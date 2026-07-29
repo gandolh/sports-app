@@ -11,48 +11,47 @@
  * that the app then saves back is how a hand-edit typo becomes permanent data
  * loss. So `expectRejected` asserts both the failure *and* the absence of a doc,
  * and every case goes through it.
+ *
+ * Two things are new in v3 and get their own sections at the bottom:
+ *
+ *   1. **The v2 → v3 migration**, which is the first one to drop a required
+ *      field. The v2 fixture is built here rather than imported, because the
+ *      shape it describes no longer exists anywhere in `src/`.
+ *   2. **The service's own shallow check**, imported from `server/` and run over
+ *      this codec's output. Nothing else in the tree proves that what `serialise`
+ *      writes is something `PUT /api/state` will accept, and a client that saves
+ *      documents the service refuses would look fine until the day someone
+ *      needed the backup.
  */
 import { describe, expect, it } from 'vitest'
-import type { Ladder, Pattern, Rung, RungId, StateDoc } from '../../domain/types.ts'
+import type { Pattern, StateDoc } from '../../domain/types.ts'
 import { CURRENT_SCHEMA_VERSION, PATTERNS } from '../../domain/types.ts'
-import { LADDERS } from '../../domain/ladders.ts'
-import { freshLadderStates } from '../../domain/engine.ts'
 import { midProgram } from '../../domain/__tests__/fixtures.ts'
-import { emptyDoc, migrate, parse, serialise, summarise } from '../codec.ts'
-import type { ParseResult } from '../codec.ts'
+import {
+  LEGACY_USERNAME,
+  USERNAME_MAX_LENGTH,
+  USERNAME_PATTERN,
+  emptyDoc,
+  isValidUsername,
+  migrate,
+  parse,
+  serialise,
+  summarise,
+} from '../codec.ts'
+import type { JsonObject, ParseResult } from '../codec.ts'
+// The state service is deliberately zero-dependency plain `.mjs`, outside
+// `tsconfig.json`'s `include` and outside the bundle — so it has no types and
+// cannot be imported without this. Importing the *real* thing is the entire point
+// of the contract tests at the bottom of this file: a restated copy of the check
+// would prove only that the copy agrees with itself.
+// @ts-expect-error untyped .mjs, imported on purpose
+import { checkDocument } from '../../../server/state-server.mjs'
+// Kept on one line each: `@ts-expect-error` suppresses the line that *reports*
+// the error, which for an untyped module is the specifier, not the `import {`.
+// @ts-expect-error untyped .mjs, imported on purpose
+import { LEGACY_USERNAME as SERVER_LEGACY_USERNAME, USERNAME_PATTERN as SERVER_USERNAME_PATTERN } from '../../../server/db.mjs'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-/**
- * Synthetic ladder content, so the codec's bounds checking can be tested
- * without depending on the real rung counts in `src/domain/ladders.ts`. One
- * test below checks the real content separately.
- */
-function stubLadders(rungCounts: Record<Pattern, number>): Readonly<Record<Pattern, Ladder>> {
-  const out = {} as Record<Pattern, Ladder>
-  for (const pattern of PATTERNS) {
-    const count = rungCounts[pattern]
-    const rungs: Rung[] = Array.from({ length: count }, (_, i) => ({
-      id: `${pattern}-${String(i).padStart(2, '0')}-stub` as RungId,
-      name: `${pattern} stub ${i}`,
-      cues: ['stub cue one', 'stub cue two'],
-    }))
-    out[pattern] = {
-      pattern,
-      unit: pattern === 'core' || pattern === 'pull' ? 'seconds' : 'reps',
-      kind: pattern === 'pull' ? 'postural' : 'strength',
-      // Mirrors the real content's shape — mid-ladder, and `push` a rung higher
-      // than the rest — so `emptyDoc` is exercised against a non-zero start.
-      startRungIndex: pattern === 'push' ? 2 : 1,
-      targetMin: pattern === 'core' || pattern === 'pull' ? 20 : 5,
-      targetMax: pattern === 'core' || pattern === 'pull' ? 45 : 12,
-      rungs,
-    }
-  }
-  return out
-}
-
-const STUB = stubLadders({ push: 9, squat: 8, hinge: 6, core: 6, pull: 6 })
 
 /** Serialised `midProgram`, re-parsed into a mutable tree for corruption. */
 function mutableDoc(): Record<string, unknown> {
@@ -72,7 +71,7 @@ function corrupt(mutate: (doc: Record<string, unknown>) => void): string {
 function expectRejected(text: unknown, ...expectedFragments: string[]): string {
   let result: ParseResult | undefined
   expect(() => {
-    result = parse(text, { ladders: STUB })
+    result = parse(text)
   }).not.toThrow()
   if (!result) throw new Error('parse returned nothing')
   expect(result.ok).toBe(false)
@@ -87,42 +86,31 @@ function expectRejected(text: unknown, ...expectedFragments: string[]): string {
   return result.error
 }
 
-/**
- * A v2 document rendered back into the **v1** shape it would have been stored in:
- * `schemaVersion: 1`, and an `effort` rating on every exercise.
- *
- * Built from `midProgram` rather than checked in as a text blob so it cannot drift
- * away from the current fixture — the whole point of the round-trip test is that
- * migration turns this into exactly `midProgram`. The ratings cycle through the
- * three v1 values deterministically; nothing reads them, which is why the field
- * was deleted.
- */
-function asV1(doc: StateDoc): Record<string, unknown> {
-  const V1_EFFORTS = ['easy', 'ok', 'hard'] as const
-  const raw = JSON.parse(serialise(doc)) as Record<string, unknown>
-  let n = 0
-  raw['schemaVersion'] = 1
-  for (const session of raw['history'] as Record<string, unknown>[]) {
-    for (const exercise of session['exercises'] as Record<string, unknown>[]) {
-      exercise['effort'] = V1_EFFORTS[n % V1_EFFORTS.length]
-      n += 1
-    }
-  }
-  return raw
-}
-
-function expectAccepted(text: string, ladders = STUB): StateDoc {
-  const result = parse(text, { ladders })
+function expectAccepted(text: string, username?: string): StateDoc {
+  const result = username === undefined ? parse(text) : parse(text, { username })
   if (!result.ok) throw new Error(`expected a valid document, got: ${result.error}`)
   return result.doc
+}
+
+function sessionAt(doc: Record<string, unknown>, index: number): Record<string, unknown> {
+  return (doc['history'] as Record<string, unknown>[])[index] as Record<string, unknown>
+}
+
+function exerciseAt(
+  doc: Record<string, unknown>,
+  session: number,
+  index: number,
+): Record<string, unknown> {
+  return (sessionAt(doc, session)['exercises'] as Record<string, unknown>[])[
+    index
+  ] as Record<string, unknown>
 }
 
 // ─── Round trip ─────────────────────────────────────────────────────────────
 
 describe('round trip on the mid-program fixture', () => {
   it('serialises and parses back to a deeply equal document', () => {
-    const doc = expectAccepted(serialise(midProgram))
-    expect(doc).toEqual(midProgram)
+    expect(expectAccepted(serialise(midProgram))).toEqual(midProgram)
   })
 
   it('is stable: re-serialising a parsed document produces identical text', () => {
@@ -131,32 +119,27 @@ describe('round trip on the mid-program fixture', () => {
     expect(second).toBe(first)
   })
 
-  it('validates against the real ladder content, so the fixture is in bounds', () => {
-    const doc = expectAccepted(serialise(midProgram), LADDERS)
-    expect(doc).toEqual(midProgram)
-  })
-
   it('key order does not depend on how the object was built', () => {
     // Same data, opposite insertion order. `serialise` must not care.
     const reordered = {
       settings: midProgram.settings,
       history: midProgram.history,
-      ladders: {
-        pull: midProgram.ladders.pull,
-        core: midProgram.ladders.core,
-        hinge: midProgram.ladders.hinge,
-        squat: midProgram.ladders.squat,
-        push: midProgram.ladders.push,
+      sessionsDone: {
+        pull: midProgram.sessionsDone.pull,
+        core: midProgram.sessionsDone.core,
+        hinge: midProgram.sessionsDone.hinge,
+        squat: midProgram.sessionsDone.squat,
+        push: midProgram.sessionsDone.push,
       },
       cyclePosition: midProgram.cyclePosition,
-      sessionsCompleted: midProgram.sessionsCompleted,
+      username: midProgram.username,
       schemaVersion: midProgram.schemaVersion,
     } as StateDoc
     expect(serialise(reordered)).toBe(serialise(midProgram))
   })
 
   it('round-trips an empty document', () => {
-    const fresh = emptyDoc(STUB)
+    const fresh = emptyDoc('alice')
     expect(expectAccepted(serialise(fresh))).toEqual(fresh)
   })
 
@@ -169,12 +152,22 @@ describe('round trip on the mid-program fixture', () => {
   })
 
   it('round-trips a document whose history has been pruned by hand', () => {
-    // sessionsCompleted is monotonic; history is a list a user may trim. The two
-    // are deliberately not required to agree.
-    const pruned: StateDoc = { ...midProgram, history: midProgram.history.slice(-2) }
+    // `sessionsDone` is the state; history is a list a user may trim. The two are
+    // deliberately not required to agree, so pruning must not invalidate the file.
+    const pruned: StateDoc = { ...midProgram, history: midProgram.history.slice(-1) }
     const doc = expectAccepted(serialise(pruned))
-    expect(doc.sessionsCompleted).toBe(midProgram.sessionsCompleted)
-    expect(doc.history).toHaveLength(2)
+    expect(doc.sessionsDone).toEqual(midProgram.sessionsDone)
+    expect(doc.history).toHaveLength(1)
+  })
+
+  it('round-trips a counter far past the top of its ladder', () => {
+    // The top rung cycles forever, so a four-figure counter is a fact rather than
+    // a typo and there is deliberately no upper bound to trip over.
+    const veteran: StateDoc = {
+      ...midProgram,
+      sessionsDone: { ...midProgram.sessionsDone, core: 4000 },
+    }
+    expect(expectAccepted(serialise(veteran)).sessionsDone.core).toBe(4000)
   })
 })
 
@@ -188,34 +181,51 @@ describe('serialised form', () => {
     expect(text.endsWith('\n')).toBe(true)
   })
 
-  it('leads with the summary and puts history last', () => {
+  it('leads with who and where, and puts history last', () => {
     const lines = text.split('\n')
     expect(lines[1]).toContain('"schemaVersion"')
-    expect(lines[2]).toContain('"sessionsCompleted"')
-    expect(text.indexOf('"history"')).toBeGreaterThan(text.indexOf('"ladders"'))
+    expect(lines[2]).toContain('"username"')
+    expect(lines[3]).toContain('"cyclePosition"')
+    expect(text.indexOf('"history"')).toBeGreaterThan(text.indexOf('"sessionsDone"'))
     expect(text.indexOf('"history"')).toBeGreaterThan(text.indexOf('"settings"'))
   })
 
-  it('keeps each ladder state and each set on one line, so history is scannable', () => {
-    expect(text).toContain('"push": { "rungIndex": 3, "target": 7, "cleanAtMax": 0, "missedStreak": 0 }')
-    expect(text).toContain('{ "targetValue": 10, "actualValue": 10 }')
+  it('puts the whole of the mutable state on one line', () => {
+    // Five integers, in PATTERNS order, visible at a glance. This is the line a
+    // person edits when the schedule has them on the wrong rung.
+    expect(text).toContain(
+      '"sessionsDone": { "push": 30, "squat": 31, "hinge": 29, "core": 90, "pull": 90 },',
+    )
   })
 
-  it('writes a cardio day as a session with an empty exercises array', () => {
-    // One line, and no `"exercises": [ ... ]` block to scroll past. A cardio day
-    // is a real completed session, so it has to appear in history.
-    expect(text).toContain('"day": "D"')
-    expect(text).toContain('"exercises": []')
+  it('keeps each exercise record on one line, so history stays scannable', () => {
+    expect(text).toContain(
+      '{ "pattern": "push", "rungId": "push-05-full-3s-down", "sets": 3, "targetValue": 8 }',
+    )
   })
 
-  it('carries no effort field anywhere', () => {
-    expect(text).not.toContain('effort')
+  it('carries none of the fields v3 deleted', () => {
+    for (const gone of [
+      'effort',
+      'actualValue',
+      'ladders',
+      'rungIndex',
+      'cleanAtMax',
+      'missedStreak',
+      'sessionsCompleted',
+      'soundEnabled',
+      'voiceEnabled',
+      'skipWarmupByDefault',
+      '"day"',
+    ]) {
+      expect(text, gone).not.toContain(gone)
+    }
   })
 
   it('is small enough that localStorage is not a constraint', () => {
-    // 21 sessions. Five years of three-a-week training is ~500 sessions.
+    // Five years of daily training is ~1800 sessions.
     const perSession = text.length / midProgram.history.length
-    expect(perSession * 500).toBeLessThan(1_000_000)
+    expect(perSession * 1800).toBeLessThan(1_000_000)
   })
 })
 
@@ -226,7 +236,7 @@ describe('parse rejects malformed input', () => {
     expectRejected(undefined, 'expected the document as text')
     expectRejected(null, 'expected the document as text')
     expectRejected(42, 'expected the document as text')
-    expectRejected({ schemaVersion: 1 }, 'expected the document as text')
+    expectRejected({ schemaVersion: 3 }, 'expected the document as text')
   })
 
   it('empty or whitespace-only text', () => {
@@ -235,12 +245,11 @@ describe('parse rejects malformed input', () => {
   })
 
   it('a truncated file', () => {
-    const cut = serialise(midProgram).slice(0, 200)
-    expectRejected(cut, 'not valid JSON')
+    expectRejected(serialise(midProgram).slice(0, 200), 'not valid JSON')
   })
 
   it('a stray trailing comma, the classic hand-edit slip', () => {
-    expectRejected('{ "schemaVersion": 1, }', 'not valid JSON')
+    expectRejected('{ "schemaVersion": 3, }', 'not valid JSON')
   })
 
   it('JSON that is not an object', () => {
@@ -262,72 +271,63 @@ describe('parse rejects malformed input', () => {
   it('a missing, non-integer or zero schemaVersion', () => {
     expectRejected(corrupt((d) => delete d['schemaVersion']), 'schemaVersion', 'missing')
     expectRejected(corrupt((d) => (d['schemaVersion'] = 0)), 'schemaVersion')
-    expectRejected(corrupt((d) => (d['schemaVersion'] = 1.5)), 'schemaVersion')
-    expectRejected(corrupt((d) => (d['schemaVersion'] = '1')), 'schemaVersion', '"1"')
+    expectRejected(corrupt((d) => (d['schemaVersion'] = 2.5)), 'schemaVersion')
+    expectRejected(corrupt((d) => (d['schemaVersion'] = '3')), 'schemaVersion', '"3"')
   })
 
   it('a document from a newer build, without misreading it', () => {
+    // v4 does not exist. It must be refused, never coerced down to v3 — a field
+    // v4 renamed would otherwise be read as the v3 field of the same name.
     const error = expectRejected(
-      corrupt((d) => (d['schemaVersion'] = CURRENT_SCHEMA_VERSION + 1)),
+      corrupt((d) => (d['schemaVersion'] = 4)),
       'newer version of the app',
     )
     expect(error).toContain('update the app')
+    expect(error).toContain('version 4')
   })
 
-  it('a missing ladder', () => {
+  it('a missing or misspelled username', () => {
+    expectRejected(corrupt((d) => delete d['username']), 'username', 'missing')
+    expectRejected(corrupt((d) => (d['username'] = 'Alice')), 'username', 'lowercase')
+    expectRejected(corrupt((d) => (d['username'] = '')), 'username')
+    expectRejected(corrupt((d) => (d['username'] = 'a'.repeat(USERNAME_MAX_LENGTH + 1))), 'username')
+    expectRejected(corrupt((d) => (d['username'] = 42)), 'username', 'expected a string')
+  })
+
+  it('a missing counter', () => {
     expectRejected(
-      corrupt((d) => delete (d['ladders'] as Record<string, unknown>)['hinge']),
-      'ladders.hinge',
+      corrupt((d) => delete (d['sessionsDone'] as Record<string, unknown>)['hinge']),
+      'sessionsDone.hinge',
       'missing',
     )
   })
 
-  it('ladders that is not an object', () => {
-    expectRejected(corrupt((d) => (d['ladders'] = [])), 'ladders', 'expected an object')
+  it('sessionsDone that is not an object', () => {
+    expectRejected(corrupt((d) => (d['sessionsDone'] = [])), 'sessionsDone', 'expected an object')
+    expectRejected(corrupt((d) => delete d['sessionsDone']), 'sessionsDone', 'missing')
   })
 
-  it('a rungIndex past the top of the ladder', () => {
-    const error = expectRejected(
-      corrupt((d) => ((d['ladders'] as Record<string, Record<string, unknown>>)['push']!['rungIndex'] = 47)),
-      'ladders.push.rungIndex',
-      '47',
-    )
-    // The message must say what the legal range actually is — "out of range"
-    // sends the reader back to the source to find out what the range was.
-    expect(error).toContain('between 0 and 8')
-    expect(error).toContain('the push ladder has 9 rungs')
-    // And it is one problem, not two.
-    expect(error).not.toContain('problems in the state document')
-  })
-
-  it('a negative or fractional rungIndex', () => {
+  it('a negative or fractional counter', () => {
     expectRejected(
-      corrupt((d) => ((d['ladders'] as Record<string, Record<string, unknown>>)['squat']!['rungIndex'] = -1)),
-      'ladders.squat.rungIndex',
+      corrupt((d) => ((d['sessionsDone'] as Record<string, unknown>)['push'] = -1)),
+      'sessionsDone.push',
+      '>= 0',
     )
     expectRejected(
-      corrupt((d) => ((d['ladders'] as Record<string, Record<string, unknown>>)['squat']!['rungIndex'] = 2.5)),
-      'ladders.squat.rungIndex',
+      corrupt((d) => ((d['sessionsDone'] as Record<string, unknown>)['core'] = 2.5)),
+      'sessionsDone.core',
       'whole number',
     )
-  })
-
-  it('a target that is not a number', () => {
     expectRejected(
-      corrupt((d) => ((d['ladders'] as Record<string, Record<string, unknown>>)['core']!['target'] = null)),
-      'ladders.core.target',
-      'expected a number',
-    )
-    expectRejected(
-      corrupt((d) => ((d['ladders'] as Record<string, Record<string, unknown>>)['core']!['target'] = '35')),
-      'ladders.core.target',
+      corrupt((d) => ((d['sessionsDone'] as Record<string, unknown>)['pull'] = null)),
+      'sessionsDone.pull',
     )
   })
 
-  it('an unknown key inside a ladder state', () => {
+  it('an unknown key inside sessionsDone', () => {
     expectRejected(
-      corrupt((d) => ((d['ladders'] as Record<string, Record<string, unknown>>)['pull']!['rungIdx'] = 2)),
-      'ladders.pull.rungIdx',
+      corrupt((d) => ((d['sessionsDone'] as Record<string, unknown>)['pushup'] = 2)),
+      'sessionsDone.pushup',
       'unknown field',
     )
   })
@@ -339,103 +339,108 @@ describe('parse rejects malformed input', () => {
 
   it('a history entry that is not an object', () => {
     expectRejected(
-      corrupt((d) => ((d['history'] as unknown[])[2] = 'a session')),
-      'history[2]',
+      corrupt((d) => ((d['history'] as unknown[])[1] = 'a session')),
+      'history[1]',
       'expected an object',
     )
   })
 
-  it('a bad cycle day', () => {
+  it('a bad variant', () => {
     expectRejected(
-      corrupt((d) => ((d['history'] as Record<string, unknown>[])[1]!['day'] = 'E')),
-      'history[1].day',
-      '"A", "B", "C" or "D"',
+      corrupt((d) => (sessionAt(d, 1)['variant'] = 'brutal')),
+      'history[1].variant',
+      '"easy", "medium" or "hard"',
     )
+    expectRejected(corrupt((d) => delete sessionAt(d, 1)['variant']), 'history[1].variant')
   })
 
-  it('but not "D", which became legal when the cycle grew a cardio day', () => {
-    // The codec derives the legal days from CYCLE. If it kept its own list, every
-    // cardio session the engine prescribes would fail to load.
-    const doc = expectAccepted(
-      corrupt((d) => ((d['history'] as Record<string, unknown>[])[1]!['day'] = 'D')),
+  it('a bad position', () => {
+    expectRejected(
+      corrupt((d) => (sessionAt(d, 0)['position'] = -1)),
+      'history[0].position',
+      '>= 0',
     )
-    expect(doc.history[1]?.day).toBe('D')
+    expectRejected(
+      corrupt((d) => (sessionAt(d, 0)['position'] = 'A')),
+      'history[0].position',
+      'whole number',
+    )
   })
 
   it('a completedAt that is not an ISO instant', () => {
     expectRejected(
-      corrupt((d) => ((d['history'] as Record<string, unknown>[])[0]!['completedAt'] = 'last tuesday')),
+      corrupt((d) => (sessionAt(d, 0)['completedAt'] = 'last tuesday')),
       'history[0].completedAt',
       'ISO-8601',
     )
     expectRejected(
-      corrupt((d) => ((d['history'] as Record<string, unknown>[])[0]!['completedAt'] = '2026-13-45T99:00:00.000Z')),
+      corrupt((d) => (sessionAt(d, 0)['completedAt'] = '2026-13-45T99:00:00.000Z')),
       'history[0].completedAt',
     )
   })
 
   it('a bad pattern or rungId inside an exercise', () => {
-    const exercise = (d: Record<string, unknown>): Record<string, unknown> =>
-      ((d['history'] as Record<string, unknown>[])[0]!['exercises'] as Record<string, unknown>[])[0]!
-
     expectRejected(
-      corrupt((d) => (exercise(d)['pattern'] = 'bench')),
+      corrupt((d) => (exerciseAt(d, 0, 0)['pattern'] = 'bench')),
       'history[0].exercises[0].pattern',
       'push, squat, hinge, core, pull',
     )
     expectRejected(
-      corrupt((d) => (exercise(d)['rungId'] = 'pushup-3')),
+      corrupt((d) => (exerciseAt(d, 0, 0)['rungId'] = 'pushup-3')),
       'history[0].exercises[0].rungId',
       'push-04-full',
     )
     expectRejected(
-      corrupt((d) => (exercise(d)['rungId'] = 'push-')),
+      corrupt((d) => (exerciseAt(d, 0, 0)['rungId'] = 'push-')),
       'history[0].exercises[0].rungId',
     )
   })
 
-  it('an effort field hand-typed into a v2 document', () => {
-    // v2 has no effort. Migration strips it from a v1 document, but a document
-    // already claiming v2 has no excuse, and the field is reported as the unknown
-    // key it is rather than silently dropped.
+  it('a v2 set array left in place of a set count', () => {
+    // The shape v2 wrote. It is not silently accepted and not silently collapsed:
+    // only `migrate` collapses, and only for a document that says it is v2.
     expectRejected(
       corrupt(
         (d) =>
-          (((d['history'] as Record<string, unknown>[])[0]!['exercises'] as Record<
-            string,
-            unknown
-          >[])[0]!['effort'] = 'hard'),
-      ),
-      'history[0].exercises[0].effort',
-      'unknown field',
-    )
-  })
-
-  it('an exercise with no sets at all', () => {
-    expectRejected(
-      corrupt(
-        (d) =>
-          (((d['history'] as Record<string, unknown>[])[0]!['exercises'] as Record<string, unknown>[])[0]![
-            'sets'
-          ] = []),
+          (exerciseAt(d, 0, 0)['sets'] = [
+            { targetValue: 8, actualValue: 8 },
+            { targetValue: 8, actualValue: 7 },
+          ]),
       ),
       'history[0].exercises[0].sets',
-      'at least one set',
+      'whole number',
     )
   })
 
-  it('a set whose values are not numbers', () => {
+  it('an exercise recorded as zero sets', () => {
     expectRejected(
-      corrupt(
-        (d) =>
-          ((
-            ((d['history'] as Record<string, unknown>[])[0]!['exercises'] as Record<string, unknown>[])[0]![
-              'sets'
-            ] as Record<string, unknown>[]
-          )[1]!['actualValue'] = 'ten'),
-      ),
-      'history[0].exercises[0].sets[1].actualValue',
+      corrupt((d) => (exerciseAt(d, 0, 0)['sets'] = 0)),
+      'history[0].exercises[0].sets',
+      '>= 1',
+    )
+  })
+
+  it('a missing or non-numeric targetValue', () => {
+    expectRejected(
+      corrupt((d) => delete exerciseAt(d, 0, 1)['targetValue']),
+      'history[0].exercises[1].targetValue',
+      'missing',
+    )
+    expectRejected(
+      corrupt((d) => (exerciseAt(d, 0, 1)['targetValue'] = 'eight')),
+      'history[0].exercises[1].targetValue',
       'expected a number',
+    )
+  })
+
+  it('an effort field hand-typed into a v3 document', () => {
+    // Migration strips it from a v1 document; a document already claiming v3 has
+    // no excuse, and the field is reported as the unknown key it is rather than
+    // silently dropped.
+    expectRejected(
+      corrupt((d) => (exerciseAt(d, 0, 0)['effort'] = 'hard')),
+      'history[0].exercises[0].effort',
+      'unknown field',
     )
   })
 
@@ -443,19 +448,24 @@ describe('parse rejects malformed input', () => {
     const settings = (d: Record<string, unknown>): Record<string, unknown> =>
       d['settings'] as Record<string, unknown>
 
-    expectRejected(corrupt((d) => delete settings(d)['soundEnabled']), 'settings.soundEnabled', 'missing')
-    expectRejected(corrupt((d) => (settings(d)['voiceEnabled'] = 'yes')), 'settings.voiceEnabled', 'true or false')
-    expectRejected(
-      corrupt((d) => delete settings(d)['skipWarmupByDefault']),
-      'settings.skipWarmupByDefault',
-    )
     expectRejected(
       corrupt((d) => (settings(d)['persistGranted'] = 'granted')),
       'settings.persistGranted',
       'not requested yet',
     )
+    expectRejected(corrupt((d) => delete settings(d)['persistGranted']), 'settings.persistGranted')
     expectRejected(corrupt((d) => delete settings(d)['sync']), 'settings.sync', 'missing')
     expectRejected(corrupt((d) => delete d['settings']), 'settings', 'missing')
+  })
+
+  it('a v2 settings field left behind', () => {
+    // Audio and the guided warmup are out of v3 scope. A v2 *document* is
+    // migrated; a v3 document with `soundEnabled` in it is a hand-edit.
+    expectRejected(
+      corrupt((d) => ((d['settings'] as Record<string, unknown>)['soundEnabled'] = true)),
+      'settings.soundEnabled',
+      'unknown field',
+    )
   })
 
   it('half-configured sync settings', () => {
@@ -471,22 +481,22 @@ describe('parse rejects malformed input', () => {
     )
   })
 
-  it('a negative or fractional session counter', () => {
-    expectRejected(corrupt((d) => (d['sessionsCompleted'] = -1)), 'sessionsCompleted')
+  it('a negative or fractional cyclePosition', () => {
+    expectRejected(corrupt((d) => (d['cyclePosition'] = -1)), 'cyclePosition')
     expectRejected(corrupt((d) => (d['cyclePosition'] = 1.5)), 'cyclePosition', 'whole number')
   })
 
   it('a misspelled top-level key, and says what it probably meant', () => {
     const error = expectRejected(
       corrupt((d) => {
-        d['sessionscompleted'] = d['sessionsCompleted']
-        delete d['sessionsCompleted']
+        d['sessionsdone'] = d['sessionsDone']
+        delete d['sessionsDone']
       }),
-      'sessionscompleted',
-      'did you mean "sessionsCompleted"',
+      'sessionsdone',
+      'did you mean "sessionsDone"',
     )
     // And still reports the field that is now missing.
-    expect(error).toContain('sessionsCompleted: expected a whole number')
+    expect(error).toContain('sessionsDone: expected an object')
   })
 
   it('an unrecognised top-level key', () => {
@@ -496,15 +506,15 @@ describe('parse rejects malformed input', () => {
   it('reports several problems at once, because a hand-edit rarely breaks one thing', () => {
     const error = expectRejected(
       corrupt((d) => {
-        d['sessionsCompleted'] = 'nine'
         d['cyclePosition'] = null
-        ;(d['settings'] as Record<string, unknown>)['soundEnabled'] = 1
+        d['username'] = 'NOPE'
+        ;(d['sessionsDone'] as Record<string, unknown>)['squat'] = 'nine'
       }),
       'problems in the state document',
     )
-    expect(error).toContain('sessionsCompleted')
     expect(error).toContain('cyclePosition')
-    expect(error).toContain('settings.soundEnabled')
+    expect(error).toContain('username')
+    expect(error).toContain('sessionsDone.squat')
   })
 })
 
@@ -514,48 +524,36 @@ describe('parse is lenient exactly where it should be', () => {
   it('allows a hand-written note under an underscore key, and drops it', () => {
     const doc = expectAccepted(
       corrupt((d) => {
-        d['_note'] = 'bumped push to rung 4 by hand on 2026-07-20'
+        d['_note'] = 'bumped push by hand on 2026-07-20'
       }),
     )
     expect(doc).toEqual(midProgram)
     expect(serialise(doc)).not.toContain('_note')
   })
 
-  it('accepts a hand-raised target above the ladder maximum', () => {
-    // "I can actually do 20 of these" is a legitimate edit; the engine converges
-    // from anywhere, so rejecting it would make the file less hand-editable for
-    // the exact reason it is hand-editable.
-    const doc = expectAccepted(
-      corrupt((d) => ((d['ladders'] as Record<string, Record<string, unknown>>)['push']!['target'] = 20)),
-    )
-    expect(doc.ladders.push.target).toBe(20)
-  })
-
   it('accepts a rungId from an older content revision', () => {
     // Rung ids are immutable so history can reference them forever. Validating
     // them against current content would reject a legitimately old document.
     const doc = expectAccepted(
-      corrupt(
-        (d) =>
-          (((d['history'] as Record<string, unknown>[])[0]!['exercises'] as Record<string, unknown>[])[0]![
-            'rungId'
-          ] = 'push-99-retired-variant'),
-      ),
+      corrupt((d) => (exerciseAt(d, 0, 0)['rungId'] = 'push-99-retired-variant')),
     )
     expect(doc.history[0]?.exercises[0]?.rungId).toBe('push-99-retired-variant')
   })
 
   it('accepts an empty history', () => {
-    const doc = expectAccepted(corrupt((d) => (d['history'] = [])))
-    expect(doc.history).toEqual([])
+    expect(expectAccepted(corrupt((d) => (d['history'] = []))).history).toEqual([])
   })
 
-  it('checks only that rungIndex is a non-negative integer when no ladders are supplied', () => {
-    const text = corrupt(
-      (d) => ((d['ladders'] as Record<string, Record<string, unknown>>)['push']!['rungIndex'] = 47),
-    )
-    expect(parse(text).ok).toBe(true)
-    expect(parse(text, { ladders: STUB }).ok).toBe(false)
+  it('accepts a session with no exercises, which is what a hand-pruned cardio day looks like', () => {
+    const doc = expectAccepted(corrupt((d) => (sessionAt(d, 2)['exercises'] = [])))
+    expect(doc.history[2]?.exercises).toEqual([])
+  })
+
+  it('accepts a target above any ladder maximum', () => {
+    // "I can actually do 20 of these" is a legitimate record of what was
+    // prescribed; history is not re-derived, so nothing downstream disagrees.
+    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 0)['targetValue'] = 200)))
+    expect(doc.history[0]?.exercises[0]?.targetValue).toBe(200)
   })
 })
 
@@ -568,24 +566,24 @@ describe('parse never throws', () => {
       const prefix = full.slice(0, end)
       let result: ParseResult | undefined
       expect(() => {
-        result = parse(prefix, { ladders: STUB })
+        result = parse(prefix)
       }).not.toThrow()
       // Any proper prefix is an incomplete document. (The one exception is a
       // prefix that only drops the trailing newline, which is still valid JSON.)
       if (prefix.trim() !== full.trim()) expect(result?.ok).toBe(false)
     }
-    expect(parse(full, { ladders: STUB }).ok).toBe(true)
+    expect(parse(full).ok).toBe(true)
   })
 
   it('on hostile and degenerate input', () => {
     const inputs: unknown[] = [
       '{}',
-      '{"schemaVersion":1}',
+      '{"schemaVersion":3}',
       '[[[[[[[[[[]]]]]]]]]]',
-      '{"schemaVersion":1,"ladders":{"push":{"rungIndex":{"rungIndex":1}}}}',
-      '{"__proto__":{"polluted":true},"schemaVersion":1}',
-      ' ',
-      '{"schemaVersion":1,"history":[[[]]]}',
+      '{"schemaVersion":3,"sessionsDone":{"push":{"push":1}}}',
+      '{"__proto__":{"polluted":true},"schemaVersion":3}',
+      '{"schemaVersion":2,"history":[[[]]]}',
+      ' ',
       Number.NaN,
       Symbol('nope'),
       () => 'not text',
@@ -593,8 +591,8 @@ describe('parse never throws', () => {
       Object.create(null),
     ]
     for (const input of inputs) {
-      expect(() => parse(input, { ladders: STUB })).not.toThrow()
-      expect(parse(input, { ladders: STUB }).ok).toBe(false)
+      expect(() => parse(input)).not.toThrow()
+      expect(parse(input).ok).toBe(false)
     }
     // Prototype pollution via a "__proto__" key must not have happened either.
     expect(({} as Record<string, unknown>)['polluted']).toBeUndefined()
@@ -604,54 +602,152 @@ describe('parse never throws', () => {
 // ─── emptyDoc ───────────────────────────────────────────────────────────────
 
 describe('emptyDoc', () => {
-  const fresh = emptyDoc(LADDERS)
+  const fresh = emptyDoc('alice')
 
-  it('starts every ladder at its startRungIndex with the target at the minimum', () => {
-    // Descending calibration: mid-ladder movement, bottom-of-range volume.
+  it('starts every counter at zero, which is the whole of a fresh document', () => {
     for (const pattern of PATTERNS) {
-      expect(fresh.ladders[pattern].rungIndex, pattern).toBe(LADDERS[pattern].startRungIndex)
-      expect(fresh.ladders[pattern].target).toBe(LADDERS[pattern].targetMin)
-      expect(fresh.ladders[pattern].cleanAtMax).toBe(0)
-      expect(fresh.ladders[pattern].missedStreak).toBe(0)
+      expect(fresh.sessionsDone[pattern], pattern).toBe(0)
     }
-  })
-
-  it('agrees exactly with the engine’s own fresh state', () => {
-    // `store.emptyDoc()` is what a real new user gets and `freshLadderStates()` is
-    // what the simulation starts from. If they disagreed, every measured number
-    // would describe a first session the app never actually prescribes.
-    expect(fresh.ladders).toEqual(freshLadderStates())
-  })
-
-  it('honours a synthetic ladder’s own start rung, not the real content’s', () => {
-    const stub = emptyDoc(STUB)
-    for (const pattern of PATTERNS) {
-      expect(stub.ladders[pattern].rungIndex, pattern).toBe(STUB[pattern].startRungIndex)
-    }
-  })
-
-  it('has no history, no sessions, and has not asked about persistence yet', () => {
     expect(fresh.history).toEqual([])
-    expect(fresh.sessionsCompleted).toBe(0)
     expect(fresh.cyclePosition).toBe(0)
+  })
+
+  it('belongs to the username it was asked for', () => {
+    expect(fresh.username).toBe('alice')
+    expect(emptyDoc('bob').username).toBe('bob')
+  })
+
+  it('has not asked about persistence yet, and has no sync configured', () => {
     expect(fresh.settings.persistGranted).toBeNull()
     expect(fresh.settings.sync).toBeNull()
   })
 
   it('is itself a valid document', () => {
-    expect(parse(serialise(fresh), { ladders: LADDERS }).ok).toBe(true)
+    expect(parse(serialise(fresh)).ok).toBe(true)
   })
 })
 
-// ─── migrate ────────────────────────────────────────────────────────────────
+// ─── The v2 fixture ─────────────────────────────────────────────────────────
 
 /**
- * The migration path built in brief 05 and empty until now, exercised for real.
+ * A realistic v2 document, built here because the shape it describes no longer
+ * exists anywhere in `src/` — v3 deleted `LadderState`, `SetResult` and the
+ * seven-position cycle, so there is nothing left to construct it from and the
+ * fixture it used to be built from (`midProgramHistory`) is gone.
  *
- * A v1 document is a v2 document plus an `effort` string on every exercise. The
- * whole point of the design was that this could land without a second validator,
- * so these tests check both halves: the field goes away, and *nothing else does*.
+ * Chosen so the migration has something to get wrong:
+ *
+ *   - **The five patterns appear a different number of times** (push 3, squat 3,
+ *     hinge 2, core 9, pull 9), so a reconstruction that counted *sessions*
+ *     rather than appearances-per-pattern, or that copied one pattern's count
+ *     into all five, fails rather than passing by coincidence. The legs day at
+ *     index 4 records squat and no hinge, which is what a session someone
+ *     abandoned half way looks like.
+ *   - **Set counts vary** (3 on the rotating patterns, 2 on the daily block, and
+ *     a 2-set hinge on the last legs day), so `sets: 3` cannot be assumed.
+ *   - **`actualValue` differs from `targetValue`** on the last set of every
+ *     exercise, so a migration that folded the achieved number into `targetValue`
+ *     is visible.
+ *   - **`ladders` disagrees with the history it sits next to**: the rung indices
+ *     are higher than nine sessions could have earned. That is the whole point —
+ *     a v2 rung index was reached by adaptive rules, and the migration must
+ *     ignore it rather than carry it over.
  */
+function v2Sets(count: number, target: number): Record<string, number>[] {
+  return Array.from({ length: count }, (_, i) => ({
+    targetValue: target,
+    // The last set falls short. Nothing in v3 records this, and this fixture is
+    // where that becomes provable rather than assumed.
+    actualValue: i === count - 1 ? target - 1 : target,
+  }))
+}
+
+function v2Exercise(
+  pattern: Pattern,
+  rungId: string,
+  sets: number,
+  target: number,
+): Record<string, unknown> {
+  return { pattern, rungId, sets: v2Sets(sets, target) }
+}
+
+const V2_DAILY_BLOCK = [
+  v2Exercise('core', 'core-03-front-plank', 2, 35),
+  v2Exercise('pull', 'pull-02-prone-t', 2, 22),
+]
+
+function v2Session(day: string, at: string, own: Record<string, unknown>[]): Record<string, unknown> {
+  return { completedAt: at, day, exercises: [...own, ...V2_DAILY_BLOCK] }
+}
+
+const V2_HISTORY: Record<string, unknown>[] = [
+  v2Session('A', '2026-06-01T07:05:00.000Z', [v2Exercise('push', 'push-04-full', 3, 7)]),
+  v2Session('B', '2026-06-02T07:11:00.000Z', [
+    v2Exercise('squat', 'squat-03-full', 3, 9),
+    v2Exercise('hinge', 'hinge-03-single-leg-heel-near', 3, 6),
+  ]),
+  // A cardio day trains no ladder of its own; the daily block still records.
+  v2Session('D', '2026-06-03T18:40:00.000Z', []),
+  v2Session('A', '2026-06-04T07:02:00.000Z', [v2Exercise('push', 'push-04-full', 3, 8)]),
+  // Abandoned half way: squat done, hinge never started.
+  v2Session('B', '2026-06-05T07:20:00.000Z', [v2Exercise('squat', 'squat-03-full', 3, 10)]),
+  v2Session('D', '2026-06-06T19:02:00.000Z', []),
+  v2Session('A', '2026-06-07T07:00:00.000Z', [v2Exercise('push', 'push-04-full', 3, 8)]),
+  v2Session('B', '2026-06-08T07:14:00.000Z', [
+    v2Exercise('squat', 'squat-03-full', 3, 10),
+    // Two sets, not three.
+    v2Exercise('hinge', 'hinge-03-single-leg-heel-near', 2, 7),
+  ]),
+  v2Session('C', '2026-06-09T07:33:00.000Z', []),
+]
+
+function v2Doc(): JsonObject {
+  return {
+    schemaVersion: 2,
+    sessionsCompleted: 9,
+    cyclePosition: 4,
+    ladders: {
+      push: { rungIndex: 4, target: 8, cleanAtMax: 1, missedStreak: 0 },
+      squat: { rungIndex: 3, target: 10, cleanAtMax: 2, missedStreak: 0 },
+      hinge: { rungIndex: 3, target: 7, cleanAtMax: 0, missedStreak: 1 },
+      core: { rungIndex: 2, target: 35, cleanAtMax: 0, missedStreak: 0 },
+      pull: { rungIndex: 2, target: 22, cleanAtMax: 3, missedStreak: 0 },
+    },
+    settings: {
+      soundEnabled: true,
+      voiceEnabled: false,
+      skipWarmupByDefault: true,
+      persistGranted: true,
+      sync: { baseUrl: 'http://127.0.0.1:8787', secret: 'shared' },
+    },
+    history: structuredClone(V2_HISTORY),
+  }
+}
+
+/** The same document as v1: `schemaVersion: 1` and an `effort` on every exercise. */
+function v1Doc(): JsonObject {
+  const V1_EFFORTS = ['easy', 'ok', 'hard'] as const
+  const raw = v2Doc() as Record<string, unknown>
+  let n = 0
+  raw['schemaVersion'] = 1
+  for (const session of raw['history'] as Record<string, unknown>[]) {
+    for (const exercise of session['exercises'] as Record<string, unknown>[]) {
+      exercise['effort'] = V1_EFFORTS[n % V1_EFFORTS.length]
+      n += 1
+    }
+  }
+  return raw
+}
+
+/** Sessions in which `pattern` appears — the definition of `sessionsDone`. */
+function appearances(pattern: Pattern): number {
+  return V2_HISTORY.filter((session) =>
+    (session['exercises'] as Record<string, unknown>[]).some((e) => e['pattern'] === pattern),
+  ).length
+}
+
+// ─── migrate ────────────────────────────────────────────────────────────────
+
 describe('migrate', () => {
   it('is the identity for the current version', () => {
     const raw = mutableDoc()
@@ -666,82 +762,175 @@ describe('migrate', () => {
     if (!result.ok) expect(result.error).toContain('no migration from version 0')
   })
 
-  it('strips effort from every exercise of a v1 document', () => {
-    const v1 = asV1(midProgram)
-    const result = migrate(v1, 1)
-    expect(result.ok).toBe(true)
-    if (!result.ok) throw new Error('unreachable')
-
-    const history = result.value['history'] as Record<string, unknown>[]
-    const exercises = history.flatMap((s) => s['exercises'] as Record<string, unknown>[])
-    expect(exercises.length).toBeGreaterThan(20)
-    for (const exercise of exercises) {
-      expect('effort' in exercise, 'effort survived the migration').toBe(false)
-      // And the fields that carry the actual training record are untouched.
-      expect(Object.keys(exercise).sort()).toEqual(['pattern', 'rungId', 'sets'])
-    }
-  })
-
   it('does not mutate the document it was handed', () => {
     // `parse` hands `migrate` its own freshly-parsed tree, but a migration that
     // mutated in place would be a trap for any other caller.
-    const v1 = asV1(midProgram)
-    const firstExercise = (
-      (v1['history'] as Record<string, unknown>[])[0]!['exercises'] as Record<string, unknown>[]
-    )[0]!
-    migrate(v1, 1)
-    expect('effort' in firstExercise).toBe(true)
+    const raw = v2Doc() as Record<string, unknown>
+    migrate(raw, 2)
+    expect(raw['ladders']).toBeDefined()
+    expect(raw['sessionsCompleted']).toBe(9)
+    const first = (raw['history'] as Record<string, unknown>[])[0] as Record<string, unknown>
+    expect(first['day']).toBe('A')
+    expect(Array.isArray((first['exercises'] as Record<string, unknown>[])[0]?.['sets'])).toBe(true)
   })
 
   it('leaves a malformed history to the validator rather than throwing on it', () => {
     // Migration runs before validation, on unvalidated input. Anything not shaped
-    // the way v1 promised must pass straight through.
+    // the way v2 promised must pass straight through.
     for (const history of [undefined, null, 42, 'nope', {}, [null], [{ exercises: 7 }], [[]]]) {
-      const result = migrate({ schemaVersion: 1, history }, 1)
-      expect(result.ok, JSON.stringify(history)).toBe(true)
+      for (const from of [1, 2]) {
+        const result = migrate({ schemaVersion: from, history }, from)
+        expect(result.ok, `${from}: ${JSON.stringify(history)}`).toBe(true)
+      }
     }
+  })
+
+  it('counts a pattern recorded twice in one session once', () => {
+    // A hand-edit can duplicate an exercise. `sessionsDone` counts sessions, and
+    // the schedule divides it by sessionsPerRung, so double-counting would
+    // advance a ladder for free.
+    const result = migrate(
+      {
+        schemaVersion: 2,
+        history: [
+          {
+            completedAt: '2026-06-01T07:05:00.000Z',
+            day: 'A',
+            exercises: [
+              v2Exercise('push', 'push-04-full', 3, 7),
+              v2Exercise('push', 'push-04-full', 3, 7),
+            ],
+          },
+        ],
+      },
+      2,
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) expect((result.value['sessionsDone'] as Record<string, number>)['push']).toBe(1)
   })
 })
 
-describe('a v1 document round-trips as v2', () => {
-  // The acceptance test for the whole migration path: a real v1 file — nine
-  // sessions of history with an effort rating on every exercise — loads, and what
-  // comes back out is a valid v2 document that serialises cleanly.
-  const v1Text = JSON.stringify(asV1(midProgram), null, 2)
+describe('a v2 document migrates to v3', () => {
+  const doc = expectAccepted(JSON.stringify(v2Doc(), null, 2), 'dana')
 
-  it('loads without complaint', () => {
-    const doc = expectAccepted(v1Text, LADDERS)
-    expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+  it('reconstructs every counter from the history, not from the rung indices', () => {
+    // The acceptance criterion, stated as the definition rather than as five
+    // literals: `sessionsDone[p]` is the number of sessions `p` appears in.
+    for (const pattern of PATTERNS) {
+      expect(doc.sessionsDone[pattern], pattern).toBe(appearances(pattern))
+    }
+    // And concretely, so a bug in `appearances` cannot make this vacuous.
+    expect(doc.sessionsDone).toEqual({ push: 3, squat: 3, hinge: 2, core: 9, pull: 9 })
   })
 
-  it('produces exactly the v2 document, with the effort ratings dropped', () => {
-    expect(expectAccepted(v1Text, LADDERS)).toEqual(midProgram)
+  it('ignores the v2 rung indices completely', () => {
+    // The document said push was on rung 4 and core on rung 2. Those numbers were
+    // produced by adaptive rules that no longer exist, so nothing about them may
+    // survive — including into the counters, where they would be invisible.
+    const serialised = serialise(doc)
+    expect(serialised).not.toContain('rungIndex')
+    expect(serialised).not.toContain('cleanAtMax')
+    expect(serialised).not.toContain('missedStreak')
+    // Rung 4 of push at 14 sessions per rung would have meant ~28 sessions.
+    expect(doc.sessionsDone.push).toBe(3)
   })
 
-  it('re-serialises as v2, so the next save is a clean v2 file', () => {
-    const reserialised = serialise(expectAccepted(v1Text, LADDERS))
-    expect(reserialised).toBe(serialise(midProgram))
-    expect(reserialised).toContain('"schemaVersion": 2')
-    expect(reserialised).not.toContain('effort')
-    // And the v2 text loads again, so the migration is genuinely idempotent
-    // rather than only surviving one pass.
-    expect(expectAccepted(reserialised, LADDERS)).toEqual(midProgram)
+  it('collapses each set array to its measured length', () => {
+    const sets = doc.history.flatMap((session) =>
+      session.exercises.map((e) => `${e.pattern}:${e.sets}`),
+    )
+    // Three on the rotating patterns, two on the daily block — and the two-set
+    // hinge on the last legs day, which is why the length is measured.
+    expect(sets).toContain('push:3')
+    expect(sets).toContain('core:2')
+    expect(sets).toContain('hinge:2')
+    expect(sets).toContain('hinge:3')
+    expect(new Set(doc.history.flatMap((s) => s.exercises.map((e) => e.sets)))).toEqual(
+      new Set([2, 3]),
+    )
   })
 
-  it('keeps the cardio sessions a v1 file could not have contained', () => {
-    // v1's cycle had three positions and no cardio day, so `day: "D"` is new in
-    // v2. The migration does not have to add anything for it — but a v1 file that
-    // somehow has one must still load, because refusing would cost real history.
-    const doc = expectAccepted(v1Text, LADDERS)
-    expect(doc.history.filter((s) => s.day === 'D')).toHaveLength(6)
+  it('keeps what was prescribed and discards what was achieved', () => {
+    // Every v2 set carried the same target and the last one fell short of it, so
+    // a targetValue of 7 on the first push session proves the prescribed number
+    // survived and the achieved 6 did not.
+    expect(doc.history[0]?.exercises[0]).toEqual({
+      pattern: 'push',
+      rungId: 'push-04-full',
+      sets: 3,
+      targetValue: 7,
+    })
+    expect(serialise(doc)).not.toContain('actualValue')
   })
 
-  it('refuses a v1 document that is broken for reasons other than its version', () => {
-    // Migration must not become a repair tool. A v1 file with a bad ladder is
-    // still a bad file.
-    const broken = asV1(midProgram)
-    ;(broken['ladders'] as Record<string, Record<string, unknown>>)['push']!['rungIndex'] = 'three'
-    expectRejected(JSON.stringify(broken), 'ladders.push.rungIndex')
+  it('numbers historical sessions by their index in history, modulo the rotation', () => {
+    // Not a mapping from the old day letters — there isn't one. The value is only
+    // ever used to label a past session.
+    expect(doc.history.map((s) => s.position)).toEqual([0, 1, 2, 0, 1, 2, 0, 1, 2])
+  })
+
+  it('defaults every historical session to the medium variant', () => {
+    // v2 had no variant, and `medium` means "the schedule's own number" — which
+    // is what v2 always prescribed.
+    expect(doc.history.every((s) => s.variant === 'medium')).toBe(true)
+  })
+
+  it('takes the username from the caller, because a v2 document has none', () => {
+    expect(doc.username).toBe('dana')
+  })
+
+  it('falls back to a documented constant when the caller does not say', () => {
+    // Matches the service's own name for pre-username rows, so a client that
+    // migrates offline and a database that migrated on the server agree.
+    expect(expectAccepted(JSON.stringify(v2Doc())).username).toBe(LEGACY_USERNAME)
+    expect(LEGACY_USERNAME).toBe('local')
+  })
+
+  it('drops the retired settings and keeps the rest', () => {
+    expect(doc.settings).toEqual({
+      persistGranted: true,
+      sync: { baseUrl: 'http://127.0.0.1:8787', secret: 'shared' },
+    })
+  })
+
+  it('carries cyclePosition over unchanged', () => {
+    // A bare counter in both schemas: `slotAt` takes it modulo three and nothing
+    // else reads it, so there is nothing to remap and nothing to invent.
+    expect(doc.cyclePosition).toBe(4)
+  })
+
+  it('re-serialises as clean v3 that loads again', () => {
+    const text = serialise(doc)
+    expect(text).toContain('"schemaVersion": 3')
+    expect(expectAccepted(text)).toEqual(doc)
+  })
+
+  it('refuses a v2 document that is broken for reasons other than its version', () => {
+    // Migration must not become a repair tool. A v2 file with a broken timestamp
+    // is still a broken file.
+    const broken = v2Doc() as Record<string, unknown>
+    ;(broken['history'] as Record<string, unknown>[])[3]!['completedAt'] = 'thursday'
+    expectRejected(JSON.stringify(broken), 'history[3].completedAt')
+  })
+})
+
+describe('a v1 document migrates all the way to v3 in one call', () => {
+  it('composes both steps rather than needing a v1→v3 shortcut', () => {
+    const v3 = expectAccepted(JSON.stringify(v1Doc(), null, 2), 'dana')
+    // Identical to the v2 document's outcome: the effort ratings the first step
+    // strips are the only difference between the two inputs.
+    expect(v3).toEqual(expectAccepted(JSON.stringify(v2Doc(), null, 2), 'dana'))
+    expect(serialise(v3)).not.toContain('effort')
+  })
+
+  it('runs one step at a time, so each step only knows its own version', () => {
+    const once = migrate(v1Doc(), 1)
+    expect(once.ok).toBe(true)
+    if (!once.ok) throw new Error('unreachable')
+    // The v1 step ran (no effort survives) and so did the v2 step (no ladders).
+    expect(JSON.stringify(once.value)).not.toContain('effort')
+    expect(once.value['ladders']).toBeUndefined()
+    expect(once.value['sessionsDone']).toBeDefined()
   })
 })
 
@@ -750,27 +939,93 @@ describe('a v1 document round-trips as v2', () => {
 describe('summarise', () => {
   it('reports the facts needed to confirm a destructive import', () => {
     const summary = summarise(midProgram)
-    expect(summary.sessionsCompleted).toBe(midProgram.sessionsCompleted)
+    expect(summary.username).toBe(midProgram.username)
+    expect(summary.cyclePosition).toBe(midProgram.cyclePosition)
     expect(summary.historyLength).toBe(midProgram.history.length)
     expect(summary.lastSessionAt).toBe(midProgram.history.at(-1)?.completedAt)
-
-    // Derived from the fixture rather than restated. The earlier version
-    // hardcoded these numbers, so repairing the fixture broke a test that was
-    // really only asserting the fixture's own contents back to itself — what
-    // matters here is that `summarise` reports ladder state in PATTERNS order.
-    expect(summary.rungs).toEqual(
-      PATTERNS.map((pattern) => ({
-        pattern,
-        rungIndex: midProgram.ladders[pattern].rungIndex,
-        target: midProgram.ladders[pattern].target,
-      })),
+    // Derived from the fixture rather than restated, so repairing the fixture
+    // cannot break a test that is really only asserting the fixture back to
+    // itself. What matters is that the counters are reported in PATTERNS order.
+    expect(summary.sessionsDone).toEqual(
+      PATTERNS.map((pattern) => ({ pattern, sessions: midProgram.sessionsDone[pattern] })),
     )
   })
 
   it('handles a fresh document', () => {
-    const summary = summarise(emptyDoc(LADDERS))
-    expect(summary.sessionsCompleted).toBe(0)
+    const summary = summarise(emptyDoc('alice'))
+    expect(summary.historyLength).toBe(0)
     expect(summary.lastSessionAt).toBeNull()
-    expect(summary.rungs).toHaveLength(PATTERNS.length)
+    expect(summary.sessionsDone.every((entry) => entry.sessions === 0)).toBe(true)
+  })
+})
+
+// ─── The service's contract ─────────────────────────────────────────────────
+
+/**
+ * The gap brief 17 left on purpose: its own tests import nothing from `src/`
+ * (deliberately — the service is version-agnostic and must not be coupled to the
+ * bundle), so **nothing proved that a document this codec serialises is a document
+ * `PUT /api/state` accepts.** That test belongs here, on the client side of the
+ * contract, and it runs the real `checkDocument` rather than a restatement of it.
+ */
+describe('the sync service accepts what serialise writes', () => {
+  it('passes the shallow check, with the fields the receipt is built from', () => {
+    expect(checkDocument(serialise(midProgram))).toEqual({
+      ok: true,
+      schemaVersion: 3,
+      username: midProgram.username,
+      historyLength: midProgram.history.length,
+    })
+  })
+
+  it('passes for a fresh document and for a migrated v2 one', () => {
+    expect(checkDocument(serialise(emptyDoc('alice')))).toMatchObject({
+      ok: true,
+      username: 'alice',
+      historyLength: 0,
+    })
+    const migrated = expectAccepted(JSON.stringify(v2Doc()), 'dana')
+    expect(checkDocument(serialise(migrated))).toMatchObject({
+      ok: true,
+      schemaVersion: 3,
+      username: 'dana',
+      historyLength: 9,
+    })
+  })
+
+  it('uses the same username rule the service enforces, character for character', () => {
+    // Restated in `codec.ts` rather than imported, because the service is
+    // zero-dependency `.mjs` and importing it would drag `node:sqlite` into a
+    // browser build. This is the test that stops the two copies drifting.
+    expect(USERNAME_PATTERN.source).toBe(SERVER_USERNAME_PATTERN.source)
+    expect(USERNAME_PATTERN.flags).toBe(SERVER_USERNAME_PATTERN.flags)
+    expect(LEGACY_USERNAME).toBe(SERVER_LEGACY_USERNAME)
+  })
+
+  it('agrees with the service about which usernames are legal', () => {
+    const cases = [
+      'alice',
+      'a',
+      '0',
+      'a.b-c_d',
+      'local',
+      'a'.repeat(USERNAME_MAX_LENGTH),
+      // …and the ones both must refuse.
+      '',
+      'Alice',
+      '.hidden',
+      '-dash',
+      '_score',
+      'a b',
+      'a/b',
+      'a'.repeat(USERNAME_MAX_LENGTH + 1),
+      'düsseldorf',
+    ]
+    for (const candidate of cases) {
+      const doc = serialise({ ...emptyDoc('placeholder'), username: candidate })
+      const serverSaysOk = (checkDocument(doc) as { ok: boolean }).ok
+      expect(isValidUsername(candidate), candidate).toBe(serverSaysOk)
+      expect(parse(doc).ok, candidate).toBe(serverSaysOk)
+    }
   })
 })
