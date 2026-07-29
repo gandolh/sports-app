@@ -19,12 +19,23 @@ for phone and desktop, no app store, no signing certs, no native build pipeline.
 so the linter wins over the newer compiler. All dependencies are exactly pinned
 (`save-exact=true`).
 
-### TanStack Router + Query, and Base UI
+### TanStack Router + Query, Base UI, and react-hook-form
 Four routes with typed params and a document that must stay fresh across them justify a
 router and a cache rather than hand-rolled state. **Base UI is `@base-ui/react`** — not
 `@base-ui-components/react`, which is stuck at an ancient release candidate. Use it
 wherever it fits; the design system in [design-system.md](design-system.md) is what it
 gets styled into.
+
+**Forms use `react-hook-form`** (user's call, 2026-07-29). There are only two — the login
+screen and the sync settings — which is a thin case for a dependency, but hand-rolled
+validation state is exactly the code that rots, and the alternative is the same logic
+written twice. Validate **on blur and submit, never per keystroke**.
+
+The validation rules themselves are **not the form layer's to define**: the username rule
+lives in `codec.ts` (`USERNAME_PATTERN`, `USERNAME_RULE`, `isValidUsername`) and must agree
+with the server's, which rejects rather than case-folds. A form that restates the rule is a
+second source of truth for it. **The password field has no validation**, which is the
+honest reflection of nothing checking it.
 
 ### `vite.config.ts` must import `defineConfig` from `vitest/config`
 Importing it from `vite` makes the `test` block fail typecheck (TS2769). Cheap to get
