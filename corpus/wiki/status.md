@@ -51,6 +51,8 @@ date anywhere in the UI. Full detail in
 | 18 | [Animated figures](../briefs/done/18-animated-figures.md) | **done** | — |
 | 19 | [UI shell: four screens](../briefs/done/19-ui-shell-and-four-screens.md) | **done** | 15, 16, 18, 20 |
 | 20 | [Milestones + total work](../briefs/done/20-milestones-and-total-work.md) | **done** | 15 |
+| 21 | [npm workspaces + shared](../briefs/todo/21-npm-workspaces-and-shared.md) | **todo** | — |
+| 22 | [Fastify API](../briefs/todo/22-fastify-api.md) | todo | 21 |
 
 ## How it ran
 
@@ -75,6 +77,11 @@ per-side side-plank dose the code splits between sides.
 
 ## What is left
 
+- **Briefs 21 and 22** — restructure into `client`/`server`/`shared` npm workspaces, then
+  migrate the service to Fastify with the REST contract unchanged. 21 is a move that must
+  end with all 611 tests still passing; 22 swaps the HTTP layer with those tests as the
+  contract. Split deliberately: a behavioural change hidden inside a 100-file move is
+  close to unreviewable.
 - **Deploy integration** in `/home/gandolh/projects/vps-deploy/projects/sports-app/` —
   not started. The DB path must sit outside the rsync tree.
 - **Two design decisions brief 19 left open rather than patching**: `POSTURAL_NOTICE`
@@ -86,6 +93,10 @@ per-side side-plank dose the code splits between sides.
   the only number in the programme with no evidence behind it.
 
 ## Deliberately out of v2
+
+**Note on the zero-dependency service:** it was a locked decision until 2026-07-29 and is
+now reversed. Deploying the service stops being a file copy and gains an install step —
+that was the decision's actual value, and it was traded knowingly.
 
 Charts of any kind · audio cues · a guided warmup · the extras pool · a rest timer ·
 adaptive progression · deload logic · streaks or a calendar heatmap · exercise

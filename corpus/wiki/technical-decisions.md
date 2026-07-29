@@ -51,15 +51,50 @@ v2 made this far safer: **the document holds one integer per pattern and nothing
 derived**, so a hand-edit cannot produce a state that disagrees with itself. See
 [progression-engine.md](progression-engine.md#state-is-one-integer-per-pattern).
 
-### Durability: a SQLite service holding JSON snapshot rows, one stream per user
+### Three npm workspaces: `client` · `server` · `shared`
+*Decided 2026-07-29 by the user, replacing a single-package layout.*
+
+`shared/` owns **the wire contract and the document shape** — nothing else. It is the fix
+for a duplication the build already had to paper over: the username rule existed in both
+`server/db.mjs` and the client codec, kept honest by a test that asserted the two regexes
+matched. One definition, imported by both, is strictly better than two definitions plus a
+test.
+
+`shared/` must stay **runtime-agnostic** — no `node:` imports, no DOM — because both a
+browser bundle and a Node service import it. That is the constraint that decides what is
+allowed in: data shapes and validation, never behaviour. The ladders, the schedule and the
+milestones stay in the client; they are logic the server has no business knowing.
+
+### The API is Fastify, and the REST contract is unchanged
+*Decided 2026-07-29 by the user, **reversing the zero-dependency decision below.***
+
+The endpoints, their paths, their status codes and their bodies stay exactly as brief 17
+landed them — the client already speaks plain REST and does not change. What changes is
+the implementation underneath: routing, body limits, content-type handling and error
+shaping stop being hand-rolled, and validation becomes schema-driven so the same schema
+that guards the server also types the client.
+
+**What this costs, stated plainly rather than discovered later:** the service gains a
+dependency tree, so deploying stops being a file copy and gains an install step on the
+server. That was the actual value of the zero-dependency choice — not code aesthetics.
+The 73 existing server tests are the contract that makes the migration verifiable instead
+of hopeful, and they must keep passing against the new implementation.
+
+### SUPERSEDED — the service was zero-dependency
+Until 2026-07-29 the service used only `node:sqlite`, `node:http` and `node:crypto`, and
+the ESLint config declared Node globals by hand rather than pulling in a `globals` package
+specifically to preserve that. Recorded because it explains why several things are shaped
+oddly, and because the deploy consequence above is the reason it was worth having.
+
+### Durability: SQLite holding JSON snapshot rows, one stream per user
 *Revisited 2026-07-29 — supersedes both an earlier plan to `PUT`/`GET` a single remote
 JSON file, and v1's "no users table".*
 
-A zero-dependency Node service owns `db/app.db` (gitignored) via Node's built-in
-`node:sqlite`, and the client `PUT`s/`GET`s a JSON document against it. **Snapshot rows
-are keyed by username**, so each user has an independent append-only stream.
-Local-first, last-write-wins per user — correct here because a user trains on one device
-at a time.
+The service owns `db/app.db` (gitignored) via Node's built-in `node:sqlite`, and the
+client `PUT`s/`GET`s a JSON document against it. **Snapshot rows are keyed by username**,
+so each user has an independent append-only stream. Local-first, last-write-wins per user
+— correct here because a user trains on one device at a time. `node:sqlite` stays: it is
+built in, and nothing about the Fastify migration touches the storage layer.
 
 **Stored as snapshot rows, not normalised tables.** The codec already owns validation
 and the canonical shape, and `schemaVersion` lives inside the JSON — normalising into

@@ -1,16 +1,17 @@
 ---
-summary: Module layout, dependency direction, and the pure-core/imperative-shell boundary — plus what v2's fixed schedule removed from it.
+summary: The three npm workspaces, the dependency direction across them, and the pure-core/imperative-shell boundary inside the client.
 updated: 2026-07-29
 ---
 
 # Architecture
 
-A single Vite + React + TypeScript package. The organising idea is a **pure core with
-an imperative shell**: everything that decides *what you should do* is a pure function
-over plain data, and everything that touches a browser API is pushed to the edge.
+**Three npm workspaces — `client`, `server`, `shared`.** Inside the client the organising
+idea is a **pure core with an imperative shell**: everything that decides *what you should
+do* is a pure function over plain data, and everything that touches a browser API is
+pushed to the edge.
 
 That boundary is enforced by [`../../eslint.config.js`](../../eslint.config.js), not by
-convention — `src/domain/**` cannot import the shell, touch a browser global, call
+convention — `client/src/domain/**` cannot import the shell, touch a browser global, call
 `new Date()` / `Date.now()`, or call `Math.random()`. Treat it as infrastructure.
 
 **v2 note.** The core got much smaller. With no adaptation there is no rule table to
@@ -18,50 +19,55 @@ simulate and no derived state to repair, so `domain/` is now content data plus o
 interpolation. The boundary still matters — it is what makes the schedule testable
 without a browser — but it is guarding far less.
 
-## Layout
+## Layout — three npm workspaces
+
+*Restructured 2026-07-29. `shared/` exists to kill a duplication the build was papering
+over: the username rule lived in both the service and the client codec, kept honest by a
+test asserting the two regexes matched.*
 
 ```
-src/
-  domain/                  PURE. Imports nothing from src/. No browser APIs, no clock.
-    types.ts               Pattern · Rung · Ladder · StateDoc · SessionResult · Variant
+shared/                    THE WIRE CONTRACT. No node:, no DOM — both runtimes import it.
+  types.ts                 Pattern · Variant · SessionResult · StateDoc · schemaVersion
+  username.ts              the one username rule, formerly duplicated in two places
+  api.ts                   request/response shapes + schemas for the four endpoints
+
+client/                    the PWA
+  src/domain/              PURE. Imports shared/ and nothing else from the repo.
     ladders.ts             the five ladders as typed content data, per-rung caps
-    schedule.ts            prescribe() · recordSession() · rungAt() · targetAt()
+    schedule.ts            prescribe() · recordSession() · toSessionResult() · rungIndexAt()
     milestones.ts          milestones reached + cumulative work, for /account
-    __tests__/
-
-  persistence/             owns the StateDoc lifecycle, keyed by username
-    codec.ts               parse/serialise + schemaVersion + migrations (v1→v2→v3)
-    store.ts               local read/write, navigator.storage.persist()
-    sync.ts                PUT/GET the state document against the SQLite service
-    session.ts             which username this browser is acting as
-
-  session/                 the imperative shell around a live workout
-    useSession.ts          player state machine (which exercise, which set)
-    timer.ts               timestamp-based countdown; never trusts setInterval
-    wakeLock.ts            navigator.wakeLock acquire/release
-
-  ui/
+  src/persistence/         the StateDoc lifecycle, keyed by username
+    codec.ts  store.ts  session.ts  sync.ts
+  src/session/             the imperative shell around a live workout
+    useSession.ts  timer.ts  wakeLock.ts
+  src/ui/
     routes/                TanStack Router: / · /week · /account · /login
-    ExerciseFigure.tsx     animated figure; tempo driven by the rung's modifier data
-    figures/               five SVG poses + per-rung overlays + the animation driver
+    components/  figures/  ExerciseFigure.tsx
+  src/main.tsx
 
-  main.tsx
-
-server/                    zero-dependency node:sqlite state service, multi-user
-  state-server.mjs         GET/PUT /api/state · POST /api/login · GET /api/health
-  db.mjs                   snapshot rows, one stream per username
+server/                    Fastify. Same REST contract, schema-validated from shared/.
+  src/routes/              /api/state · /api/login · /api/health
+  src/db.ts                node:sqlite snapshot rows, one stream per username
 ```
+
+**`shared/` holds data shapes and validation, never behaviour.** The ladders, the schedule
+and the milestones stay in the client — they are logic the server has no business knowing,
+and putting them in `shared/` would make the service depend on training content it never
+reads.
 
 ## Dependency direction
 
 ```
-ui  ──►  session  ──►  domain
+ui  ──►  session  ──►  domain  ──►  shared  ◄──  server
  │                        ▲
  └──►  persistence  ──────┘
 ```
 
-Nothing points back the other way. Specifically:
+`shared/` is the only thing both runtimes may import, and it imports nothing. Nothing else
+points back the other way. Specifically:
 
+- **`shared/` may not import `node:` anything, touch the DOM, or contain behaviour.** It is
+  a browser bundle's dependency and a Node service's dependency at the same time.
 - `domain/` may not import `persistence/`, `session/`, `ui/`, or any browser API, and
   may not read the clock — a session's timestamp is **passed in**.
 - `persistence/` knows the shape of `StateDoc` but nothing about React.
