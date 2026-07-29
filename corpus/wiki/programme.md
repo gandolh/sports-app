@@ -58,7 +58,7 @@ range per ladder, because the evidence-based ceilings differ per exercise:
 | Exercise | Range |
 |---|---|
 | Front plank | 20 → 60s |
-| Side plank (per side) | 15 → 45s |
+| Side plank (**total**, split evenly between sides) | 15 → 45s |
 | Hollow hold | 15 → 45s |
 | Tuck L-sit | 10 → 30s |
 | Prone Y / T | 10 → 30s |
@@ -66,7 +66,13 @@ range per ladder, because the evidence-based ceilings differ per exercise:
 
 Rationale in [training-science.md](training-science.md#isometric-holds-have-a-ceiling-and-it-is-low):
 McGill programs 10-second holds, transfer drops sharply past 60s, and the L-sit is
-limited by the wrists rather than the abdominals. The interpolation in
+limited by the wrists rather than the abdominals.
+
+**The side plank row said "per side" until 2026-07-29 and the code disagreed.** The rung's
+own cue splits one clock evenly between sides, so a 45-second prescription is ~22s each —
+below the side-bridge norms, which run 65–97s per side for young adults. The table now
+matches the code; whether the *cap* should rise to make each side a real dose is
+[open question #6](open-questions.md). The interpolation in
 [progression-engine.md](progression-engine.md) handles differing spans without needing
 a per-rung step, so re-tuning any of these costs nothing.
 
