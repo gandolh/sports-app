@@ -99,18 +99,35 @@ template tell. Exactly five radii exist. **The primary button is 20px, not a pil
 --ease-spring: cubic-bezier(0.34,1.4,0.64,1);   /* used exactly once, on segment fill */
 ```
 
-1. **Motion only ever confirms a state change.** Nothing animates on load. No staggered
-   entrances, no scroll reveals — "the same fade-in on every element" is a named tell.
-2. **The countdown ring is the only continuously-animating element**, and it **steps once
-   per second**. A smooth 60fps sweep reads as a loading spinner; a stepped ring reads as
-   a clock.
-3. Press feedback fires on **`pointerdown`**, not click.
-4. **The entire celebration budget** is one count-up of the sessions number on finish. No
+1. **Chrome motion only ever confirms a state change.** Nothing in the interface animates
+   on load. No staggered entrances, no scroll reveals — "the same fade-in on every
+   element" is a named tell.
+2. Press feedback fires on **`pointerdown`**, not click.
+3. **The entire celebration budget** is one count-up of the sessions number on finish. No
    confetti, no badges, no PR toast.
 
-**`prefers-reduced-motion: reduce`** collapses the `fast`, `base` and `slow` durations to 1ms but **keeps
-`--dur-instant`** (press feedback is functional) and **keeps the countdown ring** — it is
-information, not decoration.
+### Two exceptions, and they are content rather than chrome
+
+*Revised 2026-07-29 — brief 18 found this page silently contradicting the code it was
+supposed to govern, which is the failure mode a design system exists to prevent.*
+
+- **The countdown ring** animates continuously and **steps once per second**. A smooth
+  60fps sweep reads as a loading spinner; a stepped ring reads as a clock.
+- **The exercise figure loops continuously, and it does animate on load.** It is not
+  decoration and it is not a state change — it *is* the instruction. Adjacent rungs share
+  a drawing and differ only in tempo and pause, so the animation's clock is the only
+  thing that distinguishes them (see
+  [technical-decisions.md](technical-decisions.md#figures-five-poses-animated-on-a-data-driven-clock)).
+  Timing is **linear**, deliberately: easing that decelerates into the turnaround makes a
+  pauseless rung look like it dwells at the bottom, which is precisely the signal a
+  paused rung owns.
+
+Rule 1 still governs everything that is *interface*. Neither exception licenses a third.
+
+**`prefers-reduced-motion: reduce`** collapses the `fast`, `base` and `slow` durations to
+1ms but **keeps `--dur-instant`** (press feedback is functional) and **keeps the countdown
+ring** — it is information, not decoration. The figure **stops entirely** and holds its
+`end` pose: unlike the ring, its information is also carried by the cue text.
 
 ## Anti-patterns — none of these may appear
 

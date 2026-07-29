@@ -31,10 +31,45 @@ Consequences if it is wrong in either direction:
 - **Too slow** → nine months of daily training to exhaust the ladders becomes years,
   and the app feels static long before that.
 
-**How we'll answer it:** it is a single constant per ladder (`SESSIONS_PER_RUNG`) and
-re-tuning it does not invalidate stored state, by design. Watch whether the mid-rung
-target feels roughly like 0–2 reps in reserve. That is a felt judgement, not a metric —
-there is nothing to measure with.
+**How we'll answer it:** it is a single constant per ladder (`SESSIONS_PER_RUNG_ROTATING`
+= 14, `SESSIONS_PER_RUNG_DAILY` = 42) and re-tuning it does not invalidate stored state,
+by design. Watch whether the mid-rung target feels roughly like 0–2 reps in reserve. That
+is a felt judgement, not a metric — there is nothing to measure with.
+
+**Two things brief 15's implementer found underneath the number, both sharper than the
+number itself:**
+
+- **"Six weeks" silently assumes daily training, and nothing says so.** 14 is
+  `2.3 sessions/week × 6`. Train three times a week and a push rung takes ~14 weeks and
+  the whole ladder becomes ~2 years. The app has no dates and cannot notice, so a
+  realistic user gets a 2.3× slower programme than the law describes. If one thing here
+  is wrong in practice it is this coupling, not the 6.
+- **42 sessions on the daily block means 42 consecutive days of the identical hold.**
+  Forty-two days of front plank, then forty-two of side plank, in the half of the
+  programme met every single session — and it is also the *shortest* ladder, exhausted at
+  24 weeks. 21 or 28 would fix the sameness but halves the time to the tuck L-sit, which
+  collides with question 2. A real trade, deliberately not taken yet.
+
+## 7 — The step between rungs is worth far more than the variant can absorb
+
+**Found by brief 15's implementer, and it changes how the cost in
+[progression-engine.md](progression-engine.md#the-cost-recorded-rather-than-argued-away)
+should be read.**
+
+The interpolation assumes rung N+1's `min` is about as hard as rung N's `max`. On some
+pairs that is badly false. The worst is `push-03-knees` at 12 reps → `push-04-full` at 5:
+someone who can just about manage 12 knee push-ups usually cannot do 5 full ones. Same
+shape at `hinge-04` → `hinge-05` (bridge → sliding curl) and at squat 5 → 6 (split squat).
+
+The variant buys ±2 reps against inter-rung steps worth much more than that, so **it cannot
+absorb this.** The consequence: the difficulty is **front-loaded within each rung** — the
+first session of a rung can be its hardest, not its easiest. The wiki describes the cost as
+"sometimes too easy, sometimes too hard", which reads as evenly distributed. It isn't.
+
+**How we'll answer it:** the honest fixes are content, not code — an intermediate rung at
+the worst transitions (which question 3 already wants for squat 5→6), or a lower `min` on
+the rung *after* a big step so it starts gently. Watch the first two sessions after any
+rung advance.
 
 ## 2 — Does the cue text actually stop anyone from a rung they can't do?
 
@@ -71,17 +106,38 @@ movement they cannot perform and the app keeps asking for more of it every six w
 pre-empting rather than waiting for — consider inserting one before the split squat
 while the content is being edited anyway.
 
-## 4 — Can an animation legibly show a two-second pause at phone size?
+## 4 — ANSWERED 2026-07-29: yes, but not for the reason the question assumed
 
-The figure system is five poses whose animation clock is driven by each rung's
-modifier data, which is what closed the rung-discriminability question. But a 3-second
-lowering and a 3-second lowering *plus a 2-second bottom hold* differ only in whether
-the figure stops moving — at ~120px, on a floor, mid-set, that may read as a dropped
-frame rather than as a hold.
+*Was: can an animation legibly show a two-second pause at ~120px?* Brief 18 built it and
+looked at a frame-by-frame capture of `push-05` beside `push-06` at real size. **Legible.
+No beat marker needed.**
 
-**How we'll answer it:** build it, then look at rung 5 and rung 6 side by side on an
-actual phone. If it fails, the fallback is a visible beat marker (a pulsing dot at the
-pause point) rather than more text.
+The question assumed the signal is "the figure stops travelling", which at 120px and ~46px
+of displacement would indeed be marginal. The actual signal is **sharpness**: the figure is
+a two-frame crossfade, so it is a soft double-exposure the whole time it moves and crisp
+only at the endpoints. A paused rung visibly *snaps into focus and freezes* for a third of
+its loop. A change in acuity is a much stronger cue at oblique angles and low vision than a
+change in position.
+
+Kept as a note rather than deleted because it changed what we know: **the legibility rests
+on the crossfade being imperfect.** A true joint-interpolating morph would look better *and
+weaken this signal*, since "moving slowly" versus "stopped" is subtler than "blurred"
+versus "crisp". Anyone proposing a morph is trading one for the other and should say so.
+
+## 6 — Should the side-plank cap rise, given the clock is split between sides?
+
+The rung splits one clock evenly between sides, so the 45-second cap is ~22s per side.
+Published side-bridge norms run 65–97s per side. Either the cap is low by roughly half, or
+a home programme legitimately wants less than a fitness-test norm — the isometric ceiling
+evidence argues holds should be *short*, and 22s per side sits comfortably inside McGill's
+own preference for brief holds.
+
+**It was a documentation bug before it was a question:** [programme.md](programme.md) said
+"per side" while the code split the clock, and the mismatch survived a whole design pass
+because nobody multiplied by two.
+
+**How we'll answer it:** it is one `range` on one rung. Raise it to 30→90 if ~22s per side
+feels trivial in practice; leave it if the last 10 seconds are already where form goes.
 
 ## 5 — Does the daily core and posture block survive contact with real use?
 
