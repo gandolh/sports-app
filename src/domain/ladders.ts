@@ -18,8 +18,16 @@
  *
  * Convention (asserted in the tests): `<pattern>-<NN>-<slug>`, where `NN` is the
  * rung's 1-based position zero-padded to two digits and `slug` is lower-kebab.
- * The position is part of the id purely so a hand-edited state file is readable;
- * `schedule.ts` indexes by array position, never by parsing the id.
+ * `schedule.ts` indexes by array position and never parses an id, so `NN` is for
+ * humans reading a hand-edited state file — and for the cue text, where "rung 6"
+ * means the rung numbered `06`.
+ *
+ * **`NN` therefore records the position a rung SHIPPED at, not its current array
+ * index**, and the two diverge the moment a rung in the middle is retired. The
+ * push ladder is the live case: rung 7 is gone, so `push-08-diamond-hands` sits at
+ * index 6. Renumbering it would rename an id, which is the one thing that is never
+ * allowed. The tests assert `NN` is unique and strictly increasing within a
+ * ladder, not that it equals `index + 1`.
  *
  * ── FLOOR ONLY. TOWELS AND THE FLOOR ────────────────────────────────────────
  *
@@ -46,7 +54,7 @@
  *
  *   - **Every rung states its tempo explicitly, even when the tempo is normal.**
  *     Silence about tempo is how a modifier leaks forward into a rung that should
- *     not carry it (push 7, squat 6) or gets dropped from one that should
+ *     not carry it (push 8, squat 6) or gets dropped from one that should
  *     (squat 5). "Steady tempo, no pause" is information.
  *   - **A rung whose only difference from its neighbour is a pause or a count
  *     names that neighbour and says what changed.** "Rung 4" means the rung
@@ -196,19 +204,22 @@ const PUSH_RUNGS: readonly Rung[] = [
       'Stop the set when you can no longer hold the bottom still for the full two seconds without your hips dropping or your chest settling onto the floor.',
     ],
   },
-  {
-    // Was `push-07-feet-elevated`, which needed a chair or a stair. The pike is the
-    // floor-only way to shift the same load onto the shoulders. New movement, new id.
-    id: 'push-07-pike',
-    name: 'Pike push-up',
-    figureId: 'push',
-    cues: [
-      'Hands flat on the floor a little wider than your shoulders, feet hip-width and walked in toward your hands until your hips are stacked high and your body makes a V. Head between your arms, looking back between your feet.',
-      'Bend your elbows and lower the crown of your head toward the floor between your hands, then press back to straight elbows. Head down near the floor is the rep — stopping high turns this into a shrug.',
-      'Steady tempo, about one second down and one second up, no pause at the bottom. The piked hips are this rung\'s difficulty, so do not carry rung 6\'s three-second count or two-second hold over.',
-      'Stop the set when your hips drop out of the V, when your elbows splay straight out sideways, or when your head stops reaching down toward the floor.',
-    ],
-  },
+  // ── There is no rung 7, and that is deliberate ────────────────────────────
+  //
+  // `push-07-feet-elevated` needed a chair or a stair, so the floor-only fix
+  // retired it. **Do not backfill it with a pike push-up.** A pike is a vertical
+  // press, not a push-up plus a modifier, and "a rung is one movement plus a
+  // modifier, never a different exercise" is a project invariant
+  // (corpus/wiki/decisions.md). It would also cost the figure system a sixth base
+  // pose for one rung, since every rung in a ladder shares its ladder's pose.
+  //
+  // The ladder is one rung shorter as a result. The lateral-deltoid hole that
+  // leaves is already recorded as gap #6 in
+  // corpus/wiki/training-science.md#muscles-getting-nothing-ranked-by-how-much-it-matters
+  // — a known hole, not a new one, and not a reason to break the invariant.
+  //
+  // The ids below keep their original numbers: an id is immutable, so `NN` records
+  // the position a rung shipped at, not its current array index. See the header.
   {
     id: 'push-08-diamond-hands',
     name: 'Diamond push-up',
@@ -216,7 +227,7 @@ const PUSH_RUNGS: readonly Rung[] = [
     cues: [
       'Full push-up on the floor with your hands together under your chest, index fingers and thumbs touching to make a diamond. Feet hip-width, one line from heel to head.',
       'Lower until your chest touches your hands, then press to straight elbows, keeping your elbows brushing close to your ribs instead of flaring wide — that is what shifts the work onto your triceps.',
-      'Steady tempo, one second down, one second up, no bottom hold. Your hips come back down to one flat line for this rung — rung 7 stacked them high — and the narrow hands are the difficulty.',
+      'Steady tempo, one second down, one second up, no bottom hold. Rung 6\'s three-second lowering and two-second bottom hold are both dropped here — the narrow hands are this rung\'s difficulty, so do not carry its clock over.',
       'Stop the set when your elbows start flaring out or your chest no longer reaches your hands. Wrists complaining is also a stop, not something to push through.',
     ],
   },
@@ -628,7 +639,7 @@ const PULL_RUNGS: readonly Rung[] = [
  */
 const START_RUNGS: Readonly<Record<Pattern, number>> = {
   /**
-   * `push-03-knees` (index 2 of 9). Failing a knee push-up lowers you onto the
+   * `push-03-knees` (index 2 of 8). Failing a knee push-up lowers you onto the
    * floor from a hand's depth with your knees already down — there is nowhere to
    * fall to. A wall push-up and a short-lever knee push-up sit below it.
    */

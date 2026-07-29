@@ -34,9 +34,10 @@ describe('ladder shape', () => {
 
   it('has the rung counts the content commits to', () => {
     // Hard-coded on purpose: a silently dropped rung would otherwise pass every
-    // other test in this file. Hinge gained a seventh rung when the two
-    // couch-anchored nordic negatives became three sliding-curl rungs.
-    expect(LADDERS.push.rungs).toHaveLength(9)
+    // other test in this file. Push LOST one — `push-07-feet-elevated` needed a
+    // chair and was deliberately not backfilled — while hinge gained one when the
+    // two couch-anchored nordic negatives became three sliding-curl rungs.
+    expect(LADDERS.push.rungs).toHaveLength(8)
     expect(LADDERS.squat.rungs).toHaveLength(8)
     expect(LADDERS.hinge.rungs).toHaveLength(7)
     expect(LADDERS.core.rungs).toHaveLength(6)
@@ -199,11 +200,14 @@ describe('retired rung ids', () => {
   it('are gone from the ladders but still degrade gracefully', () => {
     // The floor-only fix changed six movements, and every one got a NEW id
     // because the old id is sitting in real persisted history. `findRungById`
-    // must answer "I do not know that one", not throw.
+    // must answer "I do not know that one", not throw. `push-07-pike` is here
+    // because it was briefly a candidate replacement and is now barred: a pike is
+    // a vertical press, not a push-up plus a modifier.
     const retired = [
       'push-01-hands-high',
       'push-02-hands-low',
       'push-07-feet-elevated',
+      'push-07-pike',
       'hinge-04-single-leg-feet-elevated',
       'hinge-05-nordic-negative',
       'hinge-06-nordic-negative-long-eccentric',
@@ -352,12 +356,65 @@ describe('rung ids', () => {
     }
   })
 
-  it('number themselves by 1-based ladder position', () => {
-    // The number is for humans reading a hand-edited state file. It has to be
-    // right or it misleads exactly when someone is debugging a wrong rung.
-    for (const [pattern, index, rung] of allRungs) {
-      const expected = String(index + 1).padStart(2, '0')
-      expect(rung.id, `${pattern} index ${index}`).toMatch(new RegExp(`^${pattern}-${expected}-`))
+  it('number themselves in strictly increasing order within a ladder', () => {
+    // NOT `index + 1`. An id is immutable, so `NN` is the position the rung
+    // SHIPPED at, and retiring a rung in the middle makes the two diverge for
+    // every rung above it. Renumbering to close the gap would rename ids that are
+    // sitting in real history — the one thing never allowed. What must still hold
+    // is that the numbers are unique and ordered, so a human reading a state file
+    // can still tell which rung is harder.
+    for (const [pattern, ladder] of ladders) {
+      const numbers = ladder.rungs.map((r) => Number(r.id.split('-')[1]))
+      expect(numbers.every(Number.isInteger), pattern).toBe(true)
+      expect(new Set(numbers).size, `${pattern} reuses a rung number`).toBe(numbers.length)
+      for (let i = 1; i < numbers.length; i++) {
+        expect(numbers[i]!, `${pattern} numbers go backwards at index ${i}`).toBeGreaterThan(
+          numbers[i - 1]!,
+        )
+      }
+      // And the first rung is still rung 1: nothing has been retired off the bottom.
+      expect(numbers[0], pattern).toBe(1)
+    }
+  })
+
+  it('has exactly one gap, in the push ladder, where rung 7 was retired', () => {
+    // Hard-coded so the gap stays a recorded decision rather than becoming a
+    // pattern someone copies. If a second ladder ever grows a gap, that is a
+    // content review, not a passing test.
+    expect(LADDERS.push.rungs.map((r) => r.id)).toEqual([
+      'push-01-wall',
+      'push-02-knees-short-lever',
+      'push-03-knees',
+      'push-04-full',
+      'push-05-full-3s-down',
+      'push-06-full-3s-down-2s-bottom-hold',
+      'push-08-diamond-hands',
+      'push-09-archer',
+    ])
+    for (const [pattern, ladder] of ladders) {
+      if (pattern === 'push') continue
+      const numbers = ladder.rungs.map((r) => Number(r.id.split('-')[1]))
+      expect(numbers, `${pattern} has a numbering gap`).toEqual(
+        ladder.rungs.map((_, i) => i + 1),
+      )
+    }
+  })
+
+  it('never backfills the retired push rung with a different exercise', () => {
+    // "A rung is one movement plus a modifier, never a different exercise" is a
+    // project invariant, and a pike push-up is a vertical press. It would also
+    // cost the figure system a sixth base pose for one rung. The lateral-deltoid
+    // hole this leaves is gap #6 in training-science.md — known, and not a reason
+    // to break the invariant.
+    // Scoped to the id and the name: a rung IS what its name says, whereas cue
+    // text may legitimately use "pike" as a body position — the front plank's stop
+    // signal is "hips sag or ride up into a pike", which is a failure mode, not an
+    // exercise.
+    for (const [, , rung] of allRungs) {
+      const named = `${rung.id} ${rung.name}`.toLowerCase()
+      expect(named, `${rung.id} is named as a vertical press`).not.toMatch(
+        /\bpike\b|handstand|overhead press|shoulder press/,
+      )
     }
   })
 })
@@ -459,7 +516,6 @@ describe('cues', () => {
       'push-03-knees',
       'push-05-full-3s-down',
       'push-06-full-3s-down-2s-bottom-hold',
-      'push-07-pike',
       'push-08-diamond-hands',
       'squat-03-3s-down',
       'squat-04-3s-down-2s-bottom-hold',
@@ -560,6 +616,9 @@ describe('getRung', () => {
   it('returns the rung at a valid index', () => {
     expect(getRung('push', 0).id).toBe('push-01-wall')
     expect(getRung('push', 3).id).toBe('push-04-full')
+    // Index 6, id 08: the retired rung 7 is why these differ.
+    expect(getRung('push', 6).id).toBe('push-08-diamond-hands')
+    expect(getRung('push', topRungIndex('push')).id).toBe('push-09-archer')
     expect(getRung('pull', topRungIndex('pull')).id).toBe('pull-06-end-range-isometric')
   })
 

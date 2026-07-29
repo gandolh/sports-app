@@ -14,6 +14,7 @@ import {
   recordSession,
   rungIndexAt,
   targetAt,
+  toSessionResult,
 } from '../schedule.ts'
 import type { PrescribedExercise, PrescribedItem } from '../schedule.ts'
 import { CARDIO, LADDERS, topRungIndex } from '../ladders.ts'
@@ -77,20 +78,35 @@ describe('every rung takes sessionsPerRung sessions, whatever its span', () => {
     }
   })
 
-  it('lands on the bottom of the new range on the first session of every rung', () => {
-    // The locked call "at the top of a rung the next rung starts at its own bottom
-    // target" — which is only free because the fraction resets to zero.
+  it('attains both ends of every rung exactly — the caps are values, not limits', () => {
+    // The denominator is `per - 1`, so the first session of a rung prescribes its
+    // `min` and the last prescribes its `max`. With `per` as the denominator the
+    // fraction stopped at `(per-1)/per` and a declared cap was only reached when
+    // rounding happened to close the gap: the 20→60s plank topped out at 59s and
+    // never once prescribed 60.
     for (const pattern of PATTERNS) {
       const ladder = LADDERS[pattern]
       const per = ladder.sessionsPerRung
       const rungsAbove = topRungIndex(pattern) - ladder.startRungIndex
       for (let rung = 0; rung <= rungsAbove; rung++) {
-        const n = rung * per
-        expect(targetAt(pattern, n), `${pattern} session ${n}`).toBe(
-          rangeAt(pattern, rungIndexAt(pattern, n)).min,
+        const range = rangeAt(pattern, rungIndexAt(pattern, rung * per))
+        expect(targetAt(pattern, rung * per), `${pattern} rung ${rung} start`).toBe(range.min)
+        expect(targetAt(pattern, rung * per + per - 1), `${pattern} rung ${rung} end`).toBe(
+          range.max,
         )
       }
     }
+  })
+
+  it('attains the cap on a rep ladder and on a timed one, by name', () => {
+    // Spelled out rather than only asserted as a loop, because these are the two
+    // numbers the wiki quotes as ceilings.
+    expect(rangeAt('push', rungIndexAt('push', 0))).toEqual({ min: 5, max: 12 })
+    expect(targetAt('push', 0)).toBe(5)
+    expect(targetAt('push', 13)).toBe(12)
+    expect(rangeAt('core', rungIndexAt('core', 0))).toEqual({ min: 20, max: 60 })
+    expect(targetAt('core', 0)).toBe(20)
+    expect(targetAt('core', 41)).toBe(60)
   })
 })
 
@@ -115,9 +131,8 @@ describe('the top rung cycles, with no special case', () => {
       const range = rangeAt(pattern, topRungIndex(pattern))
       const sweep = Array.from({ length: per }, (_, i) => targetAt(pattern, base + i))
       expect(sweep[0], `${pattern} does not restart at the bottom`).toBe(range.min)
-      expect(Math.max(...sweep), `${pattern} never approaches its cap`).toBeLessThanOrEqual(
-        range.max,
-      )
+      expect(sweep[sweep.length - 1], `${pattern} does not reach its cap`).toBe(range.max)
+      expect(Math.max(...sweep), `${pattern} overshot its cap`).toBe(range.max)
       // Monotonic across the sweep, then back to the bottom on the next session.
       for (let i = 1; i < sweep.length; i++) {
         expect(sweep[i]!, `${pattern} sweep dipped at ${i}`).toBeGreaterThanOrEqual(sweep[i - 1]!)
@@ -198,7 +213,7 @@ describe('the derived steps match the law', () => {
     const diffs = Array.from({ length: 41 }, (_, n) => targetAt('core', n + 1) - targetAt('core', n))
     for (const d of diffs) expect(d === 0 || d === 1).toBe(true)
     const mean = diffs.reduce((a, b) => a + b, 0) / diffs.length
-    expect(mean).toBeCloseTo(40 / 42, 1)
+    expect(mean).toBeCloseTo(40 / 41, 2)
   })
 
   it('gives the 10→30s prone T +1s per 2 sessions', () => {
@@ -513,6 +528,83 @@ describe('prescribe', () => {
     for (const position of [-1, -999, 10 ** 9, 2.5, Number.NaN]) {
       expect(() => prescribe(docWith({}, position), 'medium'), `position ${position}`).not.toThrow()
       expect(prescribe(docWith({}, position), 'medium').items.length).toBeGreaterThan(0)
+    }
+  })
+})
+
+// ─── toSessionResult ────────────────────────────────────────────────────────
+
+describe('toSessionResult', () => {
+  const AT = '2026-07-29T06:30:00.000Z'
+
+  it('carries the position and variant through and records what was prescribed', () => {
+    const state = docWith({ push: 30, squat: 31, hinge: 29, core: 90, pull: 90 }, 0)
+    const p = prescribe(state, 'hard')
+    const result = toSessionResult(p, AT)
+    expect(result.completedAt).toBe(AT)
+    expect(result.position).toBe(p.position)
+    expect(result.variant).toBe('hard')
+    const prescribed = exercises(p.items)
+    expect(result.exercises).toHaveLength(prescribed.length)
+    for (const [i, record] of result.exercises.entries()) {
+      const e = prescribed[i]!
+      expect(record).toEqual({
+        pattern: e.pattern,
+        rungId: e.rung.id,
+        sets: e.sets,
+        targetValue: e.targetValue,
+      })
+    }
+  })
+
+  it('records no ExerciseRecord for cardio, only the daily block', () => {
+    const cardioPosition = ROTATION.findIndex((s) => s.cardio)
+    const result = toSessionResult(prescribe(docWith({}, cardioPosition), 'medium'), AT)
+    expect(result.exercises.map((e) => e.pattern)).toEqual([...DAILY_BLOCK])
+    // Nothing in the record hints at a cardio round count — there is nothing to log.
+    expect(JSON.stringify(result)).not.toMatch(/cardio|rounds/i)
+  })
+
+  it('takes the timestamp as its only other input — the domain cannot read a clock', () => {
+    const state = docWith({ push: 4 }, 0)
+    const a = toSessionResult(prescribe(state, 'medium'), '2020-01-01T00:00:00.000Z')
+    const b = toSessionResult(prescribe(state, 'medium'), '2030-01-01T00:00:00.000Z')
+    expect({ ...a, completedAt: '' }).toEqual({ ...b, completedAt: '' })
+  })
+
+  it('round-trips through recordSession for every slot and every variant', () => {
+    // The property brief 19 depends on: finishing what you were prescribed
+    // advances every pattern the session trained by exactly one, and nothing else.
+    for (let position = 0; position < ROTATION.length; position++) {
+      for (const variant of VARIANTS) {
+        const before = docWith({ push: 3, squat: 3, hinge: 3, core: 9, pull: 9 }, position)
+        const after = recordSession(before, toSessionResult(prescribe(before, variant), AT))
+        const trained = new Set([...slotAt(position).patterns, ...DAILY_BLOCK])
+        for (const pattern of PATTERNS) {
+          const delta = after.sessionsDone[pattern] - before.sessionsDone[pattern]
+          expect(delta, `${pattern} on ${slotAt(position).label}/${variant}`).toBe(
+            trained.has(pattern) ? 1 : 0,
+          )
+        }
+        expect(after.cyclePosition).toBe(position + 1)
+        expect(after.history.at(-1)?.variant).toBe(variant)
+      }
+    }
+  })
+
+  it('replays a whole rotation into a history that agrees with the counters', () => {
+    let state = docWith({}, 0)
+    for (let i = 0; i < 9; i++) {
+      state = recordSession(state, toSessionResult(prescribe(state, 'medium'), AT))
+    }
+    expect(state.sessionsDone).toEqual({ push: 3, squat: 3, hinge: 3, core: 9, pull: 9 })
+    // Every pattern's recorded appearances equal its counter. Nothing derived is
+    // stored, so this is the only consistency check the document can fail.
+    for (const pattern of PATTERNS) {
+      const appearances = state.history.filter((s) =>
+        s.exercises.some((e) => e.pattern === pattern),
+      ).length
+      expect(appearances, pattern).toBe(state.sessionsDone[pattern])
     }
   })
 })

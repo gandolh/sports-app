@@ -2,8 +2,9 @@
  * The fixed schedule — the whole of the app's logic, and there is very little of
  * it. Replaces v2's `engine.ts` (2026-07-29).
  *
- *   prescribe(state, variant)     → Prescription   what to do today
- *   recordSession(state, result)  → StateDoc       counters up, history appended
+ *   prescribe(state, variant)        → Prescription    what to do today
+ *   toSessionResult(prescription, t) → SessionResult   what finishing it records
+ *   recordSession(state, result)     → StateDoc        counters up, history appended
  *
  * **Nothing here branches on what the user did**, because nothing is measured.
  * There is no rule table, no advance/hold/regress, no `isCompleted`, no
@@ -15,7 +16,15 @@
  *
  *   rungIndex        = min(startRungIndex + ⌊sessionsDone / sessionsPerRung⌋, top)
  *   sessionsIntoRung = sessionsDone mod sessionsPerRung
- *   target           = round(min + sessionsIntoRung / sessionsPerRung × (max − min))
+ *   target           = round(min + sessionsIntoRung / (sessionsPerRung − 1) × (max − min))
+ *
+ * The denominator is `sessionsPerRung − 1`, not `sessionsPerRung`, so that
+ * `sessionsIntoRung`'s range of `0 .. per−1` maps exactly onto `0 .. 1` and the
+ * declared caps are **values rather than asymptotes**: `min` is prescribed on the
+ * first session of a rung and `max` on the last. With `per` as the denominator the
+ * fraction stopped at `(per−1)/per`, which reached the cap only when rounding
+ * happened to close the gap — the 20→60s plank topped out at 59s and never once
+ * prescribed 60. A rung still takes exactly `per` sessions either way.
  *
  * Three properties fall out of this rather than being implemented, and all three
  * are the *reason* for this formulation rather than a per-rung step:
@@ -39,6 +48,7 @@ import { CARDIO, LADDERS, getRung } from './ladders.ts'
 import { DAILY_BLOCK, slotAt } from './types.ts'
 import type {
   CardioProtocol,
+  IsoTimestamp,
   Pattern,
   Range,
   Rung,
@@ -153,7 +163,10 @@ export function targetAt(pattern: Pattern, sessionsDone: number): number {
   const { min, max } = rangeAt(pattern, rungIndexAt(pattern, sessionsDone))
   const per = ladder.sessionsPerRung
   const sessionsIntoRung = ((sessionsDone % per) + per) % per
-  const fraction = sessionsIntoRung / per
+  // `per − 1` so the last session of a rung lands exactly on `max`. Guarded
+  // against a one-session rung, where `sessionsIntoRung` is always 0 and the
+  // only sensible answer is `min`.
+  const fraction = sessionsIntoRung / Math.max(per - 1, 1)
   return Math.round(min + fraction * (max - min))
 }
 
@@ -222,6 +235,36 @@ export function prescribe(state: StateDoc, variant: Variant): Prescription {
     label: slot.label,
     variant,
     items: [...own, ...daily],
+  }
+}
+
+/**
+ * The inverse of `prescribe`: what a finished prescription records.
+ *
+ * This lives in the domain rather than in the player because it defines **the
+ * shape of a recorded session**, and a shape defined in two places drifts. There
+ * is no measurement here and no place to put one — the record carries what was
+ * *prescribed*, so the only thing the caller supplies is the timestamp it is not
+ * allowed to read itself.
+ *
+ * The cardio item records nothing: a cardio slot trains no ladder, so it has no
+ * pattern, no rung and no target to log. A cardio session's `exercises` is
+ * therefore the daily block alone, which is a normal case rather than an empty
+ * one.
+ */
+export function toSessionResult(p: Prescription, completedAt: IsoTimestamp): SessionResult {
+  return {
+    completedAt,
+    position: p.position,
+    variant: p.variant,
+    exercises: p.items
+      .filter((item): item is PrescribedExercise => item.type === 'exercise')
+      .map((e) => ({
+        pattern: e.pattern,
+        rungId: e.rung.id,
+        sets: e.sets,
+        targetValue: e.targetValue,
+      })),
   }
 }
 
