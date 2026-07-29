@@ -1,0 +1,3 @@
+# Keeps this directory in git when the backlog is empty.
+# briefs/todo/ is part of the corpus skeleton -- index.md links to it, and an
+# empty directory git has dropped is a broken link, not a clean backlog.
