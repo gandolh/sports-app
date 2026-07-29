@@ -284,3 +284,28 @@ one of four. Brief 19 implements it; you own saying so.
   ([open-questions.md](../../wiki/open-questions.md) #1).
 - Re-run brief 03's discriminability gate on every changed rung: read adjacent rungs
   back to back and confirm the cues alone tell you what to do differently.
+
+---
+
+## Outcome — 2026-07-29
+
+**Done**, 121 domain tests. Two follow-ups were needed after the first pass, both from the
+implementer's own report rather than from review.
+
+The interpolation divided by `sessionsPerRung`, so `fraction` topped out at `(per-1)/per` and
+a declared `max` was an asymptote — the 20–60s plank prescribed 59s and never 60. Dividing by
+`(per-1)` maps a rung's sessions exactly onto 0..1. Push is byte-identical either way.
+
+`push-07-pike` was added and then removed. The implementer needed a floor-only replacement
+for `push-07-feet-elevated` and a pike push-up was a fair reading of the constraint, but it
+is a vertical press rather than a push-up plus a modifier, so it broke a project invariant
+*and* brief 18's five-pose premise. Push took the shorter ladder; the id numbering keeps a
+gap at 07 because renumbering would rename shipped ids.
+
+`toSessionResult` was added so brief 19 could not define the shape of a recorded session a
+second time.
+
+**Findings folded into the wiki:** the "six weeks" figure silently assumes daily training;
+42 sessions on the daily block means 42 consecutive days of the identical hold; and the step
+*between* rungs is worth far more than the ±2-rep variant can absorb, which front-loads
+difficulty within each rung rather than spreading it. See open questions 1 and 7.

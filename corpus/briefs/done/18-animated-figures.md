@@ -107,3 +107,25 @@ either way — a "probably fine" is not an answer to this one.
 - The existing reduced-motion and no-hex-colour tests still pass, unmodified.
 - **Render the figures and look at them.** Report your honest verdict on open question
   #4, and on whether the eccentric direction is right for all five patterns.
+
+---
+
+## Outcome — 2026-07-29
+
+**Done**, 87 figure tests. The load-bearing call was which pose is "lowered", because no test
+catches getting it wrong — a 3-second eccentric would simply animate as a 3-second lift. It
+splits 2/3: push and squat draw `end` at the bottom; hinge, prone and plank draw theirs at
+the top. The rule encoded is that `end` is whatever the movement arrow points at.
+
+Timelines compress 0.6× uniformly so the worst case loops in 3.6s, and timing is linear on
+purpose: easing that decelerates into the turnaround makes a *pauseless* rung appear to dwell
+at the bottom, which is the signal a paused rung owns.
+
+**Answered open question 4**, and the answer was surprising enough to keep as a note rather
+than delete: a 2-second pause is legible at 120px, but not because the figure stops moving —
+because the two-frame crossfade snaps into focus. A true joint-interpolating morph would look
+better *and weaken* this signal.
+
+**Found that `design-system.md` contradicted the code it governs** (it claimed the countdown
+ring was the only continuously-animating element and that nothing animates on load) and
+correctly declined to edit the corpus itself. That page is now fixed.

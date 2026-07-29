@@ -113,3 +113,22 @@ may require network.
   username crafted to encode to another user's key.
 - **Report the exact set of v2 fields you dropped and why**, so the next migration
   author can see the precedent.
+
+---
+
+## Outcome — 2026-07-29
+
+**Done**, 190 persistence tests. The migration reconstructs `sessionsDone` from history and
+deliberately discards the v2 `rungIndex` — carrying it over would place the user at a rung
+the v3 schedule disagrees with, invisibly.
+
+Two things beyond the brief, both load-bearing. `load()` adopts the pre-v3 single-user
+storage keys and reports `migrated` without writing; without that the migration was
+unreachable in production, since the v3 keys are new and an upgrading user's history would
+simply have vanished. And storage keys percent-encode the dot, which is legal in a username
+and is the key format's separator — the attack that guards against is a user named
+`shadow.v3.alice`, whose live key would otherwise be byte-identical to `alice`'s shadow key.
+
+Closed the gap brief 17 flagged: a test runs codec output through the server's own shallow
+check, so `serialise` producing something `PUT` rejects is a test failure rather than a
+runtime surprise.

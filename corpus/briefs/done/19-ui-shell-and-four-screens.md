@@ -302,3 +302,28 @@ it, and re-check `npm audit` after installing.
 `src/ui/SettingsScreen.tsx` has 15 typecheck errors and is the only thing failing
 typecheck. **You delete it**; its tests are already gone. **486 tests currently pass —
 do not break them.** When you finish, `npm run check` must be fully green.
+
+---
+
+## Outcome — 2026-07-29
+
+**Done with concerns** — the concerns are design observations, not defects. 611 tests across
+the tree, `npm run check` green, build emits a service worker, `npm audit` clean.
+
+Offline was **proven rather than assumed**: a whole Push session played to the finish screen
+with the network down, written to `localStorage`, zero console errors. Sync was round-tripped
+against the real service.
+
+Five defects were found by *operating* the app at phone width, none of which a screenshot or
+a test would have caught: the countdown ring sat 39px off-centre on the most-looked-at
+screen; it was oversized enough that exactly one clipped cue line was visible, and the cues
+are the only thing distinguishing adjacent rungs; the safety cue rendered seventh and below
+the fold on precisely the rungs where it is the only brake; the finish screen had ~370px of
+dead canvas and read as a failed load; and a placeholder service address greyed into an empty
+field in the way that makes someone believe they configured something they had not.
+
+**Left open, deliberately, and worth a decision rather than a patch:** `POSTURAL_NOTICE` is
+verbatim and required but outweighs the plan it annotates on `/` and sits ~730px below the
+fold on the pull player page; and long rung names — which are the *norm*, since a rung is one
+movement plus a modifier — wrap to three lines at title size in the 232px column beside the
+figure.

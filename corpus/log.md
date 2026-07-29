@@ -427,3 +427,82 @@ which had been producing a false stale-path warning.
 
 Also: the repo had **zero commits** across ~30 files until this session. The v1 tree is now
 committed as a baseline before any of the above touched code.
+
+## 2026-07-29 — the v2 rebuild shipped: six briefs, three waves, 611 tests
+
+Built briefs 15–20 through `plan-split-dispatch` in wave mode: `15 ‖ 17`, then
+`16 ‖ 18 ‖ 20`, then `19`. Green at the end — typecheck, lint, 611 tests, `npm audit`
+clean, a service worker with 10 precache entries, and **offline proven rather than
+asserted** (a full Push session played to the finish screen with the network down).
+
+Routing was senior-heavy (five opus, one sonnet) and that was the right call for this
+particular set: a cross-module contract four briefs depend on, an irreversible migration
+of persisted state, an auth surface, and a correctness call no test can catch. Only the
+milestones module was mechanical enough for sonnet.
+
+### The run's real output was the reports, not the diffs
+
+Every brief was asked for an honest verdict on something it could not be tested on, and
+**four of the six came back with a real problem**:
+
+- **Brief 15** found that declared caps were **asymptotes, not values** — dividing by
+  `sessionsPerRung` meant `fraction` topped out at `(per-1)/per`, so the 20–60s plank
+  prescribed 59s and never 60. Fixed by dividing by `(per-1)`. It also found the finding
+  I'd rank highest in the whole run: **the step between rungs is worth far more than the
+  ±2-rep variant can absorb** (12 knee push-ups → 5 full push-ups), so difficulty is
+  *front-loaded within each rung* rather than evenly spread as the wiki claimed. Filed as
+  open question 7.
+- **Brief 18** found `design-system.md` **contradicting the code it governs** — it
+  claimed the countdown ring was the only continuously-animating element and that nothing
+  animates on load, while the brief it was governing shipped a looping figure that does
+  both. It correctly declined to edit the corpus and reported instead.
+- **Brief 19** found five layout defects that only exist when the app is *operated*: the
+  countdown ring 39px off-centre on the most-looked-at screen, the ring oversized enough
+  that one clipped cue line was visible (and cues are the only thing distinguishing
+  adjacent rungs), the safety cue rendering **seventh and below the fold on exactly the
+  rungs where it is the only brake**, a finish screen with 370px of dead canvas, and a
+  placeholder address that reads as a configured service.
+- **Brief 20** found `programme.md` claiming a **per-side** side-plank dose that the
+  rung's own cue splits *between* sides — 45s meaning ~22s each. Survived a whole design
+  pass because nobody multiplied by two.
+
+Two agents also correctly refused to overstep: brief 17 wrote that its instinct was to
+add a per-user secret and flagged it rather than acting, and brief 18 declined to edit
+the corpus page it had found wrong. Both are the ownership contract working.
+
+### Corrections I made to the agents
+
+- **Reversed brief 15's `push-07-pike`.** The implementer needed a floor-only replacement
+  for the feet-elevated push-up and a pike push-up was a fair reading of the constraint —
+  but it is a vertical press, not a push-up plus a modifier, so it broke a project
+  invariant *and* brief 18's five-pose premise. Push took the shorter ladder, and the id
+  numbering now keeps a deliberate gap at 07 because renumbering would rename shipped ids.
+- **Moved the `Prescription → ExerciseRecord[]` mapping into the domain** as
+  `toSessionResult`, after brief 15 flagged that it arguably belonged there. Without it
+  brief 19 would have defined the shape of a recorded session a second time.
+
+### Things worth knowing later
+
+- **Brief 16 had to adopt the pre-v3 storage keys** to make its own migration reachable.
+  The v3 keys are new, so without adoption an upgrading user's history would have
+  silently vanished and brief 16 §1 would have been dead code.
+- **The `?user=` parameter is required on `PUT`**, which the brief hadn't asked for: a
+  mismatch check needs an independently stated target to compare the document against.
+- Usernames are **rejected rather than case-folded**, because folding makes the stream key
+  disagree with the document's own `username` field — which is precisely what `PUT`
+  refuses.
+- **Open question 4 is answered and the answer was surprising**, so it was kept as a note
+  rather than deleted: a 2-second pause is legible at 120px not because the figure stops
+  moving but because the two-frame crossfade snaps into focus. A true morph would look
+  better *and weaken* the signal.
+
+### Left open on purpose
+
+Two design calls brief 19 declined to patch because they want a decision:
+`POSTURAL_NOTICE` outweighs the plan it annotates on `/` and sits ~730px below the fold on
+the pull player page; and long rung names wrap to three lines beside the figure, which is
+the *norm* rather than an exception, since a rung is one movement plus a modifier.
+
+Deploy integration is not started. The user asked mid-run whether the service could be a
+Fastify REST API — it is already REST; whether it becomes Fastify is an open decision
+against the zero-dependency call in `technical-decisions.md`.
