@@ -1,7 +1,5 @@
 /**
- * The state service: four routes, one table, and one dependency — the shared
- * contract (`@sports-app/shared`), which is types plus one regex and imports
- * nothing itself.
+ * The state service: four routes, one table, and Fastify underneath.
  *
  * ── What this is not ─────────────────────────────────────────────────────────
  *
@@ -14,7 +12,7 @@
  * ── The routes ───────────────────────────────────────────────────────────────
  *
  *   GET  /api/health          liveness. No auth, no database read, no information.
- *   POST /api/login           { username, password } → { username }.
+ *   POST /api/login           { username, … } → { username }.
  *   GET  /api/state?user=…    that user's newest snapshot bytes, or 404.
  *   PUT  /api/state?user=…    validate shallowly, store verbatim, prune to the cap.
  *
@@ -23,19 +21,67 @@
  * serving anything else, and every route that does not exist is a route that
  * cannot be wrong.
  *
+ * ── Fastify, and what the framework is NOT allowed to do (brief 22) ──────────
+ *
+ * Brief 22 replaced hand-rolled `node:http` routing with Fastify **without
+ * changing one byte of the REST contract** — same paths, methods, status codes,
+ * headers and bodies, so that `client/src/persistence/sync.ts` needed no edit at
+ * all. The 73 tests in `__tests__/` are what makes that claim checkable rather
+ * than hopeful: they were written against the wire, not the implementation.
+ *
+ * Five things a framework does helpfully by default and must not do here. Each of
+ * the five is load-bearing and each is pinned by a test:
+ *
+ *   1. **`GET /api/state` returns the stored bytes verbatim.** Fastify will parse
+ *      and re-serialise JSON for you, which would destroy the codec's layout while
+ *      still being "valid JSON". So the JSON body parser is replaced with one that
+ *      hands the handler the **raw string** (`parseAs: 'string'`, no `JSON.parse`),
+ *      the stored document goes out as a `Buffer`, and there is deliberately no
+ *      `response` schema on that route's 200 — a serialiser attached to it would
+ *      rewrite the very bytes it exists to preserve. The client's crash-safe save
+ *      round-trips through a byte comparison, so this is not cosmetic.
+ *   2. **The secret is checked before any validation.** It is a route-level
+ *      `onRequest` hook, which is the earliest point in Fastify's lifecycle — ahead
+ *      of body parsing and ahead of schema validation. A wrong secret therefore
+ *      gets a `401` and never a `400` that would leak whether a username is even
+ *      well-formed, or that `/api/login` exists.
+ *   3. **A `?user=` / document-`username` mismatch is a `400`, not a `409`,** and
+ *      stores nothing. It is a client bug, not a concurrent edit.
+ *   4. **Usernames are rejected, never case-folded.** Folding would make the stream
+ *      key disagree with the document's own `username`, which is exactly what (3)
+ *      refuses. The rule lives in `shared/username.ts` and says why.
+ *   5. **Paths match exactly.** `ignoreTrailingSlash` stays off and
+ *      `exposeHeadRoutes` is switched **off** — otherwise Fastify would helpfully
+ *      add `HEAD /api/state`, which today is a `405`.
+ *
+ * And one more, the loudest: **Fastify logs requests by default.** `logger: false`
+ * turns the framework's logging off completely, so there is no logger for a request
+ * body to reach even in principle. The only log in this process is the `log`
+ * callback below, which is called with fixed strings the caller composes. See the
+ * `__tests__` block "the password is never stored, logged, echoed, or compared".
+ *
+ * ── Validation is schema-driven, from `shared/api.ts` ────────────────────────
+ *
+ * The wire shapes are TypeBox declarations in `@sports-app/shared/api.ts`, so the
+ * same declaration that guards this service also types the client. Fastify's AJV
+ * reads them directly for `?user=` and for response serialisation; the two JSON
+ * *bodies* are checked here with `TypeCompiler`, because they must stay raw strings
+ * (see 1 above) and a body schema would require Fastify to have parsed them first.
+ * One declaration, two entry points into it — not two declarations.
+ *
  * ── Login checks nothing, and that is the design ──────────────────────────────
  *
  * `corpus/wiki/technical-decisions.md § "Authentication is a nameplate, not a
  * boundary"`. Read that before changing anything in `login()`.
  *
- * **The password is never read.** Not hashed, not compared, not stored, not
+ * **The credential is never read.** Not hashed, not compared, not stored, not
  * logged, not echoed. There is deliberately no expression anywhere in this file
- * that evaluates `.password` — the handler destructures `username` and nothing
- * else — which is a stronger guarantee than deleting it afterwards would be,
- * because it cannot be undone by a later edit that "just needs it for a moment".
- * Storing an unchecked password buys nothing and collects real passwords that
- * people reuse elsewhere. A request without a password field is therefore
- * accepted: there is nothing to check, so there is nothing to be missing.
+ * that evaluates that field — the handler reads `username` and nothing else —
+ * which is a stronger guarantee than deleting it afterwards would be, because it
+ * cannot be undone by a later edit that "just needs it for a moment". Storing an
+ * unchecked credential buys nothing and collects real ones that people reuse
+ * elsewhere. A request without that field is therefore accepted: there is nothing
+ * to check, so there is nothing to be missing.
  *
  * **This is not a security boundary and does not pretend to be one.** Anyone who
  * knows a username can read that person's training history through
@@ -53,17 +99,20 @@
  * ── Why validation here is deliberately shallow ──────────────────────────────
  *
  * The server checks that the body is a JSON object with a numeric
- * `schemaVersion`, a valid `username`, and an array `history`. That is all.
+ * `schemaVersion`, a valid `username`, and an array `history`. That is all, and
+ * `StateDocumentEnvelope` in `shared/api.ts` says so in three lines.
  *
  * It is tempting to re-implement the codec's validation here as a second line of
  * defence. That would be a mistake: `client/src/persistence/codec.ts` is the single
  * source of truth for the document's shape, and a second, drifting validator
  * would eventually reject a document the app considers perfectly good — turning
- * this service from a safety net into a way to *lose* a workout. The three fields
- * it does check are exactly the three the service itself needs: `schemaVersion`
- * for the indexed column, `username` because it is the row key, and `history`
- * because its length is what the `sessions_completed` column holds now that the
- * v3 document no longer carries a `sessionsCompleted` field.
+ * this service from a safety net into a way to *lose* a workout. It would also
+ * reject a document from a future `schemaVersion` this build has never heard of,
+ * which the service is supposed to store blindly. The three fields it does check
+ * are exactly the three the service itself needs: `schemaVersion` for the indexed
+ * column, `username` because it is the row key, and `history` because its length
+ * is what the `sessions_completed` column holds now that the v3 document no longer
+ * carries a `sessionsCompleted` field.
  *
  * A 400 leaves the database completely untouched. The newest snapshot after a
  * rejected `PUT` is byte-for-byte the newest snapshot from before it.
@@ -93,21 +142,34 @@
  * `127.0.0.1` by default, so running it cannot accidentally expose anyone's
  * training history to a network. Host and port are environment variables.
  */
-import { createServer as createHttpServer } from 'node:http'
+import Fastify from 'fastify'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
+import { TypeCompiler } from '@sinclair/typebox/compiler'
 import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from './db.mjs'
-// The one rule the client and this service must agree on, from the one place it
-// is defined. See `shared/username.ts`.
-import { LEGACY_USERNAME, USERNAME_RULE, isValidUsername } from '@sports-app/shared/username.ts'
+// The wire contract, from the one place it is declared. `shared/` may not import
+// `node:` anything, so nothing in here can drag a Node-only module into the client
+// bundle or a browser-only one into this process. Node ≥22.18 strips the types at
+// load; there is no build step.
+import { LEGACY_USERNAME, USERNAME_RULE } from '@sports-app/shared/username.ts'
+import {
+  HEALTH_PATH,
+  HealthResponse,
+  LOGIN_PATH,
+  LoginRequest,
+  LoginResponse,
+  SECRET_HEADER,
+  STATE_PATH,
+  SnapshotReceipt,
+  StateDocumentEnvelope,
+  StateQuery,
+  USER_PARAM,
+} from '@sports-app/shared/api.ts'
 
-export const SECRET_HEADER = 'x-sync-secret'
-export const STATE_PATH = '/api/state'
-export const HEALTH_PATH = '/api/health'
-export const LOGIN_PATH = '/api/login'
-
-/** The query parameter that names whose stream a `/api/state` request is about. */
-export const USER_PARAM = 'user'
+// Re-exported rather than redeclared: the routes are part of the wire contract, so
+// they are declared beside the schemas that describe them. Callers keep naming
+// them through this module, which is the module they are talking to.
+export { HEALTH_PATH, LOGIN_PATH, SECRET_HEADER, STATE_PATH, USER_PARAM }
 
 export const DEFAULT_HOST = '127.0.0.1'
 export const DEFAULT_PORT = 8787
@@ -121,6 +183,22 @@ export const DEFAULT_PORT = 8787
 export const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024
 
 const JSON_CONTENT_TYPE = 'application/json'
+const JSON_CONTENT_TYPE_UTF8 = `${JSON_CONTENT_TYPE}; charset=utf-8`
+
+// ─── Compiled validators ────────────────────────────────────────────────────
+//
+// Compiled once at module load, not per request. `TypeCompiler` generates a
+// checking function with `new Function`, which is why the compilation happens here
+// and not in `shared/api.ts`: that package has to work under a browser's
+// Content-Security-Policy, and this one is a Node process.
+//
+// These are the *same* declarations Fastify's AJV validates `?user=` against. Two
+// entry points into one schema, because a raw-string body cannot be handed to a
+// body schema — see the file header.
+
+const checkStateQuery = TypeCompiler.Compile(StateQuery)
+const checkLoginRequest = TypeCompiler.Compile(LoginRequest)
+const checkStateDocument = TypeCompiler.Compile(StateDocumentEnvelope)
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
@@ -145,82 +223,20 @@ export function secretMatches(provided, expected) {
   return timingSafeEqual(a, b)
 }
 
-// ─── Request/response plumbing ──────────────────────────────────────────────
+// ─── Small helpers ──────────────────────────────────────────────────────────
 
 /**
- * @param {import('node:http').ServerResponse} res
- * @param {number} status
- * @param {object} payload
- */
-function sendJson(res, status, payload) {
-  const body = Buffer.from(`${JSON.stringify(payload)}\n`, 'utf8')
-  res.writeHead(status, {
-    'Content-Type': `${JSON_CONTENT_TYPE}; charset=utf-8`,
-    'Content-Length': String(body.byteLength),
-    'Cache-Control': 'no-store',
-    // This service holds one user's document and nothing about it should ever
-    // be guessed at, sniffed, or framed.
-    'X-Content-Type-Options': 'nosniff',
-  })
-  res.end(body)
-}
-
-/**
- * Send stored document bytes back exactly as they were received.
+ * The path, without the query string.
  *
- * `Buffer.from(text, 'utf8')` plus an explicit `Content-Length` is what makes
- * the round-trip byte-identical: no re-encoding, no pretty-printing, no
- * chunked-transfer surprises.
+ * Fastify's router already matches on the path alone, so this is only needed
+ * where a request has *not* matched a route — the 404/405 handler — and in log
+ * lines, which must never carry a query string into a log file.
  *
- * @param {import('node:http').ServerResponse} res
- * @param {string} docJson
- * @param {{id: number, createdAt: string}} meta
+ * @param {string | undefined} url
+ * @returns {string}
  */
-function sendDocument(res, docJson, meta) {
-  const body = Buffer.from(docJson, 'utf8')
-  res.writeHead(200, {
-    'Content-Type': `${JSON_CONTENT_TYPE}; charset=utf-8`,
-    'Content-Length': String(body.byteLength),
-    'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff',
-    // Advisory only. The client compares session counts read from inside the
-    // document, never a header, so a proxy that strips these changes nothing.
-    // Deliberately no `X-Snapshot-User`: the username is in the document, and a
-    // header would be a second place for it to disagree.
-    'X-Snapshot-Id': String(meta.id),
-    'X-Snapshot-Created-At': meta.createdAt,
-  })
-  res.end(body)
-}
-
-/**
- * Read the request body, refusing anything over `limit` bytes.
- *
- * @param {import('node:http').IncomingMessage} req
- * @param {number} limit
- * @returns {Promise<{ok: true, text: string} | {ok: false, tooLarge: boolean, error: string}>}
- */
-async function readBody(req, limit) {
-  /** @type {Buffer[]} */
-  const chunks = []
-  let total = 0
-  try {
-    for await (const chunk of req) {
-      total += chunk.length
-      if (total > limit) {
-        return { ok: false, tooLarge: true, error: `body exceeds the ${limit} byte limit` }
-      }
-      chunks.push(chunk)
-    }
-  } catch (cause) {
-    return { ok: false, tooLarge: false, error: messageOf(cause) }
-  }
-  return { ok: true, text: Buffer.concat(chunks).toString('utf8') }
-}
-
-function isJsonContentType(header) {
-  if (typeof header !== 'string') return false
-  return header.split(';')[0].trim().toLowerCase() === JSON_CONTENT_TYPE
+function pathOf(url) {
+  return (url ?? '').split('?')[0]
 }
 
 function messageOf(cause) {
@@ -238,10 +254,17 @@ function messageOf(cause) {
  */
 export const USERNAME_ERROR = `user: expected ${USERNAME_RULE}`
 
+/** The message a missing `?user=` gets — a different mistake, so a different message. */
+export const USER_REQUIRED_ERROR = `user: required. Name whose document this is with ?${USER_PARAM}=…`
+
 /**
- * Pull `?user=` off a request URL and validate it.
+ * Pull `?user=` off a request URL and validate it against `StateQuery`.
  *
- * @param {string} url the raw `req.url`
+ * Two callers, both real: the error handler, which turns Fastify's AJV rejection
+ * into the contract's wording, and anything that needs to answer "is this a
+ * serviceable target" without a socket — which is how the tests reach it.
+ *
+ * @param {string} url the raw request URL
  * @returns {{ok: true, username: string} | {ok: false, error: string}}
  */
 export function readUsername(url) {
@@ -250,14 +273,31 @@ export function readUsername(url) {
   // decoded *before* the allowlist sees them rather than after — a check that
   // runs on the encoded form can be walked straight past.
   const raw = new URLSearchParams(mark === -1 ? '' : url.slice(mark + 1)).get(USER_PARAM)
-  if (raw === null) {
-    return { ok: false, error: `user: required. Name whose document this is with ?${USER_PARAM}=…` }
-  }
-  if (!isValidUsername(raw)) return { ok: false, error: USERNAME_ERROR }
+  if (raw === null) return { ok: false, error: USER_REQUIRED_ERROR }
+  if (!checkStateQuery.Check({ [USER_PARAM]: raw })) return { ok: false, error: USERNAME_ERROR }
   return { ok: true, username: raw }
 }
 
 // ─── Shallow document check ─────────────────────────────────────────────────
+
+/**
+ * What each field of `StateDocumentEnvelope` says when it fails.
+ *
+ * TypeBox reports a JSON pointer and a generic message ("Expected string"); the
+ * contract's messages explain what the field is *for*, which is what a person
+ * staring at a rejected sync actually needs. Keyed by pointer so adding a field to
+ * the envelope without a message here is visible rather than silent.
+ */
+const DOCUMENT_ERRORS = {
+  '/schemaVersion':
+    'schemaVersion: expected a number. Every state document carries one; ' +
+    'a body without it is probably not a state document at all.',
+  '/username': `username: expected ${USERNAME_RULE}`,
+  // Checked because `history.length` is what the `sessions_completed` column
+  // holds — not because the server has an opinion about what is *in* the array.
+  // It never looks inside.
+  '/history': 'history: expected an array',
+}
 
 /**
  * @param {string} text
@@ -270,30 +310,27 @@ export function checkDocument(text) {
   } catch (cause) {
     return { ok: false, error: `not valid JSON — ${messageOf(cause)}` }
   }
+  // Ahead of the schema so that `null`, `[]` and `"a string"` get an answer about
+  // the *document* rather than a pointer into a shape they do not have.
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     return { ok: false, error: 'expected a JSON object at the top level' }
   }
 
-  const { schemaVersion, username, history } = raw
-  if (typeof schemaVersion !== 'number' || !Number.isFinite(schemaVersion)) {
-    return {
-      ok: false,
-      error:
-        'schemaVersion: expected a number. Every state document carries one; ' +
-        'a body without it is probably not a state document at all.',
-    }
-  }
-  if (!isValidUsername(username)) {
-    return { ok: false, error: `username: expected ${USERNAME_RULE}` }
-  }
-  if (!Array.isArray(history)) {
-    // Checked because `history.length` is what the `sessions_completed` column
-    // holds — not because the server has an opinion about what is *in* the
-    // array. It never looks inside.
-    return { ok: false, error: 'history: expected an array' }
+  if (!checkStateDocument.Check(raw)) {
+    // The *first* error, so the answer is about one field rather than a list —
+    // and schema property order is what decides which one that is.
+    const [first] = checkStateDocument.Errors(raw)
+    const pointer = first === undefined ? '' : first.path
+    const fallback = `${pointer}: ${first === undefined ? 'invalid' : first.message}`
+    return { ok: false, error: DOCUMENT_ERRORS[pointer] ?? fallback }
   }
 
-  return { ok: true, schemaVersion, username, historyLength: history.length }
+  return {
+    ok: true,
+    schemaVersion: raw.schemaVersion,
+    username: raw.username,
+    historyLength: raw.history.length,
+  }
 }
 
 // ─── The login body ─────────────────────────────────────────────────────────
@@ -301,13 +338,14 @@ export function checkDocument(text) {
 /**
  * Read a username out of a login body.
  *
- * **Only `username` is destructured. `.password` is never evaluated.** See the
- * file header: that is the decision, not an oversight, and this function is the
- * one place it could be broken.
+ * **Only `username` is read.** See the file header: that is the decision, not an
+ * oversight, and this function is the one place it could be broken. `LoginRequest`
+ * declares one property and allows others, so a body carrying a credential is
+ * accepted without anything here naming the field.
  *
  * Note what the failure path deliberately does *not* do: it does not include the
  * `JSON.parse` message. V8's parse errors quote a slice of the input, so an
- * unparseable login body would put part of a real password into a response and
+ * unparseable login body would put part of a real credential into a response and
  * into the log. The generic message is worth strictly more than the diagnostic
  * detail here — this body has exactly two fields and the client constructs it.
  *
@@ -325,14 +363,28 @@ export function checkCredentials(text) {
     return { ok: false, error: 'expected a JSON object at the top level' }
   }
 
-  const { username } = raw
-  if (!isValidUsername(username)) {
+  if (!checkLoginRequest.Check(raw)) {
     return { ok: false, error: `username: expected ${USERNAME_RULE}` }
   }
-  return { ok: true, username }
+  return { ok: true, username: raw.username }
 }
 
 // ─── The service ────────────────────────────────────────────────────────────
+
+/**
+ * The subset of `node:http.Server` this service is driven through.
+ *
+ * Fastify owns the socket internally and its own `listen` is promise-based, so
+ * rather than leak that shape to every caller the three methods `main()` and the
+ * tests actually use are adapted here. `listen` boots Fastify's plugin graph
+ * first — routes are registered during `ready()`, so a raw `server.listen()` would
+ * open the port before there was anything to route to.
+ *
+ * @typedef {object} StateService
+ * @property {(port: number, host: string, onListening?: () => void) => void} listen
+ * @property {() => import('node:net').AddressInfo | string | null} address
+ * @property {(done?: () => void) => void} close
+ */
 
 /**
  * @param {{
@@ -341,7 +393,7 @@ export function checkCredentials(text) {
  *   maxBodyBytes?: number,
  *   log?: (message: string) => void,
  * }} config
- * @returns {import('node:http').Server}
+ * @returns {StateService}
  */
 export function createStateServer(config) {
   const { store } = config
@@ -355,187 +407,328 @@ export function createStateServer(config) {
     throw new Error('createStateServer requires a non-empty shared secret')
   }
 
-  return createHttpServer((req, res) => {
-    void handle(req, res).catch((cause) => {
-      log(`unhandled error: ${messageOf(cause)}`)
-      if (!res.headersSent) sendJson(res, 500, { error: 'internal error' })
-      else res.end()
-    })
+  const app = Fastify({
+    // The whole of the framework's logging, off. Not "configured to omit bodies" —
+    // absent, so there is no logger a body could reach through a future option
+    // change. The `log` callback above is the only output this process produces and
+    // it is only ever handed fixed strings.
+    logger: false,
+    // Fastify would otherwise synthesise `HEAD` for every `GET` route, which would
+    // turn today's `HEAD /api/state` 405 into a 200 with the document's headers.
+    exposeHeadRoutes: false,
+    bodyLimit: maxBodyBytes,
   })
 
-  async function handle(req, res) {
-    const url = req.url ?? ''
-    // Splitting the query string off means `/api/state?x=1` cannot slip past an
-    // exact path comparison. `?user=` is read separately, by `readUsername`, and
-    // only on the routes that have a subject.
-    const path = url.split('?')[0]
-    const method = req.method ?? 'GET'
+  // ── The body arrives as a string, and is never parsed for us ──────────────
+  //
+  // `removeAllContentTypeParsers` drops Fastify's `application/json` *and* its
+  // `text/plain` parser, so this service accepts exactly one media type and
+  // everything else is a 415 — which is what it did before.
+  //
+  // The replacement returns the raw text unchanged. That is what makes
+  // `GET /api/state` able to answer with the bytes it was given: the document is
+  // never a JavaScript object in this process, so there is nothing to
+  // re-serialise. It also means a login body never becomes a structured value
+  // with a credential in a named field.
+  app.removeAllContentTypeParsers()
+  app.addContentTypeParser(
+    JSON_CONTENT_TYPE,
+    { parseAs: 'string', bodyLimit: maxBodyBytes },
+    (_request, body, done) => {
+      done(null, body)
+    },
+  )
 
-    // Liveness first, before auth: the whole point is to answer "is the process
-    // up" without needing a credential. It touches neither the database nor
-    // anything about any document — no row is read, no username is revealed, and
-    // the body is one fixed field, so it cannot become an existence oracle for
-    // an account or a leak of how much history is stored.
-    if (path === HEALTH_PATH) {
-      if (method !== 'GET' && method !== 'HEAD') return methodNotAllowed(res, 'GET, HEAD')
-      return sendJson(res, 200, { status: 'ok' })
+  // ── Headers every response carries ────────────────────────────────────────
+  //
+  // In `onSend` rather than on each reply so that the 404, the 405 and the error
+  // handler cannot forget them. This service holds one person's document and
+  // nothing about it should ever be cached, sniffed, or framed.
+  //
+  // The trailing newline is part of the contract: every JSON body this service has
+  // ever sent ended with one, so a `curl` of it does not run into the next shell
+  // prompt. A `Buffer` payload — which is only ever a stored document — is left
+  // exactly as it is, which is the point.
+  app.addHook('onSend', (_request, reply, payload, done) => {
+    reply.header('Cache-Control', 'no-store')
+    reply.header('X-Content-Type-Options', 'nosniff')
+    if (typeof payload === 'string' && !payload.endsWith('\n')) {
+      done(null, `${payload}\n`)
+      return
     }
+    done(null, payload)
+  })
+
+  /**
+   * The secret gate, as the earliest hook Fastify has.
+   *
+   * Route-level rather than global, which is what keeps two orderings right at
+   * once: an unauthorised caller on a real route gets `401` *before* any
+   * validation runs, and a caller on a path that does not exist gets `404`
+   * without the secret being consulted at all — the same answer whether or not
+   * they hold it.
+   */
+  async function requireSecret(request, reply) {
+    if (secretMatches(request.headers[SECRET_HEADER], secret)) return
+    log(`401 ${request.method} ${pathOf(request.url)}`)
+    return reply.code(401).send({ error: 'unauthorized' })
+  }
+
+  function methodNotAllowed(reply, allow) {
+    return reply
+      .header('Allow', allow)
+      .code(405)
+      .send({ error: `method not allowed; try ${allow}` })
+  }
+
+  function unsupportedMediaType(reply) {
+    return reply.code(415).send({ error: `expected Content-Type: ${JSON_CONTENT_TYPE}` })
+  }
+
+  // ── 404, and the 405 that has to be told apart from it ────────────────────
+  //
+  // Fastify routes both "no such path" and "that path, wrong method" here, and the
+  // contract answers them differently — including who is allowed to know which.
+  // `/api/health` says `405` to anyone, because liveness needs no credential;
+  // `/api/state` and `/api/login` check the secret first, so an unauthorised
+  // caller cannot use a `405` to learn that a route exists.
+  app.setNotFoundHandler(async (request, reply) => {
+    const path = pathOf(request.url)
+
+    if (path === HEALTH_PATH) return methodNotAllowed(reply, 'GET, HEAD')
 
     if (path !== STATE_PATH && path !== LOGIN_PATH) {
       // Deliberately identical for "route does not exist" and "route exists but
       // you are not allowed to know". No listing, no hints.
-      return sendJson(res, 404, { error: 'not found' })
+      return reply.code(404).send({ error: 'not found' })
     }
 
-    // The secret gate comes before any validation, so an unauthorised caller
-    // cannot use 400-vs-401 to learn the username rules — or, on `/api/login`,
-    // to learn that the route exists at all.
-    if (!secretMatches(req.headers[SECRET_HEADER], secret)) {
-      log(`401 ${method} ${path}`)
-      return sendJson(res, 401, { error: 'unauthorized' })
+    if (!secretMatches(request.headers[SECRET_HEADER], secret)) {
+      log(`401 ${request.method} ${path}`)
+      return reply.code(401).send({ error: 'unauthorized' })
     }
 
-    if (path === LOGIN_PATH) {
-      if (method !== 'POST') return methodNotAllowed(res, 'POST')
-      return login(req, res)
-    }
+    return methodNotAllowed(reply, path === LOGIN_PATH ? 'POST' : 'GET, PUT')
+  })
 
-    if (method === 'GET') return getState(url, res)
-    if (method === 'PUT') return putState(url, req, res)
-    return methodNotAllowed(res, 'GET, PUT')
-  }
+  // ── Framework errors, in the contract's words ─────────────────────────────
+  //
+  // Fastify's own error bodies carry `statusCode`, `code` and `error` keys. The
+  // client reads `error` and nothing else, so each of the three reachable
+  // framework failures is restated in the shape the contract has always used.
+  app.setErrorHandler((error, request, reply) => {
+    if (error.code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE') return unsupportedMediaType(reply)
 
-  function methodNotAllowed(res, allow) {
-    res.setHeader('Allow', allow)
-    return sendJson(res, 405, { error: `method not allowed; try ${allow}` })
-  }
-
-  // ─── POST /api/login ──────────────────────────────────────────────────────
-
-  /**
-   * Accept a username, ignore the password, answer with the username.
-   *
-   * That really is the whole handler. It exists so that the login screen has
-   * something to fail against when the service is unreachable or the deployment
-   * secret is wrong, and so the username is validated once before it becomes a
-   * stream key — not to decide whether anybody may proceed. Nothing is written:
-   * an account comes into existence when a document is stored under its name,
-   * and until then there is nothing to create.
-   */
-  async function login(req, res) {
-    if (!isJsonContentType(req.headers['content-type'])) {
-      return sendJson(res, 415, { error: `expected Content-Type: ${JSON_CONTENT_TYPE}` })
-    }
-
-    const body = await readBody(req, maxBodyBytes)
-    if (!body.ok) {
-      if (body.tooLarge) {
-        res.setHeader('Connection', 'close')
-        // No `body.error` echo of any kind beyond the limit itself: a body this
-        // route rejected may well have had a password in it.
-        return sendJson(res, 413, { error: 'login body is too large', limit: maxBodyBytes })
+    if (error.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+      // Close the connection after answering: the rest of an oversized body is
+      // not going to be read, and leaving it half-consumed would stall the socket
+      // until it timed out.
+      reply.header('Connection', 'close')
+      if (pathOf(request.url) === LOGIN_PATH) {
+        // No echo of any kind beyond the limit itself: a body this route rejected
+        // may well have carried a credential.
+        return reply.code(413).send({ error: 'login body is too large', limit: maxBodyBytes })
       }
-      return sendJson(res, 400, { error: 'could not read the request body' })
+      return reply
+        .code(413)
+        .send({ error: `body exceeds the ${maxBodyBytes} byte limit`, limit: maxBodyBytes })
     }
 
-    const checked = checkCredentials(body.text)
-    if (!checked.ok) {
-      // `checked.error` is one of a fixed set of messages that never contains
-      // any part of the request body. That is what makes it safe to log.
-      log(`400 POST ${LOGIN_PATH}: ${checked.error}`)
-      return sendJson(res, 400, { error: checked.error })
+    if (error.validation !== undefined) {
+      // `?user=` is the only schema-validated input — the two JSON bodies are
+      // checked by `checkDocument` / `checkCredentials`, which answer for
+      // themselves. So a validation failure here is always about the target, and
+      // `readUsername` states it in the contract's wording rather than AJV's.
+      const who = readUsername(request.url ?? '')
+      return reply.code(400).send({ error: who.ok ? USERNAME_ERROR : who.error })
     }
 
-    log(`login ${checked.username} (no password was read, compared, or stored)`)
-    return sendJson(res, 200, { username: checked.username })
-  }
-
-  // ─── GET /api/state ───────────────────────────────────────────────────────
-
-  function getState(url, res) {
-    const who = readUsername(url)
-    if (!who.ok) return sendJson(res, 400, { error: who.error })
-
-    const snapshot = store.latest(who.username)
-    if (snapshot === null) {
-      // 404 rather than an empty document: "nothing has ever been stored for
-      // this user" is exactly the new-device case the client needs to
-      // distinguish from "the remote holds a document with zero sessions".
-      return sendJson(res, 404, { error: 'no state has been stored yet for this user' })
+    const status = error.statusCode ?? 500
+    if (typeof error.code === 'string' && error.code.startsWith('FST_') && status < 500) {
+      // A framework rejection with no contract wording of its own — a malformed
+      // request line, say. Fastify's message is about the request's syntax and
+      // never quotes its body.
+      return reply.code(status).send({ error: error.message })
     }
-    return sendDocument(res, snapshot.docJson, snapshot)
-  }
 
-  // ─── PUT /api/state ───────────────────────────────────────────────────────
+    log(`unhandled error: ${messageOf(error)}`)
+    return reply.code(500).send({ error: 'internal error' })
+  })
 
-  async function putState(url, req, res) {
-    const who = readUsername(url)
-    if (!who.ok) return sendJson(res, 400, { error: who.error })
+  // ── GET /api/health ───────────────────────────────────────────────────────
+  //
+  // Before auth, on purpose: the whole point is to answer "is the process up"
+  // without needing a credential. It touches neither the database nor anything
+  // about any document — no row is read, no username is revealed, and the response
+  // schema pins the body to one fixed field, so it cannot become an existence
+  // oracle for an account or a leak of how much history is stored.
+  app.route({
+    method: ['GET', 'HEAD'],
+    url: HEALTH_PATH,
+    schema: { response: { 200: HealthResponse } },
+    handler: () => ({ status: 'ok' }),
+  })
 
-    if (!isJsonContentType(req.headers['content-type'])) {
-      return sendJson(res, 415, {
-        error: `expected Content-Type: ${JSON_CONTENT_TYPE}`,
+  // ── POST /api/login ───────────────────────────────────────────────────────
+  //
+  // Accept a username, ignore everything else, answer with the username.
+  //
+  // That really is the whole handler. It exists so that the login screen has
+  // something to fail against when the service is unreachable or the deployment
+  // secret is wrong, and so the username is validated once before it becomes a
+  // stream key — not to decide whether anybody may proceed. Nothing is written:
+  // an account comes into existence when a document is stored under its name, and
+  // until then there is nothing to create.
+  app.route({
+    method: 'POST',
+    url: LOGIN_PATH,
+    onRequest: requireSecret,
+    schema: { response: { 200: LoginResponse } },
+    handler: (request, reply) => {
+      const text = request.body
+      // Fastify skips parsing entirely when a request has no body *and* no
+      // content type, so there is nothing to have been a media-type error. It is
+      // still one: this route accepts exactly one media type and got none.
+      if (text === undefined) return unsupportedMediaType(reply)
+
+      const checked = checkCredentials(text)
+      if (!checked.ok) {
+        // `checked.error` is one of a fixed set of messages that never contains
+        // any part of the request body. That is what makes it safe to log.
+        log(`400 POST ${LOGIN_PATH}: ${checked.error}`)
+        return reply.code(400).send({ error: checked.error })
+      }
+
+      log(`login ${checked.username} (no password was read, compared, or stored)`)
+      return reply.code(200).send({ username: checked.username })
+    },
+  })
+
+  // ── GET /api/state ────────────────────────────────────────────────────────
+  //
+  // No `response` schema on the 200. Attaching one would hand the reply to
+  // fast-json-stringify, which is exactly the re-serialisation this route exists
+  // not to do.
+  app.route({
+    method: 'GET',
+    url: STATE_PATH,
+    onRequest: requireSecret,
+    schema: { querystring: StateQuery },
+    handler: (request, reply) => {
+      const username = request.query[USER_PARAM]
+
+      const snapshot = store.latest(username)
+      if (snapshot === null) {
+        // 404 rather than an empty document: "nothing has ever been stored for
+        // this user" is exactly the new-device case the client needs to
+        // distinguish from "the remote holds a document with zero sessions".
+        return reply.code(404).send({ error: 'no state has been stored yet for this user' })
+      }
+
+      // `Buffer.from(text, 'utf8')` plus Fastify's own `Content-Length` is what
+      // makes the round trip byte-identical: no re-encoding, no pretty-printing,
+      // no chunked-transfer surprises.
+      //
+      // The snapshot headers are advisory only. The client compares session counts
+      // read from inside the document, never a header, so a proxy that strips them
+      // changes nothing. Deliberately no `X-Snapshot-User`: the username is in the
+      // document, and a header would be a second place for it to disagree.
+      return reply
+        .code(200)
+        .header('Content-Type', JSON_CONTENT_TYPE_UTF8)
+        .header('X-Snapshot-Id', String(snapshot.id))
+        .header('X-Snapshot-Created-At', snapshot.createdAt)
+        .send(Buffer.from(snapshot.docJson, 'utf8'))
+    },
+  })
+
+  // ── PUT /api/state ────────────────────────────────────────────────────────
+  app.route({
+    method: 'PUT',
+    url: STATE_PATH,
+    onRequest: requireSecret,
+    schema: { querystring: StateQuery, response: { 200: SnapshotReceipt } },
+    handler: (request, reply) => {
+      const username = request.query[USER_PARAM]
+
+      const text = request.body
+      if (text === undefined) return unsupportedMediaType(reply)
+
+      const checked = checkDocument(text)
+      if (!checked.ok) {
+        log(`400 PUT ${STATE_PATH}: ${checked.error}`)
+        // Nothing has been written. The newest snapshot is untouched.
+        return reply.code(400).send({ error: checked.error })
+      }
+
+      if (checked.username !== username) {
+        // The one check that needs both the target and the document. A client bug
+        // that sends the wrong document — a stale one from a previous account, say,
+        // after a logout that missed a code path — would otherwise write silently
+        // into a stream it does not belong to, and the overwritten snapshot would
+        // be somebody else's training history.
+        //
+        // 400 and not 409: nothing is in conflict. One of the two names is simply
+        // wrong, and folding them together is precisely what `shared/username.ts`
+        // refuses to do.
+        const error =
+          `username mismatch: ?${USER_PARAM}=${username} but the document says ` +
+          `${checked.username}. Nothing was stored.`
+        log(`400 PUT ${STATE_PATH}: ${error}`)
+        return reply.code(400).send({ error })
+      }
+
+      // `text`, not a re-serialisation of a parsed object — there is no parsed
+      // object. See the "Bytes in, same bytes out" note in db.mjs.
+      const written = store.insert({
+        username,
+        docJson: text,
+        historyLength: checked.historyLength,
+        schemaVersion: checked.schemaVersion,
       })
-    }
 
-    const body = await readBody(req, maxBodyBytes)
-    if (!body.ok) {
-      if (body.tooLarge) {
-        // Close the connection after answering: the rest of an oversized body
-        // is not going to be read, and leaving it half-consumed would stall the
-        // socket until it timed out.
-        res.setHeader('Connection', 'close')
-        return sendJson(res, 413, { error: body.error, limit: maxBodyBytes })
-      }
-      return sendJson(res, 400, { error: `could not read the request body — ${body.error}` })
-    }
+      log(
+        `stored snapshot ${written.id} for ${username} (${checked.historyLength} sessions, ` +
+          `${text.length} bytes, pruned ${written.pruned})`,
+      )
 
-    const checked = checkDocument(body.text)
-    if (!checked.ok) {
-      log(`400 PUT ${STATE_PATH}: ${checked.error}`)
-      // Nothing has been written. The newest snapshot is untouched.
-      return sendJson(res, 400, { error: checked.error })
-    }
+      return reply.code(200).send({
+        id: written.id,
+        createdAt: written.createdAt,
+        username,
+        historyLength: checked.historyLength,
+        schemaVersion: checked.schemaVersion,
+        bytes: text.length,
+        pruned: written.pruned,
+        // This user's rows, not the table's. A count of everybody's would tell
+        // each user how much other people train.
+        retained: store.count(username),
+      })
+    },
+  })
 
-    if (checked.username !== who.username) {
-      // The one check that needs both the target and the document. A client bug
-      // that sends the wrong document — a stale one from a previous account, say,
-      // after a logout that missed a code path — would otherwise write silently
-      // into a stream it does not belong to, and the overwritten snapshot would
-      // be somebody else's training history.
-      const error =
-        `username mismatch: ?${USER_PARAM}=${who.username} but the document says ` +
-        `${checked.username}. Nothing was stored.`
-      log(`400 PUT ${STATE_PATH}: ${error}`)
-      return sendJson(res, 400, { error })
-    }
-
-    // `body.text`, not a re-serialisation of the parsed object. See the
-    // "Bytes in, same bytes out" note in db.mjs.
-    const written = store.insert({
-      username: who.username,
-      docJson: body.text,
-      historyLength: checked.historyLength,
-      schemaVersion: checked.schemaVersion,
-    })
-
-    log(
-      `stored snapshot ${written.id} for ${who.username} (${checked.historyLength} sessions, ` +
-        `${body.text.length} bytes, pruned ${written.pruned})`,
-    )
-
-    return sendJson(res, 200, {
-      id: written.id,
-      createdAt: written.createdAt,
-      username: who.username,
-      historyLength: checked.historyLength,
-      schemaVersion: checked.schemaVersion,
-      bytes: body.text.length,
-      pruned: written.pruned,
-      // This user's rows, not the table's. A count of everybody's would tell
-      // each user how much other people train.
-      retained: store.count(who.username),
-    })
+  return {
+    listen(port, host, onListening) {
+      app
+        .listen({ port, host })
+        .then(() => {
+          if (onListening !== undefined) onListening()
+        })
+        .catch((cause) => {
+          // `node:http` reports a failed bind by emitting `error` on the server,
+          // and an unhandled one takes the process down. Re-emitting keeps that
+          // behaviour: a service that cannot bind its port must not look started.
+          app.server.emit('error', cause)
+        })
+    },
+    address() {
+      return app.server.address()
+    },
+    close(done) {
+      void app.close().then(() => {
+        if (done !== undefined) done()
+      })
+    },
   }
 }
 

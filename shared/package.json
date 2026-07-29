@@ -5,10 +5,14 @@
   "type": "module",
   "description": "The wire contract and the document shape. No node:, no DOM, no behaviour — both runtimes import it.",
   "exports": {
+    "./api.ts": "./api.ts",
     "./types.ts": "./types.ts",
     "./username.ts": "./username.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "0.34.52"
   }
 }

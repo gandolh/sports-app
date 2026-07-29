@@ -47,8 +47,10 @@
  * is not a reason to add a dependency.
  *
  * The service is no longer *literally* dependency-free — it takes
- * `@sports-app/shared` for the username rule (brief 21) and brief 22 adds Fastify
- * — but nothing about either touches the storage layer. `node:sqlite` stays.
+ * `@sports-app/shared` for the username rule (brief 21) and Fastify for the HTTP
+ * layer (brief 22) — but neither touches the storage layer. This file is a **port,
+ * not a redesign**: WAL, `synchronous = FULL`, per-user retention, pruning by `id`,
+ * and the idempotent `PRAGMA table_info` guard are exactly as brief 17 left them.
  */
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'

@@ -37,6 +37,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, existsSync } from 'node:fs'
+import { spawn } from 'node:child_process'
 import { basename, dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
@@ -106,6 +107,83 @@ async function startService(options = {}) {
 
 function authorised(extra = {}) {
   return { [SECRET_HEADER]: SECRET, ...extra }
+}
+
+/**
+ * Start the service the way a deployment does — `node server/state-server.mjs`, a
+ * real child process — and capture its stdout and stderr as raw pipes.
+ *
+ * This is the harness for the one thing brief 22 could plausibly have broken
+ * silently: **Fastify logs every request by default.** Its logger is pino, and
+ * pino writes to file descriptor 1 *directly* rather than through
+ * `process.stdout.write` — so an in-process spy on `process.stdout` would report a
+ * clean run while a real deployment wrote request lines to a log file. Only a
+ * child process's pipes can see it.
+ *
+ * Port `0` so the test never collides with a real deployment; the actual port is
+ * read back out of the startup line the service prints.
+ */
+async function startServiceProcess() {
+  const root = mkdtempSync(join(tmpdir(), 'sports-app-proc-'))
+  const file = join(root, 'db', 'app.db')
+
+  const child = spawn(process.execPath, [join(PROJECT_ROOT, 'server', 'state-server.mjs')], {
+    env: {
+      ...process.env,
+      SPORTS_APP_SYNC_SECRET: SECRET,
+      SPORTS_APP_HOST: '127.0.0.1',
+      SPORTS_APP_PORT: '0',
+      SPORTS_APP_DB: file,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+
+  /** Every byte the process wrote to either stream, in order. */
+  let output = ''
+  const collect = (chunk) => {
+    output += String(chunk)
+  }
+  child.stdout.on('data', collect)
+  child.stderr.on('data', collect)
+
+  const exited = new Promise((resolve) => child.once('exit', resolve))
+  let stopped = false
+  const stop = async () => {
+    if (stopped) return
+    stopped = true
+    // SIGTERM rather than SIGKILL: the handler closes the store, which
+    // checkpoints the WAL into the main database file — the state a backup or a
+    // `sqlite3` session would see.
+    child.kill('SIGTERM')
+    await exited
+  }
+  cleanups.push(async () => {
+    await stop()
+    rmSync(root, { recursive: true, force: true })
+  })
+
+  const port = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`service did not start:\n${output}`)), 10_000)
+    const check = () => {
+      const match = /listening on http:\/\/127\.0\.0\.1:(\d+)/.exec(output)
+      if (match === null) return
+      clearTimeout(timer)
+      resolve(Number(match[1]))
+    }
+    child.stdout.on('data', check)
+    child.once('exit', () => {
+      clearTimeout(timer)
+      reject(new Error(`service exited before listening:\n${output}`))
+    })
+    check()
+  })
+
+  return {
+    base: `http://127.0.0.1:${port}`,
+    dbDir: dirname(file),
+    output: () => output,
+    stop,
+  }
 }
 
 function stateUrl(base, username) {
@@ -244,6 +322,58 @@ describe('the shared secret protects the deployment, not the accounts', () => {
     expect(response.status).toBe(401)
     expect((await response.json()).error).toBe('unauthorized')
     expect(logs.join('\n')).not.toMatch(/username: expected/)
+  })
+
+  it('answers 401 before it validates anything, on every guarded route', async () => {
+    // The ordering, stated as a property rather than as a code reading: every
+    // request below is wrong in a *second* way that a service validating first
+    // would have to report instead — an invalid username, a missing one, an
+    // unacceptable media type, an unparseable body. Each must still be a 401, or
+    // an unauthorised caller can use 400-vs-401 as an oracle for the username
+    // rules and for which routes exist.
+    const { base, store, logs } = await startService()
+    const wrong = { [SECRET_HEADER]: 'not-the-secret' }
+
+    const invalidTarget = await fetch(`${base}${STATE_PATH}?${USER_PARAM}=NOT%20A%20NAME`, {
+      headers: wrong,
+    })
+    expect(invalidTarget.status).toBe(401)
+    expect((await invalidTarget.json()).error).toBe('unauthorized')
+
+    const noTarget = await fetch(`${base}${STATE_PATH}`, { headers: wrong })
+    expect(noTarget.status).toBe(401)
+
+    const badEverything = await fetch(stateUrl(base, 'Alice'), {
+      method: 'PUT',
+      headers: { ...wrong, 'Content-Type': 'text/plain' },
+      body: 'not json at all',
+    })
+    expect(badEverything.status).toBe(401)
+    expect(store.count()).toBe(0)
+
+    const badLogin = await fetch(`${base}${LOGIN_PATH}`, {
+      method: 'POST',
+      headers: { ...wrong, 'Content-Type': 'text/plain' },
+      body: 'not json at all',
+    })
+    expect(badLogin.status).toBe(401)
+
+    // A wrong *method* on a guarded route is a 401 before it is a 405, for the
+    // same reason: a 405 with an `Allow` header would tell an unauthorised caller
+    // that the route exists and what it accepts.
+    expect((await fetch(`${base}${LOGIN_PATH}`, { headers: wrong })).status).toBe(401)
+    const deleted = await fetch(stateUrl(base, 'alice'), { method: 'DELETE', headers: wrong })
+    expect(deleted.status).toBe(401)
+    expect(deleted.headers.get('allow')).toBe(null)
+
+    // `/api/health` is the deliberate exception. Liveness needs no credential, so
+    // its 405 is available to anybody — there is nothing there to know about.
+    expect((await fetch(`${base}/api/health`, { method: 'POST' })).status).toBe(405)
+
+    // And nothing about the rules, the media type or the body was written down on
+    // the way to any of those answers.
+    expect(logs.join('\n')).not.toMatch(/expected/)
+    expect(logs.join('\n')).not.toContain('not json at all')
   })
 
   it('compares secrets in a way that accepts only the exact string', () => {
@@ -514,6 +644,57 @@ describe('the password is never stored, logged, echoed, or compared', () => {
     expect(logs.join('\n')).not.toContain(SENTINEL)
   })
 
+  it('never reaches the real process\u2019s stdout or stderr, at the file-descriptor level', async () => {
+    // The migration risk this test exists for: **Fastify logs every request by
+    // default.** `logger: false` is what switches that off, and this is what
+    // notices if it is ever switched back on — in the real process, over real
+    // pipes, because pino bypasses `process.stdout.write` entirely.
+    const service = await startServiceProcess()
+
+    const response = await fetch(`${service.base}${LOGIN_PATH}`, {
+      method: 'POST',
+      headers: authorised({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ username: 'alice', password: SENTINEL }),
+    })
+    expect(response.status).toBe(200)
+    expect(await response.text()).not.toContain(SENTINEL)
+
+    // Two writes, so the database has actually been flushed rather than never
+    // having written a page.
+    expect((await put(service.base, 'alice', docText('alice', 1))).status).toBe(200)
+    expect((await put(service.base, 'alice', docText('alice', 2))).status).toBe(200)
+
+    // SIGTERM, which checkpoints the WAL into the main file on the way out.
+    await service.stop()
+    const printed = service.output()
+
+    // 1. The credential is not in anything the process printed.
+    expect(printed).not.toContain(SENTINEL)
+
+    // 2. Nor is any request line at all. This is the assertion with teeth against
+    //    a re-enabled framework logger: Fastify's request log does not include the
+    //    body, so it would not print the sentinel — it would print one line per
+    //    request, naming the route. This service says nothing about a request it
+    //    served successfully beyond the receipt below.
+    expect(printed).not.toMatch(/api\/(login|state)/)
+    expect(printed).not.toMatch(/x-sync-secret/i)
+    expect(printed).not.toMatch(/incoming request|request completed|"reqId"/)
+
+    // 3. Positive controls: the process really is wired to these streams, really
+    //    did serve those requests, and really does log about them — through the
+    //    one log it has, which is only ever handed fixed strings.
+    expect(printed).toMatch(/listening on http/)
+    expect(printed).toMatch(/login alice/)
+    expect(printed).toMatch(/stored snapshot 2 for alice/)
+
+    // 4. And not in the database, its write-ahead log, or its shared-memory file,
+    //    as written by the real process rather than by an in-test store.
+    const onDisk = databaseBytes(service.dbDir)
+    expect(onDisk).not.toContain(SENTINEL)
+    // Again, not vacuous: the documents the same requests stored *are* findable.
+    expect(onDisk).toContain('"username": "alice"')
+  })
+
   it('has no line of code that reads .password', () => {
     // The guarantee this brief is built on, asserted against the source rather
     // than against behaviour: the handler destructures `username` and nothing
@@ -620,6 +801,26 @@ describe('username validation', () => {
       const response = await fetch(`${base}${path}?${USER_PARAM}=alice`, { headers: authorised() })
       expect(response.status, path).toBe(404)
     }
+  })
+
+  it('matches paths exactly, and gains no routes it was not given', async () => {
+    const { base } = await startService()
+
+    // `/api/state?x=1` is `/api/state` carrying a stray parameter — not a
+    // different path that could slip past a route table. The query is a separate
+    // question, answered separately.
+    const stray = await fetch(`${base}${STATE_PATH}?x=1`, { headers: authorised() })
+    expect(stray.status).toBe(400)
+    expect((await stray.json()).error).toMatch(/user: required/)
+
+    // A framework will happily synthesise `HEAD` for every `GET` route. This one
+    // has exactly two methods on `/api/state`, and `HEAD` is not one of them.
+    const head = await fetch(stateUrl(base, 'alice'), { method: 'HEAD', headers: authorised() })
+    expect(head.status).toBe(405)
+    expect(head.headers.get('allow')).toBe('GET, PUT')
+
+    // Nor is a trailing slash the same path.
+    expect((await fetch(`${base}${STATE_PATH}/`, { headers: authorised() })).status).toBe(404)
   })
 
   it('rejects an unsupported method on /api/state with 405 and an Allow header', async () => {
@@ -741,6 +942,43 @@ describe('PUT then GET round-trips byte-identically', () => {
     // Proof that the assertion above is not vacuous: a re-serialised body would
     // differ from these bytes.
     expect(JSON.stringify(JSON.parse(sent))).not.toBe(sent)
+  })
+
+  it('returns unusual-but-valid JSON formatting byte for byte, newline included', async () => {
+    const { base, store } = await startService()
+
+    // Every kind of formatting a JSON library is entitled to normalise, and one
+    // thing no other fixture in this file has: **no trailing newline.** The
+    // service appends one to its own JSON responses, so a document without one is
+    // what proves that the response path leaves a *stored* document alone rather
+    // than tidying it on the way out.
+    const sent =
+      '{"schemaVersion":3,\r\n' +
+      '        "history"   :   [ ]   ,\n' +
+      '\t"username"\t:\t"alice",\n' +
+      '  "_escapes": "tab\\there, \\u00e9\\ud83d\\ude00, \\/solidus\\/",\n' +
+      '  "_numbers": [1E2, -0.0, 5.50, 1e-7]\n' +
+      '}'
+
+    expect((await put(base, 'alice', sent)).status).toBe(200)
+
+    const read = await get(base, 'alice')
+    expect(read.status).toBe(200)
+    const returned = await read.text()
+
+    expect(returned).toBe(sent)
+    expect(returned.endsWith('\n')).toBe(false)
+    // Byte length, not character count: an accidental re-encode of the astral
+    // escape would change this and not the string comparison above.
+    expect(read.headers.get('content-length')).toBe(String(Buffer.byteLength(sent, 'utf8')))
+    expect(read.headers.get('x-snapshot-id')).toBe(String(store.latest('alice').id))
+    expect(store.latest('alice').docJson).toBe(sent)
+
+    // Proof the assertions above are not vacuous: every one of those choices is
+    // something `JSON.parse` → `JSON.stringify` would rewrite.
+    const reserialised = JSON.stringify(JSON.parse(sent))
+    expect(reserialised).not.toBe(sent)
+    expect(reserialised).not.toContain('1E2')
   })
 
   it('stores the bytes verbatim and echoes whatever schemaVersion it was given', async () => {

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "The state service. node:http, node:sqlite, and the shared contract.",
+  "description": "The state service. Fastify, node:sqlite, and the shared contract.",
   "exports": {
     "./db.mjs": "./db.mjs",
     "./state-server.mjs": "./state-server.mjs"
@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@sports-app/shared": "0.1.0"
+    "@sports-app/shared": "0.1.0",
+    "fastify": "5.10.0"
   }
 }

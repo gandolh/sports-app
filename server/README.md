@@ -1,9 +1,13 @@
 # The state service
 
-A Node service that holds a copy of each user's state document in SQLite. Its only
-dependency is `@sports-app/shared` — the username rule and the document types, which
-import nothing themselves. (Brief 22 swaps `node:http` for Fastify; brief 21 left the
-implementation alone on purpose, so that "all 611 tests still pass" meant something.)
+A **Fastify** service that holds a copy of each user's state document in SQLite. Its
+dependencies are `fastify`, and `@sports-app/shared` for the wire contract — the username
+rule, the document types, and the TypeBox schemas the routes validate against.
+
+Brief 22 replaced hand-rolled `node:http` routing with Fastify and **changed nothing on
+the wire**: same paths, methods, status codes, headers and bodies, so the client needed no
+edit. The 73 pre-existing tests in `__tests__/` are what makes that checkable rather than
+hopeful — they were written against the wire, not the implementation.
 
 It is the durability half of the persistence design: browser storage keeps the app fast
 and offline, this keeps the history alive when the phone is lost or the browser evicts
@@ -38,16 +42,26 @@ process will talk to you at all — not the accounts inside it.
 
 ## Requirements
 
-Node **≥ 22** (this uses the built-in `node:sqlite`, which is why there is nothing to
-install). Node prints
+Node **≥ 22.18**. Not 22: the service imports `@sports-app/shared/*.ts` directly and relies
+on Node's unflagged type stripping to load it, so there is no build step for the service —
+but the version that does the stripping is the floor.
+
+**There is now an install step.** Until brief 22 the service used only Node builtins plus a
+types-and-one-regex package, so deploying it was `rsync` and `pm2 restart`. Fastify has a
+dependency tree, so a server needs `npm ci --omit=dev` (or a shipped `node_modules`) before
+`node state-server.mjs` will start. That is the cost the Fastify decision was taken knowing
+about — see `corpus/wiki/technical-decisions.md § "The API is Fastify"` — and it is the one
+thing about this service a deploy has to learn.
+
+Storage is unaffected: `node:sqlite` is built in, so there is still no native
+`better-sqlite3` build — nothing to compile, nothing to rebuild after a Node upgrade. Node
+prints
 
 ```
 ExperimentalWarning: SQLite is an experimental feature and might change at any time
 ```
 
 on startup. **That warning is expected and is not a reason to add a dependency.**
-Avoiding a native `better-sqlite3` build — nothing to compile, nothing to pin, nothing
-to rebuild after a Node upgrade — is worth one line of stderr.
 
 ## Running it
 
@@ -103,6 +117,13 @@ value. Uppercase is *rejected*, not folded to lowercase: the username also lives
 the document, which is hand-editable, so silently rewriting it on the way in would make
 the stream key disagree with the document's own `username` — which is exactly the
 mismatch `PUT` refuses.
+
+**Validation is schema-driven, from `shared/api.ts`.** The wire shapes are TypeBox
+declarations in the shared workspace, so one declaration produces both the runtime guard
+here and the TypeScript type the client can use. Fastify's AJV reads them directly for
+`?user=` and for response serialisation; the two JSON *bodies* are checked here against the
+same declarations, because they have to stay raw strings — a parsed-and-re-serialised
+document is not the document that was sent.
 
 `PUT` requires `Content-Type: application/json` and a body that is a JSON object with a
 numeric `schemaVersion`, a valid `username`, and an array `history` — and the document's
