@@ -5,51 +5,57 @@ updated: 2026-07-29
 
 # Overview
 
-**sports-app** is a zero-equipment calisthenics trainer for one user, installed as
-an offline-first PWA. You open it, it already knows what today's session is, you
-follow ~12 minutes of prescribed work tapping a single large button per set, and a
-deterministic progression engine decides what comes next from what you actually
-logged. No accounts, no social features, no streaks.
+**sports-app** is a zero-equipment calisthenics trainer, installed as an offline-first
+PWA. You open it, it already knows what today's session is, you pick how hard a day
+you're having, and you work through the exercises one page at a time tapping Next.
+It takes about twelve minutes. It never asks you anything else.
 
-The full grilled design — every decision plus the reasoning that settled it — is
-[`../../SPEC.md`](../../SPEC.md). This wiki is the synthesis layer on top of it.
+**The app measures nothing.** There is no counter, no completion signal, and no
+adaptation — the prescription grows on a fixed schedule at roughly one ladder rung
+every six weeks, and pressing Next means only that you're ready for the next thing.
+That is the governing design decision and it is what makes everything else small; see
+[decisions.md](decisions.md).
+
+[`../../SPEC.md`](../../SPEC.md) is the v1 design document and is **partly superseded**
+— it describes the adaptive engine this app no longer has. Where it disagrees with
+this wiki, the wiki wins until SPEC.md is revised.
 
 ## Who it's for
 
-One person: a returning beginner (the repo owner). That single fact removes an
-enormous amount of scope — no auth, no onboarding, no privacy policy, no
-multi-tenant anything — and makes it possible to do things a product couldn't,
-like using a hand-editable JSON file as the source of truth instead of building an
-admin UI.
+A returning beginner, training at home on the floor in one room with no equipment at
+all. v2 added weak multi-user support (a username, a password nobody checks) so a
+second person can train on the same deployment — but the product is still shaped by
+one person's constraints, not by a market.
 
 ## The constraints that shaped everything
 
-- **Zero equipment, no purchases.** A hard user constraint. Its consequence is
-  stated openly rather than hidden: v1 cannot train pulling *strength*, only
-  scapular retraction and upper-back endurance. See
-  [decisions.md](decisions.md#zero-equipment-and-the-pull-gap).
-- **Sweaty hands, phone on the floor.** Mid-workout, every tap is expensive. This
-  killed the logging-app design and produced the guided player.
-- **Decision fatigue is the real enemy.** For a returning beginner, workouts fail
-  because "I don't know what to do today," so the app must arrive with the answer
-  already made.
-- **A missed day must not feel like failure.** This is why the cycle advances on
-  training rather than on the calendar.
+- **Zero equipment, no purchases.** A hard constraint, reaffirmed three times. Its
+  consequence is stated openly rather than hidden: the app cannot train pulling
+  *strength*, only scapular retraction and upper-back endurance.
+- **Sweaty hands, phone on the floor.** Mid-workout every tap is expensive. This
+  killed the logging-app design and produced the one-exercise-per-page player.
+- **Decision fatigue is the real enemy.** Workouts fail because "I don't know what to
+  do today," so the app must arrive with the answer already made.
+- **A missed day must not feel like failure.** This is why there is no date anywhere
+  in the app and the rotation advances on training, not on the calendar.
+- **Trust over measurement.** Any feature that needs to know what you actually did
+  cannot exist here. That is a constraint, and it removed about half the codebase.
 
 ## The cast
 
 | Piece | Job |
 |---|---|
-| **Progression engine** | Pure functions: history → today's prescription. The intellectual core. See [progression-engine.md](progression-engine.md). |
-| **Ladder content** | Typed data. Five movement patterns, each a list of rungs (movement + modifier) with form cues. |
-| **Session player** | The guided UI: timestamped rest timer, wake lock, big Done button, effort tap. |
-| **State document** | One human-readable JSON blob. Local-first, backed up as snapshot rows in a SQLite database. |
-| **Figures** | Ten SVG pose pairs on a rigid grid, with per-rung overlays. |
+| **The schedule** | Pure functions: sessions completed → today's prescription. One interpolation, no branches. See [progression-engine.md](progression-engine.md). |
+| **Ladder content** | Typed data. Five movement patterns, each a list of rungs (movement + modifier) with form cues and its own evidence-based cap. |
+| **The player** | One exercise per page: animated figure, the number, three dots, a Next button. |
+| **State document** | One human-readable JSON blob per user. Local-first, backed up as snapshot rows in SQLite. |
+| **Figures** | Five SVG poses, animated on a clock driven by each rung's modifier data. |
 
 ## Top-level layout
 
 ```
-SPEC.md      the grilled v1 design — product source of truth
+SPEC.md      the v1 design — partly superseded by the v2 grill
 corpus/      this wiki + the brief lifecycle
-src/         the app (created by brief 01)
+src/         the app
+server/      the zero-dependency SQLite state service
 ```

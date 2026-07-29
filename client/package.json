@@ -1,0 +1,26 @@
+{
+  "name": "@sports-app/client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Zero-equipment calisthenics trainer. Offline-first PWA.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@base-ui/react": "1.6.0",
+    "@sports-app/shared": "0.1.0",
+    "@tanstack/react-query": "5.101.4",
+    "@tanstack/react-router": "1.170.18",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-hook-form": "7.83.0"
+  },
+  "devDependencies": {
+    "@sports-app/server": "0.1.0"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    /* No `DOM`, and no `types` at all. This is the second half of the "no DOM"
+       constraint on `shared/`, and it is the half that fails *first*: `document`
+       is not a name in this project, so touching it is TS2584 before the
+       `shared/**` block in eslint.config.js ever gets a chance to report it.
+
+       `types: []` rather than omitted, because an empty array switches off the
+       automatic inclusion of every `@types/*` package hoisted into the root
+       `node_modules` — including `@types/react` and Vite's client types, which
+       would otherwise smuggle `document` and `window` back in from the client's
+       dependency tree. */
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": ["**/*.ts"]
+}

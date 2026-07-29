@@ -1,97 +1,137 @@
 ---
-summary: Module layout, dependency direction, and the pure-core/imperative-shell boundary that keeps the engine testable.
+summary: The three npm workspaces, the dependency direction across them, and the pure-core/imperative-shell boundary inside the client.
 updated: 2026-07-29
 ---
 
 # Architecture
 
-A single Vite + React + TypeScript package. The organising idea is a **pure core
-with an imperative shell**: everything that decides *what you should do* is a pure
-function over plain data, and everything that touches a browser API is pushed to
-the edge.
+**Three npm workspaces — `client`, `server`, `shared`.** Inside the client the organising
+idea is a **pure core with an imperative shell**: everything that decides *what you should
+do* is a pure function over plain data, and everything that touches a browser API is
+pushed to the edge.
 
-That boundary is the whole reason the engine is trustworthy. `domain/` has no
-imports from anywhere else in `src/`, so the progression rules can be simulated
-across hundreds of synthetic sessions in milliseconds with no DOM, no storage, and
-no clock.
+That boundary is enforced by [`../../eslint.config.js`](../../eslint.config.js), not by
+convention — `client/src/domain/**` cannot import the shell, touch a browser global, call
+`new Date()` / `Date.now()`, or call `Math.random()`. Treat it as infrastructure.
 
-## Planned layout
+**v2 note.** The core got much smaller. With no adaptation there is no rule table to
+simulate and no derived state to repair, so `domain/` is now content data plus one
+interpolation. The boundary still matters — it is what makes the schedule testable
+without a browser — but it is guarding far less.
+
+## Layout — three npm workspaces
+
+*Restructured 2026-07-29. `shared/` exists to kill a duplication the build was papering
+over: the username rule lived in both the service and the client codec, kept honest by a
+test asserting the two regexes matched.*
 
 ```
-src/
-  domain/                  PURE. Imports nothing from src/. No browser APIs, no Date.now().
-    types.ts               Pattern · Rung · Ladder · StateDoc · SessionResult · SetResult
-    ladders.ts             the five ladders as typed content data
-    engine.ts              nextSession() · applySession() · isClean()
-    progress.ts            progressIndex() and chart series derivation
-    __tests__/             unit tests + the simulation harness
+shared/                    THE WIRE CONTRACT. No node:, no DOM — both runtimes import it.
+  types.ts                 Pattern · Variant · SessionResult · StateDoc · schemaVersion
+  username.ts              the one username rule, formerly duplicated in two places
+  api.ts                   TypeBox schemas + types for the four endpoints (brief 22)
 
-  persistence/             owns the StateDoc lifecycle
-    codec.ts               parse/serialise + schemaVersion + migrations
-    store.ts               local read/write, navigator.storage.persist()
-    sync.ts                PUT/GET the state document against the SQLite service
+client/                    the PWA
+  src/domain/              PURE. Imports shared/ and nothing else from the repo.
+    ladders.ts             the five ladders as typed content data, per-rung caps
+    schedule.ts            prescribe() · recordSession() · toSessionResult() · rungIndexAt()
+    milestones.ts          milestones reached + cumulative work, for /account
+  src/persistence/         the StateDoc lifecycle, keyed by username
+    codec.ts  store.ts  session.ts  sync.ts
+  src/session/             the imperative shell around a live workout
+    useSession.ts  timer.ts  wakeLock.ts
+  src/ui/
+    routes/                TanStack Router: / · /week · /account · /login
+    components/  figures/  ExerciseFigure.tsx
+  src/main.tsx
 
-  session/                 the imperative shell around a live workout
-    useSession.ts          player state machine (idle → work → rest → done)
-    timer.ts               timestamp-based elapsed; never trusts setInterval
-    wakeLock.ts            navigator.wakeLock acquire/release
-    audio.ts               WebAudio beep (primary) + speechSynthesis (best-effort)
-
-  ui/
-    App.tsx  HomeScreen  PlayerScreen  ProgressScreen  SettingsScreen
-    ExerciseFigure.tsx     renders a placeholder box until a figure exists
-    figures/               SVG pose pairs + per-rung overlays
-
-  main.tsx
+server/                    the service. Fastify since brief 22.
+  state-server.mjs         /api/state · /api/login · /api/health, on Fastify
+  db.mjs                   node:sqlite snapshot rows, one stream per username
 ```
+
+**The service is Fastify as of brief 22, and the files did not move.** The brief sketched a
+`server/src/` layout in TypeScript; it stayed `server/*.mjs` in place, because moving it
+would have meant editing the 73 tests that are the migration's only proof — including two
+assertions that read `server/state-server.mjs` and `server/db.mjs` as source text — and
+because `db.mjs` derives the `db/` location from its own directory. `eslint.config.js`
+predicted this: its Node-globals block is scoped `server/**/*.mjs` with a note saying it is
+about the runtime, not the HTTP library, and should survive brief 22 unchanged. It did.
+
+**`shared/` holds data shapes and validation, never behaviour.** The ladders, the schedule
+and the milestones stay in the client — they are logic the server has no business knowing,
+and putting them in `shared/` would make the service depend on training content it never
+reads.
 
 ## Dependency direction
 
 ```
-ui  ──►  session  ──►  domain
+ui  ──►  session  ──►  domain  ──►  shared  ◄──  server
  │                        ▲
  └──►  persistence  ──────┘
 ```
 
-Nothing points back the other way. Specifically:
+`shared/` is the only thing both runtimes may import, and it imports nothing. Nothing else
+points back the other way. Specifically:
 
-- `domain/` may not import `persistence/`, `session/`, `ui/`, or any browser API.
-- `domain/` may not read the clock. A session's timestamp is **passed in** by the
-  caller. This keeps the engine deterministic and its tests reproducible.
+- **`shared/` may not import `node:` anything, touch the DOM, or contain behaviour.** It is
+  a browser bundle's dependency and a Node service's dependency at the same time.
+- `domain/` may not import `persistence/`, `session/`, `ui/`, or any browser API, and
+  may not read the clock — a session's timestamp is **passed in**.
 - `persistence/` knows the shape of `StateDoc` but nothing about React.
-- `session/` is the only place `wakeLock`, `speechSynthesis`, and `WebAudio` are
-  touched, each behind a capability check with a no-op fallback.
+- `session/` is the only place `wakeLock` and any timer is touched, each behind a
+  capability check with a no-op fallback.
+- **`ui/` may not read a timestamp from history.** No dates anywhere is a product
+  invariant with a mechanical test, not a styling preference.
 
 ## Data flow through one session
 
 ```
-StateDoc  ──engine.nextSession()──►  Prescription
-                                          │
-                                    PlayerScreen
-                                          │  (Done taps, rep adjustments, effort)
-                                          ▼
-                                     SessionResult
-                                          │
-StateDoc' ◄──engine.applySession()────────┘
+StateDoc ──prescribe(state, variant)──►  Prescription
+                                              │
+                                        the player pages
+                                              │  (Next taps only — nothing measured)
+                                              ▼
+                                         SessionResult
+                                              │
+StateDoc' ◄──recordSession()──────────────────┘
    │
-   ├──► store.save()      local, immediately
+   ├──► store.save()      local, immediately, keyed by username
    └──► sync.push()       fire-and-forget, failure is non-fatal
 ```
 
-`applySession` is the only function that advances cycle position and ladder rungs.
-Everything else reads.
+`recordSession` is the only function that advances the rotation position and the
+per-pattern counters. It contains no conditionals — see
+[progression-engine.md](progression-engine.md).
+
+## The player, mechanically
+
+One page per exercise. The page holds the figure, the target number, and three dots
+(two on the daily core/posture block). Tapping Next fills a dot; the last tap advances
+to the next exercise. On a hold, a start button runs an **orientative** countdown ring
+which never gates anything — Next is always live, because the app trusts the user.
+
+Rest between sets is simply however long you take before tapping. There is no rest
+timer, because a rest timer would be the app measuring something.
 
 ## Offline posture
 
-Nothing on the session-critical path may require network. The service worker
-precaches the app shell; `sync.push()` is fire-and-forget and a failure is logged,
-never surfaced as a blocking error. The one deliberate exception in the design was
-an external "show me" video link — **that exception is gone**, since figures are
-now hand-authored and bundled.
+Nothing on the session-critical path may require network. The service worker precaches
+the app shell; `sync.push()` is fire-and-forget and a failure is logged, never
+surfaced as a blocking error. **`/login` must work offline** — the username is stored
+locally and the password is never checked, so there is nothing to verify against a
+server.
+
+## Multi-user, weakly
+
+A username keys its own state document, locally and in SQLite. The password is
+accepted and discarded in the request handler; nothing stores or compares it. See
+[decisions.md](decisions.md#multi-user-with-passwords-that-are-never-checked) — this
+is not a security boundary and no feature may treat it as one.
 
 ## What does not exist, on purpose
 
-No router library (a handful of screens, one piece of state), no charting library
-(see [decisions.md](decisions.md#charts-are-hand-rolled-svg-and-never-plot-raw-reps)),
-no state management library (the StateDoc plus one reducer), no backend beyond a
-file cabinet, no code graph (see [`../routing.md`](../routing.md)).
+No charting library (charts are gone — a fixed schedule is a straight line), no state
+management library (one document plus one reducer), no simulation harness (nothing
+adapts, so there is no emergent behaviour to simulate), no rest timer, no audio cues,
+no backend beyond a file cabinet, no code graph (see [`../routing.md`](../routing.md)).

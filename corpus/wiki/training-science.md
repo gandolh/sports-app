@@ -1,5 +1,5 @@
 ---
-summary: Evidence base for the programme — what the five slots actually train, which muscles get nothing, and why cardio cannot fit in the session.
+summary: Evidence base for the programme — what the five slots actually train, which muscles get nothing, the isometric and concurrent-training ceilings, and what the fixed schedule costs.
 updated: 2026-07-29
 ---
 
@@ -119,18 +119,56 @@ out at just 30–60 min/week (already reached here), and **strength + aerobic co
 gives 40% all-cause / 46% CVD reduction**. Marginal return on more strength is small;
 marginal return on *any* aerobic work is large.
 
-**It cannot fit inside 12 minutes.** Converting to a circuit forces rest below 60s,
-makes sets fatigue-limited rather than effort-limited so proximity-to-failure becomes
-uncontrolled, and still yields only the wrong kind of ~8–10 vigorous minutes.
+**It cannot fit inside a strength session** — as a circuit it forces rest below 60s,
+makes sets fatigue-limited rather than effort-limited, and still yields the wrong kind
+of vigorous minutes. Circuits are the weakest per minute for cardio fitness *and* the
+most damaging to the strength stimulus. Hence cardio's own day.
 
-**The fix is very cheap: stair-climbing "exercise snacks."** 3 × 20–30s vigorous stair
-ascent, 3×/week → +5% to +7% VO2peak in RCTs (one trial: +2.5 mL/kg/min vs +1.0 for 40
-min of moderate cycling). **Total cost 60–90 seconds a day.** Do not go below 20s bouts —
-10s bouts gave +4% where 20s gave +10%. Plus brisk walking for guideline minutes, which
-is not substitutable by snacks.
+Brisk walking for guideline minutes remains outside the app's scope and is not
+substitutable by anything in it.
 
-Circuits are the *weakest* per minute for cardio fitness and the most damaging to the
-strength stimulus. They must not become the cardio plan.
+## Concurrent training — the ordering is what matters
+
+*Reviewed 2026-07-29 to place the cardio day in the rotation.*
+
+Interference is **maximised when HIIT at 95–100% VO2max runs alongside resistance work
+at ≥10RM** — which is exactly hard intervals plus 5–12-rep bodyweight sets. This
+programme sits squarely in the risk zone, so placement is not cosmetic.
+
+The mitigation the literature actually supports is order, not distance: **strength
+first, conditioning after.** Same-session work needs ≥6h separation for the AMPK/mTOR
+pathways not to compete; across adjacent days, `Legs → Cardio → Push` is the correct
+direction and `Cardio → Legs` is the wrong one.
+
+**Frequency is not the lever; volume is.** The dose-response meta-regressions find
+frequency's effect on hypertrophy compatible with negligible once weekly volume is
+matched. So there is nothing to gain from training legs more often — only from hitting
+5–9 direct sets per pattern per week with correct separation. With daily training you
+cannot avoid cardio landing adjacent to legs unless legs days go back-to-back, which
+breaks 48-hour recovery; the achievable optimum is therefore the order alone.
+
+## Isometric holds have a ceiling, and it is low
+
+*Reviewed 2026-07-29 to set the per-rung caps in [decisions.md](decisions.md#hold-durations-are-capped-by-evidence-not-by-symmetry).*
+
+- **McGill programs 10-second holds in a reverse pyramid**, not long holds — the goal
+  is priming stability, not exhausting the muscle. Two of the Big 3 are isometric by
+  design, which is why the holds were kept rather than converted to reps.
+- **Past 60s transfer drops sharply; past ~2 minutes it is meaningless or harmful** —
+  most people are no longer training the core, only practising discomfort while form
+  degrades. Population norms are ~106s (women) / ~118s (men), so a 60s cap is not a
+  low bar.
+- **Scapular work is prescribed at 5–10s per position**, beginners 10s building to 30s,
+  with longer variants at 30–60s. ACE's prone scapular series is short holds with
+  multiple reps, performed daily — which is what justifies the daily posture block.
+- The tuck L-sit cap is set by **the wrists**, not the abdominals.
+
+## What the fixed schedule costs against this evidence
+
+v2 removed adaptation entirely, which collides with the strongest finding on this page:
+a fixed schedule cannot target 0–2 reps in reserve. The full accounting — including why
+the adaptive engine was no better at it — is in
+[progression-engine.md](progression-engine.md#the-cost-recorded-rather-than-argued-away).
 
 ## Posture: strengthening beats stretching
 
