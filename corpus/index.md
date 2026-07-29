@@ -17,7 +17,7 @@ pages. See [CLAUDE.md](CLAUDE.md) for the conventions and the retrieval budget.
 
 <!-- BEGIN CATALOG -->
 
-- [wiki/architecture.md](wiki/architecture.md) — Module layout, dependency direction, and the pure-core/imperative-shell boundary — plus what v2's fixed schedule removed from it.
+- [wiki/architecture.md](wiki/architecture.md) — The three npm workspaces, the dependency direction across them, and the pure-core/imperative-shell boundary inside the client.
 - [wiki/decisions.md](wiki/decisions.md) — Locked product and programme calls with the reasoning that settled them — read before proposing an alternative.
 - [wiki/design-system.md](wiki/design-system.md) — Design tokens and the doctrine governing them — colour, type, spacing, motion, anti-patterns, and the floor-phone accessibility floor.
 - [wiki/open-questions.md](wiki/open-questions.md) — Only the genuinely unresolved. Answered questions are deleted from here, not archived.

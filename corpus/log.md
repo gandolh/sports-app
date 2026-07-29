@@ -506,3 +506,38 @@ the *norm* rather than an exception, since a rung is one movement plus a modifie
 Deploy integration is not started. The user asked mid-run whether the service could be a
 Fastify REST API — it is already REST; whether it becomes Fastify is an open decision
 against the zero-dependency call in `technical-decisions.md`.
+
+## 2026-07-29 — reversing the zero-dependency service: Fastify, and three workspaces
+
+The user asked whether the server could be a Fastify REST API with the frontend talking to
+it over REST. **Half of that was already true** — the client makes four `fetch` calls
+against `/api/state`, `/api/login` and `/api/health`, so the wire protocol was never the
+question. What was being asked was whether to replace the implementation underneath.
+
+I put the trade to the user rather than deciding it: at four endpoints Fastify replaces
+about 300 lines of hand-rolled but *tested* HTTP plumbing, and the real cost is not code
+aesthetics but that **deploying stops being a file copy and gains an install step on the
+server** — which was the entire value of the zero-dependency choice. The user chose to
+migrate, and additionally to restructure into **npm workspaces with `client`, `server` and
+`shared`**.
+
+`shared/` earns its place for a specific reason rather than as a habit: the username rule
+currently exists in *both* `server/db.mjs` and `src/persistence/codec.ts`, kept honest by a
+test asserting the two regexes match. One definition imported twice is strictly better than
+two definitions plus a test that they agree. The constraint that follows is that `shared/`
+holds **data shapes and validation, never behaviour** — it is a dependency of a browser
+bundle and a Node service at the same time, so it may not import `node:*` or touch the DOM,
+and that will be enforced by an ESLint rule rather than a comment, the same way the
+`domain/` purity boundary already is.
+
+**Filed as two briefs, not one.** 21 moves the tree and must end with all 611 tests still
+passing; 22 swaps the HTTP layer with those tests as the contract. A behavioural change
+hidden inside a hundred-file move is close to unreviewable, and "the move is green" is only
+a meaningful signal if nothing else changed at the same time.
+
+Two things brief 22 is most likely to break silently, so both are called out in it: Fastify
+will happily parse and re-stringify JSON, which would destroy the byte-verbatim round-trip
+the client's crash-safe save depends on; and Fastify logs requests by default, which would
+quietly defeat the five tests asserting the password never reaches the database or the logs.
+
+`decisions.md` is unchanged by any of this — the product did not move, only the plumbing.
