@@ -9,3 +9,8 @@ db         # brief 11 — gitignored SQLite database
 # the layer guard shipped as an ESLint rule, so scripts/check-layers.mjs was
 # never created and never will be. Listed to keep the check's signal clean.
 scripts
+
+# Brief 21 restructures the repo into three npm workspaces. Remove each entry as
+# its directory lands -- lint warns once it exists, which is the reminder.
+client     # brief 21 -- the PWA workspace
+shared     # brief 21 -- the wire contract, imported by both runtimes
