@@ -72,3 +72,12 @@ you need doesn't exist, note it in your outcome rather than adding it to `domain
 - Manual: with a fresh empty document, the screen renders without errors.
 - Dark and light both legible (verify `currentColor` is actually inherited).
 - No new runtime dependency added to `package.json`.
+
+---
+
+## SUPERSEDED 2026-07-29 — the v2 grill
+
+Charts are gone. A fixed schedule plotted against session number is a straight line
+containing no information, which is the design being honest rather than a rendering
+problem. `progressIndex` and `src/domain/progress.ts` are deleted by **brief 15**. The
+account page instead shows milestones and cumulative work — **brief 20**.

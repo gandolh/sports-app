@@ -26,6 +26,6 @@ pages. See [CLAUDE.md](CLAUDE.md) for the conventions and the retrieval budget.
 - [wiki/progression-engine.md](wiki/progression-engine.md) — How the app decides today's prescription — the fixed 6-week-per-rung schedule, why it needs no input, and the interpolation that makes state a single integer per pattern.
 - [wiki/status.md](wiki/status.md) — Dated snapshot of where every brief stands and what's next.
 - [wiki/technical-decisions.md](wiki/technical-decisions.md) — Locked stack, storage, routing, timer and rendering choices — read before proposing an alternative implementation.
-- [wiki/training-science.md](wiki/training-science.md) — Evidence base for the programme — what the five slots actually train, which muscles get nothing, and why cardio cannot fit in the session.
+- [wiki/training-science.md](wiki/training-science.md) — Evidence base for the programme — what the five slots actually train, which muscles get nothing, the isometric and concurrent-training ceilings, and what the fixed schedule costs.
 
 <!-- END CATALOG -->

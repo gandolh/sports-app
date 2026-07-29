@@ -38,19 +38,24 @@ there is nothing to measure with.
 
 ## 2 — Does the cue text actually stop anyone from a rung they can't do?
 
-The schedule reaches the hollow hold at ~3 months, the couch-anchored nordic negative
-at ~4, and the tuck L-sit at ~5.5, **on a clock rather than on readiness, with no
-mechanism to step back**. The user chose to rely on each rung's own safety cue rather
-than cut the rungs, gate them, or add a manual rung control
+The schedule reaches `core-04-hollow-hold` at ~3 months, `core-05-hollow-rock` at ~4,
+`core-06-tuck-l-sit` at ~5.5, `squat-07-assisted-single-leg` at ~7, and
+`push-09-archer` at ~8 — **on a clock rather than on readiness, with no mechanism to
+step back**. The user chose to rely on each rung's own safety cue rather than cut the
+rungs, gate them, or add a manual rung control
 ([decisions.md](decisions.md#accepted-risk--the-schedule-prescribes-risky-rungs-on-time-not-on-readiness)).
 
 This is a **watched accepted risk**, not an unmade decision. The open part is
 empirical: a paragraph is a weaker brake than not being asked, and we do not know
 whether it holds.
 
-**How we'll answer it:** the first real encounter with `hinge-05-nordic-negative`
-at roughly session 90. If the cue is ignored once, the mitigation to reach for is the
-one-time unlock, which was designed and costs one tap twice a year.
+**The first encounter is now the hollow hold at ~session 84, not the nordic negative** —
+the nordic is gone, removed by brief 15's floor-only fix rather than for safety. That
+makes the first test of this a lumbar-extension failure rather than a hamstring strain,
+which is a materially gentler place to find out.
+
+**How we'll answer it:** if a cue is ignored once, the mitigation to reach for is the
+one-time unlock, which was designed and costs one tap roughly twice a year.
 
 ## 3 — Will the squat ladder stall at the split-squat jump?
 

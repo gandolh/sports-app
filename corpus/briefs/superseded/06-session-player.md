@@ -84,3 +84,12 @@ hook into the events you emit. No warmup — brief 08.
   [open-questions.md](../../wiki/open-questions.md).
 - Completing a session advances `cyclePosition` and `sessionsCompleted` exactly once.
 - Wake-lock and stepper paths work in a browser where `navigator.wakeLock` is absent.
+
+---
+
+## SUPERSEDED 2026-07-29 — the v2 grill
+
+The adaptive engine this player fed no longer exists. It was built around a rest
+timer, a big Done button per set, and an effort tap — all three are gone. Its
+replacement is **brief 19**, whose player is one page per exercise with three dots and
+an orientative countdown that gates nothing.

@@ -117,3 +117,11 @@ ladders.
 - Print the full content set as a readable table and re-run brief 03's discriminability
   gate on the changed rungs: read adjacent rungs back to back and confirm the cues alone
   tell you what to do differently. **Report your honest verdict.**
+
+---
+
+## SUPERSEDED 2026-07-29 — the v2 grill
+
+Split and rewritten. The floor-only content fixes and the cardio day move into
+**brief 15**, which is editing `ladders.ts` anyway for the per-rung caps; the extras
+pool is dropped, since the user removed the extras section in the second grill.

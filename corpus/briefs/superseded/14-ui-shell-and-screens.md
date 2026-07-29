@@ -183,3 +183,14 @@ index and never time.** Settings as a plain text row at the bottom.
   session (must be ≤10), whether `Start` is visible without scrolling at 360×640 with cues
   expanded, and whether the ring and hero numeral are legible at arm's length.
 - Report which anti-patterns from the design system you were tempted by and rejected.
+
+---
+
+## SUPERSEDED 2026-07-29 — the v2 grill
+
+Six routes became four, charts and the extras pool were dropped, the effort picker
+returned as a per-session load dial, and the player mechanics changed completely.
+Enough of the spec is now wrong that editing it would be less honest than replacing it.
+Successor is **brief 19**, which keeps this brief's two mechanical enforcement tests
+(no dates in `src/ui/`, home DOM identical at 1 day vs 400 days) and its Base UI /
+TanStack choices.

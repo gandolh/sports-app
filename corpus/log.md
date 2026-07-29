@@ -324,3 +324,106 @@ One tradeoff dissolved rather than accepted: the user chose expanded cues on the
 cards, which pushes `Start` below the fold on a small phone. Making `Start` a **sticky
 bottom dock** (mirroring the player's) gives expanded cues *and* one-tap-to-begin, so there
 is nothing to trade.
+
+## 2026-07-29 — second grill: the app stops measuring, and half the codebase goes with it
+
+A second adversarial grill on the whole concept, run against a much simpler product
+statement from the user: one home page with today's training and three variants, all the
+exercises shown one by one with a next button, **no counter, trusting the user**, a
+dashboard, a calendar-style week page, weak auth, animated SVG figures, and **no time
+tracking**.
+
+Five collisions with locked v1 decisions, resolved in this order:
+
+1. **"No counter, trusting the user" vs. the engine's only input.** `SetResult.actualValue`
+   and the 3-miss regress rule were the sole mechanism by which a ladder could go *down*.
+   Four options were offered — cap the ladder, two buttons per exercise, a fixed ramp, or a
+   pre-filled counter. The user rejected all four: *"trust the user. Don't adapt."* That is
+   now the governing decision and it deletes the adaptive engine outright.
+2. **"No time tracking" vs. 12 timed rungs.** Kept as timed holds with tiered times, plus
+   an **orientative countdown with a start button that gates nothing** — Next is always
+   live. Converting the holds to reps was rejected, which was the right call: two of
+   McGill's Big 3 are isometric by design.
+3. **A calendar page vs. no dates anywhere.** Resolved as the **next 7 sessions**, no
+   dates. The invariant survived completely intact — and then survived again when the user
+   picked milestones and total-work-ever for the account page over a consistency chart, both
+   of which key off session number rather than a clock.
+4. **Three variants** became a per-session easy/medium/hard **load dial** (±2 reps / ±5s),
+   independent of the schedule. This partly reverses "no effort input anywhere", and the
+   reversal is sound for a reason worth recording: the old objection was that the *engine*
+   read the signal badly. The engine no longer reads anything, so a picker that feeds
+   nothing cannot corrupt anything.
+5. **Auth** went from "single user, no auth" to multi-user with passwords that are
+   **accepted and discarded**. Storing an unchecked password collects real reused passwords
+   for no benefit whatsoever.
+
+### The pacing law, which was a genuinely satisfying result
+
+The user gave three step sizes at three different moments — +1 rep per 2 sessions, ~+1s
+for core, +1s per 2 sessions for posture — and asked me to tweak the numbers as needed.
+They are all one rule: **a rung takes ~6 weeks, and the step is the span divided by the
+sessions in it.** Nothing the user specified had to be overridden. Expressed as
+interpolation rather than accumulation, it also gives top-of-ladder cycling and
+re-tunable per-rung caps for free, with no special case for either.
+
+### Corrections I had to make mid-grill
+
+- I presented a 3-day and a 6-day rotation as different options. `P·L·C·P·L·C` **is**
+  `P·L·C` — the same sequence written twice. The only real variable was ordering.
+- The arithmetic on the user's stated step exposed that **core rungs would take 50 weeks
+  each** against push's 7, from two compounding causes (a 1s step across a 25s span is 25
+  increments; core trained once per 7-day cycle). Fixing it produced the daily core and
+  posture block, which the posture evidence independently supports.
+- I claimed "where you are on each ladder" was the most useful account-page stat. The user
+  declined it. Fair — the most recent milestone per pattern carries nearly the same
+  information, and today's page already shows the patterns being trained.
+
+### Research commissioned during the grill
+
+- **Isometric ceilings are much lower than the ladders assumed.** McGill programs
+  **10-second holds in a reverse pyramid**; transfer drops sharply past 60s and past ~2
+  minutes it is meaningless or harmful. Caps set per rung: plank 60s, side plank 45s/side,
+  hollow hold 45s, tuck L-sit 30s (wrist-limited, not abdominal-limited), prone Y/T 30s.
+- **Concurrent-training interference is real and this programme sits in its risk zone** —
+  it peaks with HIIT at 95–100% VO2max alongside resistance work at ≥10RM, which is exactly
+  hard intervals plus 5–12-rep bodyweight sets. The mitigation is *order*, not distance:
+  strength first, conditioning after.
+- **Volume beats frequency for hypertrophy** — frequency's effect is compatible with
+  negligible once weekly volume is matched. Combined with the fact that daily training
+  makes legs/cardio adjacency unavoidable (unless legs days go back-to-back, breaking 48h
+  recovery), that settles the rotation at `Push · Legs · Cardio` with cardio always
+  *following* legs.
+
+### Accepted risk, recorded not relitigated
+
+With no adaptation the schedule prescribes rungs on a clock rather than on readiness. I
+recommended cutting the injurious rungs or gating them behind a one-time unlock; the user
+chose to rely on each rung's own safety cue. Standing, with one presentation consequence:
+**on a `safetyCritical` rung the first cue renders first and visually separated.**
+
+One thing improved without anyone choosing it: brief 15 removes the couch-anchored nordic
+negatives for a *floor-only* reason (superseded brief 13 had already specified the sliding
+leg curl replacement), so the first risky rung the user meets is a hollow hold at ~session
+84 rather than a hamstring-strain mechanism at ~4 months.
+
+### Corpus changes
+
+Rewrote `decisions.md`, `progression-engine.md`, `architecture.md`, `overview.md`,
+`technical-decisions.md`, `open-questions.md`, `status.md`, and the invariants and
+source-of-truth ordering in `CLAUDE.md`. New page `wiki/programme.md`, split out when
+`decisions.md` passed the 200-line cap — the lint gate caught both that and
+`training-science.md` going over. **`SPEC.md` dropped from rank 2 to rank 4** in the
+source-of-truth ordering: it describes an adaptive engine the app no longer has, and
+leaving it at rank 2 would have made every future agent implement the wrong product.
+
+Four open questions deleted as answered or dissolved (the fast-track over-advance, rung
+discriminability, the missing interior fixed point, descending calibration). Five filed,
+of which #1 — **is six weeks per rung right?** — is the only number in the programme with
+no evidence behind it.
+
+Briefs 06, 07, 08, 09, 13 and 14 superseded with outcome notes. Briefs 15–20 filed.
+`lint.sh` now reads `package.json` to distinguish npm subpath specifiers from repo paths,
+which had been producing a false stale-path warning.
+
+Also: the repo had **zero commits** across ~30 files until this session. The v1 tree is now
+committed as a baseline before any of the above touched code.
