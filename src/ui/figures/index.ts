@@ -30,6 +30,25 @@
  *     top from `Rung.modifier` by `ExerciseFigure.tsx`. A new rung therefore
  *     never needs a new drawing, only new modifier data.
  *
+ * ## Motion
+ *
+ * The two frames are not merely crossfaded: their opacities are driven by a
+ * **timeline derived from `Rung.modifier`** (`motion.ts`). Three rules follow,
+ * and they are as load-bearing as the drawing rules above:
+ *
+ *   - **A figure component never animates itself.** No `<animate>`, no
+ *     transition, no per-pose duration. A pose is a still drawing; the clock is
+ *     one module, so adding a rung cannot require touching a drawing and two
+ *     rungs sharing a pose cannot accidentally share a tempo.
+ *   - **CSS animation only, never a JS loop.** This renders beside a live
+ *     countdown on a phone; a rAF driver competing for those frames is a
+ *     regression. `motion.ts` emits `@keyframes` text and nothing else.
+ *   - **A new pose needs an entry in `motion.ts`'s `LOWERED_PHASE`**, because
+ *     which drawn phase is the *lowered* one differs per pattern — a push-up's
+ *     `end` is the bottom, a glute bridge's `end` is the top. An eccentric
+ *     animated in the wrong direction is worse than no animation, and no test
+ *     can catch it.
+ *
  * ## Registration
  *
  * Figures are registered here, keyed by the string on `Rung.figureId`. An id
@@ -47,6 +66,15 @@ import type { FigureComponent } from './types.ts'
 export { FIGURE_VIEWBOX, STROKE_WIDTH } from './constants.ts'
 export type { FigureComponent, FigurePhase, FigureProps, Joint } from './types.ts'
 export { ElevationMarker, AngleArc, HandPositionDots, TempoDot } from './overlays.tsx'
+export {
+  BASE_PHASE_SECONDS,
+  LOWERED_PHASE,
+  MOTION_SCALE,
+  buildTimeline,
+  motionAnimationNames,
+  motionStyles,
+} from './motion.ts'
+export type { MotionSegment, MotionSegmentPhase, MotionTimeline } from './motion.ts'
 
 /**
  * The five base pose pairs, keyed by `figureId`. This is the full registry —

@@ -2,6 +2,7 @@ import { createElement, useEffect, useState } from 'react'
 import type { Modifier, Rung } from '../domain/types.ts'
 import { AngleArc, ElevationMarker, HandPositionDots, TempoDot } from './figures/overlays.tsx'
 import { FIGURE_VIEWBOX, getFigure } from './figures/index.ts'
+import { buildTimeline, motionAnimationNames, motionStyles } from './figures/motion.ts'
 
 export interface ExerciseFigureProps {
   /** Only the fields the figure system needs — callers can pass a full
@@ -36,6 +37,13 @@ function usePrefersReducedMotion(): boolean {
  * Overlays are driven entirely by `Rung.modifier` data — this is the piece
  * that lets a new rung reuse an existing drawing (see `figures/index.ts`).
  * Nothing here knows or cares which pose it is stacked on top of.
+ *
+ * They render **once**, in their own static layer, rather than inside each
+ * pose frame. When the two frames were only ever crossfaded at 4s intervals a
+ * duplicated overlay was invisible; now that the frames' opacities are driven
+ * by a clock, a duplicated overlay would pulse in and out along with the body
+ * — an annotation flickering is noise, and the accent-coloured ones are the
+ * brightest thing on the drawing.
  */
 function renderOverlays(modifier: Modifier | undefined) {
   if (!modifier) return null
@@ -54,7 +62,8 @@ function renderOverlays(modifier: Modifier | undefined) {
 // One shared, static stylesheet. Duplicated per instance if several figures
 // are on screen at once (a handful of exercise cards) — inert, identical
 // <style> tags cost negligible parse time and keep this component free of a
-// CSS-module/build-tool dependency it doesn't otherwise need.
+// CSS-module/build-tool dependency it doesn't otherwise need. The per-rung
+// clock is a *second*, generated stylesheet — see `figures/motion.ts`.
 const STYLES = `
 .exercise-figure {
   position: relative;
@@ -64,6 +73,7 @@ const STYLES = `
   border-radius: 12px;
 }
 .exercise-figure__frame,
+.exercise-figure__overlays,
 .exercise-figure__placeholder-art {
   position: absolute;
   inset: 0;
@@ -72,16 +82,15 @@ const STYLES = `
 }
 .exercise-figure__frame--start { opacity: 1; }
 .exercise-figure__frame--end { opacity: 0; }
-.exercise-figure__frame--animated {
-  animation: exercise-figure-crossfade 4s ease-in-out infinite;
-}
-@keyframes exercise-figure-crossfade {
-  0%, 40% { opacity: 0; }
-  50% { opacity: 1; }
-  90%, 100% { opacity: 0; }
-}
+/* The reduced-motion end state, expressed twice on purpose. The class is set by
+   a real JS branch that also emits no @keyframes at all; the media query is the
+   net for environments with no matchMedia (SSR, some test runners), where the
+   branch cannot fire. Both resolve to the same still frame: the end pose. */
+.exercise-figure--static .exercise-figure__frame--start { opacity: 0; }
+.exercise-figure--static .exercise-figure__frame--end { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
-  .exercise-figure__frame--animated { animation: none; opacity: 0; }
+  .exercise-figure__frame--start { opacity: 0; }
+  .exercise-figure__frame--end { opacity: 1; }
 }
 .exercise-figure--placeholder {
   flex-direction: column;
@@ -101,34 +110,55 @@ const STYLES = `
 `
 
 /**
- * Renders a rung's figure by its `figureId`, crossfading between the `start`
- * and `end` phases. An unregistered or missing `figureId` — including a typo
- * in content data — renders a labelled placeholder instead of throwing. This
- * is the fallback the whole app is expected to live behind for a while (see
- * `corpus/briefs/todo/10-svg-figures.md`), so it is deliberately presentable
- * on its own rather than an obvious "TODO" box.
+ * Renders a rung's figure by its `figureId`, animating between the `start` and
+ * `end` poses **on a clock derived from `Rung.modifier`** (`figures/motion.ts`).
+ * That derivation is the whole point: five drawings cover 35 rungs, and what
+ * separates two rungs sharing a pose is when the figure moves and when it stops.
+ * A 3-second lowering takes three (scaled) seconds; a 2-second bottom hold
+ * visibly stops at the bottom. Nothing here is per-rung — this component reads
+ * data and emits CSS.
+ *
+ * An unregistered or missing `figureId` — including a typo in content data —
+ * renders a labelled placeholder instead of throwing. This is the fallback the
+ * whole app is expected to live behind for a while (see
+ * `corpus/briefs/todo/10-svg-figures.md`), so it is deliberately presentable on
+ * its own rather than an obvious "TODO" box.
  */
 export function ExerciseFigure({ rung, size = 120, className }: ExerciseFigureProps) {
   const reducedMotion = usePrefersReducedMotion()
   const Figure = getFigure(rung.figureId)
-  const rootClassName = ['exercise-figure', Figure ? null : 'exercise-figure--placeholder', className]
-    .filter(Boolean)
-    .join(' ')
-  const endFrameClassName = [
-    'exercise-figure__frame',
-    'exercise-figure__frame--end',
-    reducedMotion ? null : 'exercise-figure__frame--animated',
+  const timeline = buildTimeline(rung.figureId, rung.modifier)
+  const clock = motionAnimationNames(timeline)
+  // A real branch, not a slowed animation: under reduced motion no keyframes are
+  // generated, no animation class is applied, and the still `end` pose is shown.
+  const animated = !reducedMotion && Figure !== undefined
+
+  const rootClassName = [
+    'exercise-figure',
+    Figure ? null : 'exercise-figure--placeholder',
+    animated ? null : 'exercise-figure--static',
+    className,
   ]
     .filter(Boolean)
     .join(' ')
+  const frameClassName = (phase: 'start' | 'end') =>
+    [
+      'exercise-figure__frame',
+      `exercise-figure__frame--${phase}`,
+      animated ? 'exercise-figure__frame--animated' : null,
+      animated ? clock[phase] : null,
+    ]
+      .filter(Boolean)
+      .join(' ')
 
   return (
     <div className={rootClassName} role="img" aria-label={rung.name} style={{ width: size, height: size }}>
       <style>{STYLES}</style>
+      {animated ? <style>{motionStyles(timeline)}</style> : null}
       {Figure ? (
         <>
           <svg
-            className="exercise-figure__frame exercise-figure__frame--start"
+            className={frameClassName('start')}
             viewBox={FIGURE_VIEWBOX}
             aria-hidden="true"
             focusable="false"
@@ -140,10 +170,21 @@ export function ExerciseFigure({ rung, size = 120, className }: ExerciseFigurePr
                 during render" lint heuristic, which is written for the
                 unrelated anti-pattern of defining a *new* component inline. */}
             {createElement(Figure, { phase: 'start' })}
-            {renderOverlays(rung.modifier)}
           </svg>
-          <svg className={endFrameClassName} viewBox={FIGURE_VIEWBOX} aria-hidden="true" focusable="false">
+          <svg
+            className={frameClassName('end')}
+            viewBox={FIGURE_VIEWBOX}
+            aria-hidden="true"
+            focusable="false"
+          >
             {createElement(Figure, { phase: 'end' })}
+          </svg>
+          <svg
+            className="exercise-figure__overlays"
+            viewBox={FIGURE_VIEWBOX}
+            aria-hidden="true"
+            focusable="false"
+          >
             {renderOverlays(rung.modifier)}
           </svg>
         </>
