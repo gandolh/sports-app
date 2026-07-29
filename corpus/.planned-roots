@@ -9,3 +9,5 @@ db         # brief 11 — gitignored SQLite database
 # the layer guard shipped as an ESLint rule, so scripts/check-layers.mjs was
 # never created and never will be. Listed to keep the check's signal clean.
 scripts
+
+# client/ and shared/ landed in brief 21; their entries are removed.

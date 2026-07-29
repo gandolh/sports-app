@@ -324,3 +324,278 @@ One tradeoff dissolved rather than accepted: the user chose expanded cues on the
 cards, which pushes `Start` below the fold on a small phone. Making `Start` a **sticky
 bottom dock** (mirroring the player's) gives expanded cues *and* one-tap-to-begin, so there
 is nothing to trade.
+
+## 2026-07-29 — second grill: the app stops measuring, and half the codebase goes with it
+
+A second adversarial grill on the whole concept, run against a much simpler product
+statement from the user: one home page with today's training and three variants, all the
+exercises shown one by one with a next button, **no counter, trusting the user**, a
+dashboard, a calendar-style week page, weak auth, animated SVG figures, and **no time
+tracking**.
+
+Five collisions with locked v1 decisions, resolved in this order:
+
+1. **"No counter, trusting the user" vs. the engine's only input.** `SetResult.actualValue`
+   and the 3-miss regress rule were the sole mechanism by which a ladder could go *down*.
+   Four options were offered — cap the ladder, two buttons per exercise, a fixed ramp, or a
+   pre-filled counter. The user rejected all four: *"trust the user. Don't adapt."* That is
+   now the governing decision and it deletes the adaptive engine outright.
+2. **"No time tracking" vs. 12 timed rungs.** Kept as timed holds with tiered times, plus
+   an **orientative countdown with a start button that gates nothing** — Next is always
+   live. Converting the holds to reps was rejected, which was the right call: two of
+   McGill's Big 3 are isometric by design.
+3. **A calendar page vs. no dates anywhere.** Resolved as the **next 7 sessions**, no
+   dates. The invariant survived completely intact — and then survived again when the user
+   picked milestones and total-work-ever for the account page over a consistency chart, both
+   of which key off session number rather than a clock.
+4. **Three variants** became a per-session easy/medium/hard **load dial** (±2 reps / ±5s),
+   independent of the schedule. This partly reverses "no effort input anywhere", and the
+   reversal is sound for a reason worth recording: the old objection was that the *engine*
+   read the signal badly. The engine no longer reads anything, so a picker that feeds
+   nothing cannot corrupt anything.
+5. **Auth** went from "single user, no auth" to multi-user with passwords that are
+   **accepted and discarded**. Storing an unchecked password collects real reused passwords
+   for no benefit whatsoever.
+
+### The pacing law, which was a genuinely satisfying result
+
+The user gave three step sizes at three different moments — +1 rep per 2 sessions, ~+1s
+for core, +1s per 2 sessions for posture — and asked me to tweak the numbers as needed.
+They are all one rule: **a rung takes ~6 weeks, and the step is the span divided by the
+sessions in it.** Nothing the user specified had to be overridden. Expressed as
+interpolation rather than accumulation, it also gives top-of-ladder cycling and
+re-tunable per-rung caps for free, with no special case for either.
+
+### Corrections I had to make mid-grill
+
+- I presented a 3-day and a 6-day rotation as different options. `P·L·C·P·L·C` **is**
+  `P·L·C` — the same sequence written twice. The only real variable was ordering.
+- The arithmetic on the user's stated step exposed that **core rungs would take 50 weeks
+  each** against push's 7, from two compounding causes (a 1s step across a 25s span is 25
+  increments; core trained once per 7-day cycle). Fixing it produced the daily core and
+  posture block, which the posture evidence independently supports.
+- I claimed "where you are on each ladder" was the most useful account-page stat. The user
+  declined it. Fair — the most recent milestone per pattern carries nearly the same
+  information, and today's page already shows the patterns being trained.
+
+### Research commissioned during the grill
+
+- **Isometric ceilings are much lower than the ladders assumed.** McGill programs
+  **10-second holds in a reverse pyramid**; transfer drops sharply past 60s and past ~2
+  minutes it is meaningless or harmful. Caps set per rung: plank 60s, side plank 45s/side,
+  hollow hold 45s, tuck L-sit 30s (wrist-limited, not abdominal-limited), prone Y/T 30s.
+- **Concurrent-training interference is real and this programme sits in its risk zone** —
+  it peaks with HIIT at 95–100% VO2max alongside resistance work at ≥10RM, which is exactly
+  hard intervals plus 5–12-rep bodyweight sets. The mitigation is *order*, not distance:
+  strength first, conditioning after.
+- **Volume beats frequency for hypertrophy** — frequency's effect is compatible with
+  negligible once weekly volume is matched. Combined with the fact that daily training
+  makes legs/cardio adjacency unavoidable (unless legs days go back-to-back, breaking 48h
+  recovery), that settles the rotation at `Push · Legs · Cardio` with cardio always
+  *following* legs.
+
+### Accepted risk, recorded not relitigated
+
+With no adaptation the schedule prescribes rungs on a clock rather than on readiness. I
+recommended cutting the injurious rungs or gating them behind a one-time unlock; the user
+chose to rely on each rung's own safety cue. Standing, with one presentation consequence:
+**on a `safetyCritical` rung the first cue renders first and visually separated.**
+
+One thing improved without anyone choosing it: brief 15 removes the couch-anchored nordic
+negatives for a *floor-only* reason (superseded brief 13 had already specified the sliding
+leg curl replacement), so the first risky rung the user meets is a hollow hold at ~session
+84 rather than a hamstring-strain mechanism at ~4 months.
+
+### Corpus changes
+
+Rewrote `decisions.md`, `progression-engine.md`, `architecture.md`, `overview.md`,
+`technical-decisions.md`, `open-questions.md`, `status.md`, and the invariants and
+source-of-truth ordering in `CLAUDE.md`. New page `wiki/programme.md`, split out when
+`decisions.md` passed the 200-line cap — the lint gate caught both that and
+`training-science.md` going over. **`SPEC.md` dropped from rank 2 to rank 4** in the
+source-of-truth ordering: it describes an adaptive engine the app no longer has, and
+leaving it at rank 2 would have made every future agent implement the wrong product.
+
+Four open questions deleted as answered or dissolved (the fast-track over-advance, rung
+discriminability, the missing interior fixed point, descending calibration). Five filed,
+of which #1 — **is six weeks per rung right?** — is the only number in the programme with
+no evidence behind it.
+
+Briefs 06, 07, 08, 09, 13 and 14 superseded with outcome notes. Briefs 15–20 filed.
+`lint.sh` now reads `package.json` to distinguish npm subpath specifiers from repo paths,
+which had been producing a false stale-path warning.
+
+Also: the repo had **zero commits** across ~30 files until this session. The v1 tree is now
+committed as a baseline before any of the above touched code.
+
+## 2026-07-29 — the v2 rebuild shipped: six briefs, three waves, 611 tests
+
+Built briefs 15–20 through `plan-split-dispatch` in wave mode: `15 ‖ 17`, then
+`16 ‖ 18 ‖ 20`, then `19`. Green at the end — typecheck, lint, 611 tests, `npm audit`
+clean, a service worker with 10 precache entries, and **offline proven rather than
+asserted** (a full Push session played to the finish screen with the network down).
+
+Routing was senior-heavy (five opus, one sonnet) and that was the right call for this
+particular set: a cross-module contract four briefs depend on, an irreversible migration
+of persisted state, an auth surface, and a correctness call no test can catch. Only the
+milestones module was mechanical enough for sonnet.
+
+### The run's real output was the reports, not the diffs
+
+Every brief was asked for an honest verdict on something it could not be tested on, and
+**four of the six came back with a real problem**:
+
+- **Brief 15** found that declared caps were **asymptotes, not values** — dividing by
+  `sessionsPerRung` meant `fraction` topped out at `(per-1)/per`, so the 20–60s plank
+  prescribed 59s and never 60. Fixed by dividing by `(per-1)`. It also found the finding
+  I'd rank highest in the whole run: **the step between rungs is worth far more than the
+  ±2-rep variant can absorb** (12 knee push-ups → 5 full push-ups), so difficulty is
+  *front-loaded within each rung* rather than evenly spread as the wiki claimed. Filed as
+  open question 7.
+- **Brief 18** found `design-system.md` **contradicting the code it governs** — it
+  claimed the countdown ring was the only continuously-animating element and that nothing
+  animates on load, while the brief it was governing shipped a looping figure that does
+  both. It correctly declined to edit the corpus and reported instead.
+- **Brief 19** found five layout defects that only exist when the app is *operated*: the
+  countdown ring 39px off-centre on the most-looked-at screen, the ring oversized enough
+  that one clipped cue line was visible (and cues are the only thing distinguishing
+  adjacent rungs), the safety cue rendering **seventh and below the fold on exactly the
+  rungs where it is the only brake**, a finish screen with 370px of dead canvas, and a
+  placeholder address that reads as a configured service.
+- **Brief 20** found `programme.md` claiming a **per-side** side-plank dose that the
+  rung's own cue splits *between* sides — 45s meaning ~22s each. Survived a whole design
+  pass because nobody multiplied by two.
+
+Two agents also correctly refused to overstep: brief 17 wrote that its instinct was to
+add a per-user secret and flagged it rather than acting, and brief 18 declined to edit
+the corpus page it had found wrong. Both are the ownership contract working.
+
+### Corrections I made to the agents
+
+- **Reversed brief 15's `push-07-pike`.** The implementer needed a floor-only replacement
+  for the feet-elevated push-up and a pike push-up was a fair reading of the constraint —
+  but it is a vertical press, not a push-up plus a modifier, so it broke a project
+  invariant *and* brief 18's five-pose premise. Push took the shorter ladder, and the id
+  numbering now keeps a deliberate gap at 07 because renumbering would rename shipped ids.
+- **Moved the `Prescription → ExerciseRecord[]` mapping into the domain** as
+  `toSessionResult`, after brief 15 flagged that it arguably belonged there. Without it
+  brief 19 would have defined the shape of a recorded session a second time.
+
+### Things worth knowing later
+
+- **Brief 16 had to adopt the pre-v3 storage keys** to make its own migration reachable.
+  The v3 keys are new, so without adoption an upgrading user's history would have
+  silently vanished and brief 16 §1 would have been dead code.
+- **The `?user=` parameter is required on `PUT`**, which the brief hadn't asked for: a
+  mismatch check needs an independently stated target to compare the document against.
+- Usernames are **rejected rather than case-folded**, because folding makes the stream key
+  disagree with the document's own `username` field — which is precisely what `PUT`
+  refuses.
+- **Open question 4 is answered and the answer was surprising**, so it was kept as a note
+  rather than deleted: a 2-second pause is legible at 120px not because the figure stops
+  moving but because the two-frame crossfade snaps into focus. A true morph would look
+  better *and weaken* the signal.
+
+### Left open on purpose
+
+Two design calls brief 19 declined to patch because they want a decision:
+`POSTURAL_NOTICE` outweighs the plan it annotates on `/` and sits ~730px below the fold on
+the pull player page; and long rung names wrap to three lines beside the figure, which is
+the *norm* rather than an exception, since a rung is one movement plus a modifier.
+
+Deploy integration is not started. The user asked mid-run whether the service could be a
+Fastify REST API — it is already REST; whether it becomes Fastify is an open decision
+against the zero-dependency call in `technical-decisions.md`.
+
+## 2026-07-29 — reversing the zero-dependency service: Fastify, and three workspaces
+
+The user asked whether the server could be a Fastify REST API with the frontend talking to
+it over REST. **Half of that was already true** — the client makes four `fetch` calls
+against `/api/state`, `/api/login` and `/api/health`, so the wire protocol was never the
+question. What was being asked was whether to replace the implementation underneath.
+
+I put the trade to the user rather than deciding it: at four endpoints Fastify replaces
+about 300 lines of hand-rolled but *tested* HTTP plumbing, and the real cost is not code
+aesthetics but that **deploying stops being a file copy and gains an install step on the
+server** — which was the entire value of the zero-dependency choice. The user chose to
+migrate, and additionally to restructure into **npm workspaces with `client`, `server` and
+`shared`**.
+
+`shared/` earns its place for a specific reason rather than as a habit: the username rule
+currently exists in *both* `server/db.mjs` and `src/persistence/codec.ts`, kept honest by a
+test asserting the two regexes match. One definition imported twice is strictly better than
+two definitions plus a test that they agree. The constraint that follows is that `shared/`
+holds **data shapes and validation, never behaviour** — it is a dependency of a browser
+bundle and a Node service at the same time, so it may not import `node:*` or touch the DOM,
+and that will be enforced by an ESLint rule rather than a comment, the same way the
+`domain/` purity boundary already is.
+
+**Filed as two briefs, not one.** 21 moves the tree and must end with all 611 tests still
+passing; 22 swaps the HTTP layer with those tests as the contract. A behavioural change
+hidden inside a hundred-file move is close to unreviewable, and "the move is green" is only
+a meaningful signal if nothing else changed at the same time.
+
+Two things brief 22 is most likely to break silently, so both are called out in it: Fastify
+will happily parse and re-stringify JSON, which would destroy the byte-verbatim round-trip
+the client's crash-safe save depends on; and Fastify logs requests by default, which would
+quietly defeat the five tests asserting the password never reaches the database or the logs.
+
+`decisions.md` is unchanged by any of this — the product did not move, only the plumbing.
+
+## 2026-07-29 — brief 22 shipped: Fastify underneath, nothing different on the wire
+
+The service is Fastify (`5.10.0`). `npm run check` is green at **614 tests** — the 73 server
+tests all pass **unchanged**, four were added, and **not one file under `client/` changed.**
+That last fact was the brief's premise and it held: the client makes four `fetch` calls and
+needed no edit, which is what "the REST contract does not change" has to mean to be worth
+saying.
+
+**The migration's value was almost entirely in the tests it had to satisfy.** Brief 17's
+suite was written against wire behaviour rather than implementation, so it survived a total
+rewrite of the layer beneath it. That is not luck; it is what the effort spent on those
+tests bought, cashed in eleven briefs later. Nothing about a green run on a *new*
+implementation would have been believable otherwise.
+
+**Four framework defaults had to be switched off, and each was mutation-tested.** Fastify
+re-serialises JSON (which would silently destroy the byte-verbatim round trip the client's
+crash-safe save depends on), synthesises `HEAD` for every `GET` route (turning today's
+`HEAD /api/state` 405 into a 200), runs hooks globally unless scoped (which would put the
+`401` after validation), and logs every request. Flipping each switch back was verified to
+fail a test — 9 failures for the re-serialisation one.
+
+**The logging test did not have teeth on the first attempt, and the reason is worth
+remembering.** pino writes to file descriptor 1 *directly*, so an in-process spy on
+`process.stdout.write` reported a perfectly clean run with `logger: true`. Worse, Fastify's
+request log does not include the body, so even a working spy would not have found the
+sentinel password — the assertion had to become "no request line reached these pipes at
+all", checked by spawning the real service as a child process. This is exactly the failure
+mode the brief warned about: **a migration that quietly defeats a security test while
+leaving it green.** It took two attempts to actually avoid it.
+
+Writing that test also found a **sixth** unguarded behaviour: an unauthorised caller using
+the wrong method on a guarded route was answered `401` rather than the `405` that would
+reveal the route exists — correct, but nothing tested it. Removing the check left all 77
+tests green. There is a test now.
+
+**Validation is schema-driven from `shared/api.ts`** — TypeBox, so one declaration is both a
+JSON Schema for Fastify's AJV and a TypeScript type. The username schema is built from
+`USERNAME_PATTERN.source` rather than a copy of the pattern, so the regex and the schema
+cannot drift. Compilation stays in the service: `TypeCompiler` uses `new Function`, and
+`shared/` has to work under a browser CSP. `StateDocumentEnvelope` is three fields and
+stops there — a schema for the whole `StateDoc` would make the service a second source of
+truth for the document *and* reject documents from a future `schemaVersion` it is meant to
+store blindly.
+
+**The brief's `server/src/db.ts` was not followed**, deliberately. The files stayed
+`server/*.mjs` in place, because moving them would have meant editing the assertions that
+are the migration's only proof and would have moved the `db/` directory `db.mjs` derives
+from its own location. `eslint.config.js` had already called this: its Node-globals block is
+scoped `server/**/*.mjs` with a note saying it is about the runtime rather than the HTTP
+library and should survive brief 22 unchanged. It did. Both ESLint boundary blocks were
+re-proved by making them fail, as brief 21 established.
+
+**And the bill, which was known in advance:** the service has a dependency tree now, so a
+deploy needs `npm ci --omit=dev` before `node state-server.mjs` will start. Copying files is
+no longer enough. That is the whole cost of the decision, it was accepted knowing about it
+on 2026-07-29, and it now belongs to the deploy brief. Storage was untouched — `node:sqlite`
+is built in, `db.mjs` is a port and not a redesign.
