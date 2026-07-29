@@ -169,3 +169,136 @@ are:
 - **Open it in a real browser at phone width and use it.** Tap through a full session of
   each of the three slots. Report what felt wrong — this is the first time the design has
   been touched rather than read, and the report is worth as much as the code.
+
+---
+
+## Appendix — the contracts as landed
+
+*Added 2026-07-29 after briefs 15–18 and 20 shipped. Everything below is verbatim from
+the code, so you do not have to infer it. Read the files too, but start here.*
+
+### `src/domain/schedule.ts`
+
+```ts
+export const SETS_PER_STRENGTH = 3
+export const SETS_PER_DAILY_BLOCK = 2
+export const CARDIO_ROUNDS = 5
+
+export interface PrescribedExercise {
+  readonly type: 'exercise'; readonly pattern: Pattern; readonly rung: Rung
+  readonly rungIndex: number; readonly unit: TargetUnit
+  readonly ladderKind: 'strength' | 'postural'
+  readonly sets: number; readonly targetValue: number   // post-variant
+}
+export interface PrescribedCardio {
+  readonly type: 'cardio'; readonly protocol: CardioProtocol; readonly rounds: number
+}
+export type PrescribedItem = PrescribedExercise | PrescribedCardio
+export interface Prescription {
+  readonly position: number; readonly label: string; readonly variant: Variant
+  readonly items: readonly PrescribedItem[]   // slot's own work first, daily block last
+}
+
+export function prescribe(state: StateDoc, variant: Variant): Prescription
+export function recordSession(state: StateDoc, result: SessionResult): StateDoc
+export function toSessionResult(p: Prescription, completedAt: IsoTimestamp): SessionResult
+export function rungIndexAt(pattern: Pattern, sessionsDone: number): number
+export function rangeAt(pattern: Pattern, rungIndex: number): Range
+export function targetAt(pattern: Pattern, sessionsDone: number): number
+export function applyVariant(target: number, unit: TargetUnit, variant: Variant, range: Range): number
+```
+
+**Use `toSessionResult`; never hand-build a `SessionResult`.** It exists so the shape of a
+recorded session is defined in one place. It skips the cardio item — a cardio slot records
+no `ExerciseRecord` — and carries `position` and `variant` through.
+
+### `src/domain/types.ts` and `ladders.ts`
+
+`ROTATION` (3 slots: Push · Legs · Cardio), `DAILY_BLOCK = ['core','pull']`,
+`slotAt(position)`, `VARIANTS`, `isVariant`, `Rung` (with `safetyCritical?: boolean` and
+`range?: Range`), `StateDoc`, `CURRENT_SCHEMA_VERSION = 3`, `LADDERS`, `POSTURAL_NOTICE`,
+`CARDIO`, `getRung`, `topRungIndex`, `findRungById`.
+
+Rung counts: **push 8, squat 8, hinge 7, core 6, pull 6.** Push's id numbering has a
+deliberate gap at `07`, so **never parse a number out of a rung id** — use `getRung` and
+array indices.
+
+### `src/domain/milestones.ts`
+
+```ts
+export interface Milestone {
+  readonly sessionNumber: number; readonly pattern: Pattern
+  readonly kind: 'rung' | 'named'; readonly label: string
+}
+export interface TotalWork {
+  readonly reps: number; readonly holdSeconds: number; readonly sessions: number
+  readonly perPattern: Readonly<Record<Pattern, { reps: number; holdSeconds: number }>>
+}
+export function milestonesReached(doc: StateDoc): readonly Milestone[]   // newest first
+export function totalWork(doc: StateDoc): TotalWork
+```
+
+`holdSeconds` is a bare number of seconds — the UI formats it. The top-of-ladder label is
+long; render it over two lines if you like, but do not rewrite its meaning.
+
+### `src/persistence/`
+
+```ts
+// session.ts — who this browser is acting as
+function currentUsername(options?): string | null
+function setCurrentUsername(username: string, options?):
+  { ok: true; username: string } | { ok: false; error: string }
+function clearCurrentUsername(options?): void
+
+// store.ts
+function load(username: string, options?): LoadResult
+//   | { status:'loaded'|'recovered'|'migrated'; doc: StateDoc } | { status:'empty' }
+//   | { status:'corrupt'; error: string; rawText: string }
+//   | { status:'unavailable'; error: string }
+function emptyDoc(username: string): StateDoc
+function save(doc: StateDoc, options?): SaveResult          // username read from doc
+function isReadOnly(username: string): boolean
+function readOnlyReason(username: string): string | null
+function clearReadOnly(username?: string): void
+function requestPersistentStorage(doc: StateDoc): Promise<PersistenceOutcome>
+
+// codec.ts — reuse for validation, do not restate
+USERNAME_PATTERN · USERNAME_MAX_LENGTH · USERNAME_RULE · isValidUsername · LEGACY_USERNAME
+parse · serialise · summarise · emptyDoc
+
+// sync.ts
+push · pull · login · checkSync · applyRemote · saveAndPush · stateEndpoint
+```
+
+- **First run** → `{ status: 'empty' }`; call `emptyDoc(username)` and save.
+- **`'migrated'`** → a pre-v3 document was adopted and converted, **nothing written yet**.
+  Save it. On a shared browser it may not be this user's, so consider confirming.
+- **`save(doc, { allowOverwriteCorrupt: true })`** is the escape hatch out of the read-only
+  latch and also clears it. It needs an explicit confirmation.
+- On `setCurrentUsername` returning `ok: false`, **show `result.error` verbatim** — it
+  states the username rule in prose written for that purpose. Case is rejected, not folded.
+- **`login()` is advisory only.** A failure means sync is misconfigured, never "you may not
+  train". Nothing on the session-critical path may await the network.
+
+### `src/ui/ExerciseFigure.tsx` — props unchanged
+
+```ts
+{ rung: Pick<Rung,'name'|'figureId'|'modifier'>, size?: number, className?: string }
+```
+
+It animates itself — no provider, no cleanup. Each instance injects two `<style>` tags and
+renders a third static `<svg>` overlay layer. **Render it; do not edit it or anything under
+`src/ui/figures/`.**
+
+### Dependencies and the state of the tree
+
+Add `@base-ui/react` (**not** `@base-ui-components/react`), TanStack Router, TanStack Query,
+`react-hook-form`. Pin exact versions — `.npmrc` sets `save-exact=true`. Check peers against
+**React 19.2.8** and **TypeScript 6.0.3**; TypeScript is pinned at 6 because
+`typescript-eslint` does not support 7, so **do not upgrade it**. `package.json` carries an
+`overrides` entry for `brace-expansion` that clears 8 advisories via `workbox-build` — leave
+it, and re-check `npm audit` after installing.
+
+`src/ui/SettingsScreen.tsx` has 15 typecheck errors and is the only thing failing
+typecheck. **You delete it**; its tests are already gone. **486 tests currently pass —
+do not break them.** When you finish, `npm run check` must be fully green.
