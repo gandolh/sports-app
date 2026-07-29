@@ -81,11 +81,10 @@ the app and the account page has nothing else to work with.
 
 ### SUPERSEDED — "no effort input anywhere"
 
-v1 removed both the post-set effort tap and a pre-session difficulty picker, on the
-grounds that the engine read them and read them badly. **The engine no longer reads
-anything**, so the objection has no force: a picker that feeds nothing cannot corrupt
-anything. The rejection of the *post-set* tap stands permanently — asking after the
-work is asking at the worst possible moment.
+v1 removed both the post-set effort tap and a pre-session difficulty picker because the
+engine read them badly. **The engine no longer reads anything**, so a picker that feeds
+nothing cannot corrupt anything. The rejection of the *post-set* tap stands permanently:
+asking after the work is asking at the worst possible moment.
 
 ## The week — Push · Legs · Cardio, plus a daily core and posture block
 
@@ -138,14 +137,14 @@ that is not a rendering problem, it is the design being honest.
 
 *Chosen 2026-07-29, reversing "single user, no auth".*
 
-A username keys its own state document, so two people can train on one deployment.
-A password field exists, and the value is **accepted and immediately discarded** —
-never stored, never compared. Storing an unchecked password buys nothing and collects
-real passwords people reuse elsewhere.
+A username keys its own state document, so two people can train on one deployment. A
+password field exists and its value is **accepted and immediately discarded** — never
+stored, never compared. Storing an unchecked password buys nothing and collects real
+passwords people reuse elsewhere.
 
-**Anyone who knows a username can read that person's training history.** That is
-accepted for training data on a personal deployment. No later feature may treat the
-login screen as a security boundary.
+**Anyone who knows a username can read that person's training history.** Accepted for
+training data on a personal deployment; no later feature may treat the login screen as
+a security boundary.
 
 ## No dates anywhere in the app
 
