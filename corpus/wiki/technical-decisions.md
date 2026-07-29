@@ -1,5 +1,5 @@
 ---
-summary: Locked stack, storage, timer, audio and rendering choices — read before proposing an alternative implementation.
+summary: Locked stack, storage, routing, timer and rendering choices — read before proposing an alternative implementation.
 updated: 2026-07-29
 ---
 
@@ -11,72 +11,101 @@ the thing is built. **Do not relitigate these** without an explicit revisit plus
 [`../log.md`](../log.md) entry.
 
 ### PWA — Vite + React + TypeScript
-Installs to the home screen, offline via service worker, static deploy, one
-codebase for phone and desktop, no app store, no signing certs, no native build
-pipeline. Ten screens with no native API needs beyond a timer and a wake lock.
+Installs to the home screen, offline via service worker, static deploy, one codebase
+for phone and desktop, no app store, no signing certs, no native build pipeline.
 
-### A single hand-editable JSON document as the source of truth
-Deliberately not an opaque DB. For a single-user app this is strictly better: when
-the engine puts you on a rung that feels wrong, you open the file and fix it
-instead of building an admin UI.
+**TypeScript is pinned at 6.0.3, not 7.** `typescript-eslint@8.65.0` peer-requires
+`<6.1.0`, and the import-boundary rule is the entire reason ESLint is in this project —
+so the linter wins over the newer compiler. All dependencies are exactly pinned
+(`save-exact=true`).
 
-### Durability: a SQLite service holding JSON snapshot rows
-*Revisited 2026-07-29 — supersedes an earlier plan to `PUT`/`GET` a single JSON file
-on a remote host. See [`../log.md`](../log.md).*
+### TanStack Router + Query, and Base UI
+Four routes with typed params and a document that must stay fresh across them justify a
+router and a cache rather than hand-rolled state. **Base UI is `@base-ui/react`** — not
+`@base-ui-components/react`, which is stuck at an ancient release candidate. Use it
+wherever it fits; the design system in [design-system.md](design-system.md) is what it
+gets styled into.
 
-A small zero-dependency Node service owns `db/app.db` (gitignored) via Node's built-in
-`node:sqlite`, and the client `PUT`s/`GET`s the same JSON document against it behind a
-shared secret. No users table, no auth flow, no SQL migrations. Local-first,
-last-write-wins — correct here because there is exactly one user, so conflicts are
-near-impossible. Solves durability and phone↔desktop sync in one move. The same service
-and its own database run wherever the app is deployed.
+### `vite.config.ts` must import `defineConfig` from `vitest/config`
+Importing it from `vite` makes the `test` block fail typecheck (TS2769). Cheap to get
+wrong, and the error message does not point at the cause.
 
-**Stored as append-only snapshot rows, not normalised tables.** The codec already owns
-validation and the canonical shape, and `schemaVersion` lives inside the JSON —
-normalising into `sessions`/`sets`/`ladders` would create a second source of truth for
-shape and duplicate all that validation, for no benefit at one user. Snapshot rows also
-give free version history, and the JSON stays extractable with one `sqlite3` query, so
-the hand-editability decision above survives.
+### A single hand-editable JSON document per user as the source of truth
+Deliberately not an opaque DB. When the schedule puts you on a rung that feels wrong,
+you open the file and fix it instead of building an admin UI. Every field must be
+self-explanatory to someone fixing a wrong rung at 2am — hence `sessionsDone`, not
+`sd`; readable string discriminants, not numeric enums.
 
-The trade-off, stated: you lose SQL queryability over individual sessions. That costs
-nothing here because the charts screen reads the in-memory document. If it ever matters,
-add derived tables *from* the snapshots rather than replacing them.
+v2 made this far safer: **the document holds one integer per pattern and nothing
+derived**, so a hand-edit cannot produce a state that disagrees with itself. See
+[progression-engine.md](progression-engine.md#state-is-one-integer-per-pattern).
 
-**Retention is small on purpose.** Each snapshot embeds the full history, so snapshot
-size grows linearly with sessions and total database size grows *quadratically* with
-retention × sessions. Keep ~20. Raising it to 1000 would be a real problem, not a
-tuning knob.
+### Durability: a SQLite service holding JSON snapshot rows, one stream per user
+*Revisited 2026-07-29 — supersedes both an earlier plan to `PUT`/`GET` a single remote
+JSON file, and v1's "no users table".*
 
-Browser storage is **not** durable: iOS evicts IndexedDB under pressure and one
-"clear site data" wipes everything. History loss is not a degraded experience —
-the engine loses all knowledge of ladder position and restarts from rung 1.
+A zero-dependency Node service owns `db/app.db` (gitignored) via Node's built-in
+`node:sqlite`, and the client `PUT`s/`GET`s a JSON document against it. **Snapshot rows
+are keyed by username**, so each user has an independent append-only stream.
+Local-first, last-write-wins per user — correct here because a user trains on one device
+at a time.
 
-### Timestamp-based timer plus wake lock
-Rest elapsed is computed from a stored start time; `setInterval` continuity is
-never trusted. `navigator.wakeLock` is held for the duration of an active session.
-A timer that dies on screen lock breaks the guided loop, so this is a correctness
-requirement, not polish.
+**Stored as snapshot rows, not normalised tables.** The codec already owns validation
+and the canonical shape, and `schemaVersion` lives inside the JSON — normalising into
+`sessions`/`sets` would create a second source of truth for shape and duplicate all
+that validation. Snapshot rows also give free version history, and the JSON stays
+extractable with one `sqlite3` query.
 
-### Audio is `speechSynthesis` plus a WebAudio beep
-Both built in, offline, zero assets. The **beep is the fallback** — voice
-availability varies across iOS and Android, so nothing may be speech-only.
+**Retention is small on purpose: ~20 per user.** Each snapshot embeds the full history,
+so snapshot size grows linearly with sessions and total database size grows
+*quadratically* with retention × sessions. Prune by `id`, never by `created_at` — NTP
+can move a clock backwards.
 
-### Charts are hand-rolled SVG, and never plot raw reps
-A few hundred data points do not justify a charting dependency. More importantly,
-plotting reps over time in a double-progression system produces a sawtooth that
-shows you getting *worse* every time you advance a rung. Plot a monotonic index
-instead: `rungIndex × 8 + (reps − 5)`.
+Browser storage is **not** durable: iOS evicts IndexedDB under pressure and one "clear
+site data" wipes everything. Losing history means losing ladder position entirely.
 
-### Figures are a rigid system, placeholder-first
-Ten SVG pose pairs on a fixed 200×200 grid, single stroke weight, no shading, no
-faces, one accent colour. Ten figures drawn to a system read as a design language;
-forty freehand sketches read as amateur. `stroke="currentColor"` gives dark mode
-free; a CSS crossfade between frames gives a 2-frame animated demo for no extra
-assets.
+### Authentication is a nameplate, not a boundary
+Username identifies a state document; the password is accepted and **discarded in the
+request handler** — never stored, never compared. Storing an unchecked password buys
+nothing and collects real passwords people reuse elsewhere. `/login` must work offline,
+which it trivially does because there is nothing to verify.
 
-**Hard rule:** the app is built entirely against labelled placeholder boxes.
-Drawing is never on the critical path.
+Constant-time comparison still applies to the deployment's own shared secret, where one
+exists: `timingSafeEqual` over SHA-256 digests, which is constant-time even for
+wrong-length input.
+
+### Timestamp-based countdown, and a wake lock
+A hold's countdown is computed from a stored start time; `setInterval` continuity is
+never trusted. `navigator.wakeLock` is held for the duration of an active session so
+the screen does not sleep mid-set.
+
+**v2 downgraded this from a correctness requirement to a convenience.** The countdown is
+orientative and gates nothing — Next is always live — so a wake lock failure or a
+backgrounded tab costs the user a glance, not a broken session. There is no rest timer
+at all, because a rest timer would be the app measuring something.
+
+### Figures: five poses, animated on a data-driven clock
+Five SVG poses (push · squat · hinge · prone · plank) on a fixed 200×200 grid, single
+stroke weight, no shading, no faces, one accent colour. `stroke="currentColor"` gives
+dark mode free.
+
+**Each rung's `modifier` data drives the animation timing**, so one drawing produces 35
+visibly distinct results: a 3-second lowering genuinely takes three seconds, a
+2-second bottom hold visibly stops. That is what closed the rung-discriminability
+question — five drawings, one animation driver, not 35 hand-authored animations. Must
+respect `prefers-reduced-motion` by falling back to the static end pose.
+
+**Hard rule:** the app is built entirely against labelled placeholder boxes. Drawing is
+never on the critical path.
+
+### SUPERSEDED in v2 — charts, and audio cues
+- **Charts are gone.** A fixed schedule plotted against session number is a straight
+  line containing no information. The v1 rule ("never plot raw reps, plot a monotonic
+  index") was correct for an adaptive engine and is now moot.
+- **Audio cues are out of v2 scope.** They existed to announce rest-timer transitions,
+  and there is no rest timer. `speechSynthesis` plus a WebAudio beep remains the right
+  implementation if a hold-countdown chime is ever wanted.
 
 ### No code graph for now
-Greenfield single package; `grep` over a small `src/` is cheaper than maintaining
-an index. Revisit past ~50 files. See [`../routing.md`](../routing.md).
+Greenfield single package; `grep` over a small `src/` is cheaper than maintaining an
+index. Revisit past ~50 files. See [`../routing.md`](../routing.md).

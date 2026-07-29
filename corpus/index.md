@@ -17,14 +17,15 @@ pages. See [CLAUDE.md](CLAUDE.md) for the conventions and the retrieval budget.
 
 <!-- BEGIN CATALOG -->
 
-- [wiki/architecture.md](wiki/architecture.md) — Module layout, dependency direction, and the pure-core/imperative-shell boundary that keeps the engine testable.
-- [wiki/decisions.md](wiki/decisions.md) — Locked design and tech choices with the reasoning that settled them — read before proposing an alternative.
+- [wiki/architecture.md](wiki/architecture.md) — Module layout, dependency direction, and the pure-core/imperative-shell boundary — plus what v2's fixed schedule removed from it.
+- [wiki/decisions.md](wiki/decisions.md) — Locked product and programme calls with the reasoning that settled them — read before proposing an alternative.
 - [wiki/design-system.md](wiki/design-system.md) — Design tokens and the doctrine governing them — colour, type, spacing, motion, anti-patterns, and the floor-phone accessibility floor.
 - [wiki/open-questions.md](wiki/open-questions.md) — Only the genuinely unresolved. Answered questions are deleted from here, not archived.
 - [wiki/overview.md](wiki/overview.md) — What sports-app is in one paragraph, who it's for, and the constraints that shaped it.
-- [wiki/progression-engine.md](wiki/progression-engine.md) — How the app decides today's prescription — double progression, the rep cap, the modifier lever, and the exact advance rules.
+- [wiki/programme.md](wiki/programme.md) — What the training actually is — the three-day rotation, what each session contains, the per-rung hold caps, and the cardio protocol.
+- [wiki/progression-engine.md](wiki/progression-engine.md) — How the app decides today's prescription — the fixed 6-week-per-rung schedule, why it needs no input, and the interpolation that makes state a single integer per pattern.
 - [wiki/status.md](wiki/status.md) — Dated snapshot of where every brief stands and what's next.
-- [wiki/technical-decisions.md](wiki/technical-decisions.md) — Locked stack, storage, timer, audio and rendering choices — read before proposing an alternative implementation.
+- [wiki/technical-decisions.md](wiki/technical-decisions.md) — Locked stack, storage, routing, timer and rendering choices — read before proposing an alternative implementation.
 - [wiki/training-science.md](wiki/training-science.md) — Evidence base for the programme — what the five slots actually train, which muscles get nothing, and why cardio cannot fit in the session.
 
 <!-- END CATALOG -->

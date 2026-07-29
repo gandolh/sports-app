@@ -9,74 +9,82 @@ Delete an entry the moment it is answered — its history belongs in
 [`../log.md`](../log.md), not here. This page is only trustworthy if it contains
 nothing settled.
 
-## 1 — ANSWERED, and the premise was wrong
+**Four questions were deleted on 2026-07-29** when the v2 grill removed adaptation.
+Recorded here in one line each so nobody re-derives them: the `easy` fast-track
+over-advance (the fast-track no longer exists), rung discriminability (the animated
+figure's clock now differs per rung, so the cue text is no longer the only signal),
+the engine's missing interior fixed point (nothing adapts, so nothing can fail to
+converge), and descending calibration (there is no calibration — everyone gets the
+same schedule).
 
-*Asked: does the `easy` fast-track over-advance the time-based ladders?*
+## 1 — Is six weeks per rung the right pace?
 
-**Both halves of the question were mistaken.** Measured across 8 seeds:
+**This is the only number in the programme with no evidence behind it.** The caps come
+from the isometric literature, the volume from the hypertrophy meta-analyses, the
+rotation order from the concurrent-training literature — but "a rung takes six weeks"
+was chosen because it reproduces the three step sizes the user specified, and for no
+other reason.
 
-- **The fast-track was not the cause.** Disabling it recovered under 10% of the
-  over-advance. Removing the effort input entirely made it marginally *worse*
-  (605 → 633 of 2400), because the input's real contribution was the *hold* it enabled
-  ("every rep done but rated hard → repeat"), which stopped the climb one step short of
-  failure.
-- **It is not a time-ladder pathology.** The same capability curve gives 502/3600 (13.9%)
-  on rep ladders. Time ladders are ~2× worse for an arithmetic reason — a 5s step across
-  20–45s overshoots proportionally more than a 1-rep step across 5–12.
+Consequences if it is wrong in either direction:
+- **Too fast** → the schedule outruns the user, who spends most of each rung on a
+  target they cannot hit. With no adaptation there is no brake.
+- **Too slow** → nine months of daily training to exhaust the ladders becomes years,
+  and the app feels static long before that.
 
-Superseded by question 5 below, which is the real problem this was a symptom of.
-See [progression-engine.md](progression-engine.md).
+**How we'll answer it:** it is a single constant per ladder (`SESSIONS_PER_RUNG`) and
+re-tuning it does not invalidate stored state, by design. Watch whether the mid-rung
+target feels roughly like 0–2 reps in reserve. That is a felt judgement, not a metric —
+there is nothing to measure with.
 
+## 2 — Does the cue text actually stop anyone from a rung they can't do?
 
-## 2 — Is the form-cue text good enough to distinguish adjacent rungs?
+The schedule reaches the hollow hold at ~3 months, the couch-anchored nordic negative
+at ~4, and the tuck L-sit at ~5.5, **on a clock rather than on readiness, with no
+mechanism to step back**. The user chose to rely on each rung's own safety cue rather
+than cut the rungs, gate them, or add a manual rung control
+([decisions.md](decisions.md#accepted-risk--the-schedule-prescribes-risky-rungs-on-time-not-on-readiness)).
 
-Since rungs now differ by *tempo and pause* rather than by shape, a figure cannot
-tell rung 3 from rung 4 — only words can. "3s down + 2s pause" is meaningless, and
-possibly unsafe, unless the card says *where* the pause happens.
+This is a **watched accepted risk**, not an unmade decision. The open part is
+empirical: a paragraph is a weaker brake than not being asked, and we do not know
+whether it holds.
 
-If the cue text is sloppy the rungs become indistinguishable in practice and
-progression turns into placebo. This is a content-quality risk, not a code risk,
-and it is the most likely way the engine gets quietly undermined.
-
-**How we'll answer it:** review brief 03's cue text specifically for
-rung-discriminability, then check whether sessions at adjacent rungs actually feel
-different.
+**How we'll answer it:** the first real encounter with `hinge-05-nordic-negative`
+at roughly session 90. If the cue is ignored once, the mitigation to reach for is the
+one-time unlock, which was designed and costs one tap twice a year.
 
 ## 3 — Will the squat ladder stall at the split-squat jump?
 
-Rungs 1–5 progress smoothly via tempo, pause, and range. Rung 6 (split squat) is a
-genuine step change in both difficulty and coordination, and rung 7 (assisted
-single-leg) more so. The engine's regress rule will catch a stall, but a ladder
-with one impassable rung is a content bug the engine cannot fix.
+Rungs 1–5 progress by tempo, pause and range. Rung 6 (split squat) is a genuine step
+change in both difficulty and coordination, and rung 7 (assisted single-leg) more so.
 
-**How we'll answer it:** watch for repeated hold/regress cycling at rung 5→6. Fix
-would be an intermediate rung, not an engine change.
+**This got worse in v2, not better.** v1 had a 3-miss regress rule that would catch a
+stall automatically; there is no such rule now. A ladder with one impassable rung is a
+content bug the schedule cannot detect, let alone fix — the user simply arrives at a
+movement they cannot perform and the app keeps asking for more of it every six weeks.
 
-## 4 — Does `navigator.wakeLock` behave on the actual target device?
+**How we'll answer it:** the fix is an intermediate rung, not a code change. Worth
+pre-empting rather than waiting for — consider inserting one before the split squat
+while the content is being edited anyway.
 
-The design treats the wake lock as the mechanism that keeps the rest timer alive
-and audible. Support is real in Chrome and Safari 16.4+, but behaviour under a
-manual screen-off, an incoming call, or app backgrounding is not verified. The
-timestamp-based timer means elapsed time stays *correct* regardless — the open
-question is whether the **audible cue** still fires.
+## 4 — Can an animation legibly show a two-second pause at phone size?
 
-**How we'll answer it:** manual test on the phone during brief 06. Fallback if it
-fails: on returning to foreground, reconcile elapsed time and skip forward rather
-than replaying cues.
+The figure system is five poses whose animation clock is driven by each rung's
+modifier data, which is what closed the rung-discriminability question. But a 3-second
+lowering and a 3-second lowering *plus a 2-second bottom hold* differ only in whether
+the figure stops moving — at ~120px, on a floor, mid-set, that may read as a dropped
+frame rather than as a hold.
 
-## 5 — The engine has no interior fixed point
+**How we'll answer it:** build it, then look at rung 5 and rung 6 side by side on an
+actual phone. If it fails, the fallback is a visible beat marker (a pulsing dot at the
+pause point) rather than more text.
 
-**Measured, not speculative.** With no effort input there is no "completed but hard → hold"
-rule, and that was the engine's only interior fixed point. A static-capability user
-therefore **oscillates over two adjacent rungs** instead of settling: climb to the top of a
-rung → advance → fail 3× → deload → re-climb in 2 sessions → advance → fail again.
+## 5 — Does the daily core and posture block survive contact with real use?
 
-Tail bands are identical across 8 zero-noise seeds — push `[5,6]`, squat `[5,6]`, core
-`[3,4]`, pull `[3,4]` — so it oscillates rather than wanders, but it costs 0–37.5% of tail
-sessions to a missed target. Hinge `[5]` is the only true fixed point, and only because it
-sits at the top of its ladder.
+Every session now ends with two extra exercises, every day, forever. It is the change
+that made posture progress at a sane rate and it is also the most skippable thing in
+the app — and because nothing is measured, **the app cannot tell that it is being
+skipped**, so the schedule keeps advancing those ladders regardless.
 
-**The fix that needs no user input: hysteresis.** Track deloads per rung and raise the
-advancement requirement each time the same rung is failed, so the bar rises until the user
-genuinely clears it. Not yet implemented — it is an engine rule change and therefore the
-user's call.
+**How we'll answer it:** the honest answer is a felt one. If it gets skipped, the
+options are to shorten it (one set), move it to alternate days, or put it *before* the
+strength work so it cannot be the thing you drop.
