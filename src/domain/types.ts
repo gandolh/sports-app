@@ -1,69 +1,76 @@
 /**
- * The domain contract. Briefs 03, 04, 05, 09 and 11 all code against this file,
- * so a wrong field here costs five briefs later.
+ * The domain contract, **v3** (2026-07-29). Briefs 16–20 all code against this
+ * file, so a wrong field here costs five briefs later.
+ *
+ * ── What v3 deleted, and why nothing replaced it ─────────────────────────────
+ *
+ * The app no longer adapts. Nothing is measured, nothing branches on what the
+ * user did, and the prescription is a pure function of how many sessions of a
+ * pattern have been completed (corpus/wiki/progression-engine.md). So:
+ *
+ *   - `LadderState` is gone. Rung index and target are *derived* from
+ *     `sessionsDone`, which means there is no cached number that can drift from
+ *     the thing it caches — the bug class that produced the v2 fixture defect is
+ *     now inexpressible.
+ *   - `SetResult.actualValue` is gone. The app never learns what happened.
+ *   - `Effort` is gone, and stays gone: asking after the work is asking at the
+ *     worst possible moment.
+ *   - `CycleDay` / `CYCLE` / `cycleDayAt` are gone, replaced by the three-slot
+ *     `ROTATION` plus a `DAILY_BLOCK` trained in every session.
+ *   - `Settings.soundEnabled` / `voiceEnabled` / `skipWarmupByDefault` are gone:
+ *     audio and the guided warmup are out of v2 scope.
  *
  * ── The state document is the source of truth AND the backup format ──────────
  *
  * `StateDoc` is serialised to one human-readable JSON file that a person is
- * expected to open in a text editor and hand-edit — that dual role is a locked
- * decision (corpus/wiki/decisions.md). It constrains the naming here: every
- * field must be self-explanatory to someone fixing a wrong rung at 2am. Hence
- * `rungIndex`, not `ri`; readable string discriminants, not numeric enums.
+ * expected to open in a text editor and hand-edit — a locked decision
+ * (corpus/wiki/decisions.md). Two consequences that still bind in v3:
  *
- * ── Is `LadderState` authoritative, or a cache derived from `history`? ───────
+ *   1. Every field must be self-explanatory to someone fixing a wrong number at
+ *      2am. Hence `sessionsDone`, not `sd`; readable string discriminants, never
+ *      numeric enums.
+ *   2. **Out-of-range input is a normal case, not a bug to crash on.** A
+ *      hand-edited negative or absurd `cyclePosition` must degrade, not throw —
+ *      see `slotAt`.
  *
- * RESOLVED: **authoritative on read, derivable for repair.**
- *
- *   - The engine and UI always read `ladders` directly. It is the truth.
- *   - `deriveLadderStates(history)` (brief 04) can reconstruct it by replaying
- *     history, and exists as an *explicitly invoked repair tool* — never as an
- *     automatic step.
- *
- * Both halves are needed and they would conflict if derivation ran implicitly:
- * a hand-edited `rungIndex` must take effect immediately (so `ladders` wins),
- * but a corrupted counter must be recoverable without discarding months of
- * history (so derivation must exist). Running derivation automatically would
- * silently revert every hand-edit, which defeats the reason the file is
- * hand-editable in the first place.
- *
- * Brief 04 depends on this choice: `applySession` mutates `ladders` directly and
- * does not consult `history` to decide anything.
+ * The document holds nothing derived, which is the other half of why hand-editing
+ * is safe: there is no second number to keep in step with the one you changed.
  *
  * ── Purity ──────────────────────────────────────────────────────────────────
  *
  * Nothing in src/domain/ may touch a browser API or read the clock; timestamps
- * arrive as parameters. This is enforced by eslint.config.js, not convention.
+ * arrive as parameters. Enforced by eslint.config.js, not by convention.
  */
 
 // ─── Scalars ────────────────────────────────────────────────────────────────
 
-/** The five movement patterns. `pull` is postural-only in v1 — see `Ladder.kind`. */
+/** The five movement patterns. `pull` is postural-only — see `Ladder.kind`. */
 export type Pattern = 'push' | 'squat' | 'hinge' | 'core' | 'pull'
 
 export const PATTERNS: readonly Pattern[] = ['push', 'squat', 'hinge', 'core', 'pull']
 
 /**
  * Rep-based ladders count reps; core and pull are held, not repped, and count
- * seconds. Both run the *identical* progression rules — only the unit and the
+ * seconds. Both interpolate identically — only the unit, the variant step and the
  * display formatting differ.
  */
 export type TargetUnit = 'reps' | 'seconds'
 
 /**
- * The four positions the cycle can be on. `D` is cardio and trains no ladder.
+ * The per-session load dial, picked on the home page before training.
  *
- * There is deliberately **no effort type here**. The app never asks how hard
- * anything felt, before or after — no `easy | ok | hard` tap, no reps-in-reserve
- * question, no difficulty picker. The engine's only input is *did you complete
- * the prescribed work*, which makes `SetResult` the whole of the input surface.
- * Locked decision, 2026-07-29 (corpus/wiki/decisions.md, "No effort input
- * anywhere"). Re-adding a rating field here would silently reopen it.
+ * It is **a dial, never a signal**: it shifts today's target by ±2 reps / ±5
+ * seconds and nothing else. It does not touch `sessionsDone`, so an easy day
+ * costs no progress and banks no debt (corpus/wiki/decisions.md). Anything that
+ * read this to decide a *future* prescription would reintroduce adaptation.
  */
-export type CycleDay = 'A' | 'B' | 'C' | 'D'
+export type Variant = 'easy' | 'medium' | 'hard'
+
+export const VARIANTS: readonly Variant[] = ['easy', 'medium', 'hard']
 
 /**
  * ISO-8601 instant, always supplied by the caller. `src/domain/` cannot read the
- * clock, which is what makes the simulation harness reproducible.
+ * clock, which is what makes the schedule reproducible under test.
  */
 export type IsoTimestamp = string
 
@@ -71,11 +78,17 @@ export type IsoTimestamp = string
  * Stable rung identifier, e.g. `push-04-full`.
  *
  * These are written into persisted history, so **a rung id is immutable once
- * shipped**. Renaming one orphans real training records that reference it.
- * The template type enforces only the pattern prefix; brief 03 owns the rest of
- * the convention.
+ * shipped**. A rung whose *movement* changes gets a NEW id; renaming or reusing
+ * one orphans real training records. The template type enforces only the pattern
+ * prefix; `ladders.ts` owns the rest of the convention.
  */
 export type RungId = `${Pattern}-${string}`
+
+/** An inclusive target span, in the ladder's unit. */
+export interface Range {
+  readonly min: number
+  readonly max: number
+}
 
 // ─── Content ────────────────────────────────────────────────────────────────
 
@@ -111,140 +124,183 @@ export interface Rung {
    */
   readonly cues: readonly string[]
   readonly modifier?: Modifier
-  /** Key into the figure registry (brief 10). Unknown ids render a placeholder. */
+  /** Key into the figure registry. Unknown ids render a placeholder. */
   readonly figureId?: string
+  /**
+   * Overrides the ladder default. **REQUIRED on every `seconds` rung** — the
+   * evidence-based ceilings genuinely differ per exercise (front plank 60s,
+   * tuck L-sit 30s), and the interpolation absorbs differing spans for free
+   * (corpus/wiki/programme.md#hold-caps-per-rung).
+   */
+  readonly range?: Range
+  /**
+   * Failing this rung is **injurious, not merely unsuccessful** — the schedule
+   * reaches these on a clock rather than on readiness, and there is no mechanism
+   * to step back (corpus/wiki/decisions.md, accepted risk). The user chose to
+   * rely on the rung's own cue text as the only brake, which imposes one UI
+   * contract:
+   *
+   * **On a `safetyCritical` rung, `cues[0]` renders FIRST and visually
+   * separated** — as the safety check it is, not as item one of four. Brief 19
+   * implements that; this flag is how it knows which rungs.
+   */
+  readonly safetyCritical?: boolean
 }
 
 export interface Ladder {
   readonly pattern: Pattern
   readonly unit: TargetUnit
   /**
-   * Where a brand-new document starts this ladder. **Not rung 0.**
-   *
-   * Calibration is descending (corpus/wiki/progression-engine.md): with no
-   * effort input there is no fast-track, so instead of climbing up from the
-   * bottom the user starts at a rung a returning beginner plausibly *can*
-   * perform and the 3-miss regress rule walks them down if they cannot. A
-   * missed set is free information; a question is not.
-   *
-   * **This is a safety-relevant number, not a tuning knob.** Each ladder's value
-   * is capped at the hardest rung whose *failure mode* is benign, and the
-   * reasoning per ladder is written next to the value in `ladders.ts`. Raising
-   * one is a safety change, not a calibration tweak.
-   */
-  readonly startRungIndex: number
-  /**
    * `postural` means this ladder does NOT train the strength quality its pattern
    * name implies, and the UI must say so. Required rather than optional so it
-   * cannot be forgotten — v1 has no pull anchor, so the pull ladder trains
+   * cannot be forgotten — there is no pull anchor, so the pull ladder trains
    * scapular retraction and upper-back endurance only. Presenting it as pull
    * strength would be a safety misrepresentation.
    */
   readonly kind: 'strength' | 'postural'
-  readonly targetMin: number
-  readonly targetMax: number
+  /**
+   * Where every document starts this ladder. **Not rung 0.**
+   *
+   * There is no calibration in v3 — everyone gets the same schedule — so this is
+   * purely a safety cap: the hardest rung whose *failure mode* is benign. The
+   * per-ladder reasoning is written next to the value in `ladders.ts`. Raising
+   * one is a safety change, not a tuning tweak.
+   */
+  readonly startRungIndex: number
+  /** Default target span, used only by rungs that declare no `range` of their own. */
+  readonly range: Range
+  /**
+   * How many sessions of this pattern one rung takes. **This is the law**, not a
+   * tuning knob: a rung takes about six weeks on every ladder, so the number is
+   * `sessions of this pattern per week × 6`.
+   *
+   *   rotating pattern, 2.3×/week → 14      daily block, 7×/week → 42
+   *
+   * Every step in the programme derives from it, which is why it is one rule
+   * rather than three constants: 5→12 reps over 14 sessions is +1 rep per 2
+   * sessions, a 20→60s plank over 42 is +1s per session, and a 10→30s prone Y
+   * over 42 is +1s per 2 sessions — exactly the three steps the user specified
+   * independently before the law was derived (corpus/wiki/progression-engine.md).
+   */
+  readonly sessionsPerRung: number
   readonly rungs: readonly Rung[]
 }
 
-export interface CycleDaySpec {
-  readonly day: CycleDay
+/**
+ * The cardio protocol. **Deliberately not a `Ladder`.**
+ *
+ * A cardio slot has no rungs, no progression and no target value, so every field
+ * of `Ladder` would be either absent or a lie. Most of all it has no unit and no
+ * number to hit: cardio is prescribed **by breathlessness**, because a count is
+ * something the user can pace themselves down to, and self-pacing to nothing is
+ * exactly the failure mode this protocol exists to avoid
+ * (corpus/wiki/programme.md#the-cardio-day). There is no `target` field here on
+ * purpose — the absence is the guarantee.
+ */
+export interface CardioProtocol {
   readonly label: string
-  /** Empty on a cardio day: it trains no ladder and mutates no ladder state. */
+  readonly rounds: number
+  /** Seconds of hard work per round. 60, not 20 — see the note in `ladders.ts`. */
+  readonly hardSeconds: number
+  /** Lower-body only: the push day is upper-body and the daily block is daily. */
+  readonly movements: readonly string[]
+  /** Literal, not a string: no future edit may quietly switch this to a count. */
+  readonly prescribedBy: 'breathlessness'
+  readonly cues: readonly string[]
+  /** The honest limit the app must state, not hide. */
+  readonly notice: string
+}
+
+// ─── The rotation ───────────────────────────────────────────────────────────
+
+export interface RotationSlot {
+  readonly label: string
+  /** The slot's own strength work. Empty on the cardio slot. */
   readonly patterns: readonly Pattern[]
   /**
-   * Required rather than optional so it cannot be forgotten, and stated rather
-   * than inferred from `patterns.length === 0`. "This day trains no ladder" is a
-   * fact about the programme; an empty array is an accident waiting to be read
-   * as a content bug. Brief 13 owns what a cardio day actually *contains*.
+   * Stated rather than inferred from `patterns.length === 0`. "This slot trains
+   * no ladder" is a fact about the programme; an empty array is an accident
+   * waiting to be read as a content bug.
    */
   readonly cardio: boolean
 }
 
-const DAY_A: CycleDaySpec = { day: 'A', label: 'Push', patterns: ['push', 'pull'], cardio: false }
-const DAY_B: CycleDaySpec = { day: 'B', label: 'Legs', patterns: ['squat', 'hinge'], cardio: false }
-const DAY_C: CycleDaySpec = { day: 'C', label: 'Core', patterns: ['core', 'pull'], cardio: false }
-const DAY_D: CycleDaySpec = { day: 'D', label: 'Cardio', patterns: [], cardio: true }
+const PUSH_SLOT: RotationSlot = { label: 'Push', patterns: ['push'], cardio: false }
+const LEGS_SLOT: RotationSlot = { label: 'Legs', patterns: ['squat', 'hinge'], cardio: false }
+const CARDIO_SLOT: RotationSlot = { label: 'Cardio', patterns: [], cardio: true }
 
 /**
- * The rotating cycle — **seven positions, two of them cardio** (revised
- * 2026-07-29, corpus/wiki/decisions.md, "Cardio gets its own day").
+ * Push · Legs · Cardio. **Cardio always FOLLOWS legs and never precedes it** —
+ * that ordering is the whole reason for this sequence and it is a locked decision
+ * (corpus/wiki/decisions.md). With daily training you cannot keep cardio away
+ * from legs day unless legs days go back-to-back, which breaks 48-hour recovery,
+ * so the achievable optimum is the *order*: the concurrent-training literature
+ * cares about strength-before-conditioning, and `Legs → Cardio → Push` satisfies
+ * it while giving legs 48h+ before the next session. **Do not reorder.**
  *
- *   A · B · C · CARDIO · A · B · CARDIO
- *
- * Twice weekly, not three times: three cardio days would cut each strength
- * pattern to ~4.7 direct sets/week *and* exceed the impact-volume ceiling the
- * injury literature supports. The two cardio days sit as far from Day B (legs)
- * as a seven-position cycle allows, because cardio movements are lower-body.
- *
- * Position is an integer counter into this array — there is no date arithmetic
- * anywhere in the engine, so "a missed day" is not an expressible concept.
- * Locked decision (corpus/wiki/decisions.md).
+ * Position is an integer counter into this array. There is no date arithmetic
+ * anywhere in the domain, so "a missed day" is not an expressible concept.
  */
-export const CYCLE: readonly [
-  CycleDaySpec,
-  CycleDaySpec,
-  CycleDaySpec,
-  CycleDaySpec,
-  CycleDaySpec,
-  CycleDaySpec,
-  CycleDaySpec,
-] = [DAY_A, DAY_B, DAY_C, DAY_D, DAY_A, DAY_B, DAY_D]
+export const ROTATION: readonly [RotationSlot, RotationSlot, RotationSlot] = [
+  PUSH_SLOT,
+  LEGS_SLOT,
+  CARDIO_SLOT,
+]
+
+/**
+ * Trained in EVERY session, on top of the slot's own patterns.
+ *
+ * Daily because the work is low-fatigue, responds to frequency, and is the half
+ * of the goal set a desk job actively damages. It also equalises pacing: at one
+ * session per rotation, core rungs took twice as long as push rungs to clear.
+ */
+export const DAILY_BLOCK: readonly Pattern[] = ['core', 'pull']
+
+/**
+ * The slot at `position`, wrapping.
+ *
+ * Never throws. The state file is hand-editable, so a negative, fractional or
+ * absurd position is an expected input, not a bug: it degrades to a real slot
+ * rather than breaking the only screen that matters.
+ */
+export function slotAt(position: number): RotationSlot {
+  const length = ROTATION.length
+  // Positive modulo, so -1 → 2 rather than -1.
+  const index = ((position % length) + length) % length
+  // `index` is NaN for a NaN position and fractional for a fractional one; both
+  // miss the array, and the first slot is a better answer than a thrown error.
+  return ROTATION[index] ?? ROTATION[0]
+}
 
 // ─── Results ────────────────────────────────────────────────────────────────
 
-export interface SetResult {
-  readonly targetValue: number
-  /** What actually happened. Never assumed equal to target. */
-  readonly actualValue: number
-}
-
-/**
- * One exercise's record. Target and actual per set, and nothing else — the
- * `effort` field that used to sit here is gone (schema v2). See `CycleDay`.
- */
-export interface ExerciseResult {
+export interface ExerciseRecord {
   readonly pattern: Pattern
   readonly rungId: RungId
-  readonly sets: readonly SetResult[]
+  /**
+   * A COUNT, not an array. Nothing per-set is measured, so there is nothing to
+   * store per set — three sets of a target is three, not `[t, t, t]`.
+   */
+  readonly sets: number
+  /** What was prescribed, after the variant was applied. Never what was achieved. */
+  readonly targetValue: number
 }
 
 export interface SessionResult {
-  /** Supplied by the caller — `src/domain/` may not read the clock. */
+  /**
+   * Supplied by the caller — `src/domain/` may not read the clock. Stored, and
+   * **NOTHING in src/ui may read it**: there are no dates anywhere in the app,
+   * no streak, no heatmap, no missed day (corpus/wiki/decisions.md).
+   */
   readonly completedAt: IsoTimestamp
-  readonly day: CycleDay
-  /** Empty on a cardio day. A session that trains no ladder is a normal case. */
-  readonly exercises: readonly ExerciseResult[]
+  /** Which rotation slot this session was. Index into `ROTATION`, via `slotAt`. */
+  readonly position: number
+  readonly variant: Variant
+  /** Empty on a cardio slot's own work — the daily block still records. */
+  readonly exercises: readonly ExerciseRecord[]
 }
 
 // ─── State ──────────────────────────────────────────────────────────────────
-
-export interface LadderState {
-  readonly rungIndex: number
-  /** Current prescription, in the ladder's unit. Between targetMin and targetMax. */
-  readonly target: number
-  /**
-   * Consecutive clean sessions *at `targetMax`*. Two triggers a rung advance.
-   * Reset on advance and on any missed session.
-   */
-  readonly cleanAtMax: number
-  /** Consecutive missed sessions. 2 holds, 3 regresses. */
-  readonly missedStreak: number
-}
-
-/**
- * Cross-brief settings. Declared here rather than bolted on later because
- * briefs 05, 07, 08 and 11 all need a slot and none of them is allowed to edit
- * this file.
- */
-export interface Settings {
-  readonly soundEnabled: boolean
-  readonly voiceEnabled: boolean
-  /** Set after the user skips the warmup repeatedly — respect it, don't re-ask. */
-  readonly skipWarmupByDefault: boolean
-  /** Result of navigator.storage.persist(). `null` = not yet requested. */
-  readonly persistGranted: boolean | null
-  readonly sync: SyncSettings | null
-}
 
 export interface SyncSettings {
   readonly baseUrl: string
@@ -252,53 +308,47 @@ export interface SyncSettings {
   readonly secret: string
 }
 
+export interface Settings {
+  /** Result of navigator.storage.persist(). `null` = not yet requested. */
+  readonly persistGranted: boolean | null
+  readonly sync: SyncSettings | null
+}
+
 /**
- * **v2** (2026-07-29): `ExerciseResult.effort` was removed. A v1 document has an
- * `effort` string on every exercise; `codec.migrate` drops the field on load
- * rather than rejecting the document. Everything else about the shape is
- * unchanged, which is exactly why this was the right first migration to have to
- * write — see `MIGRATIONS` in `src/persistence/codec.ts`.
+ * **v3** (2026-07-29): the fixed schedule. `ladders` (four numbers per pattern)
+ * collapsed to `sessionsDone` (one), `sessionsCompleted` became derivable from
+ * `history.length`, `ExerciseResult.sets` became a count, `day` became
+ * `position`, and `variant` appeared. Brief 16 owns the v1/v2 → v3 migration.
  */
-export const CURRENT_SCHEMA_VERSION = 2
+export const CURRENT_SCHEMA_VERSION = 3
 
 export interface StateDoc {
-  /**
-   * Present from v1 even though there was only one version then. Retrofitting
-   * migration onto a file that already holds six months of real training
-   * history is a problem you only get to have once.
-   */
-  readonly schemaVersion: number
-  /** Monotonic. Never resets — there is no streak to break. */
-  readonly sessionsCompleted: number
-  /** Integer index into CYCLE. Advances on completion, never on a date. */
+  readonly schemaVersion: 3
+  /** Keys the document. A password is accepted and discarded, never stored. */
+  readonly username: string
+  /** Integer index into ROTATION. Advances on training, never on a date. */
   readonly cyclePosition: number
-  readonly ladders: Readonly<Record<Pattern, LadderState>>
+  /**
+   * **The whole of the mutable state.** Rung index, target, name and cues are all
+   * derived from these five integers by `schedule.ts`.
+   *
+   * Stored rather than derived from `cyclePosition` — which would be exact, since
+   * `sessionsDone.push` is `⌈cyclePosition / 3⌉` for the current rotation —
+   * because if the rotation ever changes, derived counters would silently
+   * reinterpret every existing user's position mid-programme. One integer per
+   * pattern is cheap insurance against a content change rewriting history.
+   */
+  readonly sessionsDone: Readonly<Record<Pattern, number>>
   readonly history: readonly SessionResult[]
   readonly settings: Settings
 }
 
-// ─── Derived helpers (pure, no state) ───────────────────────────────────────
-
-export function cycleDayAt(cyclePosition: number): CycleDaySpec {
-  // Positive modulo: cyclePosition should never be negative, but a hand-edited
-  // file is an expected input and must not produce an out-of-range index.
-  const i = ((cyclePosition % CYCLE.length) + CYCLE.length) % CYCLE.length
-  const spec = CYCLE[i]
-  if (!spec) throw new Error(`cycleDayAt: no cycle spec at index ${i}`)
-  return spec
-}
+// ─── Guards ─────────────────────────────────────────────────────────────────
 
 export function isPattern(value: unknown): value is Pattern {
   return typeof value === 'string' && (PATTERNS as readonly string[]).includes(value)
 }
 
-/** Every day letter the cycle can produce, deduplicated and in cycle order. */
-export const CYCLE_DAYS: readonly CycleDay[] = [...new Set(CYCLE.map((spec) => spec.day))]
-
-/**
- * Derived from `CYCLE` rather than restated, so adding a cycle day cannot leave
- * the persistence layer rejecting sessions the engine now prescribes.
- */
-export function isCycleDay(value: unknown): value is CycleDay {
-  return typeof value === 'string' && (CYCLE_DAYS as readonly string[]).includes(value)
+export function isVariant(value: unknown): value is Variant {
+  return typeof value === 'string' && (VARIANTS as readonly string[]).includes(value)
 }
