@@ -10,7 +10,19 @@
  * where JSON was expected — returns a value rather than throwing. It never
  * rejects, so `void push(doc)` cannot produce an unhandled rejection, and it is
  * called *after* `store.save` has already succeeded, so a failure here costs
- * nothing but a log line.
+ * nothing but a log line. The same is true of `login`, which is why a wrong
+ * secret cannot lock anybody out of their own offline history.
+ *
+ * ── The username travels in the URL, the secret in a header ──────────────────
+ *
+ * `/api/state` is keyed by `?user=<username>` on **both** `GET` and `PUT`
+ * (`server/state-server.mjs`), and a `PUT` whose body disagrees with `?user=` is
+ * refused with a 400. This module fills both from the *same* place — the
+ * document's own `username` on push, the caller's requested username on pull — so
+ * that mismatch is unreachable from this client rather than merely unlikely.
+ *
+ * The secret goes in `x-sync-secret`, never in the URL: a URL ends up in proxy
+ * logs, browser history, and referrers.
  *
  * ── `navigator.onLine` is not consulted. Anywhere. ───────────────────────────
  *
@@ -21,21 +33,30 @@
  * the request is always attempted and the failure is caught. There is a test
  * asserting the property is never read.
  *
- * ── `push` is gated on `isReadOnly()` ────────────────────────────────────────
+ * ── `push` is gated on `isReadOnly(username)` ────────────────────────────────
  *
- * The store goes read-only when the locally stored document could not be parsed.
- * In that state the app is holding something it does not understand, and
- * uploading it would put a document the app never validated into the one place
- * that is meant to be a safe copy — overwriting the last good snapshot with it.
- * A read-only app does not push.
+ * The store goes read-only for a user when their locally stored document could
+ * not be parsed. In that state the app is holding something it does not
+ * understand, and uploading it would put a document the app never validated into
+ * the one place that is meant to be a safe copy — overwriting the last good
+ * snapshot with it. A read-only app does not push. The latch is per username, so
+ * one person's broken file does not stop another's sync.
  *
  * ── Conflicts prompt; they never silently resolve ────────────────────────────
  *
- * Comparison is on `sessionsCompleted`, which is monotonic and never resets.
+ * Comparison is on `history.length`, which is also what the service records as
+ * `sessions_completed` and hands back in a `PUT` receipt (`server/README.md`).
+ * v2 compared `sessionsCompleted`, a counter that never reset; v3 deleted it
+ * because it was derivable, and the honest replacement is the length of the list.
+ * The cost is that a history pruned by hand looks *behind* — and that is the safe
+ * direction: it produces a prompt, never a silent overwrite. Comparing
+ * `cyclePosition` instead would be monotonic, but it would disagree with the
+ * number the service reports, and two answers to "how many sessions" is worse
+ * than one answer that a hand-edit can lower.
  *
- *   - **Local ahead, or equal** → last-write-wins is *correct*, not lazy. There
- *     is exactly one user; the remote holds a prefix of what this device has, so
- *     overwriting it discards nothing.
+ *   - **Local ahead, or equal** → last-write-wins is *correct*, not lazy. A
+ *     stream belongs to one person training on one device at a time, so the remote
+ *     holds a prefix of what this device has and overwriting it discards nothing.
  *   - **Remote ahead** → stop. The remote holds sessions this device has never
  *     seen, which means training happened on another device. Pushing would bury
  *     them; pulling might discard local ones. `checkSync` returns both numbers
@@ -50,7 +71,6 @@
  * hand-repairable.
  */
 import type { StateDoc, SyncSettings } from '../domain/types.ts'
-import { LADDERS } from '../domain/ladders.ts'
 import { parse, serialise } from './codec.ts'
 import type { SaveResult, StoreOptions } from './store.ts'
 import { isReadOnly, save } from './store.ts'
@@ -60,6 +80,10 @@ import { isReadOnly, save } from './store.ts'
 export const SECRET_HEADER = 'x-sync-secret'
 export const STATE_PATH = '/api/state'
 export const HEALTH_PATH = '/api/health'
+export const LOGIN_PATH = '/api/login'
+
+/** The query parameter naming whose stream a `/api/state` request is about. */
+export const USER_PARAM = 'user'
 
 /**
  * Long enough for a slow phone on a slow connection, short enough that a
@@ -87,6 +111,18 @@ export function endpoint(baseUrl: string, path: string): string {
   return `${baseUrl.trim().replace(/\/+$/, '')}${path}`
 }
 
+/**
+ * `/api/state` for one user.
+ *
+ * The username is percent-encoded even though a valid one needs no escaping. It
+ * arrives from a document that a person is invited to edit by hand, and an
+ * unescaped `&` or `#` in it would silently retarget the request at a *different*
+ * user's stream instead of being rejected.
+ */
+export function stateEndpoint(baseUrl: string, username: string): string {
+  return `${endpoint(baseUrl, STATE_PATH)}?${USER_PARAM}=${encodeURIComponent(username)}`
+}
+
 // ─── push ───────────────────────────────────────────────────────────────────
 
 export type PushFailure =
@@ -112,7 +148,9 @@ export type PushOutcome =
  * no background sync, no retry queue. A dropped push is picked up by the next
  * session, and the export file is the real backup either way.
  *
- * Callers on the session path should write `void push(doc)` and move on.
+ * The subject is `doc.username`, for both `?user=` and the body, so the two
+ * cannot disagree. Callers on the session path should write `void push(doc)` and
+ * move on.
  */
 export async function push(doc: StateDoc, options: SyncOptions = {}): Promise<PushOutcome> {
   const log = options.log ?? warn
@@ -123,7 +161,7 @@ export async function push(doc: StateDoc, options: SyncOptions = {}): Promise<Pu
     return { ok: false, reason: 'not-configured', error: 'Sync is not configured.' }
   }
 
-  if (isReadOnly()) {
+  if (isReadOnly(doc.username)) {
     log(
       'Sync push skipped: the app is read-only because the stored document could not be read. ' +
         'Refusing to upload a document that was never validated.',
@@ -147,7 +185,7 @@ export async function push(doc: StateDoc, options: SyncOptions = {}): Promise<Pu
   let response: Response
   try {
     // No onLine check. See the header.
-    response = await send(target, STATE_PATH, options, {
+    response = await send(target, stateEndpoint(target.baseUrl, doc.username), options, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: text,
@@ -174,7 +212,7 @@ export async function push(doc: StateDoc, options: SyncOptions = {}): Promise<Pu
 // ─── pull ───────────────────────────────────────────────────────────────────
 
 export type PullFailure =
-  /** The service has never been written to. The new-device case. */
+  /** This user has no snapshot on the service. The new-device case. */
   | 'empty'
   /** Wrong or missing secret. */
   | 'unauthorized'
@@ -188,21 +226,29 @@ export type PullOutcome =
   | { readonly ok: false; readonly reason: PullFailure; readonly error: string }
 
 /**
- * Download and validate the remote document. Never throws.
+ * Download and validate `username`'s remote document. Never throws.
  *
- * Validation is the codec's, with `{ ladders: LADDERS }` so `rungIndex` gets its
- * bounds check — a remote document is no more trusted than a hand-edited file,
- * and it may well have been written by a different build.
+ * Validation is the codec's: a remote document is no more trusted than a
+ * hand-edited file, and it may well have been written by a different build. On
+ * top of that the document's own `username` must be the one we asked for — the
+ * client mirror of the service's mismatch check, so that adopting a remote copy
+ * can never silently switch which account this device is showing.
  *
  * Writes nothing. Applying a pulled document is a separate, explicit step
  * (`applyRemote`) because it is destructive.
  */
-export async function pull(target: SyncSettings, options: SyncOptions = {}): Promise<PullOutcome> {
+export async function pull(
+  target: SyncSettings,
+  username: string,
+  options: SyncOptions = {},
+): Promise<PullOutcome> {
   const log = options.log ?? warn
 
   let response: Response
   try {
-    response = await send(target, STATE_PATH, options, { method: 'GET' })
+    response = await send(target, stateEndpoint(target.baseUrl, username), options, {
+      method: 'GET',
+    })
   } catch (cause) {
     log('Sync pull failed.', cause)
     return { ok: false, reason: 'network', error: messageOf(cause) }
@@ -212,7 +258,7 @@ export async function pull(target: SyncSettings, options: SyncOptions = {}): Pro
     return {
       ok: false,
       reason: 'empty',
-      error: 'The sync service has no document stored yet.',
+      error: 'The sync service has no document stored yet for this user.',
     }
   }
   if (response.status === 401 || response.status === 403) {
@@ -234,7 +280,7 @@ export async function pull(target: SyncSettings, options: SyncOptions = {}): Pro
     return { ok: false, reason: 'network', error: messageOf(cause) }
   }
 
-  const parsed = parse(text, { ladders: LADDERS })
+  const parsed = parse(text, { username })
   if (!parsed.ok) {
     // The codec's message, verbatim — it names the JSON path that is wrong,
     // which is the only useful thing to show for a document that came from
@@ -245,15 +291,100 @@ export async function pull(target: SyncSettings, options: SyncOptions = {}): Pro
       error: `The document from the sync service could not be read, so nothing was changed.\n\n${parsed.error}`,
     }
   }
+  if (parsed.doc.username !== username) {
+    return {
+      ok: false,
+      reason: 'invalid',
+      error:
+        `The sync service returned a document belonging to "${parsed.doc.username}" ` +
+        `when "${username}" was requested, so nothing was changed.`,
+    }
+  }
 
   return { ok: true, doc: parsed.doc, text }
+}
+
+// ─── login ──────────────────────────────────────────────────────────────────
+
+export type LoginOutcome =
+  | { readonly ok: true; readonly username: string }
+  | {
+      readonly ok: false
+      readonly reason: 'not-configured' | 'network' | 'unauthorized' | 'rejected' | 'invalid'
+      readonly error: string
+    }
+
+/**
+ * Ask the service to acknowledge a username. **Advisory: the answer must never
+ * gate entry to the app.**
+ *
+ * The service checks nothing — it validates the shape of the username, discards
+ * the password without reading it, and echoes the name back
+ * (corpus/wiki/technical-decisions.md, "Authentication is a nameplate"). So this
+ * call exists only to tell a user that their *deployment secret* or *service
+ * address* is wrong, at the moment they are most likely to be typing them in. A
+ * failure here means "sync will not work", never "you may not train": logging in
+ * has to work offline, and it trivially does, because there is nothing to verify.
+ *
+ * The password is passed through untouched and is not stored anywhere by this
+ * module. Never throws.
+ */
+export async function login(
+  target: SyncSettings | null,
+  username: string,
+  password: string,
+  options: SyncOptions = {},
+): Promise<LoginOutcome> {
+  if (target === null) {
+    return { ok: false, reason: 'not-configured', error: 'Sync is not configured.' }
+  }
+
+  let response: Response
+  try {
+    response = await send(target, endpoint(target.baseUrl, LOGIN_PATH), options, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+  } catch (cause) {
+    ;(options.log ?? warn)('Login check failed; the app works offline regardless.', cause)
+    return { ok: false, reason: 'network', error: messageOf(cause) }
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    return {
+      ok: false,
+      reason: 'unauthorized',
+      error: 'The sync service rejected the secret. Check the secret in Settings.',
+    }
+  }
+  if (!response.ok) {
+    return { ok: false, reason: 'rejected', error: describeStatus(response.status) }
+  }
+
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch (cause) {
+    return { ok: false, reason: 'invalid', error: messageOf(cause) }
+  }
+  const echoed =
+    typeof body === 'object' && body !== null ? (body as { username?: unknown }).username : undefined
+  if (echoed !== username) {
+    return {
+      ok: false,
+      reason: 'invalid',
+      error: `The sync service answered about a different username than the one sent.`,
+    }
+  }
+  return { ok: true, username }
 }
 
 // ─── Comparison and the conflict prompt ─────────────────────────────────────
 
 export type Comparison = 'local-ahead' | 'equal' | 'remote-ahead'
 
-/** Monotonic counters, so a plain comparison is the whole algorithm. */
+/** Two session counts, compared. See the header for which count and why. */
 export function compareSessions(localSessions: number, remoteSessions: number): Comparison {
   if (localSessions > remoteSessions) return 'local-ahead'
   if (localSessions < remoteSessions) return 'remote-ahead'
@@ -263,7 +394,7 @@ export function compareSessions(localSessions: number, remoteSessions: number): 
 export type SyncStatus =
   | { readonly kind: 'not-configured' }
   | { readonly kind: 'failed'; readonly reason: PullFailure; readonly error: string }
-  /** Nothing stored remotely yet — pushing is safe and loses nothing. */
+  /** Nothing stored remotely for this user yet — pushing is safe and loses nothing. */
   | { readonly kind: 'remote-empty'; readonly localSessions: number | null }
   /**
    * No readable local document but a good remote one: the new-device case, and
@@ -290,38 +421,42 @@ export type SyncStatus =
     }
 
 /**
- * Compare local and remote and return what should happen. **Writes nothing.**
+ * Compare one user's local and remote documents and return what should happen.
+ * **Writes nothing.**
  *
  * That is the load-bearing property, not a detail of the implementation: this
  * function cannot overwrite anything, so no reachable path through it can
  * discard a session. Every destructive step is a separate call the UI makes
  * after the user has seen the numbers.
  *
- * @param local the current document, or `null` when storage held none
+ * @param username whose stream to compare. Required even when `local` is null,
+ *   which is the whole point of the new-device case.
+ * @param local the current document, or `null` when storage held none for them
  */
 export async function checkSync(
+  username: string,
   local: StateDoc | null,
   target: SyncSettings | null,
   options: SyncOptions = {},
 ): Promise<SyncStatus> {
   if (target === null) return { kind: 'not-configured' }
 
-  const remote = await pull(target, options)
+  const remote = await pull(target, username, options)
 
   if (!remote.ok) {
     if (remote.reason === 'empty') {
-      return { kind: 'remote-empty', localSessions: local?.sessionsCompleted ?? null }
+      return { kind: 'remote-empty', localSessions: local?.history.length ?? null }
     }
     return { kind: 'failed', reason: remote.reason, error: remote.error }
   }
 
-  const remoteSessions = remote.doc.sessionsCompleted
+  const remoteSessions = remote.doc.history.length
 
   if (local === null) {
     return { kind: 'adopt-remote', remote: remote.doc, remoteSessions }
   }
 
-  const localSessions = local.sessionsCompleted
+  const localSessions = local.history.length
   switch (compareSessions(localSessions, remoteSessions)) {
     case 'equal':
       return { kind: 'in-sync', sessions: localSessions }
@@ -360,7 +495,8 @@ export interface ApplyOptions extends StoreOptions {
  * Write a pulled document to local storage, destructively.
  *
  * Goes through `store.save` rather than touching storage, so it inherits
- * verify-before-promote and the refusal to overwrite an unreadable document.
+ * verify-before-promote, the refusal to overwrite an unreadable document, and the
+ * guarantee that the document lands under *its own* username's key.
  * This function is where "replace this device with the remote copy" happens and
  * it should only ever be called from a confirmed user action.
  */
@@ -401,14 +537,14 @@ export function saveAndPush(doc: StateDoc, options: ApplyOptions & SyncOptions =
 // ─── Transport ──────────────────────────────────────────────────────────────
 
 interface SendInit {
-  readonly method: 'GET' | 'PUT'
+  readonly method: 'GET' | 'PUT' | 'POST'
   readonly headers?: Readonly<Record<string, string>>
   readonly body?: string
 }
 
 async function send(
   target: SyncSettings,
-  path: string,
+  url: string,
   options: SyncOptions,
   init: SendInit,
 ): Promise<Response> {
@@ -431,7 +567,7 @@ async function send(
     ...(signal === null ? {} : { signal }),
   }
 
-  return doFetch(endpoint(target.baseUrl, path), request)
+  return doFetch(url, request)
 }
 
 /**
@@ -453,6 +589,9 @@ function describeStatus(status: number): string {
   }
   if (status === 413) {
     return `The sync service refused the document as too large (${status}).`
+  }
+  if (status === 415) {
+    return `The sync service refused the request's content type (${status}).`
   }
   if (status === 400) {
     return `The sync service rejected the document (${status}).`
