@@ -1,0 +1,14 @@
+{
+  "name": "@sports-app/shared",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The wire contract and the document shape. No node:, no DOM, no behaviour — both runtimes import it.",
+  "exports": {
+    "./types.ts": "./types.ts",
+    "./username.ts": "./username.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

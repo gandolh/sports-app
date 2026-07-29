@@ -7,7 +7,7 @@
  * SQLite service holding JSON snapshot rows, one stream per user"), not a
  * shortcut:
  *
- *   - `src/persistence/codec.ts` already owns validation and the canonical
+ *   - `client/src/persistence/codec.ts` already owns validation and the canonical
  *     shape, and `schemaVersion` lives *inside* the JSON. A
  *     `sessions`/`sets`/`ladders` schema here would be a **second source of
  *     truth for shape**, and would have to duplicate every rule the codec
@@ -39,21 +39,34 @@
  * being "valid JSON", and the app's own export file would stop matching what
  * the service holds. The server parses only to *check*, never to rewrite.
  *
- * ── Zero dependencies, on purpose ────────────────────────────────────────────
+ * ── No storage dependency, on purpose ───────────────────────────────────────
  *
  * `node:sqlite` is built in. No `better-sqlite3` native build, nothing to
  * compile, nothing to pin, nothing to rebuild after a Node upgrade. It prints
  * an experimental warning on startup; that warning is the entire price and it
  * is not a reason to add a dependency.
+ *
+ * The service is no longer *literally* dependency-free — it takes
+ * `@sports-app/shared` for the username rule (brief 21) and brief 22 adds Fastify
+ * — but nothing about either touches the storage layer. `node:sqlite` stays.
  */
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+// The only import that is not a Node builtin, and it is deliberately types plus
+// one regex: `shared/` may not touch `node:` anything, so importing it here can
+// never drag a browser-hostile dependency into the bundle or a Node-only one into
+// the client. Node ≥22.18 strips the types at load; there is no build step.
+import { LEGACY_USERNAME, USERNAME_RULE, isValidUsername } from '@sports-app/shared/username.ts'
 
 const SERVICE_DIR = dirname(fileURLToPath(import.meta.url))
 
-/** The repository root — the service lives in `server/` beneath it. */
+/**
+ * The repository root — the service is the `server/` workspace directly beneath
+ * it. Unchanged by the workspace split: `server/` did not move, so `db/` is still
+ * a sibling of it at the repo root and still gitignored.
+ */
 export const PROJECT_ROOT = resolve(SERVICE_DIR, '..')
 
 /**
@@ -82,71 +95,22 @@ export const DEFAULT_DB_FILE = resolve(DEFAULT_DB_DIR, 'app.db')
 export const RETENTION = 20
 
 // ─── Who a stream belongs to ────────────────────────────────────────────────
-
-/**
- * The longest a username may be.
- *
- * A cap is not paranoia about SQL — the username reaches SQL only through a
- * bound parameter — it is about the two places an unbounded string is genuinely
- * a problem: it is written into every snapshot row and echoed back to a browser
- * that has to lay it out on a 320px screen. 32 characters is longer than any
- * name a person types to identify their own training log and short enough that
- * neither of those becomes a story.
- */
-export const USERNAME_MAX_LENGTH = 32
-
-/**
- * The allowlist. Lowercase letters, digits, and `.`/`-`/`_` after the first
- * character.
- *
- * Two decisions worth stating, because both look like something to "fix":
- *
- *   - **Uppercase is rejected rather than folded to lowercase.** The obvious
- *     kindness — accept `Alice`, store under `alice` — is a trap here, because
- *     the username also lives *inside* the document, which is hand-editable and
- *     round-trips verbatim. Folding on the way in would make the stream key
- *     disagree with the document's own `username` field, which is precisely the
- *     mismatch `PUT` refuses. Rejecting with a message that says "lowercase"
- *     leaves one spelling of a name, one stream, and nothing silently rewritten.
- *   - **The first character must be a letter or a digit**, so a name cannot be
- *     `.`, `..`, `-rf`, or anything else that reads as punctuation rather than
- *     as a person when it turns up in a log line or a filename someone derives
- *     from it.
- *
- * Built from `USERNAME_MAX_LENGTH` rather than restating the bound, so the cap
- * and the pattern cannot drift apart.
- */
-export const USERNAME_PATTERN = new RegExp(`^[a-z0-9][a-z0-9._-]{0,${USERNAME_MAX_LENGTH - 1}}$`)
-
-/**
- * @param {unknown} value
- * @returns {boolean}
- */
-export function isValidUsername(value) {
-  return typeof value === 'string' && USERNAME_PATTERN.test(value)
-}
-
-/** Human-readable statement of the rule, for a 400 body and for tests. */
-export const USERNAME_RULE =
-  `1–${USERNAME_MAX_LENGTH} characters, starting with a lowercase letter or a digit, ` +
-  'then lowercase letters, digits, dots, dashes or underscores'
-
-/**
- * Who the rows that predate usernames belong to.
- *
- * Before v3 the table held exactly one stream and said nothing about whose it
- * was, so migrating it means *choosing* an owner — there is no information in
- * the database to recover one from. `local` is that choice: it is a valid
- * username, so the migrated history is reachable through the ordinary route
- * (`GET /api/state?user=local`) with no special case anywhere in the service,
- * and it is honest about what those rows are — the single-user local deployment
- * that existed before accounts did.
- *
- * Reattributing them to a real name afterwards is one statement:
- *
- *   sqlite3 db/app.db "UPDATE snapshots SET username = 'alice' WHERE username = 'local'"
- */
-export const LEGACY_USERNAME = 'local'
+//
+// The username rule used to be **defined here**, and defined a second time in the
+// client's codec, with a test comparing the two regexes character for character to
+// stop them drifting. Brief 21 replaced both copies with one definition in
+// `@sports-app/shared/username.ts` that this service and the browser bundle both
+// import, and deleted the drift test as meaningless.
+//
+// The reasoning behind the rule — why uppercase is rejected rather than folded,
+// why the first character is constrained, why the cap is 32 — moved with the
+// definition. What stays here is the one thing that is genuinely about *this*
+// file: the assertion below, which is what makes interpolating `LEGACY_USERNAME`
+// into DDL safe.
+//
+// It is imported and not re-exported: every consumer names `shared/` directly, so
+// there is one definition reachable by one path rather than one definition behind
+// two names.
 
 if (!isValidUsername(LEGACY_USERNAME)) {
   // `LEGACY_USERNAME` is interpolated into DDL below, where a bound parameter is

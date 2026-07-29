@@ -19,15 +19,15 @@
  *      stored" block: it searches the database files on disk and the captured log
  *      for a sentinel string.
  *
- * ── Why nothing here imports from `src/` ──────────────────────────────────────
+ * ── Why nothing here imports from the client ─────────────────────────────────
  *
  * The documents below are hand-written v3 bodies rather than output from
- * `src/persistence/codec.ts`, and that is deliberate. This service is
+ * `client/src/persistence/codec.ts`, and that is deliberate. This service is
  * version-agnostic on purpose: it echoes whatever `schemaVersion` it is given
  * into a column and never interprets it. A test that built its fixtures from
  * `CURRENT_SCHEMA_VERSION` would fail on the client's next schema bump while
- * proving nothing about the server, and it would couple a zero-dependency `.mjs`
- * service to the bundle's TypeScript. Hand-written bodies also let a test send a
+ * proving nothing about the server, and it would couple the service to the
+ * bundle's TypeScript. Hand-written bodies also let a test send a
  * document the codec would refuse to produce, which is exactly the input a
  * shallow validator has to survive.
  *
@@ -44,9 +44,9 @@ import {
   DEFAULT_DB_FILE,
   PROJECT_ROOT,
   RETENTION,
-  USERNAME_MAX_LENGTH,
   openSnapshotStore,
 } from '../db.mjs'
+import { USERNAME_MAX_LENGTH } from '@sports-app/shared/username.ts'
 import {
   LOGIN_PATH,
   SECRET_HEADER,

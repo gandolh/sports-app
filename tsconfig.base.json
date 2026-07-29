@@ -1,0 +1,56 @@
+{
+  /* Every workspace's `tsconfig.json` extends this. Options that differ per
+     workspace — `lib`, `types`, `jsx`, `include` — are set there, never here, so
+     that `shared/` can be denied the DOM without the client losing it.
+
+     ── Plain per-workspace configs, NOT project references ──────────────────
+
+     Project references are the textbook answer for a TypeScript monorepo and are
+     deliberately not used. References exist to order *emit* and to share build
+     state between projects, and this repo emits nothing from `tsc`: every config
+     is `noEmit`, Vite produces the bundle, and Node strips the service's types at
+     load. So references would buy no build ordering that matters.
+
+     What they would cost is real. `client` resolves `@sports-app/shared/types.ts`
+     through the workspace symlink and shared's `exports` map — which is also
+     exactly how Vite, Vitest and Node resolve it. A `references` array would add a
+     *second* resolution graph that only `tsc` reads, so `tsc` and Vitest could
+     disagree about what `@sports-app/shared` means while both looked green. One
+     resolution path, understood by all four consumers, is worth more here than
+     incremental builds of a two-file package.
+
+     ── Why the exports map points at `.ts` source ───────────────────────────
+
+     `shared/` ships source, not a `dist/`. `allowImportingTsExtensions` lets `tsc`
+     follow it, Vite and Vitest transform it, and Node ≥22.18 strips the types at
+     load (which is why the root `engines.node` says 22.18 and not 22). The
+     alternative — compiling `shared/` to declarations first — puts a build step in
+     front of `npm run check` and makes a stale `dist/` a way to get a
+     confidently wrong typecheck. `erasableSyntaxOnly` below is what keeps the
+     source strippable: no enums, no namespaces, no parameter properties. */
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+
+    "strict": true,
+    /* The engine indexes into ladder arrays constantly. An off-by-one there is
+       the exact bug class this project cannot afford, so unchecked index access
+       is an error rather than a suggestion. */
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  }
+}

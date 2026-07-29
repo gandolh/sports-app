@@ -32,10 +32,10 @@ validation state is exactly the code that rots, and the alternative is the same 
 written twice. Validate **on blur and submit, never per keystroke**.
 
 The validation rules themselves are **not the form layer's to define**: the username rule
-lives in `codec.ts` (`USERNAME_PATTERN`, `USERNAME_RULE`, `isValidUsername`) and must agree
-with the server's, which rejects rather than case-folds. A form that restates the rule is a
-second source of truth for it. **The password field has no validation**, which is the
-honest reflection of nothing checking it.
+lives in `shared/username.ts` (`USERNAME_PATTERN`, `USERNAME_RULE`, `isValidUsername`) —
+one definition imported by the client *and* the service, since brief 21. A form that
+restates the rule is a second source of truth for it. **The password field has no
+validation**, which is the honest reflection of nothing checking it.
 
 ### `vite.config.ts` must import `defineConfig` from `vitest/config`
 Importing it from `vite` makes the `test` block fail typecheck (TS2769). Cheap to get
@@ -153,5 +153,5 @@ never on the critical path.
   implementation if a hold-countdown chime is ever wanted.
 
 ### No code graph for now
-Greenfield single package; `grep` over a small `src/` is cheaper than maintaining an
+Greenfield single package; `grep` over a small `client/src/` is cheaper than maintaining an
 index. Revisit past ~50 files. See [`../routing.md`](../routing.md).

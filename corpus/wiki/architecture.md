@@ -45,10 +45,16 @@ client/                    the PWA
     components/  figures/  ExerciseFigure.tsx
   src/main.tsx
 
-server/                    Fastify. Same REST contract, schema-validated from shared/.
-  src/routes/              /api/state · /api/login · /api/health
-  src/db.ts                node:sqlite snapshot rows, one stream per username
+server/                    the service. Same REST contract either way.
+  state-server.mjs         /api/state · /api/login · /api/health
+  db.mjs                   node:sqlite snapshot rows, one stream per username
 ```
+
+**The service is still `node:http` as of brief 21.** Brief 22 replaces that layer with
+Fastify and moves the routes under `server/src/`; the storage half and the wire contract are
+unchanged by it. This page described the Fastify layout before it existed — corrected
+2026-07-29, because a page that reads as present tense while describing a plan is worse than
+one that says which is which.
 
 **`shared/` holds data shapes and validation, never behaviour.** The ladders, the schedule
 and the milestones stay in the client — they are logic the server has no business knowing,

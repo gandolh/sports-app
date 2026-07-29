@@ -60,7 +60,7 @@ explicit revisit plus a `log.md` entry.
   Difficulty comes from tempo, pause, range, leverage, and unilateral work.
 - **The rotation advances on training, never on the calendar**, and **no date appears
   anywhere in the UI**. No streak, no heatmap, no missed day. History stores
-  `completedAt`; nothing in `src/ui/` may read it.
+  `completedAt`; nothing in `client/src/ui/` may read it.
 - **The prescription is a pure function of sessions completed.** Deterministic,
   clock-free, no LLM planning, no autoregulation in code. One interpolation, no
   branches.

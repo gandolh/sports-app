@@ -6,7 +6,7 @@ updated: 2026-07-29
 # Status — 2026-07-29
 
 **Where things stand: the v2 rebuild is complete and green.** All six briefs (15–20)
-shipped in three waves. **611 tests**, typecheck and lint clean, `npm audit` clean, and
+shipped in three waves. **610 tests**, typecheck and lint clean, `npm audit` clean, and
 `npm run build` emits a working service worker. Offline was proven rather than assumed —
 a full Push session played to the finish screen with the network down.
 
@@ -51,8 +51,8 @@ date anywhere in the UI. Full detail in
 | 18 | [Animated figures](../briefs/done/18-animated-figures.md) | **done** | — |
 | 19 | [UI shell: four screens](../briefs/done/19-ui-shell-and-four-screens.md) | **done** | 15, 16, 18, 20 |
 | 20 | [Milestones + total work](../briefs/done/20-milestones-and-total-work.md) | **done** | 15 |
-| 21 | [npm workspaces + shared](../briefs/todo/21-npm-workspaces-and-shared.md) | **todo** | — |
-| 22 | [Fastify API](../briefs/todo/22-fastify-api.md) | todo | 21 |
+| 21 | [npm workspaces + shared](../briefs/done/21-npm-workspaces-and-shared.md) | **done** | — |
+| 22 | [Fastify API](../briefs/todo/22-fastify-api.md) | **todo** | 21 |
 
 ## How it ran
 
@@ -63,7 +63,7 @@ wave 3   19                 ✔  the four screens
 ```
 
 `17` moved up to wave 1 because it owns only `server/**`. Brief 15 deliberately left
-`src/persistence/**` and `src/ui/**` broken by deleting `engine.ts` and `progress.ts`;
+`client/src/persistence/**` and `client/src/ui/**` broken by deleting `engine.ts` and `progress.ts`;
 16 and 19 repaired their own side, and the only file failing typecheck between waves was
 `SettingsScreen.tsx`, which 19 deleted.
 
@@ -77,11 +77,9 @@ per-side side-plank dose the code splits between sides.
 
 ## What is left
 
-- **Briefs 21 and 22** — restructure into `client`/`server`/`shared` npm workspaces, then
-  migrate the service to Fastify with the REST contract unchanged. 21 is a move that must
-  end with all 611 tests still passing; 22 swaps the HTTP layer with those tests as the
-  contract. Split deliberately: a behavioural change hidden inside a 100-file move is
-  close to unreviewable.
+- **Brief 22** — migrate the service to Fastify with the REST contract unchanged. Brief 21
+  landed the three workspaces as a pure move (610 tests, net-negative diff), so 22 has the
+  73 server tests as its contract and the client must need no edit at all.
 - **Deploy integration** in `/home/gandolh/projects/vps-deploy/projects/sports-app/` —
   not started. The DB path must sit outside the rsync tree.
 - **Two design decisions brief 19 left open rather than patching**: `POSTURAL_NOTICE`
