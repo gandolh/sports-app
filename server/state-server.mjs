@@ -1,41 +1,82 @@
 /**
- * The state service: five routes, one table, zero dependencies.
+ * The state service: four routes, one table, zero dependencies.
  *
  * ── What this is not ─────────────────────────────────────────────────────────
  *
- * Not a backend in the usual sense. There is no users table, no login, no
- * session cookie, no ORM, no migration runner, and no route that returns
- * anything other than the one JSON document the app already produces. There is
- * exactly one user, so "authorisation" is a single shared secret and
- * "conflict resolution" is a comparison of two integers.
+ * Not a backend in the usual sense. There is no users table, no session cookie,
+ * no ORM, no migration runner, and no route that returns anything other than the
+ * one JSON document the app already produces. A username names a stream of
+ * snapshots; "conflict resolution" is a comparison of two integers, done on the
+ * client.
  *
  * ── The routes ───────────────────────────────────────────────────────────────
  *
- *   GET  /api/health   liveness. No auth, no database read, no information.
- *   GET  /api/state    the newest snapshot's bytes, or 404 when there are none.
- *   PUT  /api/state    validate shallowly, store verbatim, prune to the cap.
+ *   GET  /api/health          liveness. No auth, no database read, no information.
+ *   POST /api/login           { username, password } → { username }.
+ *   GET  /api/state?user=…    that user's newest snapshot bytes, or 404.
+ *   PUT  /api/state?user=…    validate shallowly, store verbatim, prune to the cap.
  *
  * Anything else is a 404. No static files, no directory listing, no fallback
- * handler — a service whose only job is to hold one document has no business
+ * handler — a service whose only job is to hold documents has no business
  * serving anything else, and every route that does not exist is a route that
  * cannot be wrong.
+ *
+ * ── Login checks nothing, and that is the design ──────────────────────────────
+ *
+ * `corpus/wiki/technical-decisions.md § "Authentication is a nameplate, not a
+ * boundary"`. Read that before changing anything in `login()`.
+ *
+ * **The password is never read.** Not hashed, not compared, not stored, not
+ * logged, not echoed. There is deliberately no expression anywhere in this file
+ * that evaluates `.password` — the handler destructures `username` and nothing
+ * else — which is a stronger guarantee than deleting it afterwards would be,
+ * because it cannot be undone by a later edit that "just needs it for a moment".
+ * Storing an unchecked password buys nothing and collects real passwords that
+ * people reuse elsewhere. A request without a password field is therefore
+ * accepted: there is nothing to check, so there is nothing to be missing.
+ *
+ * **This is not a security boundary and does not pretend to be one.** Anyone who
+ * knows a username can read that person's training history through
+ * `GET /api/state?user=…`. That is accepted for training data on a personal
+ * deployment. There is no token, no session, no cookie, no rate limit — not
+ * because they were forgotten, but because each one would manufacture a feeling
+ * of security that the design does not provide, and a user who believed it would
+ * make worse decisions than one who knows the truth. The login screen says so in
+ * as many words.
+ *
+ * The shared secret below is a different thing entirely: it protects the
+ * *deployment* — whether this process will talk to you at all — not the accounts
+ * inside it. It does not make one user's history private from another.
  *
  * ── Why validation here is deliberately shallow ──────────────────────────────
  *
  * The server checks that the body is a JSON object with a numeric
- * `schemaVersion` and a non-negative integer `sessionsCompleted`. That is all.
+ * `schemaVersion`, a valid `username`, and an array `history`. That is all.
  *
  * It is tempting to re-implement the codec's validation here as a second line of
  * defence. That would be a mistake: `src/persistence/codec.ts` is the single
  * source of truth for the document's shape, and a second, drifting validator
  * would eventually reject a document the app considers perfectly good — turning
- * this service from a safety net into a way to *lose* a workout. The two fields
- * it does check are exactly the two the service itself needs: `schemaVersion`
- * for the indexed column, and `sessionsCompleted` because the client's conflict
- * comparison reads it back.
+ * this service from a safety net into a way to *lose* a workout. The three fields
+ * it does check are exactly the three the service itself needs: `schemaVersion`
+ * for the indexed column, `username` because it is the row key, and `history`
+ * because its length is what the `sessions_completed` column holds now that the
+ * v3 document no longer carries a `sessionsCompleted` field.
  *
  * A 400 leaves the database completely untouched. The newest snapshot after a
  * rejected `PUT` is byte-for-byte the newest snapshot from before it.
+ *
+ * ── The username travels in the query string, on both /api/state routes ───────
+ *
+ * `?user=alice`. On `GET` it is the only way to say whose document is wanted. On
+ * `PUT` it is redundant with the document's own `username` — and that is the
+ * point: the two are compared and a mismatch is a 400. Without an independently
+ * stated target there is nothing to compare, and a client bug that puts the
+ * wrong name in a document would silently overwrite someone else's stream.
+ *
+ * A username in a URL is fine; a secret in one is not, which is why the secret
+ * stays in a header. A URL ends up in proxy logs and browser history, and a
+ * username is not a secret in this design — it is a nameplate.
  *
  * ── Auth ─────────────────────────────────────────────────────────────────────
  *
@@ -47,17 +88,28 @@
  *
  * ── Binding ──────────────────────────────────────────────────────────────────
  *
- * `127.0.0.1` by default, so running it cannot accidentally expose one user's
+ * `127.0.0.1` by default, so running it cannot accidentally expose anyone's
  * training history to a network. Host and port are environment variables.
  */
 import { createServer as createHttpServer } from 'node:http'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
-import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from './db.mjs'
+import {
+  DEFAULT_DB_FILE,
+  LEGACY_USERNAME,
+  RETENTION,
+  USERNAME_RULE,
+  isValidUsername,
+  openSnapshotStore,
+} from './db.mjs'
 
 export const SECRET_HEADER = 'x-sync-secret'
 export const STATE_PATH = '/api/state'
 export const HEALTH_PATH = '/api/health'
+export const LOGIN_PATH = '/api/login'
+
+/** The query parameter that names whose stream a `/api/state` request is about. */
+export const USER_PARAM = 'user'
 
 export const DEFAULT_HOST = '127.0.0.1'
 export const DEFAULT_PORT = 8787
@@ -133,8 +185,10 @@ function sendDocument(res, docJson, meta) {
     'Content-Length': String(body.byteLength),
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
-    // Advisory only. The client compares `sessionsCompleted` from inside the
+    // Advisory only. The client compares session counts read from inside the
     // document, never a header, so a proxy that strips these changes nothing.
+    // Deliberately no `X-Snapshot-User`: the username is in the document, and a
+    // header would be a second place for it to disagree.
     'X-Snapshot-Id': String(meta.id),
     'X-Snapshot-Created-At': meta.createdAt,
   })
@@ -175,11 +229,41 @@ function messageOf(cause) {
   return cause instanceof Error ? cause.message : String(cause)
 }
 
+// ─── Usernames ──────────────────────────────────────────────────────────────
+
+/**
+ * The message a rejected username gets.
+ *
+ * It states the rule and **does not echo the value**. Echoing it would put
+ * attacker-controlled text into a response body that some client will eventually
+ * render, and the rule is the only part that helps the person reading it anyway.
+ */
+export const USERNAME_ERROR = `user: expected ${USERNAME_RULE}`
+
+/**
+ * Pull `?user=` off a request URL and validate it.
+ *
+ * @param {string} url the raw `req.url`
+ * @returns {{ok: true, username: string} | {ok: false, error: string}}
+ */
+export function readUsername(url) {
+  const mark = url.indexOf('?')
+  // `URLSearchParams` handles the percent-decoding, so `%2e%2e` and `a+b` are
+  // decoded *before* the allowlist sees them rather than after — a check that
+  // runs on the encoded form can be walked straight past.
+  const raw = new URLSearchParams(mark === -1 ? '' : url.slice(mark + 1)).get(USER_PARAM)
+  if (raw === null) {
+    return { ok: false, error: `user: required. Name whose document this is with ?${USER_PARAM}=…` }
+  }
+  if (!isValidUsername(raw)) return { ok: false, error: USERNAME_ERROR }
+  return { ok: true, username: raw }
+}
+
 // ─── Shallow document check ─────────────────────────────────────────────────
 
 /**
  * @param {string} text
- * @returns {{ok: true, schemaVersion: number, sessionsCompleted: number} | {ok: false, error: string}}
+ * @returns {{ok: true, schemaVersion: number, username: string, historyLength: number} | {ok: false, error: string}}
  */
 export function checkDocument(text) {
   let raw
@@ -192,7 +276,7 @@ export function checkDocument(text) {
     return { ok: false, error: 'expected a JSON object at the top level' }
   }
 
-  const { schemaVersion, sessionsCompleted } = raw
+  const { schemaVersion, username, history } = raw
   if (typeof schemaVersion !== 'number' || !Number.isFinite(schemaVersion)) {
     return {
       ok: false,
@@ -201,15 +285,53 @@ export function checkDocument(text) {
         'a body without it is probably not a state document at all.',
     }
   }
-  if (
-    typeof sessionsCompleted !== 'number' ||
-    !Number.isInteger(sessionsCompleted) ||
-    sessionsCompleted < 0
-  ) {
-    return { ok: false, error: 'sessionsCompleted: expected a whole number >= 0' }
+  if (!isValidUsername(username)) {
+    return { ok: false, error: `username: expected ${USERNAME_RULE}` }
+  }
+  if (!Array.isArray(history)) {
+    // Checked because `history.length` is what the `sessions_completed` column
+    // holds — not because the server has an opinion about what is *in* the
+    // array. It never looks inside.
+    return { ok: false, error: 'history: expected an array' }
   }
 
-  return { ok: true, schemaVersion, sessionsCompleted }
+  return { ok: true, schemaVersion, username, historyLength: history.length }
+}
+
+// ─── The login body ─────────────────────────────────────────────────────────
+
+/**
+ * Read a username out of a login body.
+ *
+ * **Only `username` is destructured. `.password` is never evaluated.** See the
+ * file header: that is the decision, not an oversight, and this function is the
+ * one place it could be broken.
+ *
+ * Note what the failure path deliberately does *not* do: it does not include the
+ * `JSON.parse` message. V8's parse errors quote a slice of the input, so an
+ * unparseable login body would put part of a real password into a response and
+ * into the log. The generic message is worth strictly more than the diagnostic
+ * detail here — this body has exactly two fields and the client constructs it.
+ *
+ * @param {string} text
+ * @returns {{ok: true, username: string} | {ok: false, error: string}}
+ */
+export function checkCredentials(text) {
+  let raw
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    return { ok: false, error: 'expected a JSON object with a username' }
+  }
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: 'expected a JSON object at the top level' }
+  }
+
+  const { username } = raw
+  if (!isValidUsername(username)) {
+    return { ok: false, error: `username: expected ${USERNAME_RULE}` }
+  }
+  return { ok: true, username }
 }
 
 // ─── The service ────────────────────────────────────────────────────────────
@@ -244,32 +366,44 @@ export function createStateServer(config) {
   })
 
   async function handle(req, res) {
-    // Query strings are meaningless on every route here, and splitting them off
-    // means `/api/state?x=1` cannot slip past an exact path comparison.
-    const path = (req.url ?? '').split('?')[0]
+    const url = req.url ?? ''
+    // Splitting the query string off means `/api/state?x=1` cannot slip past an
+    // exact path comparison. `?user=` is read separately, by `readUsername`, and
+    // only on the routes that have a subject.
+    const path = url.split('?')[0]
     const method = req.method ?? 'GET'
 
     // Liveness first, before auth: the whole point is to answer "is the process
-    // up" without needing a credential, and it touches neither the database nor
-    // anything about the document.
+    // up" without needing a credential. It touches neither the database nor
+    // anything about any document — no row is read, no username is revealed, and
+    // the body is one fixed field, so it cannot become an existence oracle for
+    // an account or a leak of how much history is stored.
     if (path === HEALTH_PATH) {
       if (method !== 'GET' && method !== 'HEAD') return methodNotAllowed(res, 'GET, HEAD')
       return sendJson(res, 200, { status: 'ok' })
     }
 
-    if (path !== STATE_PATH) {
+    if (path !== STATE_PATH && path !== LOGIN_PATH) {
       // Deliberately identical for "route does not exist" and "route exists but
       // you are not allowed to know". No listing, no hints.
       return sendJson(res, 404, { error: 'not found' })
     }
 
+    // The secret gate comes before any validation, so an unauthorised caller
+    // cannot use 400-vs-401 to learn the username rules — or, on `/api/login`,
+    // to learn that the route exists at all.
     if (!secretMatches(req.headers[SECRET_HEADER], secret)) {
       log(`401 ${method} ${path}`)
       return sendJson(res, 401, { error: 'unauthorized' })
     }
 
-    if (method === 'GET') return getState(res)
-    if (method === 'PUT') return putState(req, res)
+    if (path === LOGIN_PATH) {
+      if (method !== 'POST') return methodNotAllowed(res, 'POST')
+      return login(req, res)
+    }
+
+    if (method === 'GET') return getState(url, res)
+    if (method === 'PUT') return putState(url, req, res)
     return methodNotAllowed(res, 'GET, PUT')
   }
 
@@ -278,18 +412,68 @@ export function createStateServer(config) {
     return sendJson(res, 405, { error: `method not allowed; try ${allow}` })
   }
 
-  function getState(res) {
-    const snapshot = store.latest()
+  // ─── POST /api/login ──────────────────────────────────────────────────────
+
+  /**
+   * Accept a username, ignore the password, answer with the username.
+   *
+   * That really is the whole handler. It exists so that the login screen has
+   * something to fail against when the service is unreachable or the deployment
+   * secret is wrong, and so the username is validated once before it becomes a
+   * stream key — not to decide whether anybody may proceed. Nothing is written:
+   * an account comes into existence when a document is stored under its name,
+   * and until then there is nothing to create.
+   */
+  async function login(req, res) {
+    if (!isJsonContentType(req.headers['content-type'])) {
+      return sendJson(res, 415, { error: `expected Content-Type: ${JSON_CONTENT_TYPE}` })
+    }
+
+    const body = await readBody(req, maxBodyBytes)
+    if (!body.ok) {
+      if (body.tooLarge) {
+        res.setHeader('Connection', 'close')
+        // No `body.error` echo of any kind beyond the limit itself: a body this
+        // route rejected may well have had a password in it.
+        return sendJson(res, 413, { error: 'login body is too large', limit: maxBodyBytes })
+      }
+      return sendJson(res, 400, { error: 'could not read the request body' })
+    }
+
+    const checked = checkCredentials(body.text)
+    if (!checked.ok) {
+      // `checked.error` is one of a fixed set of messages that never contains
+      // any part of the request body. That is what makes it safe to log.
+      log(`400 POST ${LOGIN_PATH}: ${checked.error}`)
+      return sendJson(res, 400, { error: checked.error })
+    }
+
+    log(`login ${checked.username} (no password was read, compared, or stored)`)
+    return sendJson(res, 200, { username: checked.username })
+  }
+
+  // ─── GET /api/state ───────────────────────────────────────────────────────
+
+  function getState(url, res) {
+    const who = readUsername(url)
+    if (!who.ok) return sendJson(res, 400, { error: who.error })
+
+    const snapshot = store.latest(who.username)
     if (snapshot === null) {
-      // 404 rather than an empty document: "this service has never been
-      // written to" is exactly the new-device case the client needs to
+      // 404 rather than an empty document: "nothing has ever been stored for
+      // this user" is exactly the new-device case the client needs to
       // distinguish from "the remote holds a document with zero sessions".
-      return sendJson(res, 404, { error: 'no state has been stored yet' })
+      return sendJson(res, 404, { error: 'no state has been stored yet for this user' })
     }
     return sendDocument(res, snapshot.docJson, snapshot)
   }
 
-  async function putState(req, res) {
+  // ─── PUT /api/state ───────────────────────────────────────────────────────
+
+  async function putState(url, req, res) {
+    const who = readUsername(url)
+    if (!who.ok) return sendJson(res, 400, { error: who.error })
+
     if (!isJsonContentType(req.headers['content-type'])) {
       return sendJson(res, 415, {
         error: `expected Content-Type: ${JSON_CONTENT_TYPE}`,
@@ -315,27 +499,44 @@ export function createStateServer(config) {
       return sendJson(res, 400, { error: checked.error })
     }
 
+    if (checked.username !== who.username) {
+      // The one check that needs both the target and the document. A client bug
+      // that sends the wrong document — a stale one from a previous account, say,
+      // after a logout that missed a code path — would otherwise write silently
+      // into a stream it does not belong to, and the overwritten snapshot would
+      // be somebody else's training history.
+      const error =
+        `username mismatch: ?${USER_PARAM}=${who.username} but the document says ` +
+        `${checked.username}. Nothing was stored.`
+      log(`400 PUT ${STATE_PATH}: ${error}`)
+      return sendJson(res, 400, { error })
+    }
+
     // `body.text`, not a re-serialisation of the parsed object. See the
     // "Bytes in, same bytes out" note in db.mjs.
     const written = store.insert({
+      username: who.username,
       docJson: body.text,
-      sessionsCompleted: checked.sessionsCompleted,
+      historyLength: checked.historyLength,
       schemaVersion: checked.schemaVersion,
     })
 
     log(
-      `stored snapshot ${written.id} (${checked.sessionsCompleted} sessions, ` +
+      `stored snapshot ${written.id} for ${who.username} (${checked.historyLength} sessions, ` +
         `${body.text.length} bytes, pruned ${written.pruned})`,
     )
 
     return sendJson(res, 200, {
       id: written.id,
       createdAt: written.createdAt,
-      sessionsCompleted: checked.sessionsCompleted,
+      username: who.username,
+      historyLength: checked.historyLength,
       schemaVersion: checked.schemaVersion,
       bytes: body.text.length,
       pruned: written.pruned,
-      retained: store.count(),
+      // This user's rows, not the table's. A count of everybody's would tell
+      // each user how much other people train.
+      retained: store.count(who.username),
     })
   }
 }
@@ -399,7 +600,16 @@ export function main(env, out = console) {
     const shown = typeof address === 'object' && address !== null ? address.port : config.port
     // The secret is never logged, here or anywhere else.
     log(`listening on http://${config.host}:${shown}`)
-    log(`database ${store.file} (keeping the newest ${RETENTION} snapshots)`)
+    log(`database ${store.file} (keeping the newest ${RETENTION} snapshots per user)`)
+    if (store.migrated) {
+      // Worth one line at startup, once: somebody upgrading a real deployment
+      // needs to know where their existing history went and how to rename it.
+      log(
+        `migrated the single-stream schema: existing snapshots are now attributed to ` +
+          `"${LEGACY_USERNAME}". Reattribute with: sqlite3 ${store.file} ` +
+          `"UPDATE snapshots SET username = 'yourname' WHERE username = '${LEGACY_USERNAME}'"`,
+      )
+    }
   })
 
   // A `synchronous = FULL` database has nothing in flight to lose, but closing
