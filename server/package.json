@@ -1,0 +1,18 @@
+{
+  "name": "@sports-app/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The state service. node:http, node:sqlite, and the shared contract.",
+  "exports": {
+    "./db.mjs": "./db.mjs",
+    "./state-server.mjs": "./state-server.mjs"
+  },
+  "scripts": {
+    "start": "node state-server.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@sports-app/shared": "0.1.0"
+  }
+}

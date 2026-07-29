@@ -178,12 +178,12 @@ seated one-handed tap.
 Intent is not enforcement. Both are cheap:
 
 1. **No dates in the UI layer.** `grep` for `toLocaleDateString`, `Intl.DateTimeFormat`,
-   `formatDistance`, `daysAgo`, `new Date()` in `src/ui/` — timestamps enter and leave
-   through `src/persistence/` only. Mirrors the existing eslint rule keeping
-   `src/domain/` off the clock.
+   `formatDistance`, `daysAgo`, `new Date()` in `client/src/ui/` — timestamps enter and leave
+   through `client/src/persistence/` only. Mirrors the existing eslint rule keeping
+   `client/src/domain/` off the clock.
 2. **Time-invariance snapshot.** Render home with the last session 1 day ago and 400 days
    ago; **the DOM must be byte-identical.** This is the mechanical statement of "returning
    after two weeks looks identical to returning after one day".
 
-Extend the existing `noHexColors` test idea: **no hex colours anywhere in `src/ui/`**
+Extend the existing `noHexColors` test idea: **no hex colours anywhere in `client/src/ui/`**
 outside the token file.

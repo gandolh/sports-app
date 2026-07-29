@@ -118,6 +118,15 @@ planned=" "
 [[ -f "$PLANNED" ]] && planned=" $(sed 's/#.*//' "$PLANNED" | tr -s '[:space:]' ' ') "
 
 while IFS= read -r f; do
+  # Append-only historical records describe the layout as it was WHEN WRITTEN, so
+  # checking them against the current tree is noise by construction — and it is
+  # loud noise: the brief-21 workspace move produced 74 such warnings and buried
+  # the 6 real ones. Immutable briefs and the chronological log are exempt; the
+  # wiki, CLAUDE.md, todos/ and briefs/todo/ are not, because those must be true
+  # about the tree as it stands today.
+  case "$f" in
+    */briefs/done/*|*/briefs/superseded/*|*/log.md) continue ;;
+  esac
   d="$(dirname "$f")"
   while IFS= read -r p; do
     [[ "$p" == */ && "$p" != */*/* ]] && continue   # bare `foo/` → prose

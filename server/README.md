@@ -1,13 +1,22 @@
 # The state service
 
-A **zero-dependency** Node service that holds a copy of each user's state document in
-SQLite. It is the durability half of the persistence design: browser storage keeps the
-app fast and offline, this keeps the history alive when the phone is lost or the browser
-evicts its storage, and it gives phone↔desktop sync as a side effect.
+A Node service that holds a copy of each user's state document in SQLite. Its only
+dependency is `@sports-app/shared` — the username rule and the document types, which
+import nothing themselves. (Brief 22 swaps `node:http` for Fastify; brief 21 left the
+implementation alone on purpose, so that "all 611 tests still pass" meant something.)
+
+It is the durability half of the persistence design: browser storage keeps the app fast
+and offline, this keeps the history alive when the phone is lost or the browser evicts
+its storage, and it gives phone↔desktop sync as a side effect.
 
 Deliberately not a backend in the usual sense. No users table, no sessions, no ORM, no
 migration runner — one table holding whole-document JSON snapshots keyed by username,
 four routes, and a shared secret.
+
+It is the `server` workspace of a three-workspace repo (`client` · `server` ·
+`shared`). It did not move when the workspaces were introduced, so `db/` is still a
+sibling directory at the repo root and still gitignored. Run it with `npm run server`
+from the root, or `npm start` from here.
 
 ## Login checks nothing, and says so
 
@@ -86,7 +95,9 @@ The secret goes in the **`x-sync-secret`** header — never in the URL, which wo
 up in proxy logs and browser history. The **username** does go in the URL, because it is
 a nameplate rather than a secret.
 
-**Usernames** are 1–32 characters: a lowercase letter or digit, then lowercase letters,
+**Usernames** are defined once, in `shared/username.ts`, and imported by this service
+and by the client — there is no second copy here to drift from. They are 1–32
+characters: a lowercase letter or digit, then lowercase letters,
 digits, `.`, `-`, `_`. Anything else is a `400` that states the rule without echoing the
 value. Uppercase is *rejected*, not folded to lowercase: the username also lives inside
 the document, which is hand-editable, so silently rewriting it on the way in would make
@@ -96,7 +107,7 @@ mismatch `PUT` refuses.
 `PUT` requires `Content-Type: application/json` and a body that is a JSON object with a
 numeric `schemaVersion`, a valid `username`, and an array `history` — and the document's
 `username` must equal `?user=`. Everything else about the shape is the codec's business:
-`src/persistence/codec.ts` is the single source of truth, and a second, drifting
+`client/src/persistence/codec.ts` is the single source of truth, and a second, drifting
 validator here would eventually reject a document the app considers good, turning the
 safety net into a way to lose a workout. A rejected `PUT` returns `400` and leaves the
 database untouched.
@@ -200,7 +211,7 @@ it at both the store and the HTTP layer.
 
 ## Sync behaviour on the client
 
-`src/persistence/sync.ts`. Two things about it are load-bearing:
+`client/src/persistence/sync.ts`. Two things about it are load-bearing:
 
 - **`push` is fire-and-forget and cannot fail a workout.** It runs *after* the local
   save has already succeeded, never throws or rejects, and logs failures rather than
@@ -250,8 +261,14 @@ Two files, both against a **real temporary SQLite file** rather than a mock:
   and leaves the same schema as a fresh database, a busy user cannot evict a quiet one,
   and pruning keeps the right rows even when `created_at` goes **backwards** mid-stream.
 
-Nothing in either file imports from `src/`. The service is version-agnostic — it copies
-`schemaVersion` into a column and never interprets it — so the fixtures are hand-written
-v3 bodies. Building them from the codec would couple a zero-dependency `.mjs` service to
-the bundle's TypeScript and would break these tests on a client schema bump that cannot
+Nothing in either file imports from the client. The service is version-agnostic — it
+copies `schemaVersion` into a column and never interprets it — so the fixtures are
+hand-written v3 bodies. Building them from the codec would couple the service to the
+bundle's TypeScript and would break these tests on a client schema bump that cannot
 affect the server.
+
+They do import `@sports-app/shared/username.ts`, which is a different thing: the
+username rule is a *contract* both ends must apply identically, not a client
+implementation detail. It used to be written out twice — once here, once in the codec —
+with a test comparing the two regexes; brief 21 replaced both copies with one
+definition and deleted that test as meaningless.

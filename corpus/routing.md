@@ -47,5 +47,5 @@ Read by the `orchestrate` skill at the start of a work request.
 | "Does the engine behave correctly?" | the simulation harness + unit tests | Behavior is verified, not remembered. |
 
 **Code graph:** not installed. This is a greenfield single-package app — the graph
-earns its keep on large unfamiliar codebases, and here `grep` over a small `src/`
-is cheaper than maintaining an index. Revisit if `src/` passes ~50 files.
+earns its keep on large unfamiliar codebases, and here `grep` over a small `client/src/`
+is cheaper than maintaining an index. Revisit if `client/src/` passes ~50 files.

@@ -1,31 +1,15 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "moduleDetection": "force",
-    "jsx": "react-jsx",
-    "types": ["vite/client", "vite-plugin-pwa/client", "vitest/globals"],
+  /* The workspace root is NOT a fourth package. This config exists only to
+     typecheck the tooling that lives at the root — it has no `src`, and every line
+     of application code belongs to `client/`, `server/` or `shared/`, each with its
+     own config extending `tsconfig.base.json`.
 
-    "strict": true,
-    /* The engine indexes into ladder arrays constantly. An off-by-one there is
-       the exact bug class this project cannot afford, so unchecked index access
-       is an error rather than a suggestion. */
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
-    "exactOptionalPropertyTypes": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+     `npm run typecheck` fans out across the workspaces first and then runs this
+     one, so nothing is checked twice and nothing is missed.
 
-    "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-    "erasableSyntaxOnly": true,
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true
-  },
-  "include": ["src", "vite.config.ts", "eslint.config.js"]
+     `eslint.config.js` is listed for an editor's benefit; `tsc` skips it, because
+     `allowJs` is off — as it was before the split. Turning it on to honour one
+     `// @ts-check` comment would pull every `.js` in the tree into the program. */
+  "extends": "./tsconfig.base.json",
+  "include": ["vitest.config.ts", "eslint.config.js"]
 }

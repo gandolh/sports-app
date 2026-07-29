@@ -1,5 +1,7 @@
 /**
- * The state service: four routes, one table, zero dependencies.
+ * The state service: four routes, one table, and one dependency — the shared
+ * contract (`@sports-app/shared`), which is types plus one regex and imports
+ * nothing itself.
  *
  * ── What this is not ─────────────────────────────────────────────────────────
  *
@@ -54,7 +56,7 @@
  * `schemaVersion`, a valid `username`, and an array `history`. That is all.
  *
  * It is tempting to re-implement the codec's validation here as a second line of
- * defence. That would be a mistake: `src/persistence/codec.ts` is the single
+ * defence. That would be a mistake: `client/src/persistence/codec.ts` is the single
  * source of truth for the document's shape, and a second, drifting validator
  * would eventually reject a document the app considers perfectly good — turning
  * this service from a safety net into a way to *lose* a workout. The three fields
@@ -94,14 +96,10 @@
 import { createServer as createHttpServer } from 'node:http'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
-import {
-  DEFAULT_DB_FILE,
-  LEGACY_USERNAME,
-  RETENTION,
-  USERNAME_RULE,
-  isValidUsername,
-  openSnapshotStore,
-} from './db.mjs'
+import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from './db.mjs'
+// The one rule the client and this service must agree on, from the one place it
+// is defined. See `shared/username.ts`.
+import { LEGACY_USERNAME, USERNAME_RULE, isValidUsername } from '@sports-app/shared/username.ts'
 
 export const SECRET_HEADER = 'x-sync-secret'
 export const STATE_PATH = '/api/state'
