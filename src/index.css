@@ -1,30 +1,81 @@
-/* Baseline only. Real styling lands with the player screen (brief 06). */
-:root {
-  --bg: #111418;
-  --fg: #e8eaed;
-  --accent: #6ee7a8;
+/**
+ * Reset and base. The tokens live in `ui/tokens.css`, the interface in
+ * `ui/app.css`; this file is only the document-level floor they both stand on.
+ */
+@import './ui/tokens.css';
+@import './ui/app.css';
 
-  color-scheme: dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  /* Prevent iOS Safari from inflating text in the player screen. */
-  -webkit-text-size-adjust: 100%;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  /* Global, and it is doctrine rather than a reset convenience: a shadow does
+     not read in a dim room, so elevation is expressed by surface lightness. */
+  box-shadow: none;
 }
 
-* {
-  box-sizing: border-box;
+html {
+  /* Never a px font-size here — the whole rem scale is sized off the user's OS
+     text setting, and pinning this would silently defeat it. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
   min-height: 100dvh;
   background: var(--bg);
-  color: var(--fg);
-  /* The player screen is tapped hard and often; text selection and the
-     double-tap-to-zoom delay are both actively unwanted there. */
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 400;
+  /* The player is tapped hard and often. The grey flash and the text selection
+     that a mis-drag produces are both actively unwanted there. */
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
 }
 
-main {
-  padding: max(1rem, env(safe-area-inset-top)) 1rem
-    max(1rem, env(safe-area-inset-bottom));
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+figure {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  /* Stops a long-press on Next from selecting the label or firing the OS
+     context menu mid-set. */
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+input {
+  font: inherit;
+  color: inherit;
+}
+
+/* Never removed, at 3px with a 2px offset. A keyboard is a legitimate way to
+   drive this app — a phone with a case-keyboard, a desktop rehearsal — and an
+   invisible focus ring on a four-control screen is unrecoverable. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
 }

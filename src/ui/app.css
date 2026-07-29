@@ -1,0 +1,917 @@
+/**
+ * The interface. Every value here is a `var(--…)` from `tokens.css` — see the
+ * note at the top of that file for why a hex literal in this one fails the build.
+ *
+ * ── The layout is the accessibility model ───────────────────────────────────
+ *
+ * On a floor phone the reach model inverts: the reaching arm occludes
+ * top-centre. So priority runs bottom-centre → bottom edges → top-right →
+ * top-left → top-centre (worst). Every screen is therefore the same three bands:
+ *
+ *   .rail    a thin status strip, glanced at. Status on the left, the two
+ *            secondary destinations on the right. Nothing in the centre.
+ *   .body    the information, scrolling.
+ *   .footer  sticky, bottom-centre: the dots, the secondary row, the primary.
+ *
+ * The primary is 96px with a 20px radius — a 20px radius on a 96px block reads
+ * as a physical key, a pill reads as a template — and carries ≥24px of dead
+ * space, with nothing interactive within 120px of it except the secondary row
+ * directly above.
+ */
+
+/* ── Shell ─────────────────────────────────────────────────────────────────── */
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.screen__body {
+  flex: 1;
+  width: 100%;
+  max-width: 34rem;
+  margin-inline: auto;
+  padding: var(--sp-6) var(--sp-4) var(--sp-10);
+}
+
+/* ── The status rail ───────────────────────────────────────────────────────── */
+
+.rail {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-rail);
+  background: var(--bg);
+  border-bottom: 1px solid var(--hairline);
+  padding-top: env(safe-area-inset-top);
+}
+
+.rail__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  width: 100%;
+  max-width: 34rem;
+  margin-inline: auto;
+  min-height: var(--tap-min);
+  padding-left: var(--sp-4);
+}
+
+.rail__status {
+  font-size: var(--fs-label);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.rail__links {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+/* ── The footer action zone ────────────────────────────────────────────────── */
+
+.footer {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-footer);
+  background: var(--bg);
+  border-top: 1px solid var(--hairline);
+}
+
+.footer__inner {
+  width: 100%;
+  max-width: 34rem;
+  margin-inline: auto;
+  display: grid;
+  /* --sp-6 between the secondary row and the primary is the required dead
+     space, not a rhythm choice. */
+  gap: var(--sp-6);
+  padding: var(--sp-5) var(--sp-4) max(var(--sp-5), env(safe-area-inset-bottom));
+}
+
+.footer__secondary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+/* Groups the things that belong *with* the secondary row — the dots, the note —
+   so they sit close to it rather than sharing the primary's 24px exclusion gap. */
+.footer__group {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+/*
+ * `--fs-body`, not `--fs-meta`, and the design system contradicts itself here:
+ * `--fs-meta` is 15px, but the accessibility floor in the same document says 17px
+ * for body text, because a floor phone at ~60–70cm makes 17px behave like ~11px
+ * held. These two lines are prose, not a glanceable fragment — one of them is the
+ * sentence that tells the user the countdown gates nothing, which is the single
+ * most load-bearing piece of copy in the player. `--fs-meta` keeps the fragments
+ * (`Set 1 of 3 · 3 × 8`, the rail status); prose takes the floor.
+ */
+.footer__note {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+/* `/login` puts a <form> between the shell's bands, so the form has to become
+   the flex container or `.screen__body`'s `flex: 1` has nothing to grow inside. */
+.screen__form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────────
+   Three shapes, and only three: one big key, one secondary row, one quiet
+   link-weight control. A pill-shaped tiny button where one big button belongs
+   is a named tell. Press feedback fires on pointerdown via `data-pressed`,
+   which `PressButton` sets — `:active` alone is unreliable on iOS. */
+
+.btn-primary {
+  width: 100%;
+  min-height: var(--tap-primary);
+  border-radius: var(--r-lg);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: var(--fs-btn);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition:
+    background-color var(--dur-instant) var(--ease-out),
+    transform var(--dur-instant) var(--ease-out);
+}
+
+.btn-primary[data-pressed] {
+  background: var(--accent-press);
+  transform: scale(0.99);
+}
+
+.btn-secondary {
+  flex: 1;
+  min-height: var(--tap-row);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  color: var(--text-1);
+  font-size: var(--fs-body-l);
+  font-weight: 500;
+  padding-inline: var(--sp-4);
+  transition:
+    background-color var(--dur-instant) var(--ease-out),
+    border-color var(--dur-instant) var(--ease-out);
+}
+
+.btn-secondary[data-pressed] {
+  background: var(--surface-3);
+  border-color: var(--hairline-2);
+}
+
+.btn-quiet {
+  display: inline-grid;
+  place-items: center;
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+  padding-inline: var(--sp-3);
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--dur-instant) var(--ease-out);
+}
+
+.btn-quiet[data-pressed],
+.btn-quiet[data-status='active'] {
+  color: var(--text-1);
+}
+
+.btn-quiet--warn {
+  color: var(--warn);
+}
+
+/* Defined for completeness of the component vocabulary. Nothing in the player
+   ever uses it: a control that gates a set would contradict the governing
+   decision that the app measures nothing and trusts the user. */
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-quiet:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent-press);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--surface-3);
+  }
+  .btn-quiet:hover:not(:disabled) {
+    color: var(--text-1);
+  }
+}
+
+/* ── Type helpers ─────────────────────────────────────────────────────────── */
+
+.day-title {
+  font-size: var(--fs-display);
+  line-height: var(--lh-display);
+  letter-spacing: var(--ls-display);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.page-title {
+  font-size: var(--fs-h);
+  line-height: var(--lh-title);
+  letter-spacing: var(--ls-title);
+  font-weight: 600;
+}
+
+.prose {
+  max-width: 68ch;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.prose + .prose,
+.prose--spaced {
+  margin-top: var(--sp-4);
+}
+
+.page-title + .prose,
+.day-title + .prose {
+  margin-top: var(--sp-4);
+}
+
+.section {
+  margin-top: var(--sp-10);
+}
+
+.section__title {
+  font-size: var(--fs-label);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  color: var(--text-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--hairline);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Home: today's plan ───────────────────────────────────────────────────── */
+
+.plan {
+  margin-top: var(--sp-8);
+}
+
+.plan__item {
+  padding: var(--sp-4) 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.plan__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+}
+
+.plan__name {
+  font-size: var(--fs-h);
+  line-height: var(--lh-title);
+  font-weight: 500;
+}
+
+.plan__target {
+  font-size: var(--fs-h);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.plan__detail {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+/* ── The movement header: figure beside the name ───────────────────────────── */
+
+.movement {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+
+.movement__figure {
+  flex: none;
+  /* Figures stroke `currentColor`, so this is what colours the drawing. */
+  color: var(--text-2);
+}
+
+.movement__name {
+  font-size: var(--fs-title);
+  line-height: var(--lh-title);
+  letter-spacing: var(--ls-title);
+  font-weight: 500;
+  text-wrap: balance;
+}
+
+.movement__meta {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-meta);
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── The hero numeral, with or without a ring ──────────────────────────────── */
+
+.hero {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-6);
+}
+
+.hero__value {
+  font-size: var(--fs-hero);
+  line-height: var(--lh-hero);
+  letter-spacing: var(--ls-hero);
+  font-weight: 500;
+  /* Non-optional. Proportional digits shift the whole string as they tick. */
+  font-variant-numeric: tabular-nums;
+}
+
+.hero__unit {
+  font-size: var(--fs-label);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  color: var(--text-2);
+}
+
+/*
+ * `margin-inline: auto` is load-bearing, not tidying. The ring is a block in a
+ * block container, so without it the largest object on the training screen sat
+ * flush left while the numeral inside it was centred on the ring — 39px off the
+ * axis of the exercise name above it and the primary below it, on the one screen
+ * that is looked at from two feet away.
+ *
+ * The width is sized off its own content rather than the viewport: the numeral
+ * inside is `--fs-hero`, which is 101px at phone width, and a 281px ring around a
+ * 101px numeral is mostly empty. Shrinking it to ~15rem keeps the ring
+ * comfortably clear of the digits and buys back the first cue's line — the cues
+ * are the only thing that distinguishes one rung from the next, so pushing them
+ * all below the fold to draw a bigger circle is the wrong trade.
+ */
+.ring {
+  position: relative;
+  width: min(58vw, 15rem);
+  margin-inline: auto;
+  aspect-ratio: 1;
+}
+
+.ring__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Start the sweep at twelve o'clock. */
+  transform: rotate(-90deg);
+}
+
+/* Documented exception so nobody "fixes" it: the track is intentionally below
+   3:1. It is decorative — the numeral inside carries the value. Brightening it
+   into a competing grey ring is a regression. */
+.ring__track {
+  fill: none;
+  stroke: var(--surface-3);
+}
+
+.ring__progress {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: butt;
+  /* One step per second. A smooth 60fps sweep reads as a loading spinner; a
+     stepped ring reads as a clock. Under reduced motion the duration token
+     collapses to 1ms and the step becomes instant — the ring itself stays,
+     because it is information. */
+  transition: stroke-dashoffset var(--dur-fast) var(--ease-out);
+}
+
+.ring__inner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--sp-1);
+}
+
+/* ── Cues ─────────────────────────────────────────────────────────────────── */
+
+.cues {
+  display: grid;
+  gap: var(--sp-5);
+  margin-top: var(--sp-8);
+}
+
+.cue {
+  display: grid;
+  grid-template-columns: var(--sp-4) 1fr;
+  gap: var(--sp-3);
+  font-size: var(--fs-body-l);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+/* A drawn tick rather than a bullet glyph or a check: a check mark would imply
+   the cue had been completed, and this list is an instruction, not a checklist.
+   The margin lands it on the first line's optical centre. */
+.cue__tick {
+  width: var(--sp-2);
+  height: 2px;
+  margin-top: 0.7em;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+/*
+ * The safety block. On a rung with `safetyCritical: true` this holds `cues[0]`
+ * and nothing else, in its own element above the list — the schedule reaches
+ * these rungs on a clock rather than on readiness and there is no mechanism to
+ * step back, so the cue text is the only brake the user chose to have. Making it
+ * item one of four in a list is the failure this block exists to prevent.
+ */
+.safety {
+  margin-top: var(--sp-6);
+  padding: var(--sp-5);
+  border-radius: var(--r-md);
+  background: var(--accent-wash);
+}
+
+/* It sits above the target, so the target needs its own air back rather than
+   inheriting the hero's usual margin against a heading. */
+.safety + .hero,
+.safety + .ring {
+  margin-top: var(--sp-8);
+}
+
+.safety__label {
+  display: block;
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  color: var(--accent);
+}
+
+.safety__text {
+  font-size: var(--fs-body-l);
+  line-height: var(--lh-body);
+  color: var(--text-1);
+  text-wrap: pretty;
+}
+
+/* ── Notices ──────────────────────────────────────────────────────────────── */
+
+.notice {
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--hairline);
+}
+
+.notice__label {
+  display: block;
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-label);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  color: var(--text-3);
+}
+
+.notice__text {
+  max-width: 68ch;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.notice--inset {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+}
+
+.banner {
+  margin-top: var(--sp-4);
+  padding: var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--warn-wash);
+}
+
+.banner__label {
+  display: block;
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  color: var(--warn);
+}
+
+.banner__text {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-1);
+  /* The store's messages are multi-paragraph and already worded for a person;
+     they are shown verbatim, so their line breaks have to survive. */
+  white-space: pre-wrap;
+}
+
+/* ── Set / round dots ─────────────────────────────────────────────────────── */
+
+.dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+}
+
+.dot {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-full);
+  /* --text-3 is 4.9:1, comfortably past the 3:1 non-text floor. An unfilled dot
+     states how much is left, so it is information, not a container. */
+  border: 2px solid var(--text-3);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.dot[data-filled='true'] {
+  border-color: var(--accent);
+}
+
+.dot__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transform: scale(0);
+  /* The one and only use of --ease-spring in the app. */
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+
+.dot[data-filled='true'] .dot__fill {
+  transform: scale(1);
+}
+
+/* ── /week ────────────────────────────────────────────────────────────────── */
+
+.week {
+  margin-top: var(--sp-6);
+  display: grid;
+  gap: 0;
+}
+
+.week__cell {
+  padding: var(--sp-5) 0;
+  border-top: 1px solid var(--hairline);
+}
+
+/* The next session is the one cell that is not just a row in a list, so it is
+   the one cell that gets a surface. The other six stay hairline-separated —
+   seven identical cards would be a grid of cards for its own sake. */
+.week__cell--next {
+  border-top-color: transparent;
+  background: var(--surface-1);
+  border-radius: var(--r-md);
+  padding-inline: var(--sp-4);
+  margin-inline: calc(-1 * var(--sp-4));
+}
+
+.week__ordinal {
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.week__cell--next .week__ordinal {
+  color: var(--accent);
+}
+
+.week__label {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-h);
+  line-height: var(--lh-title);
+  letter-spacing: var(--ls-title);
+  font-weight: 600;
+}
+
+.week__items {
+  margin-top: var(--sp-3);
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.week__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  font-size: var(--fs-body);
+  color: var(--text-2);
+}
+
+.week__target {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (min-width: 44rem) {
+  .week {
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--sp-8);
+  }
+}
+
+/* ── /account ─────────────────────────────────────────────────────────────── */
+
+.stat {
+  display: grid;
+  gap: var(--sp-2);
+  margin-top: var(--sp-6);
+}
+
+.stat__value {
+  font-size: var(--fs-mono);
+  line-height: 1;
+  letter-spacing: var(--ls-hero);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat__label {
+  font-size: var(--fs-label);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  color: var(--text-2);
+}
+
+.rows {
+  margin-top: var(--sp-2);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--hairline);
+  font-size: var(--fs-body);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.row__value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.milestone {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-4);
+  padding: var(--sp-4) 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.milestone:first-child {
+  border-top: 0;
+}
+
+.milestone__ordinal {
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  /* Optically aligns the number with the first line of the label beside it. */
+  padding-top: 2px;
+}
+
+.milestone__label {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  text-wrap: pretty;
+}
+
+.ceiling {
+  margin-top: var(--sp-4);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-1);
+  text-wrap: pretty;
+}
+
+/* ── /login ───────────────────────────────────────────────────────────────── */
+
+.login {
+  display: grid;
+  gap: var(--sp-6);
+  margin-top: var(--sp-8);
+}
+
+.field {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.field__label {
+  font-size: var(--fs-label);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  color: var(--text-2);
+}
+
+.field__input {
+  min-height: var(--tap-row);
+  padding-inline: var(--sp-4);
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline-2);
+  background: var(--surface-2);
+  font-size: var(--fs-body-l);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.field__input:focus-visible {
+  border-color: var(--accent);
+}
+
+/* The browser default here is far dimmer than the text ramp's floor. A hint that
+   cannot be read is worse than no hint, because it still occupies the field. */
+.field__input::placeholder {
+  color: var(--text-3);
+  opacity: 1;
+}
+
+.field__description {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+
+/* An address inside a sentence. Tabular figures rather than a monospace family —
+   there is one font in this app and adding a second for one span would be a
+   second font for one span. */
+.mono {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.field__error {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--warn);
+  text-wrap: pretty;
+}
+
+/* ── /account: sync settings and recovery ─────────────────────────────────────
+   Both are secondary rows inside the body rather than footer actions. `/account`
+   has no primary — it is a page you read, and its four or five controls are all
+   peers — so the footer band is simply absent here and the 120px exclusion zone
+   has nothing to exclude. */
+
+.fields {
+  display: grid;
+  gap: var(--sp-6);
+  margin-top: var(--sp-6);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  /* ≥12px between targets, which --sp-3 is. */
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+}
+
+/* A floor of 12rem rather than `flex: 1` alone: two buttons share a row where
+   both labels fit on one line, and take a row each where they do not. Without it
+   "Check connection" wrapped to two lines inside a 56px row while "Save" beside
+   it used a third of its width. */
+.actions > .btn-secondary {
+  flex: 1 1 12rem;
+}
+
+/* Puts a hairline and real distance between a destructive control and the row
+   above it, so "Stop syncing" and "Replace it" cannot be hit while aiming at
+   Save. */
+.actions--apart {
+  margin-top: var(--sp-8);
+  padding-top: var(--sp-6);
+  border-top: 1px solid var(--hairline);
+}
+
+/* The answer to "check connection", and the only place in the app that reports
+   the outcome of a network call. Shares the notice's shape rather than the
+   banner's: it is information, and --warn is reserved for a save that failed. */
+.result {
+  margin-top: var(--sp-5);
+  padding: var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+
+.result__label {
+  display: block;
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  color: var(--text-2);
+}
+
+.result__text {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-1);
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+
+/* ── Finish ───────────────────────────────────────────────────────────────── */
+
+/* The one screen with almost nothing on it, so it is the one screen where the
+   block is centred in the space rather than parked at the top: three short lines
+   under a rail left ~370px of empty canvas above the primary, which reads as a
+   page that failed to load rather than a page that is finished. */
+.finish {
+  display: grid;
+  justify-items: start;
+  align-content: center;
+  gap: var(--sp-4);
+  min-height: 60dvh;
+}
+
+.finish__value {
+  font-size: var(--fs-hero);
+  line-height: var(--lh-hero);
+  letter-spacing: var(--ls-hero);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * There is no modal anywhere in this app, on purpose.
+ *
+ * The two moments that look like they want one — "is this pre-accounts history
+ * yours?" and "leave this session?" — are both better as a full screen and as
+ * nothing respectively. The first is a real decision with two long paragraphs
+ * behind it, which is a page, not a sheet. The second needs no confirmation at
+ * all: nothing is measured, so leaving costs nothing, and the position is in the
+ * URL so the back button already undoes it. Hence no `--z-dialog` user, and hence
+ * no `.sheet` rules here.
+ */
