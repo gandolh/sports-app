@@ -1,273 +1,215 @@
-import { CYCLE, CYCLE_DAYS, PATTERNS, cycleDayAt, isCycleDay, isPattern } from '../types.ts'
-import { LADDERS } from '../ladders.ts'
-import { midProgram, midProgramHistory, midProgramStart } from './fixtures.ts'
+import {
+  CURRENT_SCHEMA_VERSION,
+  DAILY_BLOCK,
+  PATTERNS,
+  ROTATION,
+  VARIANTS,
+  isPattern,
+  isVariant,
+  slotAt,
+} from '../types.ts'
+import * as contract from '../types.ts'
+import { midProgram } from './fixtures.ts'
 
-/** Rep ladders step by 1; time ladders by 5. See the fixtures.ts header. */
-const stepFor = (unit: 'reps' | 'seconds') => (unit === 'seconds' ? 5 : 1)
+describe('the rotation', () => {
+  it('has three slots: Push, Legs, Cardio', () => {
+    // Hard-coded on purpose. A silently added or dropped slot changes every
+    // pattern's sessions-per-week and therefore every number in the programme.
+    expect(ROTATION).toHaveLength(3)
+    expect(ROTATION.map((s) => s.label)).toEqual(['Push', 'Legs', 'Cardio'])
+  })
 
-describe('cycle', () => {
-  it('has seven positions covering every pattern', () => {
-    const covered = new Set(CYCLE.flatMap((d) => d.patterns))
-    expect(CYCLE).toHaveLength(7)
+  it('puts cardio immediately AFTER legs and never before it', () => {
+    // The locked reason this sequence exists: the concurrent-training literature
+    // cares about strength-before-conditioning, and with daily training the order
+    // is the only thing left to optimise. corpus/wiki/decisions.md.
+    const legs = ROTATION.findIndex((s) => s.label === 'Legs')
+    const cardio = ROTATION.findIndex((s) => s.cardio)
+    expect(legs).toBeGreaterThanOrEqual(0)
+    expect(cardio).toBe(legs + 1)
+    // And the slot after cardio (wrapping) is not legs again, or legs would be
+    // sandwiched and lose its 48h.
+    expect(slotAt(cardio + 1).label).not.toBe('Legs')
+  })
+
+  it('gives cardio exactly one slot, and that slot trains no ladder', () => {
+    const cardioSlots = ROTATION.filter((s) => s.cardio)
+    expect(cardioSlots).toHaveLength(1)
+    for (const slot of cardioSlots) {
+      expect(slot.patterns, 'a cardio slot trains no ladder').toEqual([])
+    }
+  })
+
+  it('gives every non-cardio slot at least one pattern', () => {
+    for (const slot of ROTATION.filter((s) => !s.cardio)) {
+      expect(slot.patterns.length, slot.label).toBeGreaterThan(0)
+    }
+  })
+
+  it('covers all five patterns between the rotation and the daily block', () => {
+    const covered = new Set([...ROTATION.flatMap((s) => s.patterns), ...DAILY_BLOCK])
     expect([...covered].sort()).toEqual([...PATTERNS].sort())
   })
 
-  it('runs A · B · C · cardio · A · B · cardio', () => {
-    expect(CYCLE.map((d) => d.day)).toEqual(['A', 'B', 'C', 'D', 'A', 'B', 'D'])
-    expect(CYCLE.map((d) => d.cardio)).toEqual([false, false, false, true, false, false, true])
-  })
-
-  it('gives cardio exactly two positions in seven, and no ladder', () => {
-    // Two, not three: three would cut each strength pattern to ~4.7 direct
-    // sets/week and exceed the impact-volume ceiling. Locked decision.
-    const cardioDays = CYCLE.filter((d) => d.cardio)
-    expect(cardioDays).toHaveLength(2)
-    for (const day of cardioDays) {
-      expect(day.patterns, 'a cardio day trains no ladder').toEqual([])
+  it('trains the daily block in every slot, and only there', () => {
+    expect(DAILY_BLOCK).toEqual(['core', 'pull'])
+    // Disjoint from every slot's own patterns: if a slot also listed `core`, the
+    // counter would be incremented twice for one session's work.
+    for (const slot of ROTATION) {
+      for (const pattern of slot.patterns) {
+        expect(DAILY_BLOCK, `${slot.label} duplicates the daily block`).not.toContain(pattern)
+      }
     }
   })
 
-  it('places the cardio days as far from the legs day as seven positions allow', () => {
-    // Cardio movements are lower-body, and day B is the legs day, so the two must
-    // not sit adjacent to it on both sides.
-    const legs = CYCLE.map((d, i) => [d, i] as const).filter(([d]) => d.day === 'B')
-    const cardio = CYCLE.map((d, i) => [d, i] as const).filter(([d]) => d.cardio)
-    const gaps = cardio.flatMap(([, ci]) => legs.map(([, li]) => Math.abs(ci - li)))
-    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(1)
-    // And no two cardio days are adjacent to each other either.
-    const [first, second] = cardio.map(([, i]) => i)
-    expect(second! - first!).toBeGreaterThan(1)
-  })
-
-  it('trains each pattern the number of times per turn the volume budget assumes', () => {
+  it('trains each rotating pattern once per turn, which is what 14 assumes', () => {
+    // `SESSIONS_PER_RUNG_ROTATING = 14` is "2.3 sessions/week × 6 weeks". That
+    // 2.3 is one appearance in a three-slot rotation. If a pattern ever appeared
+    // twice, 14 would silently become the wrong number.
     const counts = new Map<string, number>()
-    for (const day of CYCLE) {
-      for (const p of day.patterns) counts.set(p, (counts.get(p) ?? 0) + 1)
+    for (const slot of ROTATION) {
+      for (const p of slot.patterns) counts.set(p, (counts.get(p) ?? 0) + 1)
     }
-    // Two strength days out of three are upper-body/trunk, so pull rides along on
-    // both of them; each strength pattern gets two turns except core, which
-    // shares day C.
-    expect(counts.get('pull')).toBe(3)
-    expect(counts.get('push')).toBe(2)
-    expect(counts.get('squat')).toBe(2)
-    expect(counts.get('hinge')).toBe(2)
-    expect(counts.get('core')).toBe(1)
+    expect([...counts.values()].every((n) => n === 1)).toBe(true)
+    expect([...counts.keys()].sort()).toEqual(['hinge', 'push', 'squat'])
   })
+})
 
+describe('slotAt', () => {
   it('wraps by position, with no notion of a date', () => {
-    expect(cycleDayAt(0).day).toBe('A')
-    expect(cycleDayAt(1).day).toBe('B')
-    expect(cycleDayAt(2).day).toBe('C')
-    expect(cycleDayAt(3).day).toBe('D')
-    expect(cycleDayAt(4).day).toBe('A')
-    expect(cycleDayAt(5).day).toBe('B')
-    expect(cycleDayAt(6).day).toBe('D')
-    expect(cycleDayAt(7).day).toBe('A')
-    // 99 mod 7 = 1.
-    expect(cycleDayAt(99).day).toBe('B')
+    expect(slotAt(0).label).toBe('Push')
+    expect(slotAt(1).label).toBe('Legs')
+    expect(slotAt(2).label).toBe('Cardio')
+    expect(slotAt(3).label).toBe('Push')
+    // 100 mod 3 = 1.
+    expect(slotAt(100).label).toBe('Legs')
   })
 
   it('survives a hand-edited negative position rather than throwing', () => {
     // The state file is expected to be hand-edited, so out-of-range input is a
-    // normal case, not a bug to crash on. Positive modulo: -1 → 6, -3 → 4.
-    expect(cycleDayAt(-1).day).toBe('D')
-    expect(cycleDayAt(-3).day).toBe('A')
-    expect(cycleDayAt(-7).day).toBe('A')
-    for (const position of [-1000, -7, -1, 0, 1, 1000, 10 ** 9]) {
-      expect(() => cycleDayAt(position), `position ${position}`).not.toThrow()
+    // normal case, not a bug to crash on. Positive modulo: -1 → 2, -3 → 0.
+    expect(slotAt(-1).label).toBe('Cardio')
+    expect(slotAt(-2).label).toBe('Legs')
+    expect(slotAt(-3).label).toBe('Push')
+  })
+
+  it('survives absurd, fractional and non-finite positions', () => {
+    const absurd = [
+      -1e9,
+      -1000,
+      -1,
+      0,
+      1,
+      1000,
+      1e9,
+      Number.MAX_SAFE_INTEGER,
+      2.5,
+      -2.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+    ]
+    for (const position of absurd) {
+      expect(() => slotAt(position), `position ${position}`).not.toThrow()
+      expect(ROTATION, `position ${position}`).toContain(slotAt(position))
     }
   })
 })
 
 describe('guards', () => {
   it('narrows patterns', () => {
-    expect(isPattern('push')).toBe(true)
+    for (const p of PATTERNS) expect(isPattern(p)).toBe(true)
     expect(isPattern('bench')).toBe(false)
+    expect(isPattern('Push')).toBe(false)
     expect(isPattern(undefined)).toBe(false)
   })
 
-  it('narrows cycle days, derived from CYCLE rather than restated', () => {
-    expect(CYCLE_DAYS).toEqual(['A', 'B', 'C', 'D'])
-    for (const day of CYCLE.map((d) => d.day)) expect(isCycleDay(day)).toBe(true)
-    expect(isCycleDay('E')).toBe(false)
-    expect(isCycleDay('a')).toBe(false)
-    expect(isCycleDay(3)).toBe(false)
-    expect(isCycleDay(undefined)).toBe(false)
+  it('narrows variants — persistence has to validate the one variable field', () => {
+    expect(VARIANTS).toEqual(['easy', 'medium', 'hard'])
+    for (const v of VARIANTS) expect(isVariant(v)).toBe(true)
+    expect(isVariant('ok')).toBe(false)
+    expect(isVariant('Easy')).toBe(false)
+    expect(isVariant(2)).toBe(false)
+    expect(isVariant(undefined)).toBe(false)
+  })
+})
+
+describe('the v2 contract is gone, not deprecated', () => {
+  it('exports no cycle, ladder-state or effort machinery', () => {
+    // Cheap, and it is the one thing that would silently reintroduce a locked
+    // decision if a stale branch were merged. Every name here was deleted by
+    // design and has no replacement.
+    for (const gone of ['CYCLE', 'CYCLE_DAYS', 'cycleDayAt', 'isCycleDay']) {
+      expect(contract, `${gone} came back`).not.toHaveProperty(gone)
+    }
+  })
+
+  it('is at schema version 3', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(3)
+    expect(midProgram.schemaVersion).toBe(3)
   })
 })
 
 describe('midProgram fixture', () => {
-  it('keeps sessionsCompleted consistent with history', () => {
-    expect(midProgram.sessionsCompleted).toBe(midProgramHistory.length)
+  it('puts every pattern at a distinguishable point', () => {
+    // The fixture's whole job: a screen that renders one pattern's rung for
+    // another must fail rather than pass by coincidence.
+    const counts = PATTERNS.map((p) => midProgram.sessionsDone[p])
+    expect(new Set(counts).size).toBeGreaterThan(1)
+    for (const n of counts) expect(Number.isInteger(n) && n >= 0).toBe(true)
   })
 
-  it('records exactly the patterns each day trains', () => {
-    // Guards against a fixture that drifts from the cycle definition and
-    // silently makes downstream engine tests meaningless.
-    midProgramHistory.forEach((session, i) => {
-      const spec = CYCLE.find((d) => d.day === session.day)
-      expect(spec, `session ${i} has unknown day ${session.day}`).toBeDefined()
-      const recorded = session.exercises.map((e) => e.pattern).sort()
-      expect(recorded).toEqual([...spec!.patterns].sort())
-    })
+  it('carries the whole of the mutable state and nothing derived', () => {
+    expect(Object.keys(midProgram).sort()).toEqual([
+      'cyclePosition',
+      'history',
+      'schemaVersion',
+      'sessionsDone',
+      'settings',
+      'username',
+    ])
+    // `sessionsCompleted` was derivable from history.length and is gone; nothing
+    // in v3 stores a number that can drift from the thing it counts.
+    expect(midProgram).not.toHaveProperty('sessionsCompleted')
+    expect(midProgram).not.toHaveProperty('ladders')
   })
 
-  it('follows the cycle in order', () => {
-    midProgramHistory.forEach((session, i) => {
-      expect(session.day, `session ${i}`).toBe(cycleDayAt(i).day)
-    })
+  it('keeps settings to the two that survived v2', () => {
+    expect(Object.keys(midProgram.settings).sort()).toEqual(['persistGranted', 'sync'])
   })
 
-  it('has ladders at differing rungs, so engine tests can distinguish them', () => {
-    const rungs = Object.values(midProgram.ladders).map((l) => l.rungIndex)
-    expect(new Set(rungs).size).toBeGreaterThan(1)
-  })
-
-  it('contains a rung advance — the transition a rep chart would misrender', () => {
-    // push held rung 2 at targets 10 → 11 → 12 → 12, then advanced and reset to 5
-    // before climbing again. Brief 09 must not plot raw reps because of the 12 → 5.
-    const pushTargets = midProgramHistory
-      .flatMap((s) => s.exercises)
-      .filter((e) => e.pattern === 'push')
-      .map((e) => e.sets[0]?.targetValue)
-    expect(pushTargets).toEqual([10, 11, 12, 12, 5, 6])
-    expect(midProgram.ladders.push.target).toBe(7)
-    expect(midProgram.ladders.push.rungIndex).toBe(3)
-  })
-
-  it('contains a cardio day per turn pair, recording no exercises at all', () => {
-    const cardioSessions = midProgramHistory.filter((s) => s.day === 'D')
-    expect(cardioSessions).toHaveLength(6)
-    for (const session of cardioSessions) {
-      expect(session.exercises, 'a cardio day trains no ladder').toEqual([])
-    }
-    // And the non-cardio sessions all record work, so an empty `exercises` array
-    // is never an accident in this fixture.
-    for (const session of midProgramHistory.filter((s) => s.day !== 'D')) {
-      expect(session.exercises.length, session.completedAt).toBeGreaterThan(0)
-    }
-  })
-
-  it('contains a deload — the transition where the index falls with no rung change', () => {
-    // hinge missed 3×12 three sessions running and dropped to 3×11 at rung 0.
-    const hingeTargets = midProgramHistory
-      .flatMap((s) => s.exercises)
-      .filter((e) => e.pattern === 'hinge')
-      .map((e) => e.sets[0]!.targetValue)
-    expect(hingeTargets).toEqual([11, 12, 12, 12, 11, 12])
-    expect(midProgram.ladders.hinge.rungIndex).toBe(0)
-  })
-
-  it('carries no effort rating anywhere — the field does not exist in v2', () => {
-    // Cheap, and it is the one thing that would silently reintroduce a locked
-    // decision if a stale fixture were merged.
-    for (const session of midProgramHistory) {
+  it('records a set COUNT and a prescribed target, never an outcome', () => {
+    for (const session of midProgram.history) {
       for (const e of session.exercises) {
-        expect(Object.keys(e).sort()).toEqual(['pattern', 'rungId', 'sets'])
-      }
-    }
-    expect(midProgram.schemaVersion).toBe(2)
-    expect(midProgramStart.schemaVersion).toBe(2)
-  })
-
-  it('uses rung ids prefixed by their pattern', () => {
-    for (const session of midProgramHistory) {
-      for (const e of session.exercises) {
+        expect(Object.keys(e).sort()).toEqual(['pattern', 'rungId', 'sets', 'targetValue'])
+        expect(typeof e.sets, 'sets is a count, not an array').toBe('number')
+        expect(e).not.toHaveProperty('actualValue')
+        expect(e).not.toHaveProperty('effort')
         expect(e.rungId.startsWith(`${e.pattern}-`)).toBe(true)
       }
     }
   })
 
-  // The original fixture was written before ladders.ts existed and recorded a
-  // target of 13 on a ladder capped at 12, plus rung indices that disagreed with
-  // the rung ids in its own history. These three tests catch that whole bug class
-  // without needing the engine, so it cannot come back silently.
-  it('records only targets inside each ladder’s declared range', () => {
-    for (const session of midProgramHistory) {
-      for (const e of session.exercises) {
-        const ladder = LADDERS[e.pattern]
-        for (const s of e.sets) {
-          expect(
-            s.targetValue,
-            `${e.rungId} target ${s.targetValue} outside ${ladder.targetMin}..${ladder.targetMax}`,
-          ).toBeGreaterThanOrEqual(ladder.targetMin)
-          expect(s.targetValue).toBeLessThanOrEqual(ladder.targetMax)
-        }
-      }
+  it('records exactly the patterns each recorded slot trained', () => {
+    // Guards against a fixture that drifts from the rotation and silently makes
+    // the UI tests meaningless.
+    for (const session of midProgram.history) {
+      const expected = [...slotAt(session.position).patterns, ...DAILY_BLOCK].sort()
+      const recorded = session.exercises.map((e) => e.pattern).sort()
+      expect(recorded, `position ${session.position}`).toEqual(expected)
     }
   })
 
-  it('steps targets by the ladder’s unit step, never by an arbitrary amount', () => {
-    for (const [pattern, ladder] of Object.entries(LADDERS)) {
-      const step = stepFor(ladder.unit)
-      const targets = midProgramHistory
-        .flatMap((s) => s.exercises)
-        .filter((e) => e.pattern === pattern)
-        .map((e) => e.sets[0]!.targetValue)
-      for (const t of targets) {
-        expect((t - ladder.targetMin) % step, `${pattern} target ${t} is off-step`).toBe(0)
-      }
+  it('runs its recorded sessions in rotation order, ending at cyclePosition', () => {
+    const positions = midProgram.history.map((s) => s.position)
+    for (const [i, position] of positions.entries()) {
+      expect(position, `history[${i}]`).toBe(midProgram.cyclePosition - positions.length + i)
     }
   })
 
-  it('keeps every ladder state in bounds and consistent with its rung ids', () => {
-    for (const doc of [midProgramStart, midProgram]) {
-      for (const pattern of PATTERNS) {
-        const ladder = LADDERS[pattern]
-        const state = doc.ladders[pattern]
-        expect(state.rungIndex).toBeGreaterThanOrEqual(0)
-        expect(state.rungIndex, `${pattern} rungIndex out of ladder bounds`).toBeLessThan(
-          ladder.rungs.length,
-        )
-        expect(state.target).toBeGreaterThanOrEqual(ladder.targetMin)
-        expect(state.target).toBeLessThanOrEqual(ladder.targetMax)
-        expect((state.target - ladder.targetMin) % stepFor(ladder.unit)).toBe(0)
-      }
-    }
-  })
-
-  it('logs each exercise against the rung the ladder was actually on', () => {
-    // Rung ids are 1-based, rungIndex is 0-based. Getting this backwards was the
-    // other half of the original defect.
-    const seen = new Map<string, string>()
-    for (const session of midProgramHistory) {
-      for (const e of session.exercises) {
-        seen.set(e.pattern, e.rungId)
-      }
-    }
-    for (const [pattern, rungId] of seen) {
-      const oneBased = Number(rungId.split('-')[1])
-      const zeroBased = oneBased - 1
-      const rung = LADDERS[pattern as (typeof PATTERNS)[number]].rungs[zeroBased]
-      expect(rung?.id, `${rungId} should sit at index ${zeroBased}`).toBe(rungId)
-    }
-  })
-
-  it('starts from a state that could plausibly precede the history', () => {
-    // Full proof is brief 04's job:
-    //   midProgramHistory.reduce(applySession, midProgramStart) === midProgram
-    // Until the engine exists, assert the cheap half: the first recorded target
-    // for each pattern equals that pattern's starting target.
-    const firstTarget = new Map<string, number>()
-    for (const session of midProgramHistory) {
-      for (const e of session.exercises) {
-        if (!firstTarget.has(e.pattern)) firstTarget.set(e.pattern, e.sets[0]!.targetValue)
-      }
-    }
-    for (const pattern of PATTERNS) {
-      expect(firstTarget.get(pattern), `${pattern} first logged target`).toBe(
-        midProgramStart.ladders[pattern].target,
-      )
-    }
-  })
-
-  it('never records more sets than it has targets for', () => {
-    for (const session of midProgramHistory) {
-      for (const e of session.exercises) {
-        expect(e.sets.length).toBe(3)
-        const targets = new Set(e.sets.map((s) => s.targetValue))
-        expect(targets.size, 'all sets in an exercise share one target').toBe(1)
-      }
-    }
+  it('mixes the variants, the only genuinely variable field in the document', () => {
+    const variants = new Set(midProgram.history.map((s) => s.variant))
+    expect(variants.size).toBeGreaterThan(1)
+    for (const v of variants) expect(isVariant(v)).toBe(true)
   })
 })

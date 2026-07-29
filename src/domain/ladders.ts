@@ -1,30 +1,42 @@
 /**
- * The five ladders, as data. Content, not logic — the engine (brief 04) only ever
- * asks this file "what is rung N of pattern P".
+ * The five ladders plus the cardio protocol, as data. Content, not logic —
+ * `schedule.ts` only ever asks this file "what is rung N of pattern P, and what
+ * is its target span".
  *
  * ── RUNG IDS ARE IMMUTABLE ONCE SHIPPED ─────────────────────────────────────
  *
  * Every `id` below is written verbatim into `SessionResult.history` in the
  * persisted state document. **Renaming one orphans real training records**: the
- * history entry keeps the old string, nothing in `LADDERS` matches it, and the
- * "Last time: 3×7" line plus every chart silently loses that exercise. Adding a
- * rung is fine; reordering or renaming is not. If a rung turns out to be wrong,
- * add a new one and leave the old id in place.
+ * history entry keeps the old string, nothing in `LADDERS` matches it, and every
+ * account-page total silently loses that exercise. Adding a rung is fine;
+ * renaming or reusing an id is not. **A rung whose movement changes gets a NEW
+ * id** — that is why the floor-only fix below retired `push-01-hands-high`,
+ * `push-02-hands-low`, `push-07-feet-elevated`,
+ * `hinge-04-single-leg-feet-elevated`, `hinge-05-nordic-negative` and
+ * `hinge-06-nordic-negative-long-eccentric` rather than repointing them, and why
+ * `findRungById` must keep returning `undefined` for them instead of throwing.
  *
  * Convention (asserted in the tests): `<pattern>-<NN>-<slug>`, where `NN` is the
  * rung's 1-based position zero-padded to two digits and `slug` is lower-kebab.
  * The position is part of the id purely so a hand-edited state file is readable;
- * the engine indexes by array position, never by parsing the id.
+ * `schedule.ts` indexes by array position, never by parsing the id.
+ *
+ * ── FLOOR ONLY. TOWELS AND THE FLOOR ────────────────────────────────────────
+ *
+ * Zero equipment means zero *furniture* too: no chair, couch, sofa, bed, stair,
+ * doorframe, table, counter or windowsill in any cue. A test greps for exactly
+ * those words and fails on a hit. Walls, folded towels, blankets and a book are
+ * the whole prop list — they are what every room has and what nobody has to buy.
  *
  * ── WHY THE CUES ARE THIS LONG ──────────────────────────────────────────────
  *
  * A rung is *one movement plus a modifier*, so adjacent rungs share a pose and a
  * figure. Rung 3 and rung 4 of the squat ladder look identical in a drawing. Only
  * the cue text can distinguish them, and if it fails to, the user performs both
- * the same way, the engine dutifully advances anyway, and progression becomes
- * placebo (corpus/wiki/open-questions.md #2). So each rung's cues cover:
+ * the same way and progression becomes placebo. So each rung's cues cover:
  *
- *   1. setup — hand/foot position, what is elevated and by roughly how much
+ *   1. setup — hand/foot position, and on a `safetyCritical` rung the safety
+ *      check, because `cues[0]` is what brief 19 renders first and separated
  *   2. movement standard — where the rep starts and ends
  *   3. the modifier, **located inside the rep** — never "3s down + 2s pause",
  *      always "three seconds down, then hold still two seconds at the bottom"
@@ -37,26 +49,57 @@
  *     not carry it (push 7, squat 6) or gets dropped from one that should
  *     (squat 5). "Steady tempo, no pause" is information.
  *   - **A rung whose only difference from its neighbour is a pause or a count
- *     names that neighbour and says what changed.** Cross-references cost a
- *     clause and buy the whole point of the ladder. "Rung 4" means the rung
+ *     names that neighbour and says what changed.** "Rung 4" means the rung
  *     numbered `04` in its id — the same 1-based number a person sees in the state
  *     file. A cross-reference never *replaces* an absolute instruction, because
  *     the card on screen only ever shows the current rung: every rung restates
  *     its own setup and its own tempo in full.
  *
- * `figureId` names one of brief 10's five base pose pairs
- * (push · squat · hinge · prone · plank). Rungs within a ladder share one pose by
- * design; the per-rung difference is an overlay plus the cues above.
+ * `figureId` names one of the five base pose pairs (push · squat · hinge · prone ·
+ * plank). Rungs within a ladder share one pose by design; the per-rung difference
+ * is an overlay plus the cues above.
  */
-import type { Ladder, Pattern, Rung } from './types.ts'
+import type { CardioProtocol, Ladder, Pattern, Range, Rung } from './types.ts'
 
-/** Rep-based ladders: 3×5 climbing to 3×12, then the next modifier. */
-const REP_MIN = 5
-const REP_MAX = 12
+// ─── The law: how long a rung takes ─────────────────────────────────────────
 
-/** Time-based ladders: 3×20s climbing to 3×45s, then the next modifier. */
-const SEC_MIN = 20
-const SEC_MAX = 45
+/**
+ * **A rung takes about six weeks, on every ladder.** These two numbers are that
+ * sentence, not tuning knobs: `sessions of the pattern per week × 6`.
+ *
+ * A rotating pattern (push, squat, hinge) is trained once per three-slot rotation
+ * — 2.3×/week at one session a day — so 14. The daily block (core, pull) is
+ * trained 7×/week, so 42. Read as bare numbers they look arbitrary; they are the
+ * only two values consistent with the law (corpus/wiki/progression-engine.md).
+ *
+ * Re-tuning either is the *one* number in the programme with no evidence behind
+ * it (corpus/wiki/open-questions.md #1), and it is deliberately cheap to change:
+ * nothing stored depends on it, so a re-tune moves everyone's target without
+ * invalidating a single persisted record.
+ */
+export const SESSIONS_PER_RUNG_ROTATING = 14
+export const SESSIONS_PER_RUNG_DAILY = 42
+
+// ─── Target spans ───────────────────────────────────────────────────────────
+
+/**
+ * All three rep ladders run 5 → 12. **Reps cap at 12** because past ~12–15
+ * bodyweight reps the adaptation drifts from strength to endurance and there is
+ * no load to add; at the cap the lever switches to the next modifier.
+ */
+const REPS_5_12: Range = { min: 5, max: 12 }
+
+/**
+ * Hold spans, per exercise rather than per ladder, because the evidence-based
+ * ceilings differ: McGill programs 10-second holds, transfer drops sharply past
+ * 60s, and the L-sit is limited by the wrists rather than the abdominals
+ * (corpus/wiki/programme.md#hold-caps-per-rung). The interpolation absorbs
+ * differing spans for free, so re-tuning any one of these costs nothing.
+ */
+const SEC_20_60: Range = { min: 20, max: 60 }
+const SEC_15_45: Range = { min: 15, max: 45 }
+const SEC_20_45: Range = { min: 20, max: 45 }
+const SEC_10_30: Range = { min: 10, max: 30 }
 
 /**
  * `<pattern>-<NN>-<slug>`. Exported so the tests and any future validator check
@@ -65,12 +108,11 @@ const SEC_MAX = 45
 export const RUNG_ID_PATTERN = /^(?:push|squat|hinge|core|pull)-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 /**
- * What the UI must show alongside any ladder with `kind: 'postural'`. v1 has no
+ * What the UI must show alongside any ladder with `kind: 'postural'`. There is no
  * anchor, so the Pull slot trains scapular retraction and upper-back endurance —
  * the posture half of the imbalance — and nothing else. Saying so is a locked
  * decision with a safety rationale: presenting postural work as pull strength is
- * the misrepresentation that does real damage
- * (corpus/wiki/decisions.md#zero-equipment-and-the-pull-gap).
+ * the misrepresentation that does real damage (corpus/wiki/programme.md).
  */
 export const POSTURAL_NOTICE =
   'Postural work, not pulling strength. With no bar or anchor, horizontal pulling ' +
@@ -82,38 +124,40 @@ export const POSTURAL_NOTICE =
 
 const PUSH_RUNGS: readonly Rung[] = [
   {
-    id: 'push-01-hands-high',
-    name: 'Push-up, hands on a counter',
+    // Was `push-01-hands-high`, a counter/windowsill push-up. New movement, new id.
+    id: 'push-01-wall',
+    name: 'Wall push-up',
     figureId: 'push',
     modifier: { elevation: 'hands' },
     cues: [
-      'Hands on a kitchen counter or windowsill at about hip-to-chest height, shoulder-width apart, then walk your feet back until you are one straight line from heel to head.',
-      'Lower until your chest touches the counter edge, then push until your elbows are straight. Chest to the edge is the rep — a half-rep does not count.',
-      'Steady tempo: about one second down, one second up, and no pause at either end. This rung has no tempo modifier.',
+      'Stand facing a wall two of your own foot-lengths back, feet hip-width, and place your hands flat on the wall at chest height, a little wider than your shoulders. Squeeze your glutes so you are one straight line from heel to head.',
+      'Bend your elbows and let your chest travel in until it is a hand\'s width from the wall, then push until your elbows are straight. Chest close to the wall is the rep — a short push does not count.',
+      'Steady tempo: about one second in, one second out, and no pause at either end. This rung has no tempo modifier. Step your feet further back to make it harder, closer to make it easier.',
       'Stop the set the moment your hips sag or your lower back arches, even if your arms still feel fresh — that is failure of the plank, which is half of a push-up.',
     ],
   },
   {
-    id: 'push-02-hands-low',
-    name: 'Push-up, hands on a chair',
+    // Was `push-02-hands-low`, a chair/stair push-up. New movement, new id.
+    id: 'push-02-knees-short-lever',
+    name: 'Knee push-up, knees under your hips',
     figureId: 'push',
-    modifier: { elevation: 'hands' },
     cues: [
-      'Hands on the front edge of a sturdy chair seat or the third stair, shoulder-width, feet walked back into one straight line from heel to head.',
-      'Lower until your chest touches the chair edge, then press all the way back to straight elbows.',
-      'Same steady one-second-down, one-second-up tempo as rung 1, still no pause. The only change is that your hands are lower, which shifts more of your weight onto your arms.',
-      'Stop the set when your hips sag, your elbows flare wide of 45°, or your chest stops reaching the chair.',
+      'On the floor: hands flat under your shoulders, knees down directly beneath your hips so your thighs are nearly vertical, one straight line from knee to head with no bend at the hip.',
+      'Lower until your chest is a fist deep off the floor, then press back to straight elbows. Chest to a fist off the floor is the rep.',
+      'Steady tempo, about one second down and one second up, with no pause at the bottom. Rung 1 had you upright against a wall; here you are on the floor, but with your knees tucked in close so your arms carry less of you than they will on rung 3.',
+      'Stop the set when your hips sag toward the floor, your back arches, or your chest stops reaching a fist off the floor.',
     ],
   },
   {
-    // Id fixed by src/domain/__tests__/fixtures.ts — do not rename.
+    // Id fixed by history — do not rename. Cue 3 and the name changed when rung 2
+    // stopped being a chair push-up; the movement did not.
     id: 'push-03-knees',
-    name: 'Knee push-up',
+    name: 'Knee push-up, knees set back',
     figureId: 'push',
     cues: [
       'On the floor: hands under your shoulders, knees down about a foot behind your hips, one straight line from knee to head with no bend at the hip.',
       'Lower until your chest is a fist deep off the floor, then press back to straight elbows.',
-      'Steady tempo, no pause at the bottom. Rung 2 had your hands raised; here they are on the floor and your chest travels the full range.',
+      'Steady tempo, no pause at the bottom. Rung 2 kept your knees tucked beneath your hips; sliding them a foot further back lengthens the lever, so your arms now carry more of you.',
       'Stop the set when your hips sag toward the floor, your back arches, or your chest stops reaching a fist off the floor. Do not finish a set on half-reps.',
     ],
   },
@@ -153,15 +197,16 @@ const PUSH_RUNGS: readonly Rung[] = [
     ],
   },
   {
-    id: 'push-07-feet-elevated',
-    name: 'Feet-elevated push-up',
+    // Was `push-07-feet-elevated`, which needed a chair or a stair. The pike is the
+    // floor-only way to shift the same load onto the shoulders. New movement, new id.
+    id: 'push-07-pike',
+    name: 'Pike push-up',
     figureId: 'push',
-    modifier: { elevation: 'feet' },
     cues: [
-      'Hands on the floor under your shoulders, feet up on a chair seat or the second stair so your shoulders sit lower than your hips. Still one straight line from heel to head.',
-      'Lower until your chest is a fist deep off the floor, then press to straight elbows. Look at the floor a hand ahead of you so your neck stays in line.',
-      'Back to a steady tempo — one second down, one second up, no pause at the bottom. The elevation is this rung\'s difficulty, so do not carry rung 6\'s three-second count or two-second hold over.',
-      'Stop the set when your lower back arches, your hips pike up to shorten the rep, or your chest stops reaching a fist off the floor.',
+      'Hands flat on the floor a little wider than your shoulders, feet hip-width and walked in toward your hands until your hips are stacked high and your body makes a V. Head between your arms, looking back between your feet.',
+      'Bend your elbows and lower the crown of your head toward the floor between your hands, then press back to straight elbows. Head down near the floor is the rep — stopping high turns this into a shrug.',
+      'Steady tempo, about one second down and one second up, no pause at the bottom. The piked hips are this rung\'s difficulty, so do not carry rung 6\'s three-second count or two-second hold over.',
+      'Stop the set when your hips drop out of the V, when your elbows splay straight out sideways, or when your head stops reaching down toward the floor.',
     ],
   },
   {
@@ -171,7 +216,7 @@ const PUSH_RUNGS: readonly Rung[] = [
     cues: [
       'Full push-up on the floor with your hands together under your chest, index fingers and thumbs touching to make a diamond. Feet hip-width, one line from heel to head.',
       'Lower until your chest touches your hands, then press to straight elbows, keeping your elbows brushing close to your ribs instead of flaring wide — that is what shifts the work onto your triceps.',
-      'Steady tempo, one second down, one second up, no bottom hold. Your feet are back on the floor for this rung; the narrow hands are the difficulty.',
+      'Steady tempo, one second down, one second up, no bottom hold. Your hips come back down to one flat line for this rung — rung 7 stacked them high — and the narrow hands are the difficulty.',
       'Stop the set when your elbows start flaring out or your chest no longer reaches your hands. Wrists complaining is also a stop, not something to push through.',
     ],
   },
@@ -180,8 +225,9 @@ const PUSH_RUNGS: readonly Rung[] = [
     name: 'Archer push-up',
     figureId: 'push',
     modifier: { unilateral: true },
+    safetyCritical: true,
     cues: [
-      'Full push-up with your hands set much wider than shoulder-width, both palms flat, the fingers of each hand turned slightly outward.',
+      'Safety check first: only start this rung if you can hold the bottom of a full push-up still for two seconds. If you cannot, stay on rung 8 — failing an archer twists your trunk over a wide, straight, loaded arm, which is a shoulder injury rather than a missed rep. Then set your hands much wider than shoulder-width, palms flat, fingers turned slightly outward.',
       'Bend one arm and lower your chest toward that hand while the other arm stays nearly straight and slides out wide, carrying only a little weight. Press back up with the bending arm; the chest still travels to a fist off the floor on the working side.',
       'Steady tempo, no bottom hold, and alternate sides every rep — each side counts as one rep, so if the target is an odd number, start the next set on the other side.',
       'Stop the set when the straight arm starts bending to help, when your hips rotate to face the working hand, or when your chest stops reaching down to the working side.',
@@ -193,18 +239,19 @@ const PUSH_RUNGS: readonly Rung[] = [
 
 const SQUAT_RUNGS: readonly Rung[] = [
   {
+    // Id kept: the movement is still an assisted squat. Only the thing you hold
+    // changed, from a doorframe to a wall.
     id: 'squat-01-assisted',
-    name: 'Assisted squat, holding a doorframe',
+    name: 'Assisted squat, fingertips on a wall',
     figureId: 'squat',
     cues: [
-      'Stand an arm\'s length from a doorframe, feet hip-width, toes turned slightly out. Hold both sides of the frame at chest height.',
+      'Stand facing a wall about a forearm\'s length away, feet hip-width, toes turned slightly out, with your fingertips resting flat on the wall at chest height.',
       'Sit down and back until the tops of your thighs are parallel with the floor, then stand up fully and squeeze your glutes at the top. Knees track over your toes; heels stay glued down.',
-      'Steady tempo — about one second down, one second up, no pause at the bottom. Pull on the frame only to keep your balance, never to hoist yourself up.',
-      'Stop the set when your heels lift, your knees cave inward, or your hands go from steadying you to hauling you up.',
+      'Steady tempo — about one second down, one second up, no pause at the bottom. The fingertips are there to stop you tipping backward, never to take your weight.',
+      'Stop the set when your heels lift, your knees cave inward, or your hands go from steadying you to pressing hard into the wall to haul you up.',
     ],
   },
   {
-    // Id fixed by src/domain/__tests__/fixtures.ts — do not rename.
     id: 'squat-02-bodyweight',
     name: 'Bodyweight squat',
     figureId: 'squat',
@@ -245,7 +292,7 @@ const SQUAT_RUNGS: readonly Rung[] = [
     figureId: 'squat',
     modifier: { eccentricSeconds: 3, pauseSeconds: 2, pauseAt: 'bottom', elevation: 'heels' },
     cues: [
-      'Put your heels on a 2–4 cm book or board with the balls of your feet on the floor. Stance unchanged: hip-width, toes slightly out.',
+      'Put your heels on a 2–4 cm book with the balls of your feet on the floor. Stance unchanged: hip-width, toes slightly out.',
       'Now spend the extra range you just bought: descend past parallel until the backs of your thighs come close to your calves, then stand all the way up. Depth is what this rung adds — the elevation exists to let you sit lower, so go lower.',
       'Keep rung 4\'s clock exactly: three seconds down, two seconds held still at the very bottom, then stand at normal speed. Same tempo as rung 4, deeper hole.',
       'Stop the set when your lower back rounds at the bottom, when your knees ache instead of your thighs working, or when you can no longer reach the deeper position.',
@@ -268,32 +315,40 @@ const SQUAT_RUNGS: readonly Rung[] = [
     name: 'Assisted single-leg squat',
     figureId: 'squat',
     modifier: { unilateral: true },
+    safetyCritical: true,
     cues: [
-      'Stand on one leg beside a doorframe or the back of a chair, other leg held straight out in front and low but clear of the floor, one hand resting on the support.',
+      'Safety check first: only start this rung if you can stand out of a deep two-legged squat with no help at all. A single-leg squat that fails does it with the knee collapsing inward under your whole weight. Then stand on one leg with one hand flat on a wall at shoulder height, the other leg held straight out in front, low but clear of the floor.',
       'Lower on the standing leg as far as you can control, aiming for that thigh at parallel, then stand back up. Use the hand for as little help as gets you through the rep, and a little less each session.',
       'Steady tempo, one second down, one second up, no bottom hold. Reps count per leg. Leverage, not the clock, is what makes this rung hard.',
-      'Stop the set when the supporting hand starts pulling you up rather than steadying you, or when the standing heel lifts off the floor.',
+      'Stop the set when the supporting hand starts pushing you up rather than steadying you, or when the standing heel lifts off the floor.',
     ],
   },
   {
     id: 'squat-08-pistol-progression',
     name: 'Pistol squat progression',
     figureId: 'squat',
+    safetyCritical: true,
     modifier: { unilateral: true },
     cues: [
-      'Stand on one leg, free leg straight out in front, arms forward. Set a chair or a stack of cushions behind you at the lowest height you can still stand up from without help.',
-      'Lower under control until you just touch the seat — touch, do not sit and rest — then stand straight back up on the same leg. Lower the seat as you get stronger; a full pistol is a touch down beside your own heel.',
+      'Safety check first: only start this rung once rung 7 is controlled all the way down, because here there is no hand on the wall to catch you. Then stand on one leg, free leg straight out in front, arms forward, with a firm stack of folded blankets behind you at the lowest height you can still stand up from unaided.',
+      'Lower under control until you just touch the stack — touch, do not sit and rest — then stand straight back up on the same leg. Take a blanket off the stack as you get stronger; a full pistol is a touch down beside your own heel.',
       'Steady tempo, one second down, one second up, no hold. Reps count per leg, and the free foot stays off the floor for the whole set.',
-      'Stop the set when you drop onto the seat instead of touching it, when the free foot touches down to help, or when the standing knee twists inward.',
+      'Stop the set when you drop onto the stack instead of touching it, when the free foot touches down to help, or when the standing knee twists inward.',
     ],
   },
 ]
 
-// ─── HINGE — posterior chain, bridge to nordic ──────────────────────────────
+// ─── HINGE — posterior chain, bridge to sliding leg curl ────────────────────
+//
+// Rungs 5–6 were couch-anchored nordic negatives until brief 15: the anchor
+// violated the floor-only constraint, and a hamstring cannot be anchored to a
+// floor. The sliding leg curl replaces them and is **not** a downgrade — it
+// biases *biceps femoris*, which the nordic does not, and needs nothing but a
+// floor and a towel. With the nordics gone this ladder has no rung whose failure
+// mode is injurious, so nothing here is `safetyCritical`.
 
 const HINGE_RUNGS: readonly Rung[] = [
   {
-    // Id fixed by src/domain/__tests__/fixtures.ts — do not rename.
     id: 'hinge-01-glute-bridge',
     name: 'Glute bridge',
     figureId: 'hinge',
@@ -329,50 +384,69 @@ const HINGE_RUNGS: readonly Rung[] = [
     ],
   },
   {
-    id: 'hinge-04-single-leg-feet-elevated',
-    name: 'Single-leg glute bridge, foot elevated',
+    // Was `hinge-04-single-leg-feet-elevated`, which put the planted heel on a
+    // chair. Pushing the heel out along the floor buys the same longer lever and
+    // the same hamstring bias with nothing under it. New movement, new id.
+    id: 'hinge-04-single-leg-heel-far',
+    name: 'Single-leg glute bridge, heel far from your hips',
     figureId: 'hinge',
-    modifier: { unilateral: true, elevation: 'feet' },
+    modifier: { unilateral: true },
     cues: [
-      'The same single-leg bridge, but with the planted heel up on a chair seat or sofa edge — roughly knee height as you lie down — with that knee bent about 90°. Free leg lifted, knee bent or straight.',
-      'Push through the elevated heel and lift your hips high enough to make a straight knee-hip-shoulder line, then lower until your backside is just above the floor. The elevation lengthens the range, so the bottom of the rep is now further down than on rung 3.',
-      'Steady tempo, one second up, one second down, still no hold at the top. The only change from rung 3 is the height of your foot and the longer range that comes with it. Reps count per side.',
-      'Stop the set when your hips cannot reach the top line, when your hamstring gives a sharp pull rather than a hard working burn, or when the planted foot slips on the chair.',
+      'On your back with one foot flat and that heel pushed out until the knee is only slightly bent — roughly two hand-lengths further from your backside than on rung 3. Lift the other leg, knee bent or straight, arms by your sides.',
+      'Push down through the far heel and lift your hips until knee, hip and shoulder line up, hips dead level with no dip toward the free-leg side, then lower until your backside brushes the floor.',
+      'Steady tempo, one second up, one second down, still no hold at the top. The only change from rung 3 is how far out the heel sits: the straighter leg moves the work off your glutes and onto your hamstrings. Reps count per side — finish one side, then switch.',
+      'Stop the set when your hips tilt, when the planted heel slides further away from you, or when your hamstring cramps rather than working hard.',
     ],
   },
   {
-    id: 'hinge-05-nordic-negative',
-    name: 'Couch-anchored nordic negative',
+    // Replaces `hinge-05-nordic-negative`. Floor and a towel, no anchor.
+    id: 'hinge-05-sliding-leg-curl',
+    name: 'Bilateral sliding leg curl',
     figureId: 'hinge',
-    modifier: { eccentricSeconds: 3 },
     cues: [
-      'Kneel on a folded blanket facing away from the sofa with your heels and lower calves wedged firmly under the couch frame or the front edge of the seat. Tug hard against the anchor before your first rep: if your heels can pull free at all, do not do this rung. Put both hands on the floor in front of you, ready to catch.',
-      'Squeeze your glutes and hold a straight line from knee to shoulder with no bend at the hip. Lower your whole body forward as slowly as you can, resisting the entire way with your hamstrings — at least three seconds.',
-      'The instant you can no longer slow the fall, plant your hands and catch yourself on the floor. That bail-out is part of every rep, not a failure. Push back up to kneeling with your arms, not your hamstrings.',
-      'Stop the set immediately at any sharp or pulling sensation behind your thigh, or the moment a rep turns into a free-fall you have to catch. Hamstring strains happen on this movement and they happen without warning — finish this set early rather than late.',
+      'Lie on your back on a smooth floor with a folded towel under each heel, knees bent about 90°, feet hip-width. Lift your hips into a bridge — one straight line from knee to shoulder — and keep them up for every rep of the set.',
+      'Keeping your hips up, slide both heels slowly away until your legs are nearly straight, then pull them back in under your knees. Your hips must not drop while the heels travel; holding that height is the exercise.',
+      'Steady tempo: about two seconds sliding out, two seconds pulling back in, with no pause at either end. Both legs work together on this rung.',
+      'Stop the set when your hips sink as the heels slide out, when your lower back arches to keep the height, or when your hamstrings cramp. A cramp is a stop, not something to push through.',
     ],
   },
   {
-    id: 'hinge-06-nordic-negative-long-eccentric',
-    name: 'Nordic negative, 5-second lowering',
+    // Replaces `hinge-06-nordic-negative-long-eccentric`.
+    id: 'hinge-06-sliding-curl-eccentric',
+    name: 'Sliding leg curl, 5-second slide out only',
     figureId: 'hinge',
     modifier: { eccentricSeconds: 5 },
     cues: [
-      'Same setup and the same safety check as rung 5: heels and calves wedged under the couch frame, blanket under your knees, hands ready on the floor, and a hard tug on the anchor before the first rep.',
-      'Straight line from knee to shoulder, glutes squeezed, hips never bending. Now stretch the lowering out to five seconds or more, resisting slowly with your hamstrings and fighting for every inch, and aim to keep control further down than you managed on rung 5.',
-      'This rung differs from rung 5 in exactly two ways: the lowering count is five seconds instead of three, and you hold control deeper before bailing. Still catch yourself with your hands, and still push back up to kneeling with your arms.',
-      'Stop the set the moment the lowering collapses into a fall, or at any sharp pull behind your thigh. Soreness two days later is expected; sudden sharp pain during a rep ends the session for that pattern.',
+      'Same setup as rung 5: a folded towel under each heel on a smooth floor, knees bent, hips lifted into the straight knee-to-shoulder line.',
+      'Now stretch the slide out to five full seconds — "five, four, three, two, one" as your heels travel away and your legs straighten — resisting slowly and fighting for every inch with your hamstrings.',
+      'Then let your hips down to the floor, pull your feet back in with the hips resting down, and lift into the bridge again for the next rep. That is the second difference from rung 5: five seconds out instead of two, and no loaded curl back in.',
+      'Stop the set the moment the slide collapses into a slither you cannot slow, or at any sharp pull behind your thigh. Soreness two days later is expected; sharp pain during a rep ends the set.',
+    ],
+  },
+  {
+    // New top rung. The nordic negatives it replaces were the only rungs above
+    // index 3, so the ladder would otherwise be a rung shorter than the others.
+    id: 'hinge-07-single-leg-slide',
+    name: 'Single-leg sliding leg curl',
+    figureId: 'hinge',
+    modifier: { unilateral: true },
+    cues: [
+      'Same bridge setup as rung 5 but with only one heel on a folded towel. Hold the other leg clear of the floor with the knee bent, and lift your hips into the straight knee-to-shoulder line.',
+      'Slide the working heel slowly away until that leg is nearly straight, then pull it back in under your knee, hips staying up the whole time and level from side to side.',
+      'Steady tempo, about two seconds out and two seconds back, no pause at either end — do not carry rung 6\'s five-second count over. One leg now carries all of it, which is the only change from rung 5. Reps count per side — finish one side, then switch.',
+      'Stop the set when your hips drop or tilt toward the free leg, when the heel skids out faster than you meant to let it, or when your hamstring cramps.',
     ],
   },
 ]
 
-// ─── CORE — time-based ──────────────────────────────────────────────────────
+// ─── CORE — time-based, every rung declares its own span ────────────────────
 
 const CORE_RUNGS: readonly Rung[] = [
   {
     id: 'core-01-dead-bug',
     name: 'Dead bug',
     figureId: 'plank',
+    range: SEC_20_45,
     cues: [
       'Lie on your back with both arms pointing straight at the ceiling and both knees bent 90° above your hips. Press your lower back flat into the floor and keep it pressed for the whole hold — that flatness is the exercise.',
       'Slowly reach one arm overhead and the opposite leg out straight and low, just above the floor, then bring both back and swap sides. Keep alternating, slowly, for the whole time on the clock.',
@@ -381,10 +455,12 @@ const CORE_RUNGS: readonly Rung[] = [
     ],
   },
   {
-    // Id fixed by src/domain/__tests__/fixtures.ts — do not rename.
     id: 'core-02-plank',
     name: 'Front plank',
     figureId: 'plank',
+    // The one hold that runs to 60s: the plank is the position the transfer
+    // evidence is strongest for, and 60s is where it starts dropping off.
+    range: SEC_20_60,
     cues: [
       'Forearms on the floor with your elbows directly under your shoulders, feet hip-width, one straight line from heels to head, hips level with your shoulders.',
       'Squeeze your glutes, tuck your ribs down toward your hips, and push the floor away with your forearms. Hold still and breathe normally for the whole time — this is a hold, not a rest position.',
@@ -397,6 +473,7 @@ const CORE_RUNGS: readonly Rung[] = [
     name: 'Side plank',
     figureId: 'plank',
     modifier: { unilateral: true },
+    range: SEC_15_45,
     cues: [
       'Lie on one side with your forearm on the floor, elbow directly under your shoulder, feet stacked — or the lower knee down if stacking is too much. Lift your hips into one straight line from ankle to head.',
       'Push your bottom shoulder away from the floor and hold still with your hips stacked: the top hip must not drift backward or sink. Breathe normally.',
@@ -408,9 +485,11 @@ const CORE_RUNGS: readonly Rung[] = [
     id: 'core-04-hollow-hold',
     name: 'Hollow hold',
     figureId: 'plank',
+    range: SEC_15_45,
+    safetyCritical: true,
     cues: [
-      'Lie on your back, press your lower back flat into the floor, then lift your shoulder blades and your legs a few inches clear of it, arms reaching back past your ears if you can keep the back flat.',
-      'Hold that shallow banana shape absolutely still and take short, controlled breaths. If your lower back peels up, bend your knees or bring your arms down by your sides to shorten the lever, and keep holding.',
+      'Safety check first: lie on your back, press your lower back flat into the floor, then lift your shoulder blades and legs a few inches clear with your arms reaching back past your ears. If your lower back peels away from the floor, bend your knees or bring your arms down by your sides until it presses flat again. Only start the clock once it does.',
+      'Hold that shallow banana shape absolutely still and take short, controlled breaths. An arched lower back under a long lever is how this rung hurts people, so shorten the lever rather than holding on.',
       'Nothing moves during this hold. It is the same shape as rung 5 but with no rocking at all.',
       'Stop the clock when your lower back lifts off the floor and you cannot get it back down even after shortening your arms and legs.',
     ],
@@ -419,9 +498,11 @@ const CORE_RUNGS: readonly Rung[] = [
     id: 'core-05-hollow-rock',
     name: 'Hollow rock',
     figureId: 'plank',
+    range: SEC_15_45,
+    safetyCritical: true,
     cues: [
-      'Set up in exactly the hollow position of rung 4: lower back pressed flat, shoulder blades and heels off the floor, arms overhead.',
-      'Now rock the whole rigid shape back and forth between your upper back and your hips, like a rocking chair. The rock comes from staying stiff and shifting as one piece — your hips and shoulders must not open and close.',
+      'Safety check first: set up in exactly the hollow position of rung 4 — lower back pressed flat, shoulder blades and heels off the floor, arms overhead — and do not start rocking until you can hold that shape still. A rock driven by an arching back loads your lumbar spine instead of your abs.',
+      'Now rock the whole rigid shape back and forth between your upper back and your hips, like a rocking horse. The rock comes from staying stiff and shifting as one piece — your hips and shoulders must not open and close.',
       'Keep rocking continuously for the whole time on the clock. Rung 4 is dead still; this rung never stops moving.',
       'Stop the clock when your body starts folding and unfolding to make the rock happen, or when your heels or shoulders drop to the floor.',
     ],
@@ -430,8 +511,12 @@ const CORE_RUNGS: readonly Rung[] = [
     id: 'core-06-tuck-l-sit',
     name: 'Tuck L-sit progression',
     figureId: 'plank',
+    // 10→30s, the lowest ceiling on any ladder: the L-sit is limited by the
+    // wrists rather than the abdominals, so a long hold buys pain, not transfer.
+    range: SEC_10_30,
+    safetyCritical: true,
     cues: [
-      'Sit on the floor with your hands flat beside your hips, or on two low books for extra clearance. Press your shoulders down away from your ears and lock your elbows straight.',
+      'Safety check first: sit on the floor with your hands flat beside your hips, or on two low books for extra clearance, shoulders pressed down away from your ears and elbows locked straight. If your wrists already sting in that position, do not start the clock — this rung fails through the wrists, not the abs.',
       'Push into the floor, lift your backside clear, and hold both knees tucked toward your chest with your feet off the floor. Only your hands touch the ground.',
       'Hold still for the time on the clock. As it gets easier, extend your feet toward straight legs — but keep the tuck if straightening rounds your back.',
       'Stop the clock the moment your feet touch down or your elbows bend. Stop the set entirely if your wrists sting rather than your abs and shoulders working.',
@@ -443,10 +528,10 @@ const CORE_RUNGS: readonly Rung[] = [
 
 const PULL_RUNGS: readonly Rung[] = [
   {
-    // Id fixed by src/domain/__tests__/fixtures.ts — do not rename.
     id: 'pull-01-prone-y',
     name: 'Prone Y raise',
     figureId: 'prone',
+    range: SEC_10_30,
     cues: [
       'Lie face down with your forehead on a folded towel, arms straight overhead and angled out about 45° each side so they form a Y. Thumbs pointing up.',
       'Pull your shoulder blades down and together first, then lift both arms a few inches off the floor and hold. The lift is small — the work is the squeeze between your shoulder blades, not the height of your hands.',
@@ -455,10 +540,10 @@ const PULL_RUNGS: readonly Rung[] = [
     ],
   },
   {
-    // Id fixed by src/domain/__tests__/fixtures.ts — do not rename.
     id: 'pull-02-prone-t',
     name: 'Prone T raise',
     figureId: 'prone',
+    range: SEC_10_30,
     cues: [
       'Same face-down setup, forehead on the towel — but your arms now go straight out to the sides at shoulder height, making a T. Thumbs up.',
       'Squeeze your shoulder blades together and lift both arms a few inches, then hold still. The T angle puts the work lower between your shoulder blades than rung 1\'s Y did.',
@@ -470,6 +555,7 @@ const PULL_RUNGS: readonly Rung[] = [
     id: 'pull-03-ytw-combo',
     name: 'Prone Y-T-W combo',
     figureId: 'prone',
+    range: SEC_20_45,
     cues: [
       'Face down, forehead on the towel, arms overhead in the Y position from rung 1.',
       'Hold the Y for a slow count of three, sweep your arms out to the T for three, then bend your elbows and pull them down to your ribs with palms facing forward for a W — three again. Then start over at the Y.',
@@ -481,6 +567,7 @@ const PULL_RUNGS: readonly Rung[] = [
     id: 'pull-04-reverse-snow-angel',
     name: 'Reverse snow angel',
     figureId: 'prone',
+    range: SEC_20_45,
     cues: [
       'Face down, forehead on the towel, arms straight overhead with the backs of your hands held off the floor, thumbs up.',
       'Keeping your arms straight and clear of the floor the whole time, sweep them slowly out and all the way down to your hips, then slowly back overhead. One sweep out and back takes about four seconds.',
@@ -492,6 +579,7 @@ const PULL_RUNGS: readonly Rung[] = [
     id: 'pull-05-prone-lat-slide',
     name: 'Prone lat slide',
     figureId: 'prone',
+    range: SEC_20_45,
     // `pauseAt: 'bottom'` = the bottom of the pull, elbows driven past the ribs.
     modifier: { pauseSeconds: 2, pauseAt: 'bottom' },
     cues: [
@@ -505,6 +593,7 @@ const PULL_RUNGS: readonly Rung[] = [
     id: 'pull-06-end-range-isometric',
     name: 'End-range isometric hold',
     figureId: 'prone',
+    range: SEC_20_45,
     cues: [
       'Face down, forehead on the towel. Move into the hardest end position you have earned on rung 5: elbows pulled down past your ribs, shoulder blades pinned down and together, hands off the floor.',
       'Now simply stay there. No movement at all for the whole time on the clock — maximum squeeze held at the very end of the range, breathing shallow and steady.',
@@ -517,78 +606,65 @@ const PULL_RUNGS: readonly Rung[] = [
 // ─── Starting rungs — a SAFETY cap, not a calibration knob ──────────────────
 
 /**
- * Where a brand-new document starts each ladder (`Ladder.startRungIndex`).
+ * Where every document starts each ladder (`Ladder.startRungIndex`).
  *
- * Calibration is **descending** (corpus/wiki/decisions.md, "No effort input
- * anywhere"): there is no effort tap, therefore no fast-track, therefore no way
- * for the engine to climb quickly to a rung that fits. So it starts at a rung a
- * returning beginner plausibly *can* perform and lets the 3-miss regress rule
- * walk them down. A missed set is free information; a question is not.
+ * There is no calibration in v3 — everyone gets the same schedule and there is no
+ * regress rule to walk anybody down — so these five numbers are pure safety caps.
  *
  * ── The rule these five numbers obey ────────────────────────────────────────
  *
  * **A starting rung must never be one where FAILING is injurious.** Not "hard",
- * not "ambitious" — the test is what happens in the moment the user cannot
- * finish the rep, because on day one that is a likely outcome by design. A rung
- * whose failure mode is "you sink to the floor" is a legal entry point. A rung
- * whose failure mode is "your hamstring takes the load you could not" is not, at
- * any plausible capability.
+ * not "ambitious" — the test is what happens in the moment the user cannot finish
+ * the rep, because on day one that is a likely outcome. A rung whose failure mode
+ * is "you sink to the floor" is a legal entry point. A rung whose failure mode is
+ * "your lumbar spine takes the load you could not" is not, at any plausible
+ * capability.
  *
- * That rules the following out as entry points *regardless* of how strong the
- * user might be, and they are named here so nobody has to re-derive it:
- *
- *   - `hinge-05/06-nordic-negative*` — an uncontrolled nordic is a documented
- *     hamstring-strain mechanism, and the rung's own cues say strains here
- *     "happen without warning". Never an entry point.
- *   - `squat-07-assisted-single-leg`, `squat-08-pistol-progression` — failing a
- *     loaded single-leg squat is a knee-valgus collapse under bodyweight.
- *   - `push-09-archer` — failure rotates the trunk over a wide-set, extended arm.
- *   - `core-03..06` (hollow hold/rock, tuck L-sit) — hollow work fails by the
- *     lumbar spine extending under load, and the L-sit fails through the wrists.
- *
- * Each value below is the hardest rung *left* after applying that test, which is
- * what makes it a cap rather than a preference. Raising one is a safety change.
+ * The rungs that rules out are exactly the ones flagged `safetyCritical: true`,
+ * and they are listed again in `NEVER_A_STARTING_RUNG` so a test can assert the
+ * rule rather than the numbers. Each value below is the hardest rung *left* after
+ * applying the test, which is what makes it a cap rather than a preference.
+ * Raising one is a safety change.
  */
 const START_RUNGS: Readonly<Record<Pattern, number>> = {
   /**
    * `push-03-knees` (index 2 of 9). Failing a knee push-up lowers you onto the
    * floor from a hand's depth with your knees already down — there is nowhere to
-   * fall to. Two rungs of counter/chair elevation sit below it for anyone who
-   * cannot, and the regress rule finds them in three sessions.
+   * fall to. A wall push-up and a short-lever knee push-up sit below it.
    */
   push: 2,
   /**
-   * `squat-02-bodyweight` (index 1 of 8). A bodyweight squat that fails ends
-   * with you standing up short of parallel or sitting down; both are benign, and
-   * neither needs a spotter or an anchor. Rung 0 (holding a doorframe) is the
-   * fallback, and rungs 2–4 add a 3s eccentric and a bottom hold, where failure
-   * means being stuck in the hole rather than short of it.
+   * `squat-02-bodyweight` (index 1 of 8). A bodyweight squat that fails ends with
+   * you standing up short of parallel or sitting down; both are benign. Rung 0
+   * (fingertips on a wall) is the fallback, and rungs 2–4 add a 3s eccentric and a
+   * bottom hold, where failure means being stuck in the hole rather than short of
+   * it.
    */
   squat: 1,
   /**
-   * `hinge-02-glute-bridge-2s-top-hold` (index 1 of 6). Deliberately the last
+   * `hinge-02-glute-bridge-2s-top-hold` (index 1 of 7). Deliberately the last
    * **bilateral, supine** rung: failure is "your hips settle back to the floor",
-   * from four inches up, with both feet planted. Index 2 onward is unilateral
-   * and index 4–5 are nordic negatives, and the hinge is the one pattern here
-   * whose too-hard failure mode is a named injury rather than a missed rep. This
-   * is the most conservative of the five numbers on purpose.
+   * from four inches up, with both feet planted. Index 2 onward is unilateral or a
+   * sliding curl, both of which fail by the hips dropping — which is why this
+   * ladder no longer has a `safetyCritical` rung at all now that the couch-anchored
+   * nordic negatives are gone. Kept conservative anyway: a hamstring under a long
+   * lever is still the sharpest thing on this ladder.
    */
   hinge: 1,
   /**
    * `core-02-plank` (index 1 of 6). A plank fails by the hips sagging, and the
    * user drops to their knees; the cue already tells them to. It is also the one
-   * core position essentially everyone has performed before, which matters when
-   * the first session has no calibration data at all. The rungs above it fail
-   * through the lumbar spine or the wrists (see above).
+   * core position essentially everyone has performed before. The rungs above it
+   * fail through the lumbar spine or the wrists.
    */
   core: 1,
   /**
    * `pull-02-prone-t` (index 1 of 6). No rung on this ladder has an injurious
-   * failure mode — every one is face-down, unloaded, and fails by the arms
-   * drifting back to the floor — so here the cap is set by *plausibility*, not
-   * safety: rung 2 onward requires holding an unbroken position through changing
-   * shapes, which is a trained skill rather than an effort. A prone T for 20s is
-   * within reach of a deconditioned upper back; a Y-T-W flow is not.
+   * failure mode — every one is face-down, unloaded, and fails by the arms drifting
+   * back to the floor — so here the cap is set by *plausibility*, not safety: rung
+   * 2 onward requires holding an unbroken position through changing shapes, which
+   * is a trained skill rather than an effort. A prone T for 10s is within reach of
+   * a deconditioned upper back; a Y-T-W flow is not.
    */
   pull: 1,
 }
@@ -601,8 +677,8 @@ export const LADDERS: Readonly<Record<Pattern, Ladder>> = {
     unit: 'reps',
     kind: 'strength',
     startRungIndex: START_RUNGS.push,
-    targetMin: REP_MIN,
-    targetMax: REP_MAX,
+    range: REPS_5_12,
+    sessionsPerRung: SESSIONS_PER_RUNG_ROTATING,
     rungs: PUSH_RUNGS,
   },
   squat: {
@@ -610,8 +686,8 @@ export const LADDERS: Readonly<Record<Pattern, Ladder>> = {
     unit: 'reps',
     kind: 'strength',
     startRungIndex: START_RUNGS.squat,
-    targetMin: REP_MIN,
-    targetMax: REP_MAX,
+    range: REPS_5_12,
+    sessionsPerRung: SESSIONS_PER_RUNG_ROTATING,
     rungs: SQUAT_RUNGS,
   },
   hinge: {
@@ -619,8 +695,8 @@ export const LADDERS: Readonly<Record<Pattern, Ladder>> = {
     unit: 'reps',
     kind: 'strength',
     startRungIndex: START_RUNGS.hinge,
-    targetMin: REP_MIN,
-    targetMax: REP_MAX,
+    range: REPS_5_12,
+    sessionsPerRung: SESSIONS_PER_RUNG_ROTATING,
     rungs: HINGE_RUNGS,
   },
   core: {
@@ -628,12 +704,15 @@ export const LADDERS: Readonly<Record<Pattern, Ladder>> = {
     unit: 'seconds',
     kind: 'strength',
     startRungIndex: START_RUNGS.core,
-    targetMin: SEC_MIN,
-    targetMax: SEC_MAX,
+    /* Never used: every `seconds` rung declares its own span, and a test enforces
+       that. Declared anyway because `Ladder.range` is required — a ladder with no
+       default would make the field optional for the rep ladders too. */
+    range: SEC_20_45,
+    sessionsPerRung: SESSIONS_PER_RUNG_DAILY,
     rungs: CORE_RUNGS,
   },
   /**
-   * `postural`, never `strength`. v1 has no anchor, so this ladder does not train
+   * `postural`, never `strength`. There is no anchor, so this ladder does not train
    * the quality its pattern name implies. The marker is a safety invariant with a
    * test of its own — see `POSTURAL_NOTICE` for the wording the UI must surface.
    */
@@ -642,8 +721,8 @@ export const LADDERS: Readonly<Record<Pattern, Ladder>> = {
     unit: 'seconds',
     kind: 'postural',
     startRungIndex: START_RUNGS.pull,
-    targetMin: SEC_MIN,
-    targetMax: SEC_MAX,
+    range: SEC_20_45,
+    sessionsPerRung: SESSIONS_PER_RUNG_DAILY,
     rungs: PULL_RUNGS,
   },
 }
@@ -652,19 +731,63 @@ export const LADDERS: Readonly<Record<Pattern, Ladder>> = {
  * Rung ids that must never be a starting rung, whatever `START_RUNGS` says.
  *
  * Exported so the test asserts the *rule* rather than the five numbers: a future
- * content edit that reorders a ladder cannot quietly move a nordic negative into
- * an entry position without failing here.
+ * content edit that reorders a ladder cannot quietly move a hollow rock into an
+ * entry position without failing here. A test also asserts this list and the set
+ * of `safetyCritical` rungs agree exactly — they answer the same question ("does
+ * failing this hurt you?") and two lists that can disagree are worse than one.
+ *
+ * The nordic negatives that used to head this list are gone: they were removed by
+ * brief 15's floor-only fix, not for safety, and no sliding-curl rung replaces
+ * their failure mode.
  */
 export const NEVER_A_STARTING_RUNG: readonly string[] = [
-  'hinge-05-nordic-negative',
-  'hinge-06-nordic-negative-long-eccentric',
+  'push-09-archer',
   'squat-07-assisted-single-leg',
   'squat-08-pistol-progression',
-  'push-09-archer',
   'core-04-hollow-hold',
   'core-05-hollow-rock',
   'core-06-tuck-l-sit',
 ]
+
+// ─── Cardio ─────────────────────────────────────────────────────────────────
+
+/**
+ * The cardio slot's content. Not a `Ladder` and not on any ladder: it has no
+ * rungs, no progression and **no number to hit**.
+ *
+ * Three constraints, each with a reason, and none of them is a preference:
+ *
+ *   - **60-second intervals, not 20.** Short-interval HIIT beats nothing but
+ *     loses to longer intervals: 4×4min gave 6.5% VO2max against 3.3% for 8×20s.
+ *     Do not "optimise" this into a Tabata.
+ *   - **Lower-body movements only.** The push day is upper-body and the daily
+ *     core/posture block runs every session, so burpees and mountain climbers
+ *     would collide with both.
+ *   - **Prescribed by breathlessness, never by a count.** A rep target is
+ *     something the user can pace themselves down to, and a high-rep set on an
+ *     easy movement ends when the muscle quits rather than when the
+ *     cardiovascular system is taxed — that is a pressor response, not aerobic
+ *     training. Tabata's own author published a note that copying 20/10 intervals
+ *     while dropping the intensity requirement yields no VO2max improvement.
+ */
+export const CARDIO: CardioProtocol = {
+  label: 'Cardio',
+  rounds: 5,
+  hardSeconds: 60,
+  movements: ['High knees, running in place', 'Fast bodyweight squats'],
+  prescribedBy: 'breathlessness',
+  cues: [
+    'Five rounds. Tap start, then go as hard as you can for the full sixty seconds — high knees or fast bodyweight squats, whichever you can drive hardest today.',
+    'Judge every round by your breathing, not by a count. By the end of the minute you should be breathing far too hard to hold a conversation. There is no number to hit here and there never will be, because a number is something you can quietly pace yourself down to.',
+    'Rest as long as you like between rounds — the easy interval is simply the time before you tap Next. A round is only worth anything if you can go genuinely hard in the one after it.',
+    'Stop a round early if you feel chest pain, dizziness, or pain in a joint rather than hard work in your legs. Cut the round rather than easing off the intensity of the ones you do.',
+  ],
+  notice:
+    'Five hard minutes twice a week reaches roughly 20–45% of the guideline weekly ' +
+    'aerobic minimum. The fitness gains are largely achievable at this dose; the ' +
+    'volume-dependent benefits — blood pressure, blood lipids, the dose-response ' +
+    'mortality curve — are not. This app would rather say so than imply otherwise.',
+}
 
 // ─── Lookups ────────────────────────────────────────────────────────────────
 
@@ -672,9 +795,10 @@ export const NEVER_A_STARTING_RUNG: readonly string[] = [
  * The rung at `index` (0-based) of `pattern`.
  *
  * Throws on an out-of-range index rather than returning `undefined`. A bad index
- * means either an engine bug or a hand-edited `rungIndex` past the top of the
- * ladder, and both must surface immediately: returning `undefined` would let a
- * session render blank cues and get logged against nothing.
+ * means either a scheduling bug or a hand-edited state file, and both must surface
+ * immediately: returning `undefined` would let a session render blank cues and get
+ * logged against nothing. `rungIndexAt` clamps, so a valid document never gets
+ * here with a bad index.
  */
 export function getRung(pattern: Pattern, index: number): Rung {
   const ladder = LADDERS[pattern]
@@ -683,21 +807,22 @@ export function getRung(pattern: Pattern, index: number): Rung {
     throw new Error(
       `getRung: ${pattern} has no rung at index ${index} ` +
         `(valid range 0..${ladder.rungs.length - 1}). ` +
-        'Check rungIndex in the state document.',
+        'Check sessionsDone in the state document.',
     )
   }
   return rung
 }
 
-/** Highest valid `rungIndex` for a pattern. */
+/** Highest valid rung index for a pattern. */
 export function topRungIndex(pattern: Pattern): number {
   return LADDERS[pattern].rungs.length - 1
 }
 
 /**
  * Look up a rung by the id stored in history. Returns `undefined` — unlike
- * `getRung` — because a persisted id from a future or hand-edited state file is a
- * display problem ("Last time: —"), not a reason to break the screen.
+ * `getRung` — because a persisted id from an older content version is an expected
+ * input: the floor-only fix retired six ids that are still sitting in real
+ * history. That is a display problem ("—"), not a reason to break the screen.
  */
 export function findRungById(rungId: string): Rung | undefined {
   for (const ladder of Object.values(LADDERS)) {
