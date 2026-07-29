@@ -1,0 +1,11 @@
+# Directory roots the corpus documents but the briefs have not created yet.
+# lint.sh suppresses stale-path warnings for these, and warns once a root
+# actually exists so the entry gets removed. Keeping this list short is the
+# point: an entry that lingers after its brief is done is a real finding.
+figures    # brief 10 — shorthand for src/ui/figures/
+db         # brief 11 — gitignored SQLite database
+
+# Referenced only as a rejected alternative by the (immutable) done brief 01:
+# the layer guard shipped as an ESLint rule, so scripts/check-layers.mjs was
+# never created and never will be. Listed to keep the check's signal clean.
+scripts

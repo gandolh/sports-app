@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-ssr/
+coverage/
+.codegraph/
+.env
+.env.*
+*.local
+.DS_Store
+*.tsbuildinfo
+dev-dist/
+
+# Local SQLite database — never committed.
+db/
