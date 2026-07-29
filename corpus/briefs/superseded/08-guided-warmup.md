@@ -57,3 +57,11 @@ the state document's `history` and must not touch `cyclePosition`.
   session otherwise intact.
 - A session run with the warmup and one run without produce **identical** state
   mutations.
+
+---
+
+## SUPERSEDED 2026-07-29 — the v2 grill
+
+Dropped. The v2 app opens straight onto the first exercise — the user listed the app's
+contents in the second grill without a warmup, and confirmed the reading. No successor
+brief.

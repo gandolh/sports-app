@@ -9,10 +9,9 @@ Settled **product and programme** calls. Implementation choices live in
 [technical-decisions.md](technical-decisions.md). **Do not relitigate either** without
 an explicit revisit plus a [`../log.md`](../log.md) entry.
 
-> **v2, decided 2026-07-29 in a second grill.** The app no longer adapts. Sections
-> marked SUPERSEDED are kept only where the old reasoning explains why the new choice
-> is shaped the way it is. [`../../SPEC.md`](../../SPEC.md) describes v1 and is being
-> revised; where the two disagree, this page wins until SPEC.md catches up.
+> **v2, decided 2026-07-29 in a second grill.** The app no longer adapts. SUPERSEDED
+> sections are kept only where the old reasoning explains the new choice.
+> [`../../SPEC.md`](../../SPEC.md) describes v1; this page wins where they disagree.
 
 ## The governing decision — the app measures nothing
 
@@ -163,17 +162,20 @@ milestones key off session number; total-work-ever needs no clock. History does 
 
 *Decided by the user 2026-07-29 against the recommendation. Recorded, not relitigated.*
 
-With no adaptation, the schedule reaches the hollow hold at ~3 months, the
-couch-anchored nordic negative at ~4, the tuck L-sit at ~5.5, and the assisted
-single-leg squat and archer push-up at ~7–8 — regardless of whether the user can
-perform them, and with no mechanism to step back.
+With no adaptation, the schedule reaches the hollow hold at ~3 months, the hollow rock
+at ~4, the tuck L-sit at ~5.5, the assisted single-leg squat at ~7, and the archer
+push-up and pistol progression at ~8 — regardless of whether the user can perform them,
+and with no mechanism to step back.
 
-Four mitigations were offered (cut the rungs, a one-time unlock, a manual rung
-control, or nothing) and the user chose to rely on the rungs' own cue text, which
-already opens with an explicit safety check and a stop signal. The one consequence
-that follows: **on flagged rungs the safety cue renders first and visually separated**,
-not as item one of four in a paragraph block. See
-[open-questions.md](open-questions.md).
+**The nordic negative is no longer on that list** — it was the sharpest item when the
+decision was taken, and brief 15 removes it because the couch anchor violates the
+floor-only constraint. The hinge ladder now has no injurious rung at all.
+
+Four mitigations were offered (cut the rungs, a one-time unlock, a manual rung control,
+or nothing) and the user chose to rely on the rungs' own cue text, which already opens
+with an explicit safety check and a stop signal. The one consequence that follows:
+**on flagged rungs the safety cue renders first and visually separated**, not as item
+one of four. See [open-questions.md](open-questions.md).
 
 ## Standing decisions from v1, unchanged
 

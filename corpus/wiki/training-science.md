@@ -1,5 +1,5 @@
 ---
-summary: Evidence base for the programme — what the five slots actually train, which muscles get nothing, and why cardio cannot fit in the session.
+summary: Evidence base for the programme — what the five slots actually train, which muscles get nothing, the isometric and concurrent-training ceilings, and what the fixed schedule costs.
 updated: 2026-07-29
 ---
 

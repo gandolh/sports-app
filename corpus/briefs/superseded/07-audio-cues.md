@@ -67,3 +67,12 @@ restructure `useSession.ts` — subscribe to the events brief 06 already emits.
   actual device** — this is the fallback path that matters.
 - Manual: with Voice off and Sound on, timing cues still fire.
 - No changes to `src/domain/`.
+
+---
+
+## SUPERSEDED 2026-07-29 — the v2 grill
+
+Audio existed to announce rest-timer transitions, and v2 has no rest timer. Out of
+scope entirely — see wiki/technical-decisions.md, "SUPERSEDED in v2 — charts, and audio
+cues". `speechSynthesis` plus a WebAudio beep remains the right implementation if a
+hold-countdown chime is ever wanted; no brief owns it.
