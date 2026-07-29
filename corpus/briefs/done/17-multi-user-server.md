@@ -108,3 +108,20 @@ that string.
 - A test asserts `/api/health` reads no database and leaks nothing.
 - **Report the wire shape you chose** (query param vs body vs header for the username)
   so brief 16 can match it.
+
+---
+
+## Outcome — 2026-07-29
+
+**Done**, 73 tests, still zero dependencies. The password is accepted and discarded, held by
+five tests including one that reads `app.db`, its WAL and its SHM as raw bytes after a
+checkpoint — each search carrying a positive control so it cannot pass vacuously. The
+implementer mutation-tested the load-bearing assertions rather than trusting a green run.
+
+`?user=` is required on `PUT` as well as `GET`, which the brief had not asked for: a mismatch
+check needs an independently stated target to compare against. Usernames are rejected rather
+than case-folded, because folding would make the stream key disagree with the document's own
+`username` — which is exactly what `PUT` refuses.
+
+The implementer noted its instinct was to add a per-user secret, and flagged it instead of
+acting on it. That is the correct handling of a locked decision.

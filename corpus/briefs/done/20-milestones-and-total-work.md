@@ -110,3 +110,24 @@ existing one.
   output is a bare number of seconds so the caller owns formatting).
 - **Report your named-milestone list and the cardio decision** — both are copy choices
   as much as code ones.
+
+---
+
+## Outcome — 2026-07-29
+
+**Done**, 14 tests. Both outputs are derived without a clock, which is why the no-dates
+invariant survived the whole redesign.
+
+The trap the brief warned about is real and was handled: a rung index is a function of a
+*current* session count, so historical positions must be replayed rather than computed from
+the document's present `sessionsDone`. There is a test for exactly that.
+
+Two judgement calls. `squat-02-bodyweight` is squat's own starting rung, so nobody ever
+climbs into it and the milestone could never fire on a rung increase — it fires on the
+pattern's first trained session instead. And cardio counts toward nothing, because a cardio
+slot records no `ExerciseRecord`, so reconstructing a rounds count from the current constant
+would be the same use-a-present-number-for-a-past-one bug the module exists to avoid.
+
+Corrected the brief: the side-plank label says "45 seconds split across both sides", not "per
+side", because the rung's own cue splits one clock between them. That mismatch had also been
+sitting in `programme.md`.

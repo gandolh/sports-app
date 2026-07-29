@@ -5,15 +5,16 @@ updated: 2026-07-29
 
 # Status — 2026-07-29
 
-**Where things stand:** a second design grill replaced the adaptive engine with a fixed
-schedule, and the corpus has been rewritten to match. Briefs 15–20 are filed and the
-build has not started. Six briefs were superseded.
+**Where things stand: the v2 rebuild is complete and green.** All six briefs (15–20)
+shipped in three waves. **611 tests**, typecheck and lint clean, `npm audit` clean, and
+`npm run build` emits a working service worker. Offline was proven rather than assumed —
+a full Push session played to the finish screen with the network down.
 
-The v1 tree is committed as a baseline (`3dd4c49`, first commit in the repo) and the
-rewrite runs on branch `v2-fixed-schedule`. **The v1 code as committed was verified
-green**: typecheck clean, lint clean, 407 tests, `npm run build` emitting a working
-service worker, `db/` gitignored. That is the state brief 15 starts from and the state
-any regression should be compared against.
+Nothing is deployed. The remaining known work is listed under *What is left* below.
+
+The v1 tree is committed as a baseline (`3dd4c49`, the first commit in the repo) and the
+rebuild runs on branch `v2-fixed-schedule`, one commit per brief. v1 as committed was
+green at 407 tests — that is the state to compare a regression against.
 
 ## What changed, in one paragraph
 
@@ -44,30 +45,45 @@ date anywhere in the UI. Full detail in
 | 12 | [Domain v2: no effort, 7-day cycle, mid-ladder starts](../briefs/done/12-domain-v2-no-effort.md) | **done** (superseded in substance by 15) | 04 |
 | 13 | [Cardio + floor-only content + extras](../briefs/superseded/13-cardio-and-floor-only-content.md) | superseded — content moved into 15 | — |
 | 14 | [UI shell v1](../briefs/superseded/14-ui-shell-and-screens.md) | superseded by 19 | — |
-| 15 | [Domain v3: the fixed schedule](../briefs/todo/15-domain-v3-fixed-schedule.md) | **todo** | — |
-| 16 | [Persistence v3](../briefs/todo/16-persistence-v3.md) | todo | 15 |
-| 17 | [Multi-user server + login](../briefs/todo/17-multi-user-server.md) | todo | — |
-| 18 | [Animated figures](../briefs/todo/18-animated-figures.md) | todo | — |
-| 19 | [UI shell: four screens](../briefs/todo/19-ui-shell-and-four-screens.md) | todo | 15, 16, 18, 20 |
-| 20 | [Milestones + total work](../briefs/todo/20-milestones-and-total-work.md) | todo | 15 |
+| 15 | [Domain v3: the fixed schedule](../briefs/done/15-domain-v3-fixed-schedule.md) | **done** | — |
+| 16 | [Persistence v3](../briefs/done/16-persistence-v3.md) | **done** | 15 |
+| 17 | [Multi-user server + login](../briefs/done/17-multi-user-server.md) | **done** | — |
+| 18 | [Animated figures](../briefs/done/18-animated-figures.md) | **done** | — |
+| 19 | [UI shell: four screens](../briefs/done/19-ui-shell-and-four-screens.md) | **done** | 15, 16, 18, 20 |
+| 20 | [Milestones + total work](../briefs/done/20-milestones-and-total-work.md) | **done** | 15 |
 
-## Dependency waves
+## How it ran
 
 ```
-wave 1   15                 the v3 contract — blocks 16, 19, 20
-wave 2   16 · 17 · 18 · 20  persistence, server, figures, milestones   (17 and 18 could
-                            start in wave 1: 17 touches only server/, 18 only figures)
-wave 3   19                 the four screens
+wave 1   15 ‖ 17            ✔  the v3 contract · the multi-user service
+wave 2   16 ‖ 18 ‖ 20       ✔  persistence · figures · milestones
+wave 3   19                 ✔  the four screens
 ```
 
-**Brief 15 is the keystone and worth the most care.** Four briefs code against the
-types it lands, and it is the one that has to get the interpolation right — if that is
-wrong, every prescription in the app is wrong and no test downstream will notice.
+`17` moved up to wave 1 because it owns only `server/**`. Brief 15 deliberately left
+`src/persistence/**` and `src/ui/**` broken by deleting `engine.ts` and `progress.ts`;
+16 and 19 repaired their own side, and the only file failing typecheck between waves was
+`SettingsScreen.tsx`, which 19 deleted.
 
-Brief 15 will deliberately leave `src/persistence/**` and `src/ui/**` broken by
-deleting `engine.ts` and `progress.ts`. That is expected, and briefs 16 and 19 repair
-their own side. **The tree does not typecheck between wave 1 and wave 3** — do not treat
-that as a regression.
+**The most valuable output of the run was not code.** Each brief was asked to report an
+honest verdict on something it could not be tested on, and four of the six found a real
+problem: brief 15 caught that declared caps were asymptotes and that the step *between*
+rungs exceeds what the variant can absorb; brief 18 found `design-system.md`
+contradicting the code it governs; brief 19 found five layout defects that only appear
+when the app is operated rather than rendered; brief 20 found `programme.md` claiming a
+per-side side-plank dose the code splits between sides.
+
+## What is left
+
+- **Deploy integration** in `/home/gandolh/projects/vps-deploy/projects/sports-app/` —
+  not started. The DB path must sit outside the rsync tree.
+- **Two design decisions brief 19 left open rather than patching**: `POSTURAL_NOTICE`
+  outweighs the plan it annotates on `/` and is far below the fold on the pull player
+  page; and long rung names wrap to three lines beside the figure, which is the norm
+  rather than an exception since a rung is one movement plus a modifier.
+- **Open questions 1, 2, 3, 5, 6 and 7** — see
+  [open-questions.md](open-questions.md). Question 1 (is six weeks per rung right?) is
+  the only number in the programme with no evidence behind it.
 
 ## Deliberately out of v2
 
