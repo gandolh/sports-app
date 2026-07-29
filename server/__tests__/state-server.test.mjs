@@ -1,10 +1,8 @@
 /**
- * Service tests, against a real SQLite file.
+ * Service tests, against a real SQLite file over a real HTTP socket.
  *
- * Every test here opens a genuine `DatabaseSync` on a temporary path and drives
- * the service over a real HTTP socket. There is no mock database and no mock
- * transport, because the three properties worth testing are all properties of
- * the real thing:
+ * There is no mock database and no mock transport, because the properties worth
+ * testing are all properties of the real thing:
  *
  *   1. **A `PUT` followed by a `GET` returns the same bytes.** Not the same
  *      parsed object — the same bytes. `serialise` in the codec is byte-stable
@@ -15,23 +13,50 @@
  *      assertion that catches it.
  *   2. **A rejected write changes nothing.** The newest snapshot after a 400 is
  *      compared byte-for-byte against the newest snapshot from before it.
- *   3. **Retention prunes to the cap and always keeps the newest.** A mock
- *      cannot tell you whether the `DELETE ... WHERE id NOT IN (...)` actually
- *      keeps the right rows.
+ *   3. **One user cannot read, overwrite, or evict another.** Isolation is a
+ *      claim about what a `WHERE username = ?` actually did.
+ *   4. **The password never lands anywhere.** See the "the password is never
+ *      stored" block: it searches the database files on disk and the captured log
+ *      for a sentinel string.
+ *
+ * ── Why nothing here imports from `src/` ──────────────────────────────────────
+ *
+ * The documents below are hand-written v3 bodies rather than output from
+ * `src/persistence/codec.ts`, and that is deliberate. This service is
+ * version-agnostic on purpose: it echoes whatever `schemaVersion` it is given
+ * into a column and never interprets it. A test that built its fixtures from
+ * `CURRENT_SCHEMA_VERSION` would fail on the client's next schema bump while
+ * proving nothing about the server, and it would couple a zero-dependency `.mjs`
+ * service to the bundle's TypeScript. Hand-written bodies also let a test send a
+ * document the codec would refuse to produce, which is exactly the input a
+ * shallow validator has to survive.
+ *
+ * The fixtures do imitate the codec's layout — blank lines between sections,
+ * one-line nested objects, a trailing newline — because that layout is what the
+ * byte-verbatim assertions are protecting.
  */
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { CURRENT_SCHEMA_VERSION } from '../../src/domain/types.ts'
-import { LADDERS } from '../../src/domain/ladders.ts'
-import { emptyDoc, serialise } from '../../src/persistence/codec.ts'
-import { DEFAULT_DB_DIR, DEFAULT_DB_FILE, PROJECT_ROOT, RETENTION, openSnapshotStore } from '../db.mjs'
 import {
+  DEFAULT_DB_DIR,
+  DEFAULT_DB_FILE,
+  PROJECT_ROOT,
+  RETENTION,
+  USERNAME_MAX_LENGTH,
+  openSnapshotStore,
+} from '../db.mjs'
+import {
+  LOGIN_PATH,
   SECRET_HEADER,
+  STATE_PATH,
+  USER_PARAM,
+  checkCredentials,
   checkDocument,
   createStateServer,
   readConfig,
+  readUsername,
   secretMatches,
 } from '../state-server.mjs'
 
@@ -53,10 +78,16 @@ async function startService(options = {}) {
   // Deliberately nested inside a `db/` directory the store has to create
   // itself — the acceptance criterion is that the database lands under `db/`.
   const file = join(root, 'db', 'app.db')
-  const store = openSnapshotStore({ file, ...(options.retention ? { retention: options.retention } : {}) })
+  const store =
+    options.store ??
+    openSnapshotStore({ file, ...(options.retention ? { retention: options.retention } : {}) })
+
+  /** Every log line the service emitted, for the "nothing leaked" assertions. */
+  const logs = []
   const server = createStateServer({
     store,
     secret: SECRET,
+    log: (message) => logs.push(message),
     ...(options.maxBodyBytes ? { maxBodyBytes: options.maxBodyBytes } : {}),
   })
 
@@ -70,25 +101,76 @@ async function startService(options = {}) {
     rmSync(root, { recursive: true, force: true })
   })
 
-  return { root, file, store, base }
+  return { root, file, dbDir: dirname(file), store, base, logs }
 }
 
 function authorised(extra = {}) {
   return { [SECRET_HEADER]: SECRET, ...extra }
 }
 
-async function put(base, text, headers = {}) {
-  return fetch(`${base}/api/state`, {
+function stateUrl(base, username) {
+  return username === undefined
+    ? `${base}${STATE_PATH}`
+    : `${base}${STATE_PATH}?${USER_PARAM}=${encodeURIComponent(username)}`
+}
+
+async function put(base, username, text, headers = {}) {
+  return fetch(stateUrl(base, username), {
     method: 'PUT',
     headers: authorised({ 'Content-Type': 'application/json', ...headers }),
     body: text,
   })
 }
 
-/** A real document, produced by the same serialiser the app uses. */
-function docText(sessionsCompleted) {
-  const doc = emptyDoc(LADDERS)
-  return serialise({ ...doc, sessionsCompleted, cyclePosition: sessionsCompleted % 3 })
+async function get(base, username) {
+  return fetch(stateUrl(base, username), { headers: authorised() })
+}
+
+async function login(base, body, headers = {}) {
+  return fetch(`${base}${LOGIN_PATH}`, {
+    method: 'POST',
+    headers: authorised({ 'Content-Type': 'application/json', ...headers }),
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  })
+}
+
+/**
+ * A v3 state document, laid out the way the codec lays one out.
+ *
+ * `sessions` drives `history.length`, which is what the service reads — the
+ * entries themselves are deliberately not realistic session objects, because the
+ * server never looks inside them and a test that pretended otherwise would be
+ * asserting the codec's business.
+ */
+function docText(username, sessions, overrides = {}) {
+  const done = { push: 0, squat: 0, hinge: 0, core: 0, pull: 0 }
+  const history = Array.from(
+    { length: sessions },
+    (_, i) => `    { "completedAt": "2026-07-${String((i % 28) + 1).padStart(2, '0')}T06:00:00.000Z" }`,
+  )
+  const version = overrides.schemaVersion ?? 3
+  const name = 'username' in overrides ? overrides.username : username
+
+  const lines = [
+    '{',
+    `  "schemaVersion": ${version},`,
+    ...(name === undefined ? [] : [`  "username": ${JSON.stringify(name)},`]),
+    `  "cyclePosition": ${sessions % 3},`,
+    '',
+    `  "sessionsDone": { ${Object.entries(done)
+      .map(([k, v]) => `${JSON.stringify(k)}: ${v}`)
+      .join(', ')} },`,
+    '',
+    '  "settings": {',
+    '    "persistGranted": null,',
+    '    "sync": null',
+    '  },',
+    '',
+    history.length === 0 ? '  "history": []' : `  "history": [\n${history.join(',\n')}\n  ]`,
+    '}',
+    '',
+  ]
+  return lines.join('\n')
 }
 
 // ─── Where the database lives ───────────────────────────────────────────────
@@ -113,18 +195,17 @@ describe('database location', () => {
   })
 })
 
-// ─── Auth ───────────────────────────────────────────────────────────────────
+// ─── The deployment secret ──────────────────────────────────────────────────
 
-describe('auth', () => {
+describe('the shared secret protects the deployment, not the accounts', () => {
   it('rejects a missing secret with 401', async () => {
     const { base } = await startService()
-    const response = await fetch(`${base}/api/state`)
-    expect(response.status).toBe(401)
+    expect((await fetch(stateUrl(base, 'alice'))).status).toBe(401)
   })
 
   it('rejects a wrong secret with 401', async () => {
     const { base } = await startService()
-    const response = await fetch(`${base}/api/state`, {
+    const response = await fetch(stateUrl(base, 'alice'), {
       headers: { [SECRET_HEADER]: 'not-the-secret' },
     })
     expect(response.status).toBe(401)
@@ -134,7 +215,7 @@ describe('auth', () => {
     const { base } = await startService()
     const sameLength = 'x'.repeat(SECRET.length)
     expect(sameLength.length).toBe(SECRET.length)
-    const response = await fetch(`${base}/api/state`, {
+    const response = await fetch(stateUrl(base, 'alice'), {
       headers: { [SECRET_HEADER]: sameLength },
     })
     expect(response.status).toBe(401)
@@ -142,20 +223,27 @@ describe('auth', () => {
 
   it('rejects an unauthorised PUT without writing anything', async () => {
     const { base, store } = await startService()
-    const response = await fetch(`${base}/api/state`, {
+    const response = await fetch(stateUrl(base, 'alice'), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: docText(1),
+      body: docText('alice', 1),
     })
     expect(response.status).toBe(401)
     expect(store.count()).toBe(0)
   })
 
-  it('answers /api/health with no secret at all', async () => {
-    const { base } = await startService()
-    const response = await fetch(`${base}/api/health`)
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ status: 'ok' })
+  it('guards /api/login too, and answers 401 before it validates anything', async () => {
+    const { base, logs } = await startService()
+    const response = await fetch(`${base}${LOGIN_PATH}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'NOT A VALID NAME', password: 'x' }),
+    })
+    // 401, not 400: an unauthorised caller learns nothing about the username
+    // rules, and nothing about whether this route exists.
+    expect(response.status).toBe(401)
+    expect((await response.json()).error).toBe('unauthorized')
+    expect(logs.join('\n')).not.toMatch(/username: expected/)
   })
 
   it('compares secrets in a way that accepts only the exact string', () => {
@@ -174,27 +262,369 @@ describe('auth', () => {
   })
 })
 
-// ─── GET before any PUT ─────────────────────────────────────────────────────
+// ─── /api/health ────────────────────────────────────────────────────────────
 
-describe('GET /api/state', () => {
-  it('returns 404 before anything has been stored', async () => {
+describe('GET /api/health', () => {
+  it('answers with no secret at all', async () => {
     const { base } = await startService()
-    const response = await fetch(`${base}/api/state`, { headers: authorised() })
-    expect(response.status).toBe(404)
-    expect((await response.json()).error).toMatch(/no state/i)
+    const response = await fetch(`${base}/api/health`)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ status: 'ok' })
   })
 
-  it('returns 404 for any other route', async () => {
+  it('reads no database, and cannot be turned into an existence oracle', async () => {
+    // A store that throws on every method. If liveness touched a row — even to
+    // count them — this would 500 instead of 200.
+    const exploding = {
+      file: ':none:',
+      retention: RETENTION,
+      migrated: false,
+      latest: () => {
+        throw new Error('health must not read the database')
+      },
+      insert: () => {
+        throw new Error('health must not write the database')
+      },
+      count: () => {
+        throw new Error('health must not count rows')
+      },
+      ids: () => {
+        throw new Error('health must not list rows')
+      },
+      usernames: () => {
+        throw new Error('health must not list users')
+      },
+      close: () => {},
+    }
+    const { base } = await startService({ store: exploding })
+
+    const response = await fetch(`${base}/api/health`)
+    expect(response.status).toBe(200)
+
+    // The body is exactly one fixed field: no version, no uptime, no row count,
+    // no user list, no database path. Nothing that says who uses this deployment
+    // or how much they train.
+    const body = await response.json()
+    expect(Object.keys(body)).toEqual(['status'])
+    expect(body.status).toBe('ok')
+  })
+
+  it('rejects a write to it with 405', async () => {
     const { base } = await startService()
-    for (const path of ['/', '/api', '/api/states', '/db/app.db', '/../.gitignore']) {
-      const response = await fetch(`${base}${path}`, { headers: authorised() })
-      expect(response.status).toBe(404)
+    const response = await fetch(`${base}/api/health`, { method: 'POST' })
+    expect(response.status).toBe(405)
+    expect(response.headers.get('allow')).toBe('GET, HEAD')
+  })
+})
+
+// ─── POST /api/login ────────────────────────────────────────────────────────
+
+describe('POST /api/login checks nothing, on purpose', () => {
+  it('accepts a username and any password, and answers with the username', async () => {
+    const { base } = await startService()
+    const response = await login(base, { username: 'alice', password: 'anything at all' })
+    expect(response.status).toBe(200)
+    // Exactly the username back. No token, no session id, no cookie, no expiry —
+    // there is no session to represent, and inventing one would imply a boundary
+    // that does not exist.
+    expect(await response.json()).toEqual({ username: 'alice' })
+    expect(response.headers.get('set-cookie')).toBe(null)
+  })
+
+  it('accepts two different passwords for the same username, identically', async () => {
+    const { base } = await startService()
+    const first = await login(base, { username: 'alice', password: 'hunter2' })
+    const second = await login(base, { username: 'alice', password: 'completely-different' })
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+    // The second login is not a failed one. Nothing was remembered from the
+    // first, so there is nothing for the second to disagree with.
+    expect(await second.json()).toEqual({ username: 'alice' })
+  })
+
+  it('accepts a body with no password field at all', async () => {
+    const { base } = await startService()
+    // Not an oversight in the test: there is nothing to check, so a missing
+    // password cannot be missing *something*.
+    const response = await login(base, { username: 'alice' })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ username: 'alice' })
+  })
+
+  it('writes nothing — an account exists once a document is stored under it', async () => {
+    const { base, store } = await startService()
+    await login(base, { username: 'alice', password: 'x' })
+    expect(store.count()).toBe(0)
+    expect(store.usernames()).toEqual([])
+    // And logging in does not conjure a document to read.
+    expect((await get(base, 'alice')).status).toBe(404)
+  })
+
+  it('does not tell you whether the account has any history', async () => {
+    const { base } = await startService()
+    await put(base, 'alice', docText('alice', 3))
+
+    const known = await login(base, { username: 'alice', password: 'x' })
+    const unknown = await login(base, { username: 'nobody', password: 'x' })
+
+    expect(known.status).toBe(unknown.status)
+    expect(await known.json()).toEqual({ username: 'alice' })
+    expect(await unknown.json()).toEqual({ username: 'nobody' })
+  })
+
+  it('rejects an invalid username with 400 and states the rule without echoing the value', async () => {
+    const { base } = await startService()
+    for (const username of ['', 'Alice', 'x'.repeat(USERNAME_MAX_LENGTH + 1), '../etc', 'a b']) {
+      const response = await login(base, { username, password: 'x' })
+      expect(response.status, username).toBe(400)
+      const { error } = await response.json()
+      expect(error).toMatch(/username: expected/)
+      if (username !== '') expect(error).not.toContain(username)
     }
   })
 
-  it('rejects an unsupported method with 405 and an Allow header', async () => {
+  it('rejects the wrong method and the wrong content type', async () => {
     const { base } = await startService()
-    const response = await fetch(`${base}/api/state`, {
+
+    const wrongMethod = await fetch(`${base}${LOGIN_PATH}`, { headers: authorised() })
+    expect(wrongMethod.status).toBe(405)
+    expect(wrongMethod.headers.get('allow')).toBe('POST')
+
+    const wrongType = await login(base, { username: 'alice' }, { 'Content-Type': 'text/plain' })
+    expect(wrongType.status).toBe(415)
+  })
+
+  it('reports the credential check directly', () => {
+    expect(checkCredentials('{"username":"alice","password":"x"}')).toEqual({
+      ok: true,
+      username: 'alice',
+    })
+    expect(checkCredentials('{"username":"alice"}')).toEqual({ ok: true, username: 'alice' })
+    expect(checkCredentials('[]')).toMatchObject({ ok: false })
+    expect(checkCredentials('nope')).toMatchObject({ ok: false })
+    expect(checkCredentials('{"username":"Alice"}')).toMatchObject({ ok: false })
+  })
+})
+
+// ─── The password never lands anywhere ──────────────────────────────────────
+
+describe('the password is never stored, logged, echoed, or compared', () => {
+  /**
+   * A string that could not plausibly occur in the database or the log for any
+   * other reason. If it turns up, it got there from the request body.
+   */
+  const SENTINEL = 'PASSWORD-SENTINEL-8f3a1c-do-not-store-me'
+
+  /** Every byte of every file the store owns: the database, its WAL, its shm. */
+  function databaseBytes(dbDir) {
+    return readdirSync(dbDir)
+      .map((name) => readFileSync(join(dbDir, name)))
+      .map((buffer) => buffer.toString('binary'))
+      .join('\n')
+  }
+
+  it('does not appear in the database files, the log, or the response', async () => {
+    const { base, dbDir, logs, store } = await startService()
+
+    const response = await login(base, { username: 'alice', password: SENTINEL })
+    expect(response.status).toBe(200)
+    const bodyText = await response.text()
+
+    // Force real writes after the login, so the search is over a database that
+    // has actually been flushed rather than one that never wrote a page.
+    await put(base, 'alice', docText('alice', 1))
+    await put(base, 'alice', docText('alice', 2))
+    expect(store.count('alice')).toBe(2)
+
+    // 1. Not in the response the client got back.
+    expect(bodyText).not.toContain(SENTINEL)
+    expect(JSON.parse(bodyText)).toEqual({ username: 'alice' })
+
+    // 2. Not in anything the service logged.
+    expect(logs.join('\n')).not.toContain(SENTINEL)
+    // The login *was* logged, so the assertion above is not vacuous — a service
+    // that logged nothing at all would pass it for the wrong reason.
+    expect(logs.join('\n')).toMatch(/login alice/)
+
+    // 3. Not in the database, its write-ahead log, or its shared-memory file.
+    //    Searched as raw bytes rather than through SQL, because a password could
+    //    have landed in a page SQL no longer references.
+    const onDisk = databaseBytes(dbDir)
+    expect(onDisk).not.toContain(SENTINEL)
+    // Again, not vacuous: the document the same test stored *is* findable there.
+    expect(onDisk).toContain('"username": "alice"')
+  })
+
+  it('survives the database being closed and reopened without the password appearing', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'sports-app-pw-'))
+    const dbDir = join(root, 'db')
+    const file = join(dbDir, 'app.db')
+    const store = openSnapshotStore({ file })
+    const logs = []
+    const server = createStateServer({ store, secret: SECRET, log: (m) => logs.push(m) })
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const base = `http://127.0.0.1:${server.address().port}`
+
+    try {
+      await login(base, { username: 'alice', password: SENTINEL })
+      await put(base, 'alice', docText('alice', 1))
+    } finally {
+      await new Promise((resolve) => server.close(resolve))
+      // Closing checkpoints the WAL into the main database file, which is the
+      // state a backup or a `sqlite3` session would see.
+      store.close()
+    }
+
+    expect(databaseBytes(dbDir)).not.toContain(SENTINEL)
+    expect(logs.join('\n')).not.toContain(SENTINEL)
+    rmSync(root, { recursive: true, force: true })
+  })
+
+  it('does not leak the body through a JSON parse error', async () => {
+    const { base, logs } = await startService()
+
+    // A truncated body — the shape a broken client actually sends. V8's
+    // `JSON.parse` message quotes a slice of the input, so passing it through
+    // would put part of a real password into the response and the log.
+    const truncated = `{"username":"alice","password":"${SENTINEL}"`
+    const response = await login(base, truncated)
+
+    expect(response.status).toBe(400)
+    const text = await response.text()
+    expect(text).not.toContain(SENTINEL)
+    expect(logs.join('\n')).not.toContain(SENTINEL)
+
+    // Proof the sentinel really was in the request: the same bytes are what a
+    // naive `JSON.parse` error message would have quoted.
+    let parseMessage = ''
+    try {
+      JSON.parse(truncated)
+    } catch (cause) {
+      parseMessage = String(cause)
+    }
+    expect(parseMessage).not.toBe('')
+  })
+
+  it('does not echo an oversized login body back in the 413', async () => {
+    const { base, logs } = await startService({ maxBodyBytes: 256 })
+    const padded = JSON.stringify({ username: 'alice', password: `${SENTINEL}${'x'.repeat(4000)}` })
+    const response = await login(base, padded)
+    expect(response.status).toBe(413)
+    expect(await response.text()).not.toContain(SENTINEL)
+    expect(logs.join('\n')).not.toContain(SENTINEL)
+  })
+
+  it('has no line of code that reads .password', () => {
+    // The guarantee this brief is built on, asserted against the source rather
+    // than against behaviour: the handler destructures `username` and nothing
+    // else. Behavioural tests can only show that the password did not reach a
+    // particular place; this shows it is never read at all.
+    const source = readFileSync(join(PROJECT_ROOT, 'server', 'state-server.mjs'), 'utf8')
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    expect(code).not.toMatch(/\.password\b/)
+    expect(code).not.toMatch(/\[['"]password['"]\]/)
+    expect(code).not.toMatch(/\bpassword\s*[,}]/)
+
+    const db = readFileSync(join(PROJECT_ROOT, 'server', 'db.mjs'), 'utf8')
+    expect(db.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/password/i)
+  })
+})
+
+// ─── Username validation on /api/state ──────────────────────────────────────
+
+describe('username validation', () => {
+  const REJECTED = [
+    '',
+    'Alice',
+    'ALICE',
+    'x'.repeat(USERNAME_MAX_LENGTH + 1),
+    '.hidden',
+    '-rf',
+    '_x',
+    'a b',
+    'a/b',
+    '../etc/passwd',
+    '%2e%2e%2fetc',
+    "alice'; DROP TABLE snapshots; --",
+    'alice"',
+    'café',
+    'alice\n',
+    'a'.repeat(4096),
+  ]
+
+  it('rejects a GET with no ?user= at all', async () => {
+    const { base } = await startService()
+    const response = await fetch(`${base}${STATE_PATH}`, { headers: authorised() })
+    expect(response.status).toBe(400)
+    expect((await response.json()).error).toMatch(/user: required/)
+  })
+
+  it('rejects every out-of-alphabet, empty and over-long username on GET', async () => {
+    const { base } = await startService()
+    for (const username of REJECTED) {
+      const response = await get(base, username)
+      expect(response.status, JSON.stringify(username)).toBe(400)
+      expect((await response.json()).error).toMatch(/user: expected/)
+    }
+  })
+
+  it('rejects them on PUT too, and stores nothing', async () => {
+    const { base, store } = await startService()
+    for (const username of REJECTED) {
+      const response = await put(base, username, docText('alice', 1))
+      expect(response.status, JSON.stringify(username)).toBe(400)
+    }
+    expect(store.count()).toBe(0)
+  })
+
+  it('accepts a username at exactly the cap', async () => {
+    const { base } = await startService()
+    const name = 'a'.repeat(USERNAME_MAX_LENGTH)
+    expect((await put(base, name, docText(name, 1))).status).toBe(200)
+    expect((await get(base, name)).status).toBe(200)
+  })
+
+  it('treats a percent-encoded username as the decoded string, not the raw one', async () => {
+    const { base } = await startService()
+    // `%61lice` decodes to `alice`, so it must reach the same stream. The
+    // allowlist runs after decoding for exactly this reason: a check on the
+    // encoded form can be walked past with `%2e%2e`.
+    await put(base, 'alice', docText('alice', 2))
+    const response = await fetch(`${base}${STATE_PATH}?${USER_PARAM}=%61lice`, {
+      headers: authorised(),
+    })
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe(docText('alice', 2))
+  })
+
+  it('reports the query parse directly', () => {
+    expect(readUsername('/api/state?user=alice')).toEqual({ ok: true, username: 'alice' })
+    expect(readUsername('/api/state?x=1&user=bob&y=2')).toEqual({ ok: true, username: 'bob' })
+    expect(readUsername('/api/state')).toMatchObject({ ok: false })
+    expect(readUsername('/api/state?user=')).toMatchObject({ ok: false })
+    expect(readUsername('/api/state?user=Bob')).toMatchObject({ ok: false })
+    expect(readUsername('/api/state?user=a%20b')).toMatchObject({ ok: false })
+  })
+
+  it('still refuses any path that is not one of the three routes', async () => {
+    const { base } = await startService()
+    for (const path of [
+      '/',
+      '/api',
+      '/api/states',
+      '/api/state/alice',
+      '/api/login/alice',
+      '/db/app.db',
+      '/../.gitignore',
+    ]) {
+      const response = await fetch(`${base}${path}?${USER_PARAM}=alice`, { headers: authorised() })
+      expect(response.status, path).toBe(404)
+    }
+  })
+
+  it('rejects an unsupported method on /api/state with 405 and an Allow header', async () => {
+    const { base } = await startService()
+    const response = await fetch(stateUrl(base, 'alice'), {
       method: 'DELETE',
       headers: authorised(),
     })
@@ -203,18 +633,90 @@ describe('GET /api/state', () => {
   })
 })
 
+// ─── Per-user isolation ─────────────────────────────────────────────────────
+
+describe('one stream per user', () => {
+  it('gives each user their own document back', async () => {
+    const { base } = await startService()
+    const alice = docText('alice', 4)
+    const bob = docText('bob', 9)
+
+    expect((await put(base, 'alice', alice)).status).toBe(200)
+    expect((await put(base, 'bob', bob)).status).toBe(200)
+
+    expect(await (await get(base, 'alice')).text()).toBe(alice)
+    expect(await (await get(base, 'bob')).text()).toBe(bob)
+  })
+
+  it('404s for a user with no history even when other users have some', async () => {
+    const { base } = await startService()
+    await put(base, 'alice', docText('alice', 4))
+
+    const response = await get(base, 'carol')
+    expect(response.status).toBe(404)
+    expect((await response.json()).error).toMatch(/no state/i)
+    // The 404 is the same one an empty database gives: it says nothing about
+    // whether anybody else is stored here.
+    const empty = await startService()
+    expect((await get(empty.base, 'carol')).status).toBe(404)
+  })
+
+  it('does not let a write to one user disturb another', async () => {
+    const { base, store } = await startService()
+    const bob = docText('bob', 9)
+    await put(base, 'bob', bob)
+    const bobBefore = store.latest('bob')
+
+    for (let i = 1; i <= 5; i += 1) await put(base, 'alice', docText('alice', i))
+
+    const bobAfter = store.latest('bob')
+    expect(bobAfter.id).toBe(bobBefore.id)
+    expect(bobAfter.docJson).toBe(bob)
+    expect(await (await get(base, 'bob')).text()).toBe(bob)
+  })
+
+  it('rejects a PUT whose document disagrees with its target, and stores nothing', async () => {
+    const { base, store } = await startService()
+    const bob = docText('bob', 9)
+    await put(base, 'bob', bob)
+
+    // A client bug: the right target, somebody else's document.
+    const response = await put(base, 'alice', bob)
+    expect(response.status).toBe(400)
+    const { error } = await response.json()
+    expect(error).toMatch(/username mismatch/)
+    expect(error).toMatch(/Nothing was stored/)
+
+    expect(store.count('alice')).toBe(0)
+    expect(store.count('bob')).toBe(1)
+    expect(store.latest('bob').docJson).toBe(bob)
+    expect((await get(base, 'alice')).status).toBe(404)
+  })
+
+  it('records the username on the row it wrote', async () => {
+    const { base, store } = await startService()
+    await put(base, 'alice', docText('alice', 1))
+    await put(base, 'bob', docText('bob', 1))
+    expect(store.usernames()).toEqual(['alice', 'bob'])
+    expect(store.latest('alice').username).toBe('alice')
+    expect(store.latest('bob').username).toBe('bob')
+  })
+})
+
 // ─── The round trip ─────────────────────────────────────────────────────────
 
 describe('PUT then GET round-trips byte-identically', () => {
-  it('returns exactly the bytes that were sent, for a real serialised document', async () => {
+  it('returns exactly the bytes that were sent', async () => {
     const { base } = await startService()
-    const sent = docText(9)
+    const sent = docText('alice', 9)
 
-    const written = await put(base, sent)
+    const written = await put(base, 'alice', sent)
     expect(written.status).toBe(200)
-    expect((await written.json()).sessionsCompleted).toBe(9)
+    const receipt = await written.json()
+    expect(receipt.historyLength).toBe(9)
+    expect(receipt.username).toBe('alice')
 
-    const read = await fetch(`${base}/api/state`, { headers: authorised() })
+    const read = await get(base, 'alice')
     expect(read.status).toBe(200)
     const returned = await read.text()
 
@@ -229,11 +731,11 @@ describe('PUT then GET round-trips byte-identically', () => {
     // reorder, a trailing newline, odd-but-legal whitespace, unicode, and a
     // number whose JSON text is not its shortest form.
     const sent =
-      '{\n  "sessionsCompleted": 3,\n\t"schemaVersion": 1,\n' +
+      '{\n  "username": "alice",\n\t"schemaVersion": 3,\n  "history": [],\n' +
       '  "_note": "hé — ✅ \\u00e9\\ud83d\\ude00",\n  "target": 5.50\n}\n'
 
-    expect(await (await put(base, sent)).status).toBe(200)
-    const returned = await (await fetch(`${base}/api/state`, { headers: authorised() })).text()
+    expect((await put(base, 'alice', sent)).status).toBe(200)
+    const returned = await (await get(base, 'alice')).text()
 
     expect(returned).toBe(sent)
     // Proof that the assertion above is not vacuous: a re-serialised body would
@@ -241,28 +743,44 @@ describe('PUT then GET round-trips byte-identically', () => {
     expect(JSON.stringify(JSON.parse(sent))).not.toBe(sent)
   })
 
-  it('stores the bytes verbatim in doc_json', async () => {
+  it('stores the bytes verbatim and echoes whatever schemaVersion it was given', async () => {
     const { base, store } = await startService()
-    const sent = docText(4)
-    await put(base, sent)
-    expect(store.latest().docJson).toBe(sent)
-    expect(store.latest().sessionsCompleted).toBe(4)
-    // Read from the domain rather than hardcoded: `docText` builds a real
-    // document, so pinning a literal here would break on every schema bump
-    // while proving nothing about the server, which only echoes the field.
-    expect(store.latest().schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    // 4 is not a version this build knows. The service does not know versions —
+    // it copies the number into a column, and a test that pinned it to the
+    // client's current constant would be asserting the codec's business.
+    const sent = docText('alice', 4, { schemaVersion: 4 })
+    await put(base, 'alice', sent)
+
+    const latest = store.latest('alice')
+    expect(latest.docJson).toBe(sent)
+    expect(latest.historyLength).toBe(4)
+    expect(latest.schemaVersion).toBe(4)
+  })
+
+  it('holds history.length in the sessions_completed column', async () => {
+    const { base, store } = await startService()
+    // The v3 document dropped `sessionsCompleted`; the column it populated now
+    // holds the length of the history, which is the same fact stated honestly.
+    // A document *with* a stray `sessionsCompleted` must not be believed over it.
+    const sent = docText('alice', 3).replace(
+      '"cyclePosition"',
+      '"sessionsCompleted": 999,\n  "cyclePosition"',
+    )
+    const response = await put(base, 'alice', sent)
+    expect((await response.json()).historyLength).toBe(3)
+    expect(store.latest('alice').historyLength).toBe(3)
   })
 
   it('survives a close and reopen of the same file', async () => {
     const service = await startService()
-    const sent = docText(12)
-    await put(service.base, sent)
+    const sent = docText('alice', 12)
+    await put(service.base, 'alice', sent)
 
     // A second handle on the same path — this is what makes it a durability
     // test rather than a test of an in-process cache.
     const reopened = openSnapshotStore({ file: service.file })
     try {
-      expect(reopened.latest().docJson).toBe(sent)
+      expect(reopened.latest('alice').docJson).toBe(sent)
     } finally {
       reopened.close()
     }
@@ -274,9 +792,9 @@ describe('PUT then GET round-trips byte-identically', () => {
 describe('a rejected PUT changes nothing', () => {
   it('rejects a malformed body with 400 and leaves the newest row untouched', async () => {
     const { base, store } = await startService()
-    const good = docText(7)
-    await put(base, good)
-    const before = store.latest()
+    const good = docText('alice', 7)
+    await put(base, 'alice', good)
+    const before = store.latest('alice')
 
     const bodies = [
       'not json at all',
@@ -284,38 +802,41 @@ describe('a rejected PUT changes nothing', () => {
       'null',
       '"a string"',
       '{}',
-      '{"sessionsCompleted": 3}',
-      '{"schemaVersion": "1", "sessionsCompleted": 3}',
-      '{"schemaVersion": 1}',
-      '{"schemaVersion": 1, "sessionsCompleted": -1}',
-      '{"schemaVersion": 1, "sessionsCompleted": 2.5}',
-      '{"schemaVersion": 1, "sessionsCompleted": "3"}',
+      '{"username": "alice", "history": []}',
+      '{"schemaVersion": "3", "username": "alice", "history": []}',
+      '{"schemaVersion": 3, "history": []}',
+      '{"schemaVersion": 3, "username": "", "history": []}',
+      '{"schemaVersion": 3, "username": "Alice", "history": []}',
+      '{"schemaVersion": 3, "username": 7, "history": []}',
+      '{"schemaVersion": 3, "username": "alice"}',
+      '{"schemaVersion": 3, "username": "alice", "history": {}}',
+      '{"schemaVersion": 3, "username": "alice", "history": null}',
+      '{"schemaVersion": 3, "username": "alice", "history": 3}',
     ]
 
     for (const body of bodies) {
-      const response = await put(base, body)
+      const response = await put(base, 'alice', body)
       expect(response.status, `body: ${body}`).toBe(400)
     }
 
-    const after = store.latest()
+    const after = store.latest('alice')
     expect(after.id).toBe(before.id)
     expect(after.docJson).toBe(good)
     expect(store.count()).toBe(1)
 
-    const read = await fetch(`${base}/api/state`, { headers: authorised() })
-    expect(await read.text()).toBe(good)
+    expect(await (await get(base, 'alice')).text()).toBe(good)
   })
 
   it('rejects a non-JSON content type with 415', async () => {
     const { base, store } = await startService()
-    const response = await put(base, docText(1), { 'Content-Type': 'text/plain' })
+    const response = await put(base, 'alice', docText('alice', 1), { 'Content-Type': 'text/plain' })
     expect(response.status).toBe(415)
     expect(store.count()).toBe(0)
   })
 
   it('accepts a charset parameter on the content type', async () => {
     const { base } = await startService()
-    const response = await put(base, docText(1), {
+    const response = await put(base, 'alice', docText('alice', 1), {
       'Content-Type': 'application/json; charset=utf-8',
     })
     expect(response.status).toBe(200)
@@ -324,77 +845,94 @@ describe('a rejected PUT changes nothing', () => {
   it('rejects an oversized body and stores nothing', async () => {
     const { base, store } = await startService({ maxBodyBytes: 512 })
     const padded = JSON.stringify({
-      schemaVersion: 1,
-      sessionsCompleted: 1,
+      schemaVersion: 3,
+      username: 'alice',
+      history: [],
       _pad: 'x'.repeat(4000),
     })
     expect(padded.length).toBeGreaterThan(512)
 
-    const response = await put(base, padded)
+    const response = await put(base, 'alice', padded)
     expect(response.status).toBe(413)
     expect(store.count()).toBe(0)
 
     // The same body is accepted under the default cap, so the 413 above is the
     // cap doing its job rather than the body being malformed.
     const roomy = await startService()
-    expect((await put(roomy.base, padded)).status).toBe(200)
+    expect((await put(roomy.base, 'alice', padded)).status).toBe(200)
   })
 
   it('reports the shallow check directly', () => {
-    expect(checkDocument('{"schemaVersion":1,"sessionsCompleted":0}')).toEqual({
+    expect(checkDocument('{"schemaVersion":3,"username":"alice","history":[]}')).toEqual({
       ok: true,
-      schemaVersion: 1,
-      sessionsCompleted: 0,
+      schemaVersion: 3,
+      username: 'alice',
+      historyLength: 0,
     })
     expect(checkDocument('{')).toMatchObject({ ok: false })
-    expect(checkDocument('{"schemaVersion":1,"sessionsCompleted":-1}')).toMatchObject({ ok: false })
+    expect(checkDocument('{"schemaVersion":3,"username":"alice"}')).toMatchObject({ ok: false })
+    expect(checkDocument('{"schemaVersion":3,"username":"..","history":[]}')).toMatchObject({
+      ok: false,
+    })
   })
 })
 
 // ─── Retention ──────────────────────────────────────────────────────────────
 
 describe('retention', () => {
-  it('prunes to the cap and always keeps the newest', async () => {
+  it('prunes one user to the cap and always keeps their newest', async () => {
     const retention = 5
     const { base, store } = await startService({ retention })
 
     const sent = []
     for (let i = 1; i <= 12; i += 1) {
-      sent.push(docText(i))
-      const response = await put(base, sent[i - 1])
+      sent.push(docText('alice', i))
+      const response = await put(base, 'alice', sent[i - 1])
       expect(response.status).toBe(200)
-      expect(store.count()).toBe(Math.min(i, retention))
+      expect(store.count('alice')).toBe(Math.min(i, retention))
     }
 
-    expect(store.count()).toBe(retention)
+    expect(store.count('alice')).toBe(retention)
+    expect(store.latest('alice').docJson).toBe(sent[11])
+    expect(store.latest('alice').historyLength).toBe(12)
 
-    // The newest row is the newest write, byte-for-byte.
-    expect(store.latest().docJson).toBe(sent[11])
-    expect(store.latest().sessionsCompleted).toBe(12)
+    // The survivors are the *newest* five, not an arbitrary five.
+    expect(store.ids('alice')).toEqual([12, 11, 10, 9, 8])
 
-    // And the survivors are the *newest* five, not an arbitrary five.
-    const ids = store.ids()
-    expect(ids.length).toBe(retention)
-    expect(ids).toEqual([12, 11, 10, 9, 8])
-
-    const read = await fetch(`${base}/api/state`, { headers: authorised() })
-    expect(await read.text()).toBe(sent[11])
+    expect(await (await get(base, 'alice')).text()).toBe(sent[11])
   })
 
   it('never prunes below the cap', async () => {
     const { base, store } = await startService({ retention: 4 })
-    for (let i = 1; i <= 3; i += 1) {
-      await put(base, docText(i))
-    }
-    expect(store.count()).toBe(3)
-    expect(store.ids()).toEqual([3, 2, 1])
+    for (let i = 1; i <= 3; i += 1) await put(base, 'alice', docText('alice', i))
+    expect(store.count('alice')).toBe(3)
+    expect(store.ids('alice')).toEqual([3, 2, 1])
   })
 
-  it('defaults to a retention small enough that the quadratic term stays small', () => {
-    // Not a tuning knob: snapshot size grows with sessions and total size grows
-    // with retention × sessions. This assertion exists so that raising it is a
-    // deliberate act with a failing test attached.
-    expect(RETENTION).toBe(20)
+  it('does not let a busy user evict a quiet user over HTTP either', async () => {
+    const retention = 3
+    const { base, store } = await startService({ retention })
+
+    const bobDoc = docText('bob', 1)
+    await put(base, 'bob', bobDoc)
+    const bobRow = store.latest('bob')
+
+    for (let i = 1; i <= 20; i += 1) await put(base, 'alice', docText('alice', i))
+
+    expect(store.count('alice')).toBe(retention)
+    expect(store.count('bob')).toBe(1)
+    expect(store.latest('bob').id).toBe(bobRow.id)
+    expect(await (await get(base, 'bob')).text()).toBe(bobDoc)
+  })
+
+  it('reports retained as this user’s row count, not everybody’s', async () => {
+    const { base } = await startService({ retention: 10 })
+    await put(base, 'bob', docText('bob', 1))
+    await put(base, 'bob', docText('bob', 2))
+    const response = await put(base, 'alice', docText('alice', 1))
+    // 1, not 3: a count of every row would tell each user how much the others
+    // train.
+    expect((await response.json()).retained).toBe(1)
   })
 })
 
