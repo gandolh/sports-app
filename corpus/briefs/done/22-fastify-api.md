@@ -111,3 +111,60 @@ Fastify touches storage.
 - **Report the deploy consequence concretely**: what now has to happen on a server that
   previously only needed the files copied. That goes in the deploy brief, and it is the cost
   this migration was accepted knowing about.
+
+---
+
+## Outcome — 2026-07-29
+
+**Done.** `fastify@5.10.0` + `@sinclair/typebox@0.34.52`, exactly pinned. `npm run check`
+green at **614 tests** (610 before; the 73 server tests all pass **unchanged** and four were
+added). `npm audit` clean, including `--omit=dev`. **Zero files under `client/` changed** —
+the premise held, and `git status` is the proof.
+
+**The five trap behaviours needed four explicit switches, not zero.** Every one is now
+pinned by a test that was verified to fail when the switch is flipped back:
+
+| Trap | What Fastify does by default | What it took | Mutation → failures |
+|---|---|---|---|
+| verbatim bytes | parses and re-serialises JSON | a raw-string content-type parser, a `Buffer` reply, and **no `response` schema on that route's 200** | 9 |
+| secret before validation | hooks are global unless scoped | route-level `onRequest` | 1 |
+| mismatch is 400 | — | unchanged logic | 1 |
+| reject, never fold | — | pattern built from `USERNAME_PATTERN.source` | 4 |
+| exact paths | synthesises `HEAD` for every `GET` | `exposeHeadRoutes: false` | 1 |
+| **request logging** | pino, on, **writing to fd 1 directly** | `logger: false` | 1 |
+
+**The logging test had to be rewritten to have teeth, and the first version did not.** An
+in-process spy on `process.stdout.write` passed happily with `logger: true`, because pino
+writes to the file descriptor and never touches `process.stdout.write`. The test now spawns
+`node server/state-server.mjs` as a real child process, reads its pipes, and asserts that
+**no request line reaches them at all** — Fastify's request log does not include the body, so
+"the sentinel is absent" would never have caught it. Positive controls confirm the process
+really served the requests and really does write to those streams.
+
+**A sixth behaviour turned out to be unguarded** and now is: an unauthorised caller hitting a
+guarded route with the *wrong method* must get `401`, not the `405` that would reveal the
+route exists. Removing that check left all 77 tests green until a test was added for it.
+
+**The files did not move to `server/src/` and did not become TypeScript.** This brief listed
+`server/src/db.ts`; keeping `server/*.mjs` in place is a deliberate deviation. Moving would
+have required editing the tests that are the migration's only proof — two of them read
+`server/state-server.mjs` and `server/db.mjs` as source text — and `db.mjs` derives the `db/`
+directory from its own location. `eslint.config.js` had already predicted the outcome: its
+Node-globals block is scoped `server/**/*.mjs` with a note that it is about the runtime, not
+the HTTP library, and should survive brief 22 unchanged. It did, and both ESLint blocks were
+proved to still fire by making them fail.
+
+**One sub-contract divergence, recorded rather than hidden:** Fastify parses the body before
+it validates the query string, so a `PUT` that is wrong in *both* ways — bad `?user=` **and**
+a non-JSON content type — answers `415` where it used to answer `400`. No test pinned the
+precedence and the client cannot produce the case.
+
+**`shared/api.ts`** holds the route constants and TypeBox declarations for all four
+endpoints: `Username` (pattern from `USERNAME_PATTERN.source`, so the regex and the schema
+cannot disagree), `HealthResponse`, `LoginRequest`/`LoginResponse`, `StateQuery`,
+`StateDocumentEnvelope` (the three shallow fields and nothing else), `SnapshotReceipt`,
+`ErrorResponse`. Compilation is **not** there — `TypeCompiler` uses `new Function`, and
+`shared/` has to survive a browser CSP — so the service compiles them.
+
+**The deploy consequence, concretely:** `npm ci --omit=dev` before `node state-server.mjs`.
+Copying files is no longer enough. That belongs in the deploy brief.

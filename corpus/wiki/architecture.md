@@ -29,7 +29,7 @@ test asserting the two regexes matched.*
 shared/                    THE WIRE CONTRACT. No node:, no DOM — both runtimes import it.
   types.ts                 Pattern · Variant · SessionResult · StateDoc · schemaVersion
   username.ts              the one username rule, formerly duplicated in two places
-  api.ts                   request/response shapes + schemas for the four endpoints
+  api.ts                   TypeBox schemas + types for the four endpoints (brief 22)
 
 client/                    the PWA
   src/domain/              PURE. Imports shared/ and nothing else from the repo.
@@ -45,16 +45,18 @@ client/                    the PWA
     components/  figures/  ExerciseFigure.tsx
   src/main.tsx
 
-server/                    the service. Same REST contract either way.
-  state-server.mjs         /api/state · /api/login · /api/health
+server/                    the service. Fastify since brief 22.
+  state-server.mjs         /api/state · /api/login · /api/health, on Fastify
   db.mjs                   node:sqlite snapshot rows, one stream per username
 ```
 
-**The service is still `node:http` as of brief 21.** Brief 22 replaces that layer with
-Fastify and moves the routes under `server/src/`; the storage half and the wire contract are
-unchanged by it. This page described the Fastify layout before it existed — corrected
-2026-07-29, because a page that reads as present tense while describing a plan is worse than
-one that says which is which.
+**The service is Fastify as of brief 22, and the files did not move.** The brief sketched a
+`server/src/` layout in TypeScript; it stayed `server/*.mjs` in place, because moving it
+would have meant editing the 73 tests that are the migration's only proof — including two
+assertions that read `server/state-server.mjs` and `server/db.mjs` as source text — and
+because `db.mjs` derives the `db/` location from its own directory. `eslint.config.js`
+predicted this: its Node-globals block is scoped `server/**/*.mjs` with a note saying it is
+about the runtime, not the HTTP library, and should survive brief 22 unchanged. It did.
 
 **`shared/` holds data shapes and validation, never behaviour.** The ladders, the schedule
 and the milestones stay in the client — they are logic the server has no business knowing,

@@ -65,20 +65,50 @@ browser bundle and a Node service import it. That is the constraint that decides
 allowed in: data shapes and validation, never behaviour. The ladders, the schedule and the
 milestones stay in the client; they are logic the server has no business knowing.
 
+**`shared/` had zero dependencies when brief 21 landed it and has exactly one now** —
+`@sinclair/typebox`, added by brief 22 for the endpoint schemas. It is pure runtime-agnostic
+JavaScript, so the boundary rule still holds, and it is currently **0 bytes in the client
+bundle** (verified: the client imports `shared/types.ts` and `shared/username.ts` but never
+`shared/api.ts`, so nothing pulls it in). The thing to watch: **the day a client file imports
+`shared/api.ts`, TypeBox lands in the bundle.** If that day comes, either import the types
+via `Static<>` only or keep the schemas server-side — do not let it arrive unnoticed.
+
 ### The API is Fastify, and the REST contract is unchanged
-*Decided 2026-07-29 by the user, **reversing the zero-dependency decision below.***
+*Decided 2026-07-29 by the user, **reversing the zero-dependency decision below.** Landed
+by brief 22 the same day: `fastify@5.10.0`, all 73 server tests passing unchanged, zero
+files under `client/` touched.*
 
-The endpoints, their paths, their status codes and their bodies stay exactly as brief 17
-landed them — the client already speaks plain REST and does not change. What changes is
+The endpoints, their paths, their status codes and their bodies are exactly as brief 17
+landed them — the client already speaks plain REST and did not change. What changed is
 the implementation underneath: routing, body limits, content-type handling and error
-shaping stop being hand-rolled, and validation becomes schema-driven so the same schema
-that guards the server also types the client.
+shaping stopped being hand-rolled, and validation is schema-driven from
+**`shared/api.ts`** (TypeBox: one declaration is both a JSON Schema for Fastify's AJV and a
+TypeScript type).
 
-**What this costs, stated plainly rather than discovered later:** the service gains a
-dependency tree, so deploying stops being a file copy and gains an install step on the
-server. That was the actual value of the zero-dependency choice — not code aesthetics.
-The 73 existing server tests are the contract that makes the migration verifiable instead
-of hopeful, and they must keep passing against the new implementation.
+**Four defaults a framework has that this contract does not**, all of them switched off and
+each pinned by a test that was proved to fail when the switch is flipped back:
+
+- `logger: false` — Fastify logs every request, through pino, **to file descriptor 1
+  directly**. An in-process spy on `process.stdout` cannot see it, so the test that proves
+  this spawns the real service as a child process and reads its pipes.
+- **The JSON body parser is replaced with one that returns the raw string.** A parsed body
+  is a re-serialised body, and `GET /api/state` must answer with the bytes it stored.
+  Consequently there is no `response` schema on that route's 200 either.
+- `exposeHeadRoutes: false` — otherwise `HEAD /api/state` becomes a 200 instead of a 405.
+- **The secret is a route-level `onRequest` hook**, the earliest point in the lifecycle, so
+  `401` precedes validation *and* precedes the `405` that would reveal a route exists.
+
+**What this costs, stated plainly rather than discovered later:** the service gained a
+dependency tree, so deploying stops being a file copy and gains an install step
+(`npm ci --omit=dev` on the server before `node state-server.mjs` will start). That was the
+actual value of the zero-dependency choice — not code aesthetics. Storage is untouched:
+`node:sqlite` is still built in, so there is still nothing to compile.
+
+**One deliberate divergence, sub-contract:** Fastify parses the body before it validates the
+query string, so a `PUT` that is wrong in *both* ways — bad `?user=` *and* a non-JSON
+content type — now answers `415` where it used to answer `400`. Both are 4xx, no test
+pinned the precedence, and the client cannot produce the case. Recorded because "the
+contract did not change" should mean it, or say where it did.
 
 ### SUPERSEDED — the service was zero-dependency
 Until 2026-07-29 the service used only `node:sqlite`, `node:http` and `node:crypto`, and
@@ -93,8 +123,10 @@ JSON file, and v1's "no users table".*
 The service owns `db/app.db` (gitignored) via Node's built-in `node:sqlite`, and the
 client `PUT`s/`GET`s a JSON document against it. **Snapshot rows are keyed by username**,
 so each user has an independent append-only stream. Local-first, last-write-wins per user
-— correct here because a user trains on one device at a time. `node:sqlite` stays: it is
-built in, and nothing about the Fastify migration touches the storage layer.
+— correct here because a user trains on one device at a time. `node:sqlite` stayed: it is
+built in, and the Fastify migration was a port of `db.mjs`, not a redesign — WAL,
+`synchronous = FULL`, retention per user, pruning by `id`, and the idempotent
+`PRAGMA table_info` guard are all untouched.
 
 **Stored as snapshot rows, not normalised tables.** The codec already owns validation
 and the canonical shape, and `schemaVersion` lives inside the JSON — normalising into

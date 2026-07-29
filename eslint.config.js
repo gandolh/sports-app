@@ -224,13 +224,17 @@ export default tseslint.config(
   },
 
   // ---------------------------------------------------------------------------
-  // The state service (brief 11). Plain .mjs run directly by Node, never bundled,
-  // and dependency-free apart from `@sports-app/shared` — including no `globals`
-  // package, hence the explicit list. It is not under `client/src/`, so none of
-  // the pure-core rules above apply to it.
+  // The state service (brief 11). Plain .mjs run directly by Node and never
+  // bundled. The explicit globals list is here rather than a `globals` package
+  // because the service was once dependency-free and that was worth preserving;
+  // it now takes Fastify, but one dependency in the *linter* still buys nothing.
+  // It is not under `client/src/`, so none of the pure-core rules above apply.
   //
-  // Brief 22 swaps node:http for Fastify. This block is about the *runtime*, not
-  // the HTTP library, so it should survive that unchanged.
+  // This block predicted its own survival of brief 22 — it is about the
+  // *runtime*, not the HTTP library — and it was right: the Fastify migration
+  // left the service as `server/*.mjs` in place, so the glob never moved. Proved
+  // by pointing it at a glob that matches nothing, which turns every `process`,
+  // `Buffer` and `URLSearchParams` in the service into a `no-undef` error.
   // ---------------------------------------------------------------------------
   {
     files: ['server/**/*.mjs'],

@@ -541,3 +541,61 @@ the client's crash-safe save depends on; and Fastify logs requests by default, w
 quietly defeat the five tests asserting the password never reaches the database or the logs.
 
 `decisions.md` is unchanged by any of this — the product did not move, only the plumbing.
+
+## 2026-07-29 — brief 22 shipped: Fastify underneath, nothing different on the wire
+
+The service is Fastify (`5.10.0`). `npm run check` is green at **614 tests** — the 73 server
+tests all pass **unchanged**, four were added, and **not one file under `client/` changed.**
+That last fact was the brief's premise and it held: the client makes four `fetch` calls and
+needed no edit, which is what "the REST contract does not change" has to mean to be worth
+saying.
+
+**The migration's value was almost entirely in the tests it had to satisfy.** Brief 17's
+suite was written against wire behaviour rather than implementation, so it survived a total
+rewrite of the layer beneath it. That is not luck; it is what the effort spent on those
+tests bought, cashed in eleven briefs later. Nothing about a green run on a *new*
+implementation would have been believable otherwise.
+
+**Four framework defaults had to be switched off, and each was mutation-tested.** Fastify
+re-serialises JSON (which would silently destroy the byte-verbatim round trip the client's
+crash-safe save depends on), synthesises `HEAD` for every `GET` route (turning today's
+`HEAD /api/state` 405 into a 200), runs hooks globally unless scoped (which would put the
+`401` after validation), and logs every request. Flipping each switch back was verified to
+fail a test — 9 failures for the re-serialisation one.
+
+**The logging test did not have teeth on the first attempt, and the reason is worth
+remembering.** pino writes to file descriptor 1 *directly*, so an in-process spy on
+`process.stdout.write` reported a perfectly clean run with `logger: true`. Worse, Fastify's
+request log does not include the body, so even a working spy would not have found the
+sentinel password — the assertion had to become "no request line reached these pipes at
+all", checked by spawning the real service as a child process. This is exactly the failure
+mode the brief warned about: **a migration that quietly defeats a security test while
+leaving it green.** It took two attempts to actually avoid it.
+
+Writing that test also found a **sixth** unguarded behaviour: an unauthorised caller using
+the wrong method on a guarded route was answered `401` rather than the `405` that would
+reveal the route exists — correct, but nothing tested it. Removing the check left all 77
+tests green. There is a test now.
+
+**Validation is schema-driven from `shared/api.ts`** — TypeBox, so one declaration is both a
+JSON Schema for Fastify's AJV and a TypeScript type. The username schema is built from
+`USERNAME_PATTERN.source` rather than a copy of the pattern, so the regex and the schema
+cannot drift. Compilation stays in the service: `TypeCompiler` uses `new Function`, and
+`shared/` has to work under a browser CSP. `StateDocumentEnvelope` is three fields and
+stops there — a schema for the whole `StateDoc` would make the service a second source of
+truth for the document *and* reject documents from a future `schemaVersion` it is meant to
+store blindly.
+
+**The brief's `server/src/db.ts` was not followed**, deliberately. The files stayed
+`server/*.mjs` in place, because moving them would have meant editing the assertions that
+are the migration's only proof and would have moved the `db/` directory `db.mjs` derives
+from its own location. `eslint.config.js` had already called this: its Node-globals block is
+scoped `server/**/*.mjs` with a note saying it is about the runtime rather than the HTTP
+library and should survive brief 22 unchanged. It did. Both ESLint boundary blocks were
+re-proved by making them fail, as brief 21 established.
+
+**And the bill, which was known in advance:** the service has a dependency tree now, so a
+deploy needs `npm ci --omit=dev` before `node state-server.mjs` will start. Copying files is
+no longer enough. That is the whole cost of the decision, it was accepted knowing about it
+on 2026-07-29, and it now belongs to the deploy brief. Storage was untouched — `node:sqlite`
+is built in, `db.mjs` is a port and not a redesign.

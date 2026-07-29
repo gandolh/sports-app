@@ -5,8 +5,9 @@ updated: 2026-07-29
 
 # Status — 2026-07-29
 
-**Where things stand: the v2 rebuild is complete and green.** All six briefs (15–20)
-shipped in three waves. **610 tests**, typecheck and lint clean, `npm audit` clean, and
+**Where things stand: the v2 rebuild is complete and green, and the service is on
+Fastify.** Briefs 15–20 shipped in three waves; 21 split the tree into workspaces and 22
+migrated the HTTP layer. **614 tests**, typecheck and lint clean, `npm audit` clean, and
 `npm run build` emits a working service worker. Offline was proven rather than assumed —
 a full Push session played to the finish screen with the network down.
 
@@ -52,7 +53,7 @@ date anywhere in the UI. Full detail in
 | 19 | [UI shell: four screens](../briefs/done/19-ui-shell-and-four-screens.md) | **done** | 15, 16, 18, 20 |
 | 20 | [Milestones + total work](../briefs/done/20-milestones-and-total-work.md) | **done** | 15 |
 | 21 | [npm workspaces + shared](../briefs/done/21-npm-workspaces-and-shared.md) | **done** | — |
-| 22 | [Fastify API](../briefs/todo/22-fastify-api.md) | **todo** | 21 |
+| 22 | [Fastify API](../briefs/done/22-fastify-api.md) | **done** | 21 |
 
 ## How it ran
 
@@ -77,11 +78,11 @@ per-side side-plank dose the code splits between sides.
 
 ## What is left
 
-- **Brief 22** — migrate the service to Fastify with the REST contract unchanged. Brief 21
-  landed the three workspaces as a pure move (610 tests, net-negative diff), so 22 has the
-  73 server tests as its contract and the client must need no edit at all.
 - **Deploy integration** in `/home/gandolh/projects/vps-deploy/projects/sports-app/` —
-  not started. The DB path must sit outside the rsync tree.
+  not started. The DB path must sit outside the rsync tree, **and brief 22 added a second
+  requirement: the service now needs `npm ci --omit=dev` on the server** before
+  `node state-server.mjs` will start. Copying files is no longer enough. See
+  [technical-decisions.md](technical-decisions.md#the-api-is-fastify-and-the-rest-contract-is-unchanged).
 - **Two design decisions brief 19 left open rather than patching**: `POSTURAL_NOTICE`
   outweighs the plan it annotates on `/` and is far below the fold on the pull player
   page; and long rung names wrap to three lines beside the figure, which is the norm
