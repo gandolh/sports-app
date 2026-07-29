@@ -46,6 +46,21 @@ ancient release candidate. Use it wherever it fits. **TanStack Router** for the 
 routes and **TanStack Query** for the state document, so a mutation on `/` invalidates
 what `/account` reads without a manual refresh.
 
+**Forms use `react-hook-form`.** Do not hand-roll validation state, and do not validate on
+every keystroke — validate on blur and on submit, because a username field that turns red
+while you are still typing the third character is hostile.
+
+There are exactly two forms, and the validation rules are **not yours to invent** — both
+already exist in code and must be reused, not restated:
+
+- **`/login`** — username and password. The username rule lives in
+  `src/persistence/codec.ts` as `USERNAME_PATTERN`, `USERNAME_MAX_LENGTH`, `USERNAME_RULE`
+  and `isValidUsername`, and it must agree exactly with the server's, which rejects rather
+  than case-folds. On failure show `setCurrentUsername`'s `result.error` verbatim — it
+  states the rule in prose already written for this purpose. **The password field has no
+  validation at all**, which is the honest reflection of the fact that nothing checks it.
+- **`/account` → sync settings** — `baseUrl` and `secret` (see the gap below).
+
 ## 1. `/` — home, then the player
 
 Home shows today's session: the slot label, the exercises with their targets, and
@@ -96,6 +111,23 @@ design being honest, not a gap.
 State plainly, where a pattern has reached its top rung, that it has reached the ceiling
 of what floor-only training offers and that the target now cycles. That is a real
 finish, not a failure, and the copy should say so without hedging.
+
+### A gap this brief has to close
+
+Deleting `SettingsScreen.tsx` removes the only UI that ever configured sync — but
+`src/persistence/sync.ts` and `Settings.sync` both survive, so without a replacement the
+feature becomes unreachable and `db/` never receives a backup. **`/account` carries the
+sync settings form**: `baseUrl` and `secret`, plus a connection check via `checkSync`.
+
+The secret is **write-only in the UI** — masked, replaceable, never displayed back, not
+even to the person who typed it. It is a deployment credential sitting in a document the
+user is invited to hand-edit, and rendering it into the DOM puts it in screenshots and
+screen shares for no benefit.
+
+Also surface the **read-only latch** here: if `isReadOnly(username)` is true,
+`readOnlyReason(username)` is the banner text. A user whose document is corrupt must be
+told, with the export/repair escape hatch offered — silently failing to save someone's
+training history is the worst thing this app could do.
 
 ## 4. `/login`
 
