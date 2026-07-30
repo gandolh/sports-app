@@ -62,7 +62,7 @@ const NAMED_ON_ENTRY: ReadonlyMap<RungId, string> = new Map([
 
 const NAMED_ON_COMPLETION: ReadonlyMap<RungId, string> = new Map([
   ['core-02-plank', 'Held a 60-second front plank.'],
-  ['core-03-side-plank', 'Held 45 seconds of side plank, split across both sides.'],
+  ['core-03-side-plank', 'Held 90 seconds of side plank, split across both sides — 45 on each.'],
 ])
 
 /**
