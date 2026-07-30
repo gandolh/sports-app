@@ -9,11 +9,14 @@
  *
  * Two things here are deliberate and look like mistakes:
  *
- *   - **No light theme, and no `prefers-color-scheme` block.** One user, 7am, a
- *     dim room. A light variant would be a scope with no user in it.
- *   - **`box-shadow` is never used.** Elevation is expressed by surface
- *     lightness (`--surface-1..3`), because a shadow does not read in a dim room.
- *     There is no `--shadow-*` token to reach for.
+ *   - **One theme — light — and no `prefers-color-scheme` block.** The app was
+ *     dark-only until 2026-07-30 for a stated reason (one user, 7am, a dim room);
+ *     the user asked for white instead, so it is white-only. A second theme would
+ *     double the palette and halve the number of eyes on each half.
+ *   - **`box-shadow` is never used.** Elevation is expressed by surface *tint*
+ *     (`--surface-1..3`) and hairlines. There is no `--shadow-*` token to reach
+ *     for — shadow on white is the single most common template tell, and the
+ *     surfaces here are containers rather than floating cards.
  */
 
 /* Archivo, self-hosted. Deliberately not Inter or Roboto — "Inter everywhere" is
@@ -35,35 +38,46 @@
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
   /* ── Colour ───────────────────────────────────────────────────────────────
-     The accent computes to 12.0:1 on the canvas — AAA at any size. The text
-     ramp bottoms out at 4.9:1 and nothing dimmer ships. */
-  --bg: #111418;
-  --surface-1: #171b21;
-  --surface-2: #1e232a;
-  --surface-3: #262c34;
-  --hairline: rgba(255, 255, 255, 0.08);
-  --hairline-2: rgba(255, 255, 255, 0.14);
+     White canvas. Every ratio below is measured against the surface the token
+     is actually used on, not against `--bg` — `--text-3` is the placeholder
+     inside a `--surface-2` field, so the floor that matters is 4.7:1 there, not
+     5.3:1 on white.
 
-  --text-1: #e8eaed; /* 15.3:1 */
-  --text-2: #a2aab4; /*  7.9:1 */
-  --text-3: #7c858f; /*  4.9:1 — the floor */
+     Inverting the dark palette was not an option: `#6ee7a8` is 1.5:1 on white,
+     so the accent had to be re-chosen rather than re-tuned. It is still the
+     same green in hue — the identity survives; the lightness does not. */
+  --bg: #ffffff;
+  --surface-1: #f5f7f8;
+  --surface-2: #eef1f3;
+  --surface-3: #e3e8ea;
+  --hairline: rgba(17, 24, 32, 0.12);
+  --hairline-2: rgba(17, 24, 32, 0.22);
 
-  --accent: #6ee7a8;
-  --accent-press: #57c98c;
-  --accent-wash: rgba(110, 231, 168, 0.16);
-  --on-accent: #0b1f14; /* 11.2:1 on accent */
+  --text-1: #14181d; /* 17.8:1 */
+  --text-2: #4a535d; /*  7.8:1 */
+  --text-3: #646c75; /*  5.3:1 on white, 4.7:1 on --surface-2 — the floor */
+
+  --accent: #0b6b3f; /*  6.6:1 on white — AA as text at any size */
+  --accent-press: #085330;
+  --accent-wash: rgba(11, 107, 63, 0.1);
+  --on-accent: #ffffff; /*  6.6:1 on accent, 9.2:1 on accent-press */
 
   /* Regressions and destructive confirms ONLY. There is no red anywhere in this
-     app: green-vs-red comparison affect is guilt with extra steps. */
-  --warn: #e8b04b; /* 9.5:1 */
-  --warn-wash: rgba(232, 176, 75, 0.12);
+     app: green-vs-red comparison affect is guilt with extra steps. The dark
+     theme's #e8b04b amber is 1.9:1 on white, so this is the same ochre taken
+     down to a readable lightness. */
+  --warn: #7d4f00; /* 7.0:1 */
+  --warn-wash: rgba(125, 79, 0, 0.1);
 
   /* ── Type ─────────────────────────────────────────────────────────────────
      Shipped in `rem` with no px `font-size` on `html`, so OS text scaling
-     works. Minimum weight on dark is 400, 500 under 17px — thin type halates. */
+     works. Minimum weight is 400, 500 under 17px. The reason changed with the
+     theme and the rule did not: on dark, thin type halated; on white, dark-on-
+     light optically thins the stroke, so 300 would be spindly rather than
+     glowing. Same floor, opposite cause. */
   --font-ui: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   --fs-hero: clamp(5.5rem, 26vw, 8.25rem); /* set target, rest countdown */
@@ -71,7 +85,12 @@
   --fs-display: 2.5rem; /* day title, cardio state label */
   --fs-title: 1.75rem; /* exercise name in session */
   --fs-h: 1.375rem;
-  --fs-btn: 1.5rem;
+  /* 19px, down from 24px on 2026-07-30 with the button heights. 24px inside a
+     56px control leaves 16px of breathing room top and bottom and reads as a
+     banner; the label should sit in the button, not fill it. Same value as
+     --fs-body-l by arithmetic, kept a separate token because it answers a
+     different question. */
+  --fs-btn: 1.1875rem;
   --fs-body-l: 1.1875rem; /* cues */
   --fs-body: 1.0625rem; /* floor for body text */
   --fs-meta: 0.9375rem;
@@ -106,11 +125,22 @@
   --r-xl: 24px;
   --r-full: 999px;
 
-  /* A sweaty finger aiming at a phone flat on the floor, viewed obliquely
-     mid-exhale, has a far higher error rate than a seated one-handed tap. */
-  --tap-min: 48px;
-  --tap-row: 56px;
-  --tap-primary: 96px;
+  /*
+   * Ordinary control sizes. **Revised 2026-07-30** from 48 / 56 / 96px.
+   *
+   * The old numbers came from a floor-phone model — a sweaty finger aiming at a
+   * phone lying on the ground, viewed obliquely mid-exhale — which justified a
+   * 96px primary. The user scoped the app to phones and desktops, both of which
+   * have good pointing accuracy, so that model is retired and these are the
+   * conventional sizes for those two devices.
+   *
+   * The floor is still 44px, which is WCAG 2.2's AAA target size (2.5.8) and the
+   * reason nothing here goes lower. Going below it to look tidier would be a real
+   * accessibility regression rather than a style choice.
+   */
+  --tap-min: 44px; /* icon-sized and link-weight controls */
+  --tap-row: 48px; /* secondary buttons and text inputs */
+  --tap-primary: 56px; /* the one primary action per screen */
 
   /* ── Motion ───────────────────────────────────────────────────────────────
      Chrome motion only ever confirms a state change. Two content exceptions

@@ -2,21 +2,30 @@
  * The interface. Every value here is a `var(--…)` from `tokens.css` — see the
  * note at the top of that file for why a hex literal in this one fails the build.
  *
- * ── The layout is the accessibility model ───────────────────────────────────
+ * ── The three bands ─────────────────────────────────────────────────────────
  *
- * On a floor phone the reach model inverts: the reaching arm occludes
- * top-centre. So priority runs bottom-centre → bottom edges → top-right →
- * top-left → top-centre (worst). Every screen is therefore the same three bands:
+ * Every screen is the same three:
  *
  *   .rail    a thin status strip, glanced at. Status on the left, the two
  *            secondary destinations on the right. Nothing in the centre.
  *   .body    the information, scrolling.
- *   .footer  sticky, bottom-centre: the dots, the secondary row, the primary.
+ *   .footer  sticky to the bottom: the dots, the secondary row, the primary.
  *
- * The primary is 96px with a 20px radius — a 20px radius on a 96px block reads
- * as a physical key, a pill reads as a template — and carries ≥24px of dead
- * space, with nothing interactive within 120px of it except the secondary row
- * directly above.
+ * **The footer stays sticky.** That is the load-bearing part of this layout and
+ * it is not about tap accuracy: the action you want next is always in the same
+ * place without scrolling, on a page whose cue list is taller than the viewport.
+ *
+ * What is *no longer* here is the floor-phone sizing model — a 96px primary, 24px
+ * of mandated dead space, and a 120px exclusion zone around it, all justified by
+ * a sweaty finger aiming at a phone on the ground. The app targets phones and
+ * desktops, which both point accurately, so control sizes are ordinary
+ * (`tokens.css`) and the spacing here is rhythm rather than a safety margin.
+ *
+ * The *reach* half of that model does survive, because it costs nothing: a
+ * reaching arm occludes top-centre, so priority still runs bottom-centre → bottom
+ * edges → top-right → top-left → top-centre (worst). Hence the primary at the
+ * bottom, the destructive control top-right, and nothing but a glanceable status
+ * strip in the top centre.
  */
 
 /* ── Shell ─────────────────────────────────────────────────────────────────── */
@@ -88,10 +97,13 @@
   max-width: 34rem;
   margin-inline: auto;
   display: grid;
-  /* --sp-6 between the secondary row and the primary is the required dead
-     space, not a rhythm choice. */
-  gap: var(--sp-6);
-  padding: var(--sp-5) var(--sp-4) max(var(--sp-5), env(safe-area-inset-bottom));
+  /* Was --sp-6, as the "required dead space" protecting a 96px primary from a
+     mis-aimed thumb. That requirement went with the floor-phone model on
+     2026-07-30, so this is now ordinary rhythm and sized like it.
+     `max(…, safe-area-inset-bottom)` stays — it is about the home indicator on
+     a notched phone, which has nothing to do with target sizes. */
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-4) max(var(--sp-4), env(safe-area-inset-bottom));
 }
 
 .footer__secondary {
@@ -140,7 +152,11 @@
 .btn-primary {
   width: 100%;
   min-height: var(--tap-primary);
-  border-radius: var(--r-lg);
+  /* --r-md, not --r-lg: 20px on the old 96px block read as a physical key, but
+     20px on 56px is within 4px of a pill, which the design system names as a
+     tell. Stepping down keeps roughly the original proportion and incidentally
+     gives all three button shapes one radius. */
+  border-radius: var(--r-md);
   background: var(--accent);
   color: var(--on-accent);
   font-size: var(--fs-btn);
@@ -220,6 +236,17 @@
     color: var(--text-1);
   }
 }
+
+/*
+ * There is deliberately **no per-device override of control sizes** here.
+ *
+ * A `(pointer: fine)` block briefly shrank the primary on desktop while phones
+ * kept a 96px one. That was the wrong shape of fix: it left two sizes to reason
+ * about and kept a number nobody wanted on the device the app is mostly used on.
+ * The sizes in `tokens.css` are now ordinary on both targets, so one set does the
+ * job. Resist re-adding a modality breakpoint for sizing — `hover: hover` above
+ * is for hover *affordances*, which genuinely only exist on one of them.
+ */
 
 /* ── Type helpers ─────────────────────────────────────────────────────────── */
 
@@ -408,8 +435,8 @@
 }
 
 /* Documented exception so nobody "fixes" it: the track is intentionally below
-   3:1. It is decorative — the numeral inside carries the value. Brightening it
-   into a competing grey ring is a regression. */
+   3:1 (1.24:1 on white). It is decorative — the numeral inside carries the
+   value. Darkening it into a competing grey ring is a regression. */
 .ring__track {
   fill: none;
   stroke: var(--surface-3);
@@ -573,8 +600,9 @@
   width: 18px;
   height: 18px;
   border-radius: var(--r-full);
-  /* --text-3 is 4.9:1, comfortably past the 3:1 non-text floor. An unfilled dot
-     states how much is left, so it is information, not a container. */
+  /* --text-3 is 5.3:1 on white, comfortably past the 3:1 non-text floor. An
+     unfilled dot states how much is left, so it is information, not a
+     container. */
   border: 2px solid var(--text-3);
   transition: border-color var(--dur-fast) var(--ease-out);
 }

@@ -5,9 +5,13 @@
     <!-- viewport-fit=cover so the player screen can reach into the safe areas;
          maximum-scale is deliberately omitted (pinch-zoom must stay available). -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#111418" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- `default`, not `black-translucent`: translucent draws the status bar's
+         own text in white over the page, which on a white canvas is invisible.
+         `default` gives a light bar with dark glyphs, which is what the theme
+         wants. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <!-- The one font, self-hosted and preloaded. Offline-first means no font CDN,
          and preloading it stops the first paint of a 132px numeral happening in
          the system font and then reflowing. -->

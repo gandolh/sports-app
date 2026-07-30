@@ -1,7 +1,9 @@
 // Runs in the default `node` environment — no DOM needed, this just reads
-// source text. A hardcoded hex colour in any figure or overlay breaks dark
-// mode (the whole app inverts via `currentColor`/`var(--accent)`, never a
-// literal value), so this is a build-breaking check, not a style nit.
+// source text. A hardcoded hex colour in any figure or overlay survives a theme
+// change silently (the drawings take their colour from `currentColor` and
+// `var(--accent)`, never a literal), so this is a build-breaking check rather
+// than a style nit. It is what made the 2026-07-30 dark→white switch a
+// one-file edit.
 //
 // Uses Vite's `import.meta.glob` raw-string import rather than `node:fs` so
 // this test needs no `@types/node` addition to the shared tsconfig.

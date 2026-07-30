@@ -5,23 +5,51 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/**
+ * This repo deliberately carries no `@types/node` — `client/tsconfig.json` pins
+ * `types` to the three it actually wants, and the service is untypechecked
+ * `.mjs`. One env var does not justify reversing that, so this declares the
+ * single member of `process` used below and nothing else.
+ */
+declare const process: { readonly env: Readonly<Record<string, string | undefined>> }
+
+/**
+ * Where the app is served from, with a guaranteed leading and trailing slash.
+ *
+ * Defaults to `/` so local dev, `npm run preview` and every test are unchanged;
+ * the VPS deploy sets `SPORTS_APP_BASE=/sports-app/` because the box serves a
+ * dozen projects as sub-paths of one domain. It has to be a build-time constant
+ * rather than runtime config: Vite bakes it into every asset URL, and the PWA
+ * manifest and service-worker scope below have to agree with it exactly or the
+ * installed app resolves its own start URL outside its own scope.
+ */
+const baseSegment = (process.env.SPORTS_APP_BASE ?? '').replace(/^\/+|\/+$/g, '')
+const base = baseSegment === '' ? '/' : `/${baseSegment}/`
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
+        // All three follow `base`. `scope` is what stops an installed PWA at
+        // /sports-app/ from claiming the whole domain on a shared host.
+        id: base,
+        start_url: base,
+        scope: base,
         name: 'Calisthenics',
         short_name: 'Calisthenics',
         description: 'Zero-equipment calisthenics trainer',
-        // Deliberately dark: this app is opened at 7am on a floor, and a
-        // full-white splash in a dim room is genuinely unpleasant.
-        theme_color: '#111418',
-        background_color: '#111418',
+        // Matches `--bg` in tokens.css. These two are the splash and the OS
+        // chrome, so a mismatch here shows up as a coloured flash between the
+        // splash and the first paint — the one place the theme is visible
+        // before any of the app's own CSS has loaded.
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -38,6 +66,11 @@ export default defineConfig({
         // network — nothing on the session-critical path may require it.
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
         cleanupOutdatedCaches: true,
+        // Client-side routing: a cold load of /sports-app/week must serve the
+        // shell, not 404. Caddy's `try_files` does this when online; this is the
+        // same rule for when the service worker is answering instead, which is
+        // the case that actually matters here.
+        navigateFallback: `${base}index.html`,
       },
     }),
   ],
@@ -58,6 +91,17 @@ export default defineConfig({
     // `node` by default so src/domain/ tests run with no DOM at all. Component
     // tests opt in per-file with `// @vitest-environment jsdom`.
     environment: 'node',
+    // Not for styling — no test renders anything that needs a stylesheet. It is
+    // what makes a CSS file readable *as text* from `import.meta.glob(…, '?raw')`.
+    //
+    // With the default `css: false`, Vitest stubs every CSS module to an empty
+    // string, and it does so by module id, so `tokens.css?raw` is stubbed too.
+    // The glob still returns the right *keys*, which is the trap: a test that
+    // greps CSS source passes with flying colours while reading nothing at all.
+    // `__tests__/noHexColors.test.ts` had been checking `app.css` that way since
+    // it was written, and `__tests__/contrast.test.ts` needs the token values,
+    // so this flips both from vacuous to real.
+    css: true,
     globals: true,
     // Client tests only. The service's tests are a separate Vitest project
     // (server/vitest.config.mjs) that the root config aggregates, so `npm test`
