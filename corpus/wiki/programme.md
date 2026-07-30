@@ -1,6 +1,6 @@
 ---
 summary: What the training actually is — the three-day rotation, what each session contains, the per-rung hold caps, and the cardio protocol.
-updated: 2026-07-29
+updated: 2026-07-30
 ---
 
 # The programme
@@ -58,7 +58,7 @@ range per ladder, because the evidence-based ceilings differ per exercise:
 | Exercise | Range |
 |---|---|
 | Front plank | 20 → 60s |
-| Side plank (**total**, split evenly between sides) | 15 → 45s |
+| Side plank (**total**, split evenly between sides — so 15 → 45s *each*) | 30 → 90s |
 | Hollow hold | 15 → 45s |
 | Tuck L-sit | 10 → 30s |
 | Prone Y / T | 10 → 30s |
@@ -68,13 +68,21 @@ Rationale in [training-science.md](training-science.md#isometric-holds-have-a-ce
 McGill programs 10-second holds, transfer drops sharply past 60s, and the L-sit is
 limited by the wrists rather than the abdominals.
 
-**The side plank row said "per side" until 2026-07-29 and the code disagreed.** The rung's
-own cue splits one clock evenly between sides, so a 45-second prescription is ~22s each —
-below the side-bridge norms, which run 65–97s per side for young adults. The table now
-matches the code; whether the *cap* should rise to make each side a real dose is
-[open question #6](open-questions.md). The interpolation in
-[progression-engine.md](progression-engine.md) handles differing spans without needing
-a per-rung step, so re-tuning any of these costs nothing.
+**The side plank is the one row that is a total rather than a per-exercise dose, and it
+took two passes to get right.** The row said "per side" until 2026-07-29, when it was found
+to contradict the code: the rung's own cue splits one clock evenly between sides, so the
+then-current 45-second cap was ~22s each — roughly half the published side-bridge norms of
+65–97s per side. That was a documentation fix, and it left the *cap* itself open as
+question 6.
+
+**Resolved 2026-07-30: the cap rose to 30 → 90s total**, which is 15 → 45s on each side and
+lands inside the norms. It is deliberately the only rung above the 60s ceiling the front
+plank respects, and that is not an inconsistency — no single side is ever held longer than
+45s. The rung's third cue now states outright that the number on the clock is the total, so
+the display cannot be misread as a per-side prescription.
+
+The interpolation in [progression-engine.md](progression-engine.md) handles differing spans
+without needing a per-rung step, so re-tuning any of these costs nothing.
 
 ## Rep ladders
 

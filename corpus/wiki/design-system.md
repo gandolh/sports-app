@@ -1,19 +1,23 @@
 ---
-summary: Design tokens and the doctrine governing them — colour, type, spacing, motion, anti-patterns, and the floor-phone accessibility floor.
-updated: 2026-07-29
+summary: Design tokens and the doctrine governing them — colour, type, spacing and motion. The banned patterns and accessibility floor live in design-guardrails.md.
+updated: 2026-07-30
 ---
 
 # Design system
 
 Derived 2026-07-29 from shipped apps in the category (Hevy, Strong, Freeletics, NTC,
-Caliber, Ladder, Down Dog, Peloton, Apple Fitness+), Material dark-theme guidance and
+Caliber, Ladder, Down Dog, Peloton, Apple Fitness+), Material theme guidance and
 WCAG 2.2. Screen-level specs live in the UI brief; this page is the durable layer.
+
+*The colour section was re-derived on 2026-07-30 when the theme went from dark to white.
+Everything else on this page survived that change unaltered, which is the useful signal:
+the system was never actually about being dark.*
 
 ## The governing idea
 
 > **This app is an instrument, not a coach.** It reports state in large tabular numerals
-> on near-black, uses exactly one signal colour to mean "act now", and has no opinion
-> about your character. **Nothing on any screen reads the clock.**
+> on a plain white canvas, uses exactly one signal colour to mean "act now", and has no
+> opinion about your character. **Nothing on any screen reads the clock.**
 
 The aesthetic is **Instrument**, chosen for three reasons: oversized numerals are the only
 thing legible on a phone lying on the floor at arm's length; it is the opposite of the
@@ -22,22 +26,32 @@ template tells listed below.
 
 ## Colour
 
-`#111418` and `#6ee7a8` were already chosen and both survive review — the accent computes
-to **12.0:1** on the canvas, AAA at any size. Elevation is expressed by **surface
-lightness, never shadow**, because shadows do not read in a dim room.
+**The theme is white, since 2026-07-30.** It was dark-only before that, for a stated
+reason — one user, 7am, a dim room — and the user asked for white instead. The palette
+below is a re-derivation, not an inversion: `#6ee7a8` is **1.5:1 on white**, so the accent
+had to be re-chosen. It is the same green in hue and a different green in lightness.
+
+Elevation is expressed by **surface tint and hairlines, never shadow.** That rule outlived
+its original justification (a shadow does not read in a dim room) and now has a better
+one: shadow-on-white is the single most recognisable template look.
 
 ```css
---bg: #111418;  --surface-1: #171B21;  --surface-2: #1E232A;  --surface-3: #262C34;
---hairline: rgba(255,255,255,0.08);   --hairline-2: rgba(255,255,255,0.14);
+--bg: #ffffff;  --surface-1: #f5f7f8;  --surface-2: #eef1f3;  --surface-3: #e3e8ea;
+--hairline: rgba(17,24,32,0.12);   --hairline-2: rgba(17,24,32,0.22);
 
---text-1: #E8EAED;   /* 15.3:1 */
---text-2: #A2AAB4;   /*  7.9:1 */
---text-3: #7C858F;   /*  4.9:1 — the floor; nothing dimmer ships */
+--text-1: #14181D;   /* 17.8:1 */
+--text-2: #4A535D;   /*  7.8:1 */
+--text-3: #646C75;   /*  5.3:1 on white, 4.7:1 on --surface-2 — the floor */
 
---accent: #6ee7a8;  --accent-press: #57C98C;
---accent-wash: rgba(110,231,168,0.16);  --on-accent: #0B1F14;  /* 11.2:1 on accent */
---warn: #E8B04B;     /*  9.5:1 — regressions and destructive confirms ONLY */
+--accent: #0B6B3F;  --accent-press: #085330;   /*  6.6:1 on white */
+--accent-wash: rgba(11,107,63,0.10);  --on-accent: #ffffff;  /* 6.6:1 on accent */
+--warn: #7D4F00;     /*  7.0:1 — regressions and destructive confirms ONLY */
 ```
+
+**Ratios are quoted against the surface a token is actually painted on, not against
+`--bg`.** `--text-3` is the placeholder inside a `--surface-2` field, so its real floor is
+4.7:1, not the 5.3:1 it scores on white. Reading only the against-white number is how a
+palette ships a failing pair.
 
 **Doctrine:**
 1. `--accent` is for the primary button, the countdown ring's progress, filled rail
@@ -46,7 +60,9 @@ lightness, never shadow**, because shadows do not read in a dim room.
 2. **No red, no green-vs-red.** `Last time: 3×7` is never coloured — comparison affect is
    guilt with extra steps. A ladder regression is stated in words.
 3. **No gradients anywhere.** **`box-shadow: none` globally.**
-4. **No light theme.** One user, 7am, dim room. Scope with no user.
+4. **One theme, and it is light.** No `prefers-color-scheme` block, no dark variant. Two
+   themes would double the palette and halve the attention on each half; the app has one
+   user and he picked this one.
 
 ## Type
 
@@ -59,7 +75,7 @@ AI-generated-UI fingerprint. Self-hosted because the app is offline-first: no fo
 --fs-mono:    72px;   /* sessions-completed count */
 --fs-display: 40px;   /* day title, cardio state label */
 --fs-title:   28px;   /* exercise name in session */
---fs-h:       22px;   --fs-btn: 24px;   --fs-body-l: 19px;  /* cues */
+--fs-h:       22px;   --fs-btn: 19px;   --fs-body-l: 19px;  /* cues */
 --fs-body:    17px;   /* floor for body text */
 --fs-meta:    15px;   --fs-label: 13px;  /* tracked uppercase eyebrows only */
 
@@ -72,7 +88,9 @@ AI-generated-UI fingerprint. Self-hosted because the app is offline-first: no fo
   the countdown — proportional digits shift the whole string as they tick.
 - Negative tracking on hero and display sizes. Default tracking at 132px is the tell that
   nobody set it.
-- Minimum weight on dark is **400**, **500** under 17px. Thin type halates on dark.
+- Minimum weight is **400**, **500** under 17px. The reason changed with the theme and the
+  rule did not: thin type halated on dark; on white, dark-on-light optically thins the
+  stroke, so 300 would be spindly rather than glowing. Same floor, opposite cause.
 - Ship the scale in `rem`; never set a px `font-size` on `html`, so OS text scaling works.
 - **Only `--fs-label` is uppercase.** Uppercase body text is slower to read.
 
@@ -84,12 +102,19 @@ AI-generated-UI fingerprint. Self-hosted because the app is offline-first: no fo
 
 --r-sm:8px; --r-md:14px; --r-lg:20px; --r-xl:24px; --r-full:999px;
 
---tap-min: 48px;  --tap-row: 56px;  --tap-primary: 96px;
+--tap-min: 44px;  --tap-row: 48px;  --tap-primary: 56px;   /* revised 2026-07-30 */
 ```
 
 **Nothing uses 6, 10, 14 or 18px of spacing** — arbitrary in-between values are a top
-template tell. Exactly five radii exist. **The primary button is 20px, not a pill:** a
-20px radius on a 96px block reads as a physical key; a pill reads as a template.
+template tell. Exactly five radii exist.
+
+**The tap sizes were 48 / 56 / 96px until 2026-07-30**, sized for a phone lying on the
+floor. That model is retired — see
+[design-guardrails.md](design-guardrails.md#accessibility--target-sizes-and-reach) — and
+these are ordinary sizes for a phone and a desktop, floored at WCAG's 44px AAA target.
+
+**The primary button takes `--r-md`, not `--r-lg`.** 20px on the old 96px block read as a
+physical key; on 56px it is 4px off a pill, and a pill reads as a template.
 
 ## Motion
 
@@ -129,61 +154,9 @@ Rule 1 still governs everything that is *interface*. Neither exception licenses 
 ring** — it is information, not decoration. The figure **stops entirely** and holds its
 `end` pose: unlike the ring, its information is also carried by the cue text.
 
-## Anti-patterns — none of these may appear
+## Guardrails — moved
 
-**Generic-AI tells:** Inter or Roboto · lavender/indigo accent · centred hero · three
-rounded cards in a row · glassmorphism / `backdrop-filter` · glowing borders · purple
-gradient orbs · one huge rounded icon above a heading · uniform fade-ins · buttons that
-snap instead of ease · `box-shadow` on dark.
-
-**Fitness-specific tells:** photography of a model mid-lunge (**this app contains zero
-photography**) · emoji as iconography · gradient progress rings with a glow · anatomy
-heatmaps · motivational copy ("Crush it!", "Beast mode") — copy is imperative and factual
-· per-pattern colour palettes · cards inside cards · inconsistent radii · pill-shaped tiny
-buttons where one big button belongs · a bottom tab bar on a two-destination app ·
-**skeleton loaders** (everything is local and synchronous; a skeleton means an
-architecture bug) · `font-weight: 300` on dark.
-
-**And, enforcing the product constraints:** any date, any calendar, any heatmap, any
-"3 days ago", any % of a weekly goal, any trophy.
-
-## Accessibility — the floor-phone context
-
-Standards floor is 24×24 (WCAG 2.2 AA 2.5.8), 44×44 (AAA), 48dp (Material). **This app
-uses 48×48 minimum, 56px secondary rows, 96px primary** — a sweaty finger aiming at a
-phone flat on the floor, viewed obliquely mid-exhale, has a far higher error rate than a
-seated one-handed tap.
-
-- ≥12px between targets; ≥24px dead space around the primary; **no interactive element
-  within 120px of the primary** except the secondary row above it.
-- **The reach model inverts for a floor phone:** the reaching arm occludes top-centre. So
-  priority runs bottom-centre → bottom edges → top-right → top-left → **top-centre
-  (worst)**. Primary lives bottom-centre; destructive close lives top-right; top-centre
-  carries only a thin status rail that is glanced at, never aimed at.
-- Body text ≥4.5:1. Large text may take a 3:1 discount — **don't**. Non-text UI ≥3:1.
-- **Documented exception so nobody "fixes" it:** the countdown ring's *track* is
-  intentionally below 3:1. It is decorative — the numeral inside carries the value.
-  Brightening it into a competing grey ring is a regression.
-- **17px is the body floor, 19px for cues.** A floor phone at ~60–70cm subtends roughly
-  60% of the angular size it would in the hand, so 17px there behaves like ~11px held.
-  That is why 14px never appears.
-- **Never put the per-second countdown in an `aria-live` region** — it would announce 60
-  times per rest. Use `role="timer"`, `aria-hidden` the numeral, and fire one polite
-  announcement at set transitions, at 10s, and at 0.
-- Targets read as prose: `aria-label="3 sets of 8 reps"`, not `3×8` ("3 x 8").
-- Focus: 3px `--accent` outline, 2px offset, never removed.
-
-## Two tests that enforce this mechanically
-
-Intent is not enforcement. Both are cheap:
-
-1. **No dates in the UI layer.** `grep` for `toLocaleDateString`, `Intl.DateTimeFormat`,
-   `formatDistance`, `daysAgo`, `new Date()` in `client/src/ui/` — timestamps enter and leave
-   through `client/src/persistence/` only. Mirrors the existing eslint rule keeping
-   `client/src/domain/` off the clock.
-2. **Time-invariance snapshot.** Render home with the last session 1 day ago and 400 days
-   ago; **the DOM must be byte-identical.** This is the mechanical statement of "returning
-   after two weeks looks identical to returning after one day".
-
-Extend the existing `noHexColors` test idea: **no hex colours anywhere in `client/src/ui/`**
-outside the token file.
+The banned patterns, the floor-phone accessibility floor, and the four mechanical tests
+now live in [design-guardrails.md](design-guardrails.md). Split out on 2026-07-30 when
+this page passed 200 lines. **Read that page before adding anything visual** — this one
+tells you what the vocabulary is, that one tells you what you may not do with it.

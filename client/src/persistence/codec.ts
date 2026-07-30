@@ -218,7 +218,7 @@ type MigrationStep = (raw: JsonObject, options: MigrateOptions) => JsonObject
 /**
  * v1 → v2: drop `ExerciseResult.effort`.
  *
- * The effort input was removed from the app entirely (corpus/wiki/decisions.md,
+ * The effort input was removed from the app entirely (corpus/wiki/adherence.md,
  * "No effort input anywhere"), so every v1 document carries a field the current
  * shape does not allow. **Dropping it is the whole migration** — the document is
  * otherwise valid v2, and the training history it holds is irreplaceable, so

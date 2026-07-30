@@ -599,3 +599,210 @@ deploy needs `npm ci --omit=dev` before `node state-server.mjs` will start. Copy
 no longer enough. That is the whole cost of the decision, it was accepted knowing about it
 on 2026-07-29, and it now belongs to the deploy brief. Storage was untouched — `node:sqlite`
 is built in, `db.mjs` is a port and not a redesign.
+
+---
+
+## 2026-07-30 — Five questions answered, the theme goes white, and the deploy exists
+
+No brief. Three changes made directly, plus the answers that unblocked one of them.
+
+### The user answered five of the six open questions
+
+Asked whether all briefs were done and what was still open, the user closed 1, 2, 3, 5
+and 6 in a handful of sentences. Each is now a section in
+[wiki/decisions.md](wiki/decisions.md); [wiki/open-questions.md](wiki/open-questions.md)
+holds only question 7.
+
+- **1 — is six weeks per rung right?** *"Don't make assumptions about continuity. I will
+  try to do it daily, but there might be some days when i skip. After i skip, i will go
+  to the next session in the queue."* This dissolves the question rather than answering
+  it. The sharp version of Q1 was that "six weeks" silently assumes daily training and
+  the app cannot notice a three-a-week user taking two years — the answer is that the
+  app was never promising six weeks, only a step size. The queue is the contract. No code
+  changed, and the constants stay re-tunable.
+- **2 and 3 — is the cue text a strong enough brake, and will the squat ladder stall?**
+  *"It's ok if it gets difficult"* and *"If it's dangerous, the player can skip it by
+  pressing next."* The brake is **Next**, not the prose — a stronger mitigation than the
+  one recorded on 2026-07-29, and free, because the app measures nothing. Recorded as a
+  constraint on future work: nothing may ever count, flag or display a skip, because that
+  is what this rests on. The intermediate squat rung is not being added.
+- **5 — does the daily core and posture block survive real use?** *"yes, it's important
+  to have some exercises for daily posture and core."* Kept at full frequency; all three
+  alternatives rejected. Moving it *before* the strength work is the one that looks free
+  and is not — it would put low-intensity holds ahead of the main work, which the
+  concurrent-training ordering exists to prevent.
+- **6 — should the side-plank cap rise?** *"yes, it should rise."* 15→45s total became
+  **30→90s** (`SEC_30_90` in `ladders.ts`), which is 15→45s per side against norms of
+  65–97s. It is now the only rung above the front plank's 60s ceiling, which is
+  consistent rather than exceptional: the cap governs one continuous hold and a side
+  plank is two. The rung's third cue was rewritten to say the clock is a total, so 90
+  cannot be misread as per-side. The milestone label moved with it.
+
+**Question 7 survives all of this, and it is worth saying why**, because the answers look
+like they should have killed it. 2 and 3 were about whether the user will *accept* a hard
+rung; 7 is the claim that the interpolation **misrepresents where difficulty sits inside
+a rung** — a smooth ramp drawn over a step function. Accepting hard sessions does not make
+a wrong curve right.
+
+### Dark → white
+
+The user asked for a white theme, reversing an explicit doctrine line ("No light theme.
+One user, 7am, dim room. Scope with no user"). Reversed, and recorded in
+[wiki/design-system.md](wiki/design-system.md).
+
+**It could not be an inversion.** `#6ee7a8` is 1.5:1 on white, so the accent was
+re-chosen rather than re-tuned — `#0b6b3f`, same hue, 6.6:1. `--warn` likewise: the amber
+was 1.9:1. Everything else in the design system survived untouched, which is the useful
+signal — the system was never actually about being dark.
+
+The edit itself was **one file**, which is exactly the payoff `noHexColors` was written
+for. Then two things turned up underneath it:
+
+- **`--text-3` on `--surface-2` fails if you only check against `--bg`.** It is the
+  `/login` placeholder. The against-white figure was a comfortable 4.8:1 and the real one
+  was 4.25:1. Fixed by darkening the floor to `#646c75`; the page now quotes ratios
+  against the surface each token is *painted on*, not against the canvas.
+- **`noHexColors` had been passing vacuously for `app.css` since it was written.** Vitest
+  stubs CSS modules to `''` by module id, so `app.css?raw` matched the glob, returned no
+  bytes, and a grep over nothing passed. `css: true` in `client/vite.config.ts` fixes it,
+  and `app.css` is now genuinely checked (it was clean). Generalisable: **a test that
+  greps files it failed to open is green and worthless** — assert the input is non-empty.
+
+Added `client/src/ui/__tests__/contrast.test.ts` (20 cases): parses `tokens.css`,
+composites the `rgba()` washes over their real backdrops, asserts 4.5:1 / 3:1 pair by
+pair, and asserts the *ceiling* on the ring track so the documented sub-3:1 exception
+cannot be "fixed" later. 614 → 634 tests.
+
+### The deploy
+
+Built at `~/projects/vps-deploy/projects/sports-app/` (`deploy.ts`, `.env.example`,
+`.env`, `README.md`), plus the Caddy routes and a one-line `hasServer` registration in
+`vps-deploy/src/projects.ts`. Modelled on public-resource-map, the closest existing shape
+(SPA + Fastify + sqlite + pm2).
+
+**Serving under a sub-path needed a source change here**, and it is the only one:
+`SPORTS_APP_BASE` now drives the Vite `base`, the PWA manifest `start_url`/`scope`/`id`,
+the service worker's `navigateFallback`, and the TanStack Router `basepath` — four things
+that must agree exactly. Default `/`, so dev, preview and every test are unchanged. The
+deploy verifies the first two after building, because a wrong base fails silently and
+completely: every asset 404s and the page is blank with a clean server log.
+
+Four things worth keeping:
+
+- **The DB path is the dangerous one.** The service defaults to `<repo>/db/app.db`, which
+  under `SERVER_DIR` sits *inside* the rsync mirror — `rsync --delete` would destroy the
+  user's entire training history on the second deploy. `SPORTS_APP_DB` points at
+  `/srv/sports-app-api/data/app.db` and `--exclude=/data` is anchored. There is no backup
+  job; move one and you must move the other.
+- **Port 8794, not the service's own 8787** — farm-valley's sim server already holds that
+  on this box.
+- **`npm ci --omit=dev -w @sports-app/server --include-workspace-root`.** Unscoped it
+  would install the client's React tree on a box that never runs it; scoped it is 58
+  packages. Verified locally end to end before writing it in: rsync subset → install →
+  boot → `/api/health` 200 → DB created at the out-of-tree path.
+- **Two secret leaks found and fixed in review of my own script.** The shared secret was
+  being echoed to the terminal by the command logger *and* passed in the `ssh` argv, where
+  it is readable via `ps`. It now goes over stdin with a redacted label, and the `.env` is
+  written under `umask 077`. A dry run is asserted not to contain it.
+
+**No build-time API URL, deliberately.** Sync is optional and the settings field's
+*emptiness* means "same origin", which is load-bearing in the app's own design — so the
+address and secret are typed into `/account` once per browser rather than baked in. That
+is a contract with a human, and it is written down in both READMEs.
+
+**The deploy has not been run.** It typechecks and dry-runs clean; SSH, the Node version
+check, the remote `npm ci`, pm2 and the Caddy reload are all unverified against the real
+server.
+
+### 2026-07-30, later — the floor-phone sizing model is retired
+
+The user looked at the app on a laptop and said the primary button was too big, then, after
+a first fix, scoped the devices: *"The expected devices are smarthphones and desktop. You
+don't need to over-extend the buttons for those because they got good accuracy."*
+
+That invalidates a whole cluster of numbers, not one button. The floor-phone model — a
+sweaty finger aiming at a device on the ground, viewed obliquely mid-exhale — was the sole
+justification for a **96px primary, 24px of mandated dead space, and a 120px exclusion
+zone**. It was plausible and never confirmed.
+
+Now `--tap-min: 44px`, `--tap-row: 48px`, `--tap-primary: 56px`, `--fs-btn: 19px` (from
+24px — 24px inside a 56px control fills it rather than sitting in it), the primary's radius
+steps `--r-lg` → `--r-md` (20px on 56px is 4px off a pill, a named tell), and the footer gap
+drops `--sp-6` → `--sp-4` because it was dead space rather than rhythm. **44px is a hard
+floor** — WCAG 2.2 AAA target size — so this stops there rather than at "looks tidy".
+
+**The instructive part is that my first attempt was wrong in a way that looked right.** I
+gated the old sizes behind `(hover: hover) and (pointer: fine)`, shrinking the primary on
+desktop and leaving phones at 96px, and argued for modality over viewport width. The
+argument was fine and the premise was not: it preserved a number nobody wanted on the
+device the app is mostly used on, and left two sizes to maintain. Recorded in
+[wiki/design-guardrails.md](wiki/design-guardrails.md) as a shape to watch for — **when a
+rule's justification is wrong, change the rule; do not add a breakpoint that hides it on one
+device.** There is now no per-device override of control sizes anywhere.
+
+**Two things deliberately survived**, since they were bundled with the retired model and are
+independently justified: the **sticky footer** (the next action is always in the same place
+without scrolling, on screens whose cue list is taller than the viewport) and the **reach
+ordering** that puts the primary bottom-centre and the destructive control top-right (a
+reaching arm occludes top-centre regardless of how accurately it points). Type sizes were
+left alone — those are about viewing distance, not aim.
+
+### 2026-07-30, later still — brief 23 written: the figures get a rig
+
+Researched the animation system against `~/projects/game-engine`, then grilled the
+result into [briefs/todo/23-figure-rig-and-morph.md](briefs/todo/23-figure-rig-and-morph.md).
+Nothing implemented.
+
+**The engine turned out not to be the answer.** It has easing curves, an injected-time
+tween, an `AnimationClip`, and Catmull-Rom corner smoothing — and the useful output was
+not a technique to copy but a **measurement**. `figures/motion.ts` claims a morph is
+impossible because the poses "have different path shapes… nothing to tween
+geometrically". That is wrong: the poses are joint dictionaries, and three of the five
+figures already have identical topology. The real blocker is that **bone lengths are not
+preserved between the two poses** — `push` arm −44%, `hinge` torso +26%, `squat` leg
+−37% — because the pairs were drawn as independent stills, not as one skeleton twice.
+Four of the five worst cases are anatomically impossible; only the squat's arms are real
+foreshortening.
+
+**Two pieces of maths did the deciding, and both killed a cheaper option.** A chord is
+shorter than its radius, so lerping joint *coordinates* collapses `prone`'s arm to 26%
+of its length mid-sweep even after the lengths are corrected — which makes angle
+interpolation the only correct choice rather than a preference. And the measured sweeps
+showed `push`'s limbs barely rotate (4°, 0°, −8°): its hands and feet are **planted**
+while the torso descends, so the elbow is not authored, it is **solved**. That splits
+the figures into IK (planted endpoint: push, plank, hinge legs, squat legs) and FK
+(free swing: prone arms, squat arms) — a distinction I missed in the first research pass
+and which makes this a substantially bigger job than the "afternoon of geometry" I
+initially estimated. Said so.
+
+**The architecture survives intact**, which is the good news. `figures/index.ts` forbids
+a JS loop ("this renders beside a live countdown on a phone") and forbids a figure
+animating itself, so `motion.ts` samples the timeline, solves FK/IK per sample, and
+emits per-bone `@keyframes` — JS once per render, never per frame, no new CSS features.
+`buildTimeline` is untouched and every assertion about it must still pass; its own
+docstring already anticipated "a future morphing renderer would consume the same
+timeline".
+
+**Art direction, from the user's reference image** (a game stickman with spiky hair and
+baggy orange trousers): took the silhouette ideas, refused the palette. A hair spike and
+a trouser flare, `currentColor` at `STROKE_WIDTH`, unfilled — both justified
+functionally rather than decoratively (the spike is a stationary landmark for `prone`'s
+150° sweep; the flare marks the hip, an invisible vertex that carries the most
+information in `hinge` and `plank`). Colour would need a new token, a contrast pair and
+a `decisions.md` revisit, and was rejected. I declined to identify the source game
+rather than guess, and flagged that copying a recognisable character into a deployed app
+is a different thing from taking stylistic cues.
+
+**Deliberately deferred: easing the turnaround (R3).** The loop reverses direction
+instantly at the bottom, which no body does, and linearity is enforced by an actual test
+rather than just a doc rule. Left alone because 30 of 35 rungs have no pause, so easing
+all of them risks 30 rungs reading as lightly paused — and because the rig may dissolve
+the problem by itself, a rotating limb reading more organically than a translating
+point. One variable at a time.
+
+**A third vacuous test found**, in the same family as the CSS-glob one: the
+reduced-motion assertion in `ExerciseFigure.test.tsx` queries by
+`.exercise-figure__frame--start` and then asserts that element has that class — always
+true. Its name also contradicts the CSS, which holds the `end` pose. Brief 23 fixes it.
+The generalisable shape is now stated twice in the corpus: **a test that greps files it
+failed to open, or asserts the selector it just queried, is green and worthless.**

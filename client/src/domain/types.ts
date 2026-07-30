@@ -95,9 +95,10 @@ export interface Rung {
   /**
    * Failing this rung is **injurious, not merely unsuccessful** — the schedule
    * reaches these on a clock rather than on readiness, and there is no mechanism
-   * to step back (corpus/wiki/decisions.md, accepted risk). The user chose to
-   * rely on the rung's own cue text as the only brake, which imposes one UI
-   * contract:
+   * to step back (corpus/wiki/adherence.md, accepted risk). The user chose to
+   * rely on the rung's own cue text as a brake — and confirmed on 2026-07-30
+   * that the real brake is pressing Next, which costs nothing because the app
+   * measures nothing. The cue still imposes one UI contract:
    *
    * **On a `safetyCritical` rung, `cues[0]` renders FIRST and visually
    * separated** — as the safety check it is, not as item one of four. Brief 19

@@ -168,4 +168,5 @@ completed. **The judgement moved to the one party who can assess it.**
 
 The unmitigated cost is safety: the schedule reaches genuinely risky rungs on a clock
 rather than on readiness. That is an accepted risk with a named owner —
-[decisions.md](decisions.md#accepted-risk--the-schedule-prescribes-risky-rungs-on-time-not-on-readiness).
+[adherence.md](adherence.md#accepted-risk--the-schedule-prescribes-risky-rungs-on-time-not-on-readiness)
+(moved out of `decisions.md` on 2026-07-30).
