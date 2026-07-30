@@ -1,7 +1,8 @@
 # Improving the figure animation, researched against ~/projects/game-engine
 
-Captured 2026-07-30. Research only — **nothing here has been implemented**, and R2
-and R3 both need a decision before they could be.
+Captured 2026-07-30. **R1 is done** (see below). R2 became
+[brief 23](../briefs/todo/23-figure-rig-and-morph.md) after a grill; R3 is deferred
+with a stated reason there.
 
 The question was what the game-engine monorepo has that would improve this app's
 animations. The useful answer turned out not to be a technique to copy but a
@@ -110,6 +111,13 @@ redundant signal, not the only one. That materially changes the trade and should
 folded into the question-4 note either way.
 
 ## Recommendations, cheapest first
+
+**R1 — DONE 2026-07-30.** `client/src/ui/easing.ts` + 17 tests; `CountUp` now stores
+elapsed ms and calls `tween(0, value, elapsed, DURATION_MS, easeOutCubic)`. Two things
+differed from the plan below: only the curves that correspond to a shipped token were
+ported (an unused curve invites a fourth easing into a system documenting three), and
+the `shouldAnimate` guard **stayed** — it also covers reduced motion and `value <= 0`,
+which injected time does nothing about. Original text follows.
 
 **R1 — extract an easing module; adopt the injected-time contract.** No visual change,
 no decision needed. `client/src/ui/components/CountUp.tsx` currently inlines

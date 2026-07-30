@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { groupDigits } from './format.ts'
+import { easeOutCubic, tween } from '../easing.ts'
 
 /**
  * **The entire celebration budget of this app**: one count-up of the sessions
@@ -42,28 +43,33 @@ export function CountUp({
   readonly value: number
   readonly className?: string
 }) {
-  // 0 → 1 through the sweep. Starts at 1 when there is nothing to animate.
-  const [progress, setProgress] = useState(() => (shouldAnimate(value) ? 0 : 1))
+  /**
+   * Elapsed milliseconds, not normalised progress — the curve and the clamping
+   * both live in `easing.tween` now, so this holds the one thing only the
+   * component can know. Starts *finished* when there is nothing to animate, so a
+   * reduced-motion user never sees a zero frame.
+   */
+  const [elapsedMs, setElapsedMs] = useState(() => (shouldAnimate(value) ? 0 : DURATION_MS))
 
   useEffect(() => {
     if (!shouldAnimate(value)) return
     let frame = 0
     const startedAt = performance.now()
     const step = (now: number): void => {
-      const t = Math.min((now - startedAt) / DURATION_MS, 1)
-      setProgress(t)
-      if (t < 1) frame = requestAnimationFrame(step)
+      const elapsed = now - startedAt
+      setElapsedMs(elapsed)
+      if (elapsed < DURATION_MS) frame = requestAnimationFrame(step)
     }
     frame = requestAnimationFrame(step)
     return () => cancelAnimationFrame(frame)
   }, [value])
 
-  // Matches --ease-out's shape closely enough for a number; solving the exact
-  // cubic Bézier for a 520ms count is precision nobody can perceive.
-  const eased = 1 - (1 - progress) ** 3
+  // `easing.ts` owns the curve, the clamp, and the guarantee that the last frame
+  // is exactly `value` rather than a hair short of it. Reading the clock is the
+  // only part that has to happen here.
   return (
     <span className={className} aria-label={`${value}`}>
-      {groupDigits(value * eased)}
+      {groupDigits(tween(0, value, elapsedMs, DURATION_MS, easeOutCubic))}
     </span>
   )
 }
