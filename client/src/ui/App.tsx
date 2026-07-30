@@ -29,9 +29,25 @@ import { loginRoute } from './routes/login.tsx'
 
 const routeTree = rootRoute.addChildren([indexRoute, weekRoute, accountRoute, loginRoute])
 
+/**
+ * The sub-path the app is served from, without its trailing slash, or `undefined`
+ * at the domain root.
+ *
+ * `import.meta.env.BASE_URL` is Vite's echo of `base` in `vite.config.ts`, so
+ * this cannot drift from the asset URLs or the service-worker scope. It is
+ * `'/'` in dev and in every test, which normalises to `undefined` — the router
+ * then behaves exactly as it did before this existed.
+ *
+ * Without it the router at `https://gandolh.ro/sports-app/` reads its own
+ * location as `/sports-app/`, matches no route, and renders the 404 on every
+ * screen while the assets around it load perfectly.
+ */
+const basepath = import.meta.env.BASE_URL.replace(/\/+$/, '') || undefined
+
 export function createAppRouter(history?: RouterHistory) {
   return createRouter({
     routeTree,
+    ...(basepath === undefined ? {} : { basepath }),
     ...(history === undefined ? {} : { history }),
     // Nothing to preload: every route reads the same synchronous local document,
     // so a preload would be work with no latency to hide.
