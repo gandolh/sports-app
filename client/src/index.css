@@ -9,8 +9,10 @@
 *::before,
 *::after {
   box-sizing: border-box;
-  /* Global, and it is doctrine rather than a reset convenience: a shadow does
-     not read in a dim room, so elevation is expressed by surface lightness. */
+  /* Global, and it is doctrine rather than a reset convenience: elevation is
+     expressed by surface tint and hairlines, never by a shadow. The rule
+     outlived the dark theme that motivated it — a shadow did not read in a dim
+     room, and on white it reads all too well as the default card look. */
   box-shadow: none;
 }
 
