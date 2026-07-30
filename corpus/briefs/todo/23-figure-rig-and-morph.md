@@ -277,3 +277,83 @@ Fold the outcome back into question 4 either way.
   `client/src/ui/components/CountUp.tsx`, not the figures. Still captured in
   [todos/figure-animation-from-game-engine.md](../../todos/figure-animation-from-game-engine.md).
 - **Colour on the figures**, a sixth pose, and any change to the four overlays.
+
+---
+
+# Wave 1 outcome, and the wave 2 contract
+
+*Appended 2026-07-30 after wave 1 shipped (`figures/rig.ts`, commit 30024c8). Wave 2
+agents: **read this section before the canonical table above.** It corrects it.*
+
+## The table above is a starting point, not data
+
+It was measured off drawings whose lengths were wrong, so imposing the canonical
+length changes the angles that reproduce the intended silhouette. **Treat CANON as
+authoritative and the angle columns as hints, then re-derive.** Budget more time for
+`push` and `squat` than "re-author as a rig" suggests.
+
+## Corrections — all confirmed numerically by wave 1
+
+| # | Figure | Correction |
+|---|---|---|
+| 1 | `plank` | **Not IK. FK.** Nothing in it touches `GROUND_Y` (182) — hands ~140, feet ~130 — and a planted foot needs 62.9 from the hip when the longest leg available is 56.6, so IK clamps for the whole loop. Model it as the shoulder fixed and the torso pitching **3.37° → −8.44°**. Tips travel 1–13 units, which is what the drawings already do. |
+| 2 | `prone` | **END angles are 220 and 233**, not −140/−127. As written they interpolate the long way (211°/294°) and drag the hand *down through the torso* to ~4 units — a blob at 132px that reads as the arm vanishing into the body. |
+| 3 | `push` | **`bend: -1`.** The drawn elbow is *ahead* of the shoulder→hand line; a push-up's elbow goes back toward the feet. Read the sign off anatomy, not the pose. |
+| 4 | all | **Straight-phase lengths come from the derived chord, not the rounded measurement.** The table's 0.1-rounding is short enough to make a pose the table calls *straight* unreachable, so it clamps. Use `push legL` 67.6, `push legR` 77.0, `squat` legs 79.2. |
+| 5 | all | **The neck is a bone and it was omitted.** shoulder→head varies (push 20.0→18.9, plank 21.6→20.0). Declare it. |
+| 6 | `hinge` | START hip moves to **(123.5, 158)** once the torso is 66. After that hinge is the cleanest of the five: the knee lands within 1 unit of the drawn one in *both* phases while the hip rises 46, with no clamping. |
+| 7 | `push` | **Author it as a rigid body pivoting about the planted feet.** The exact rigid rotation that drops the shoulder 44 units gives shoulder (44.9, 126), hip (115.4, 113.9) — and yields a torso of 71.5 against CANON 71.4, which is the check that it is right. The table's END has the shoulder ~17 units too far right, and that error is the *only* reason its legs appear to bend 16 units at the bottom of a push-up. Authored correctly, **push's legs stay straight and only the arms fold** — a better drawing and less drift. |
+
+## Two decisions taken by the user, 2026-07-30
+
+**`squat` is redrawn side-on, facing right.** A side view keeps the femur in the
+picture plane *and* lets the arms reach forward in-plane, so it removes **both**
+foreshorten cases rather than adding a third. It also makes all five figures share
+one projection — squat was the only front-facing one — and a side view shows squat
+depth, which is what the rung actually prescribes. The front view's symmetric
+silhouette is the accepted cost.
+
+**`push` keeps its 44-unit chest descent and accepts a ~40-unit elbow.** Elbow
+offset is `sqrt((chain/2)² − (chord/2)²)`, so the two are not independent: a modest
+20-unit elbow buys only a ~10-unit descent, which at 132px is ~6.6 device pixels of
+chest travel and reads as a still image. The descent *is* the information. The elbow
+lands under the chest at (99.7, 154), 37 units clear of the torso, so the silhouette
+guard passes comfortably. This is what a deep push-up looks like from the side; the
+drawing's small bulge was the −44% lie.
+
+## `foreshorten` is now dead and must be deleted
+
+The side-on squat was the last case. **No figure may declare `foreshorten`.** With
+zero users, bone length becomes *unconditionally* invariant, which is a stronger
+statement than "invariant times a declared scalar" — so the field comes out of
+`types.ts` and `rig.ts`, and the bone-length test becomes absolute. Do not reach for
+it; if you believe you need it, report BLOCKED and say which limb and why.
+
+## The wave 2 file contract — read this, six agents are working in parallel
+
+**Figures become pure data.** A figure exports a `Rig`, not a component. Rendering is
+generic: the hair spike, the trouser flare and the limb paths are all drawn by
+`primitives.tsx` from any rig, because none of them need per-figure knowledge. This
+is what makes the render path and the five figures independent of each other.
+
+| Chunk | Owns | Contract it must honour |
+|---|---|---|
+| **B** (render path) | `primitives.tsx`, `ExerciseFigure.tsx`, `figures/index.ts`, `motion.ts` | Imports `<NAME>_RIG` from each figure file. Build a **fixture rig** for your own tests — do not wait on or import the real ones. `buildTimeline` stays untouched. |
+| **C1** | `Push.tsx` | exports `PUSH_RIG: Rig` |
+| **C2** | `Squat.tsx` | exports `SQUAT_RIG: Rig` |
+| **C3** | `Hinge.tsx` | exports `HINGE_RIG: Rig` |
+| **C4** | `Prone.tsx` | exports `PRONE_RIG: Rig` |
+| **C5** | `Plank.tsx` | exports `PLANK_RIG: Rig` |
+
+Rules that keep the parallelism safe:
+
+- **Filenames stay `.tsx`** even though the figure files no longer contain JSX. A
+  deliberate small ugliness: renaming five files plus the registry plus tests is
+  churn with no payoff, and it would force B and C to agree on a rename mid-flight.
+- **The `MovementArrow` spec is part of each figure's exported data** (its `x`, `y1`,
+  `y2` differ per figure), drawn by the generic renderer.
+- **A C agent touches exactly one file** and verifies it against `rig.ts` helpers
+  directly — bone lengths constant, `worstTipDrift` under budget, no hand or foot
+  within 12 units of the torso at any sample. You do not need the renderer to prove
+  your geometry.
+- **Only B touches `figures/index.ts`.** A C agent that edits it will conflict.
