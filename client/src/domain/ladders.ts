@@ -111,6 +111,19 @@ const SEC_20_45: Range = { min: 20, max: 45 }
 const SEC_10_30: Range = { min: 10, max: 30 }
 
 /**
+ * The side plank's, and the one span here that is a *total* rather than a
+ * per-side dose: the rung splits the clock evenly between sides, so this is
+ * 15→45s on each. It was 15→45 total (~7→22s per side) until 2026-07-30, which
+ * sat at roughly half the published side-bridge norms of 65–97s per side —
+ * open question 6, resolved by the user in favour of raising it.
+ *
+ * Deliberately the only rung above the 60s ceiling the front plank respects,
+ * and that is not an inconsistency: no single side is ever held longer than 45s,
+ * which is inside the same evidence the other caps come from.
+ */
+const SEC_30_90: Range = { min: 30, max: 90 }
+
+/**
  * `<pattern>-<NN>-<slug>`. Exported so the tests and any future validator check
  * the same rule rather than two drifting copies of it.
  */
@@ -485,11 +498,11 @@ const CORE_RUNGS: readonly Rung[] = [
     name: 'Side plank',
     figureId: 'plank',
     modifier: { unilateral: true },
-    range: SEC_15_45,
+    range: SEC_30_90,
     cues: [
       'Lie on one side with your forearm on the floor, elbow directly under your shoulder, feet stacked — or the lower knee down if stacking is too much. Lift your hips into one straight line from ankle to head.',
       'Push your bottom shoulder away from the floor and hold still with your hips stacked: the top hip must not drift backward or sink. Breathe normally.',
-      'Split the time on the clock evenly between the two sides — half the seconds on each.',
+      'The number on the clock is the total across both sides, not each side. Split it evenly — half the seconds on one side, half on the other, and switch at the halfway point.',
       'Stop the clock when the bottom hip sinks or you have to roll your chest toward the floor to stay up.',
     ],
   },

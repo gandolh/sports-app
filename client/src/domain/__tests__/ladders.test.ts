@@ -121,7 +121,9 @@ describe('target ranges', () => {
     const expected: Readonly<Record<string, [number, number]>> = {
       'core-01-dead-bug': [20, 45],
       'core-02-plank': [20, 60],
-      'core-03-side-plank': [15, 45],
+      // A TOTAL, split evenly between sides — 15→45s on each. Raised from
+      // [15, 45] on 2026-07-30 (open question 6).
+      'core-03-side-plank': [30, 90],
       'core-04-hollow-hold': [15, 45],
       'core-05-hollow-rock': [15, 45],
       'core-06-tuck-l-sit': [10, 30],
