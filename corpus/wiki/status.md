@@ -1,17 +1,24 @@
 ---
 summary: Dated snapshot of where every brief stands and what's next.
-updated: 2026-07-29
+updated: 2026-07-30
 ---
 
-# Status — 2026-07-29
+# Status — 2026-07-30
 
-**Where things stand: the v2 rebuild is complete and green, and the service is on
-Fastify.** Briefs 15–20 shipped in three waves; 21 split the tree into workspaces and 22
-migrated the HTTP layer. **614 tests**, typecheck and lint clean, `npm audit` clean, and
-`npm run build` emits a working service worker. Offline was proven rather than assumed —
-a full Push session played to the finish screen with the network down.
+**Where things stand: the backlog is empty, the app is white, and the deploy exists but
+has not been run.** Briefs 15–20 shipped in three waves; 21 split the tree into
+workspaces and 22 migrated the HTTP layer. **634 tests**, typecheck and lint clean, and
+`npm run build` emits a working service worker at both `/` and a sub-path. Offline was
+proven rather than assumed — a full Push session played to the finish screen with the
+network down.
 
-Nothing is deployed. The remaining known work is listed under *What is left* below.
+**2026-07-30, no brief — three changes made directly** (see [`../log.md`](../log.md)):
+the theme went dark → white, the side-plank cap rose to 30→90s, and the VPS deploy was
+built at `~/projects/vps-deploy/projects/sports-app/`. **Five of the six open questions
+were answered by the user**, leaving one.
+
+The deploy is written, typechecked and dry-run clean, but **it has never been executed
+against the server** — so nothing is live yet.
 
 The v1 tree is committed as a baseline (`3dd4c49`, the first commit in the repo) and the
 rebuild runs on branch `v2-fixed-schedule`, one commit per brief. v1 as committed was
@@ -54,6 +61,7 @@ date anywhere in the UI. Full detail in
 | 20 | [Milestones + total work](../briefs/done/20-milestones-and-total-work.md) | **done** | 15 |
 | 21 | [npm workspaces + shared](../briefs/done/21-npm-workspaces-and-shared.md) | **done** | — |
 | 22 | [Fastify API](../briefs/done/22-fastify-api.md) | **done** | 21 |
+| 23 | [Figure rig + morph](../briefs/todo/23-figure-rig-and-morph.md) | **todo** — grilled 2026-07-30, not started | 18 |
 
 ## How it ran
 
@@ -78,18 +86,34 @@ per-side side-plank dose the code splits between sides.
 
 ## What is left
 
-- **Deploy integration** in `/home/gandolh/projects/vps-deploy/projects/sports-app/` —
-  not started. The DB path must sit outside the rsync tree, **and brief 22 added a second
-  requirement: the service now needs `npm ci --omit=dev` on the server** before
-  `node state-server.mjs` will start. Copying files is no longer enough. See
-  [technical-decisions.md](technical-decisions.md#the-api-is-fastify-and-the-rest-contract-is-unchanged).
+- **Run the deploy.** It is built but unexecuted: `node cli.ts sports-app all` from
+  `~/projects/vps-deploy`. Everything below the first run is unverified against the real
+  box — SSH, the Node version check, `npm ci` on the server, pm2, and the Caddy reload.
+  After it succeeds, the app needs its sync address and secret typed into `/account`
+  once — the deploy project's own README says exactly what to type.
 - **Two design decisions brief 19 left open rather than patching**: `POSTURAL_NOTICE`
   outweighs the plan it annotates on `/` and is far below the fold on the pull player
   page; and long rung names wrap to three lines beside the figure, which is the norm
   rather than an exception since a rung is one movement plus a modifier.
-- **Open questions 1, 2, 3, 5, 6 and 7** — see
-  [open-questions.md](open-questions.md). Question 1 (is six weeks per rung right?) is
-  the only number in the programme with no evidence behind it.
+- **Open question 7** — the only one left. The step *between* rungs exceeds what the ±2
+  variant can absorb, so difficulty is front-loaded inside each rung and the wiki
+  describes it as evenly distributed. See [open-questions.md](open-questions.md).
+- **The white theme has not been looked at on a phone.** Contrast is enforced by test,
+  which is a different claim from "it looks right in a bright room at arm's length".
+- **Brief 23 is written and grilled but not started** — the figure crossfade becomes a
+  rigged morph. It is the first brief since 22 and the only one currently awaiting work.
+
+## The deploy, in one paragraph
+
+Static PWA → `/var/www/sports-app`, served at `https://gandolh.ro/sports-app/`. Fastify
+state service → pm2 `sports-app-api` on `127.0.0.1:8794`, proxied at `/sports-app-api`
+(**not** its default 8787 — farm-valley holds that port). The sqlite file lives at
+`/srv/sports-app-api/data/app.db`, outside the rsync tree, protected by an anchored
+`--exclude=/data`; the service's own default would have put it *inside* the mirror where
+`rsync --delete` destroys it on the second deploy. Serving under a sub-path needed one
+source change here: `SPORTS_APP_BASE` now drives the Vite `base`, the PWA manifest
+`start_url`/`scope`/`id`, the service worker's `navigateFallback` and the router
+`basepath` together.
 
 ## Deliberately out of v2
 

@@ -1,6 +1,6 @@
 ---
 summary: Locked product and programme calls with the reasoning that settled them — read before proposing an alternative.
-updated: 2026-07-29
+updated: 2026-07-30
 ---
 
 # Decisions
@@ -63,28 +63,12 @@ to endurance and there is no load to add.
 indefinitely. That is the honest ceiling of floor-only training, not a failure state,
 and the account page says so. Ladders run out at roughly 9 months of daily training.
 
-## Easy / medium / hard, picked per session, reps only
+## Adherence and accepted risk — moved
 
-*Chosen 2026-07-29, reversing "no effort input anywhere" (below) — but only as a
-**load dial**, never as a signal.*
-
-The home page offers today's training in three variants. The pick changes the target
-by **−2 / 0 / +2 reps** (floored at 3; **hard is a no-op at 12**) or the equivalent
-seconds tier for holds, and nothing else. Sets, movements and rungs are identical.
-
-**The pick has no effect on the schedule.** An easy day banks no debt and costs no
-progress; tomorrow's prescription is what it was always going to be. This is the
-whole point — a bad day must be free.
-
-The pick *is* recorded in history, because it is the only genuinely variable input in
-the app and the account page has nothing else to work with.
-
-### SUPERSEDED — "no effort input anywhere"
-
-v1 removed both the post-set effort tap and a pre-session difficulty picker because the
-engine read them badly. **The engine no longer reads anything**, so a picker that feeds
-nothing cannot corrupt anything. The rejection of the *post-set* tap stands permanently:
-asking after the work is asking at the worst possible moment.
+The four decisions about **the app's model of a real person** — the easy/medium/hard load
+dial, arriving at risky rungs on a clock, skipped days, and the daily core block — now
+live in [adherence.md](adherence.md). Split out on 2026-07-30 when this page passed 200
+lines for the second time (the first split produced [programme.md](programme.md)).
 
 ## The week — Push · Legs · Cardio, plus a daily core and posture block
 
@@ -112,6 +96,16 @@ Each timed rung carries its own range — a front plank runs 20→60s, a tuck L-
 approach comes from, programs **10-second holds in a reverse pyramid**, not long holds;
 transfer drops sharply past 60s, and the L-sit is limited by the wrists rather than the
 abdominals.
+
+**The side plank rose to 30→90s on 2026-07-30**, at the user's decision, closing open
+question 6. It is a *total* split evenly between sides, so it is 15→45s each, against
+published side-bridge norms of 65–97s per side; the previous 15→45s total worked out at
+~22s per side, about half the norm.
+
+This makes it the only rung above the front plank's 60s ceiling, which is consistent
+rather than an exception: **no single side is ever held longer than 45s.** The rule this
+table encodes is a cap on one continuous hold, and a side plank is two of them. The
+rung's cue now says the clock is the total, so the 90 cannot be read as per-side.
 
 ## Four screens, and only one of them is the training flow
 
@@ -156,25 +150,6 @@ most needs to feel easy.
 This survived the v2 redesign intact. `/week` shows the next 7 *sessions*, not days;
 milestones key off session number; total-work-ever needs no clock. History does store
 `completedAt` timestamps — nothing in the UI may read them.
-
-## Accepted risk — the schedule prescribes risky rungs on time, not on readiness
-
-*Decided by the user 2026-07-29 against the recommendation. Recorded, not relitigated.*
-
-With no adaptation, the schedule reaches the hollow hold at ~3 months, the hollow rock
-at ~4, the tuck L-sit at ~5.5, the assisted single-leg squat at ~7, and the archer
-push-up and pistol progression at ~8 — regardless of whether the user can perform them,
-and with no mechanism to step back.
-
-**The nordic negative is no longer on that list** — it was the sharpest item when the
-decision was taken, and brief 15 removes it because the couch anchor violates the
-floor-only constraint. The hinge ladder now has no injurious rung at all.
-
-Four mitigations were offered (cut the rungs, a one-time unlock, a manual rung control,
-or nothing) and the user chose to rely on the rungs' own cue text, which already opens
-with an explicit safety check and a stop signal. The one consequence that follows:
-**on flagged rungs the safety cue renders first and visually separated**, not as item
-one of four. See [open-questions.md](open-questions.md).
 
 ## Standing decisions from v1, unchanged
 
