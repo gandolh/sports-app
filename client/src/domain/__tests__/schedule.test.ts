@@ -20,14 +20,20 @@ import type { PrescribedExercise, PrescribedItem } from '../schedule.ts'
 import { CARDIO, LADDERS, topRungIndex } from '../ladders.ts'
 import { DAILY_BLOCK, ROTATION, slotAt } from '../types.ts'
 import { PATTERNS, VARIANTS } from '@sports-app/shared/types.ts'
-import type { Pattern, SessionResult, StateDoc, Variant } from '@sports-app/shared/types.ts'
+import type {
+  ExerciseRecord,
+  Pattern,
+  SessionResult,
+  StateDoc,
+  Variant,
+} from '@sports-app/shared/types.ts'
 import { midProgram } from './fixtures.ts'
 
 const ZERO: Readonly<Record<Pattern, number>> = { push: 0, squat: 0, hinge: 0, core: 0, pull: 0 }
 
 function docWith(sessionsDone: Partial<Record<Pattern, number>>, cyclePosition = 0): StateDoc {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     username: 'test',
     cyclePosition,
     sessionsDone: { ...ZERO, ...sessionsDone },
@@ -606,6 +612,195 @@ describe('toSessionResult', () => {
         s.exercises.some((e) => e.pattern === pattern),
       ).length
       expect(appearances, pattern).toBe(state.sessionsDone[pattern])
+    }
+  })
+})
+
+// ─── The causation guard ────────────────────────────────────────────────────
+
+/**
+ * ████ DO NOT DELETE THIS BLOCK ████
+ *
+ * Schema v4 gave `ExerciseRecord` a `logged` field, reversing "the app measures
+ * nothing" (corpus/wiki/reversals.md). What did **not** reverse is the direction
+ * of causation, and that is now the governing invariant: *the prescription never
+ * adapts to what you logged.*
+ *
+ * That invariant is the only one in this project that is invisible when it breaks.
+ * A wrong number on screen gets reported by the first user; an engine that has
+ * quietly started reading `history[].exercises[].logged` looks like a thoughtful
+ * feature, and it turns every figure in corpus/wiki/progression-engine.md into a
+ * lie while every other test in this file stays green — because every other test
+ * builds documents with an empty or hand-written history and then asks questions
+ * about `sessionsDone`.
+ *
+ * So this block asserts the one thing that cannot be read off the formula: given
+ * any document, **adding, changing or removing `logged` anywhere in `history`
+ * leaves `prescribe()`'s output identical, for every variant.**
+ *
+ * **It passes trivially today, and that is the point.** `prescribe` does not read
+ * `history` at all, so there is nothing here to keep working and nothing here that
+ * can rot. It costs one cheap run per suite until the day somebody wires a log
+ * into the engine, and on that day it is the only thing standing between the
+ * reversal and adaptation. Do not delete it for looking tautological, and do not
+ * repair a failure here by narrowing the case that failed.
+ */
+describe('LOGGING NEVER REACHES THE PRESCRIPTION — causation guard, do not delete', () => {
+  /** What to write on the `index`-th `ExerciseRecord` of a document; `undefined` means "not logged". */
+  type Logger = (index: number, record: ExerciseRecord) => readonly number[] | undefined
+
+  /**
+   * A copy of `doc` with `log` applied to every recorded exercise.
+   *
+   * Deep-cloned first, so the variant shares no object with the original: an
+   * engine that mutated its input could otherwise make the two documents agree by
+   * accident, which is the one way this guard could pass while being wrong.
+   */
+  function withLogs(doc: StateDoc, log: Logger): StateDoc {
+    const clone = structuredClone(doc)
+    let index = 0
+    return {
+      ...clone,
+      history: clone.history.map((session) => ({
+        ...session,
+        exercises: session.exercises.map((record) => {
+          const logged = log(index++, record)
+          // `exactOptionalPropertyTypes` is on and the contract says an absent key
+          // is not `logged: undefined`, so "not logged" is built by omission.
+          const { logged: _cleared, ...rest } = record
+          return logged === undefined ? rest : { ...rest, logged }
+        }),
+      })),
+    }
+  }
+
+  const loggedCount = (doc: StateDoc): number =>
+    doc.history.reduce((n, s) => n + s.exercises.filter((e) => e.logged !== undefined).length, 0)
+
+  /** A document produced by actually playing the app, so its history is real rather than hand-written. */
+  function played(sessions: number, from = 0): StateDoc {
+    let state = docWith({ push: 7, squat: 8, hinge: 6, core: 20, pull: 25 }, from)
+    for (let i = 0; i < sessions; i++) {
+      const variant = VARIANTS[i % VARIANTS.length]!
+      state = recordSession(state, toSessionResult(prescribe(state, variant), '2026-09-04T06:00:00.000Z'))
+    }
+    return state
+  }
+
+  const SHAPES: readonly (readonly [string, StateDoc])[] = [
+    ['the midProgram fixture', midProgram],
+    ['one full turn of the rotation, played', played(3)],
+    ['three turns, played from the cardio slot', played(9, 2)],
+    [
+      'a top-rung document, where the target cycles rather than climbs',
+      docWith({ push: 900, squat: 900, hinge: 900, core: 3000, pull: 3000 }, 1),
+    ],
+    ['a fresh document with no history at all', docWith({}, 0)],
+    [
+      'a hand-edited document full of absurd numbers',
+      {
+        ...midProgram,
+        cyclePosition: -7,
+        sessionsDone: { push: -3, squat: 2.5, hinge: 0, core: 10 ** 9, pull: 41 },
+      },
+    ],
+  ]
+
+  const EVERY_SET: Logger = (index, record) => [record.targetValue, record.targetValue - 1, index]
+
+  const LOGGERS: readonly (readonly [string, Logger])[] = [
+    ['nothing logged — the baseline the app ships with', () => undefined],
+    ['every set logged at exactly what was prescribed', EVERY_SET],
+    ['every set logged far short of the target', () => [1, 1, 1]],
+    ['every set logged far above the target', () => [10 ** 4, 10 ** 4, 10 ** 4]],
+    ['zeros — "I did nothing", which must prescribe the same as "I did well"', () => [0, 0, 0]],
+    ['an empty array, which is a different value from an absent key', () => []],
+    ['a log on every other record, so presence itself varies', (i) => (i % 2 === 0 ? [7] : undefined)],
+    [
+      'values no honest client would write, as a hand-edited file might',
+      (i) => [-5, 0.5, Number.NaN, 10 ** 9, i],
+    ],
+  ]
+
+  it('gives an identical prescription however history is logged, for every variant', () => {
+    for (const [shape, original] of SHAPES) {
+      for (const variant of VARIANTS) {
+        const baseline = prescribe(original, variant)
+        for (const [logging, log] of LOGGERS) {
+          expect(
+            prescribe(withLogs(original, log), variant),
+            `${shape} / ${variant} / ${logging}`,
+          ).toEqual(baseline)
+        }
+      }
+    }
+  })
+
+  it('is unmoved by CHANGING a log, not only by adding one', () => {
+    for (const [shape, original] of SHAPES) {
+      const meagre = withLogs(original, () => [3, 3, 3])
+      const strong = withLogs(original, () => [12, 12, 12])
+      for (const variant of VARIANTS) {
+        expect(prescribe(strong, variant), `${shape} / ${variant}`).toEqual(
+          prescribe(meagre, variant),
+        )
+      }
+    }
+  })
+
+  it('is unmoved by REMOVING a log from a document that carried one', () => {
+    // The direction that matters the day logs become deletable on screen: clearing
+    // an entry you mistyped must not move your own schedule, forwards or back.
+    for (const [shape, original] of SHAPES) {
+      const logged = withLogs(original, EVERY_SET)
+      const cleared = withLogs(logged, () => undefined)
+      expect(loggedCount(cleared), shape).toBe(0)
+      for (const variant of VARIANTS) {
+        expect(prescribe(cleared, variant), `${shape} / ${variant}`).toEqual(
+          prescribe(logged, variant),
+        )
+      }
+    }
+  })
+
+  it('does not let a log on the incoming result move the counters either', () => {
+    // The other end of the same loop. `recordSession` is the only function that
+    // advances state, so a log reaching IT would adapt the schedule exactly as
+    // surely as one reaching `prescribe` — and it is the likelier mistake, because
+    // the result is the object the logging UI will actually be holding.
+    const state = docWith({ push: 4, squat: 4, hinge: 4, core: 12, pull: 12 }, 0)
+    const plain = toSessionResult(prescribe(state, 'medium'), '2026-09-04T06:00:00.000Z')
+    const annotated: SessionResult = {
+      ...plain,
+      exercises: plain.exercises.map((e) => ({ ...e, logged: [0, 0, 0] })),
+    }
+    expect(recordSession(state, annotated).sessionsDone).toEqual(
+      recordSession(state, plain).sessionsDone,
+    )
+    expect(recordSession(state, annotated).cyclePosition).toBe(
+      recordSession(state, plain).cyclePosition,
+    )
+  })
+
+  it('writes no `logged` of its own — the pure core has nothing to put in one', () => {
+    // `logged` is written by the person, through the UI. The domain has no source
+    // for it, so a `logged` appearing out of `toSessionResult` would be fabricated
+    // data wearing the same field name as real data.
+    const result = toSessionResult(prescribe(midProgram, 'hard'), '2026-09-04T06:00:00.000Z')
+    expect(result.exercises.length).toBeGreaterThan(0)
+    for (const record of result.exercises) {
+      expect(record, record.rungId).not.toHaveProperty('logged')
+    }
+  })
+
+  it('actually writes logs — a guard that mutated nothing would pass vacuously', () => {
+    // Without this, every assertion above would still pass if `withLogs` silently
+    // stopped writing anything, and the guard would become decoration.
+    const withHistory = SHAPES.filter(([, doc]) => doc.history.length > 0)
+    expect(withHistory.length, 'no shape has a history; the guard proves nothing').toBeGreaterThan(2)
+    for (const [shape, doc] of withHistory) {
+      expect(loggedCount(doc), `${shape} already carries logs`).toBe(0)
+      expect(loggedCount(withLogs(doc, EVERY_SET)), shape).toBeGreaterThan(0)
     }
   })
 })

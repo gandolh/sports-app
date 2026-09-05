@@ -75,13 +75,34 @@ export interface Rung {
   readonly id: RungId
   readonly name: string
   /**
-   * 2–4 short imperative cues covering setup, movement standard, where the
-   * modifier applies, and the failure signal that says stop the set.
+   * Short imperative cues covering setup, the movement standard, and where the
+   * modifier applies. The fourth — the failure signal that says stop the set —
+   * moved out to `stopRule` below in brief 24, so these are one shorter than they
+   * were and now describe only how to *do* the rung.
    *
    * Load-bearing: a figure cannot distinguish rung 3 from rung 4 when they share
    * a pose and differ only in tempo. Only these can.
    */
   readonly cues: readonly string[]
+  /**
+   * The one line that tells the user when to END a set — "stop the clock when
+   * your hips sag toward the floor", never "do eight of these".
+   *
+   * **Required, not optional**, for the same reason `Ladder.kind` is required: a
+   * rung shipped without a stop rule is a safety gap, and optional means the
+   * thirty-sixth rung will ship without one. In an app whose premise is that the
+   * user autoregulates and the engine measures nothing about effort
+   * (corpus/wiki/reversals.md), this line is the only brake there is.
+   *
+   * It is a field of its own rather than the last entry in `cues` because
+   * position was deciding its weight: as `cues[3]` it rendered as item four of
+   * four, below the fold, and a brake you have to scroll to is not a brake.
+   *
+   * The text moved out of `cues` **verbatim**. It is content, not a summary of
+   * content — do not rewrite, shorten or normalise the wording of an existing
+   * one, and do not invent one for a rung that never had it.
+   */
+  readonly stopRule: string
   readonly modifier?: Modifier
   /** Key into the figure registry. Unknown ids render a placeholder. */
   readonly figureId?: string
@@ -96,9 +117,10 @@ export interface Rung {
    * Failing this rung is **injurious, not merely unsuccessful** — the schedule
    * reaches these on a clock rather than on readiness, and there is no mechanism
    * to step back (corpus/wiki/adherence.md, accepted risk). The user chose to
-   * rely on the rung's own cue text as a brake — and confirmed on 2026-07-30
-   * that the real brake is pressing Next, which costs nothing because the app
-   * measures nothing. The cue still imposes one UI contract:
+   * rely on the rung's own text as a brake — `stopRule` above — and confirmed on
+   * 2026-07-30 that the real brake is pressing Next, which still costs nothing:
+   * v4 records what you logged but no logged value reaches `prescribe()`, so a
+   * short set banks no debt. The cues still impose one UI contract:
    *
    * **On a `safetyCritical` rung, `cues[0]` renders FIRST and visually
    * separated** — as the safety check it is, not as item one of four. Brief 19
