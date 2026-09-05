@@ -200,12 +200,23 @@ describe('no hand comes within 12 units of the torso segment', () => {
     // 220/233 (they are congruent mod 360) but are interpolated the *long*
     // way from the start angles of 71/66, dragging the hand down through the
     // torso instead of up past the head.
+    //
+    // Narrowed to the `fk` branch before spreading rather than re-asserting
+    // `kind: 'fk'` inside the literal. `RigLimb` is a union and only its `fk`
+    // arm carries `angleDeg`, so spreading the union and overriding `kind`
+    // leaves `foreshorten` typed as possibly-undefined from the `ik` side —
+    // which `exactOptionalPropertyTypes` rejects, because an explicit
+    // `undefined` is not the same as an absent key here.
+    const { armL, armR } = PRONE_RIG.limbs
+    if (armL.kind !== 'fk' || armR.kind !== 'fk') {
+      throw new Error('prone arms are authored as fk limbs; this test assumes it')
+    }
     const trapped: Rig = {
       ...PRONE_RIG,
       limbs: {
         ...PRONE_RIG.limbs,
-        armL: { ...PRONE_RIG.limbs.armL, kind: 'fk', angleDeg: { start: 71, end: -140 } },
-        armR: { ...PRONE_RIG.limbs.armR, kind: 'fk', angleDeg: { start: 66, end: -127 } },
+        armL: { ...armL, angleDeg: { start: 71, end: -140 } },
+        armR: { ...armR, angleDeg: { start: 66, end: -127 } },
       },
     }
     let worst = Infinity

@@ -423,10 +423,13 @@ describe('rung ids', () => {
 })
 
 describe('cues', () => {
-  it('gives every rung 2–4 cues', () => {
+  it('gives every rung 1–3 cues', () => {
+    // Was 2–4 before `stopRule` became its own field: the failure signal that
+    // used to be the last element of `cues` moved out, so every bound here
+    // drops by one.
     for (const [pattern, index, rung] of allRungs) {
-      expect(rung.cues.length, `${pattern}[${index}] ${rung.id}`).toBeGreaterThanOrEqual(2)
-      expect(rung.cues.length, `${pattern}[${index}] ${rung.id}`).toBeLessThanOrEqual(4)
+      expect(rung.cues.length, `${pattern}[${index}] ${rung.id}`).toBeGreaterThanOrEqual(1)
+      expect(rung.cues.length, `${pattern}[${index}] ${rung.id}`).toBeLessThanOrEqual(3)
     }
   })
 
@@ -445,12 +448,34 @@ describe('cues', () => {
 
   it('gives every rung a failure signal that says stop', () => {
     // Without this the card tells you how to do the movement but never when to
-    // quit, which is how a sagging plank becomes a lower-back complaint.
+    // quit, which is how a sagging plank becomes a lower-back complaint. The
+    // signal used to live as the last element of `cues`; it is `stopRule` now.
     for (const [, , rung] of allRungs) {
+      expect(/\bstop\b/i.test(rung.stopRule), `${rung.id}'s stopRule never says stop`).toBe(true)
+    }
+  })
+
+  it('gives every rung a non-empty stopRule', () => {
+    for (const [, , rung] of allRungs) {
+      expect(rung.stopRule.trim(), `${rung.id} has an empty stopRule`).not.toBe('')
+    }
+  })
+
+  it('never lets two differently-named rungs share a stopRule', () => {
+    // A copy-paste guard: if this trips, a stop rule was copied to the wrong
+    // rung rather than written for it.
+    const byStopRule = new Map<string, string[]>()
+    for (const [, , rung] of allRungs) {
+      const names = byStopRule.get(rung.stopRule) ?? []
+      names.push(rung.name)
+      byStopRule.set(rung.stopRule, names)
+    }
+    for (const [stopRule, names] of byStopRule) {
+      const distinctNames = new Set(names)
       expect(
-        rung.cues.some((c) => /\bstop\b/i.test(c)),
-        `${rung.id} has no cue telling the user to stop the set`,
-      ).toBe(true)
+        distinctNames.size,
+        `stopRule shared by differently-named rungs (${[...distinctNames].join(', ')}): "${stopRule}"`,
+      ).toBe(1)
     }
   })
 

@@ -133,19 +133,51 @@ export interface ExerciseRecord {
   readonly pattern: Pattern
   readonly rungId: RungId
   /**
-   * A COUNT, not an array. Nothing per-set is measured, so there is nothing to
-   * store per set — three sets of a target is three, not `[t, t, t]`.
+   * A COUNT, not an array: how many sets were *asked for*.
+   *
+   * It stayed a count through the v4 logging reversal, and that is a decision
+   * rather than an oversight. Widening it into an array of what happened would
+   * have merged the prescription and the record into one field, and the whole
+   * point of `logged` below is that the two halves stay separate and only one of
+   * them is allowed anywhere near the engine.
    */
   readonly sets: number
   /** What was prescribed, after the variant was applied. Never what was achieved. */
   readonly targetValue: number
+  /**
+   * What the user actually did, per set, when they chose to say. Length ≤ `sets`.
+   * ABSENT is the normal case and means "not logged", never "did nothing" —
+   * `exactOptionalPropertyTypes` is on, so an absent key, `logged: undefined` and
+   * `logged: []` are three different values and only the first means "no answer".
+   *
+   * **Nothing reads this back into the prescription.** That is the governing
+   * invariant (corpus/CLAUDE.md), and it is held by a test rather than by this
+   * comment: the causation guard in
+   * `client/src/domain/__tests__/schedule.test.ts` asserts that writing arbitrary
+   * logs anywhere in `history` changes nothing about what `prescribe()` returns.
+   * The field exists to be shown to the person, not to the engine — the moment a
+   * logged value reaches `prescribe()` the fixed schedule stops being fixed and
+   * every number in corpus/wiki/progression-engine.md becomes a lie.
+   */
+  readonly logged?: readonly number[]
 }
 
 export interface SessionResult {
   /**
-   * Supplied by the caller — `client/src/domain/` may not read the clock. Stored,
-   * and **NOTHING in client/src/ui may read it**: there are no dates anywhere in
-   * the app, no streak, no heatmap, no missed day (corpus/wiki/decisions.md).
+   * Supplied by the caller — `client/src/domain/` may not read the clock. That
+   * half is unchanged and still enforced by eslint: dates enter through
+   * `client/src/persistence/` and are passed in, which is what keeps the schedule
+   * reproducible under test.
+   *
+   * What changed is who may read it. Until 2026-09-04 this said **nothing in
+   * `client/src/ui` may read it**, because there were no dates anywhere in the
+   * app. That decision was reversed (corpus/wiki/reversals.md) and the UI now
+   * reads `completedAt` for the calendar, the streak, and the "last time"
+   * comparison.
+   *
+   * Reading it is not scheduling on it. The rotation advances on training and
+   * never on the calendar, so a fortnight's gap and a night's sleep prescribe the
+   * same next session; the calendar reports, it does not decide.
    */
   readonly completedAt: IsoTimestamp
   /**
@@ -179,14 +211,21 @@ export interface Settings {
  * `history.length`, `ExerciseResult.sets` became a count, `day` became
  * `position`, and `variant` appeared. Brief 16 owns the v1/v2 → v3 migration.
  *
+ * **v4** (2026-09-04): `ExerciseRecord.logged`, from the logging reversal
+ * (corpus/wiki/reversals.md). The change is additive and the field is optional, so
+ * every v3 document is already structurally a valid v4 one — the version still
+ * bumps because the service indexes `schema_version`, and "written by a build that
+ * could not have recorded logs" is a fact worth being able to ask about. Brief 25
+ * owns the v3 → v4 migration; nothing in this file performs one.
+ *
  * It lives here rather than in the codec because the service writes it into an
  * indexed column: `schema_version` on every snapshot row. Two runtimes agreeing
  * on the current version is exactly what a shared contract is for.
  */
-export const CURRENT_SCHEMA_VERSION = 3
+export const CURRENT_SCHEMA_VERSION = 4
 
 export interface StateDoc {
-  readonly schemaVersion: 3
+  readonly schemaVersion: 4
   /** Keys the document. A password is accepted and discarded, never stored. */
   readonly username: string
   /** Integer index into ROTATION. Advances on training, never on a date. */

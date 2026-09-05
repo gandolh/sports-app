@@ -3,11 +3,13 @@
 // The player's behaviour, driven through the real router and the real store.
 //
 // The first test in this file is the most important behavioural test in the
-// project: **Next is never gated**. Everything else here protects a content
-// requirement that exists for a safety reason.
+// project: **Next is never gated** — not by the countdown, and since the v4
+// logging reversal, not by the log either. Everything else here protects a
+// content or safety requirement that has a reason written next to it in the
+// component.
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { POSTURAL_NOTICE } from '../../domain/ladders.ts'
+import { POSTURAL_NOTICE, getRung } from '../../domain/ladders.ts'
 import type { Pattern, StateDoc } from '@sports-app/shared/types.ts'
 import { parse } from '../../persistence/codec.ts'
 import { STORAGE_KEYS, emptyDoc } from '../../persistence/store.ts'
@@ -44,6 +46,20 @@ async function tapNext(router: Router): Promise<void> {
   const before = currentUrl(router)
   fireEvent.click(nextButton())
   await waitFor(() => expect(currentUrl(router)).not.toBe(before))
+}
+
+/** `a` comes before `b` in document order. */
+function precedes(a: Element, b: Element): boolean {
+  return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+}
+
+/** The document as the codec will read it back, which is the only proof that counts. */
+function storedDoc(): StateDoc {
+  const stored = parse(localStorage.getItem(STORAGE_KEYS.live(USERNAME)) ?? '', {
+    username: USERNAME,
+  })
+  if (!stored.ok) throw new Error(stored.error)
+  return stored.doc
 }
 
 beforeEach(() => {
@@ -95,16 +111,54 @@ describe('Next is never gated', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+describe('the stop rule', () => {
+  it('renders above the cue list, and not inside it', async () => {
+    seedUser(docWith())
+    await renderApp(`/?v=medium&i=0&d=0`)
+
+    const stop = screen.getByTestId('stop-rule')
+    const cues = screen.getByTestId('cue-list')
+
+    // Its own box, outside the list. Tucking it into the top of the list "so it
+    // reads together" is the single easiest way to undo brief 24, and it would
+    // pass a text-only assertion.
+    expect(cues.contains(stop)).toBe(false)
+    expect(stop.contains(cues)).toBe(false)
+    expect(precedes(stop, cues)).toBe(true)
+  })
+
+  it('is the rung’s own `stopRule`, verbatim', async () => {
+    seedUser(docWith())
+    await renderApp(`/?v=medium&i=0&d=0`)
+    // The push ladder starts at rung index 2 and nothing has been trained.
+    const rung = getRung('push', 2)
+    expect(screen.getByTestId('stop-rule').textContent).toContain(rung.stopRule)
+    // And it is no longer the last cue, which is where it lived before brief 24.
+    expect(screen.getByTestId('cue-list').textContent).not.toContain(rung.stopRule)
+  })
+
+  it('is absent on the cardio slot, which has no rung and no stop rule', async () => {
+    seedUser(withCyclePosition(docWith(), 2))
+    await renderApp(`/?v=medium&i=0&d=0`)
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Cardio')
+    expect(screen.queryByTestId('stop-rule')).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 describe('a safetyCritical rung', () => {
-  // push-09-archer sits at rung index 8; the push ladder starts at index 2 and
-  // takes 14 sessions per rung, so 84 sessions of push lands exactly on it.
+  // The push ladder starts at index 2 and takes 14 sessions per rung, so 84
+  // sessions clamps to the top rung — `push-09-archer`, at index 7.
   const AT_ARCHER = 84
+  const ARCHER = getRung('push', 7)
 
   it('renders its first cue in a separate element from the remaining cues', async () => {
     seedUser(docWith({ push: AT_ARCHER }))
     await renderApp(`/?v=medium&i=0&d=0`)
 
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Archer push-up')
+    expect(ARCHER.safetyCritical).toBe(true)
 
     const safety = screen.getByTestId('safety-cue')
     const list = screen.getByTestId('cue-list')
@@ -114,30 +168,27 @@ describe('a safetyCritical rung', () => {
     expect(list.contains(safety)).toBe(false)
 
     expect(safety.textContent).toContain('Safety check first:')
-    // The whole point: it is not also item one of four in the list.
+    // The whole point: it is not also item one of the list. The count is derived
+    // from the content rather than written down, so re-cueing a rung cannot
+    // silently turn this into an assertion about nothing.
     expect(list.textContent).not.toContain('Safety check first:')
-    expect(list.querySelectorAll('li')).toHaveLength(3)
+    expect(list.querySelectorAll('li')).toHaveLength(ARCHER.cues.length - 1)
 
     // And it renders *first*, which is what makes it readable without scrolling
-    // on a phone: ahead of the target numeral as well as of the other cues.
-    const order = (before: Element, after: Element): boolean =>
-      (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-
-    const movement = screen.getByText('Archer push-up').closest('.movement')
-    const hero = document.querySelector('.hero')
-    expect(movement).not.toBeNull()
-    expect(hero).not.toBeNull()
-
-    expect(order(movement as Element, safety)).toBe(true)
-    expect(order(safety, hero as Element)).toBe(true)
-    expect(order(safety, list)).toBe(true)
+    // on a phone: ahead of the target numeral, the stop rule and the other cues.
+    const hero = screen.getByText(ARCHER.name)
+    expect(precedes(hero, safety)).toBe(true)
+    expect(precedes(safety, screen.getByTestId('stop-rule'))).toBe(true)
+    expect(precedes(safety, list)).toBe(true)
   })
 
   it('is the only case that gets a separate block — an ordinary rung has none', async () => {
     seedUser(docWith())
     await renderApp(`/?v=medium&i=0&d=0`)
     expect(screen.queryByTestId('safety-cue')).toBeNull()
-    expect(screen.getByTestId('cue-list').querySelectorAll('li')).toHaveLength(4)
+    expect(screen.getByTestId('cue-list').querySelectorAll('li')).toHaveLength(
+      getRung('push', 2).cues.length,
+    )
   })
 })
 
@@ -156,6 +207,56 @@ describe('POSTURAL_NOTICE', () => {
     seedUser(docWith())
     await renderApp('/')
     expect(document.body.textContent).toContain(POSTURAL_NOTICE)
+  })
+
+  it('is a warning that never turns red and never offers to go away', async () => {
+    seedUser(docWith())
+    await renderApp(`/?v=medium&i=2&d=0`)
+    const note = screen.getByTestId('honest-note')
+    // No dismiss affordance of any kind inside it. `<HonestNote>` has no
+    // `onDismiss` prop to add one with, and this is what says so from outside.
+    expect(note.querySelectorAll('button')).toHaveLength(0)
+    // The danger hue belongs to the stop rule alone. The class list is the only
+    // place this is observable without a layout engine.
+    expect(note.className).toContain('warn')
+    expect(note.className).not.toContain('dang')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('the countdown is not announced sixty times a minute', () => {
+  it('is a role=timer whose numeral is hidden and is in no live region', async () => {
+    seedUser(docWith())
+    await renderApp(`/?v=medium&i=1&d=0`)
+
+    const timer = screen.getByRole('timer')
+    // The one rule that makes this app usable with a screen reader on the screen
+    // that matters most: a per-second value inside `aria-live` announces sixty
+    // times a minute.
+    expect(timer.querySelector('[aria-live]')).toBeNull()
+    expect(timer.getAttribute('aria-live')).toBeNull()
+    // The numeral is inside an `aria-hidden` container; the timer's own label
+    // carries the duration.
+    const numeral = timer.querySelector('[aria-hidden="true"]')
+    expect(numeral).not.toBeNull()
+    expect(timer.getAttribute('aria-label')).toMatch(/^\d+ second hold$/)
+  })
+
+  it('announces the set transition once, politely, and on rep exercises too', async () => {
+    seedUser(docWith())
+    // Item 0 is a rep exercise — no clock at all, so this announcement cannot be
+    // the countdown's and has to be the player's own.
+    const { router } = await renderApp(`/?v=medium&i=0&d=0`)
+
+    const region = screen.getByTestId('set-announcement')
+    expect(region.getAttribute('aria-live')).toBe('polite')
+    expect(region.textContent).toContain('Set 1 of 3')
+
+    await tapNext(router)
+    expect(screen.getByTestId('set-announcement').textContent).toContain('Set 2 of 3')
+    // Targets read as prose, never as `3 × 8`.
+    expect(screen.getByTestId('set-announcement').textContent).toContain('sets of')
   })
 })
 
@@ -196,6 +297,101 @@ describe('the position lives in the URL', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+describe('logging is offered and never demanded', () => {
+  /** Walks the whole Push session — 3 push sets, 2 core, 2 pull — from wherever it is. */
+  async function playToTheEnd(router: Router, taps: number): Promise<void> {
+    for (let tap = 0; tap < taps; tap += 1) await tapNext(router)
+    await screen.findByText('Session complete.')
+  }
+
+  it('records nothing at all when the log buttons are never touched', async () => {
+    seedUser(docWith({ push: 4 }))
+    const { router } = await renderApp(`/?v=medium&i=0&d=0`)
+    await playToTheEnd(router, 7)
+
+    const text = localStorage.getItem(STORAGE_KEYS.live(USERNAME)) ?? ''
+    // The key must be ABSENT, not `[]`. Absent means "no answer was given";
+    // an empty array means "I did nothing", and they are different facts.
+    expect(text).not.toContain('logged')
+    for (const exercise of storedDoc().history[0]?.exercises ?? []) {
+      expect('logged' in exercise).toBe(false)
+    }
+  })
+
+  it('records the target when Log is tapped, and it survives the codec', async () => {
+    seedUser(docWith({ push: 4 }))
+    const { router } = await renderApp(`/?v=medium&i=0&d=0`)
+
+    const log = screen.getByRole('button', { name: /^Log \d+ reps? for this set/ })
+    const target = Number(/\d+/.exec(log.textContent ?? '')?.[0])
+    expect(Number.isFinite(target)).toBe(true)
+    fireEvent.click(log)
+
+    // The button reports the state back rather than silently succeeding.
+    expect(screen.getByRole('button', { name: /^Logged \d+ reps?\. Tap to remove\./ })).toBeTruthy()
+
+    await playToTheEnd(router, 7)
+
+    const push = storedDoc().history[0]?.exercises.find((e) => e.pattern === 'push')
+    expect(push?.logged).toEqual([target])
+    // Only the set that was logged. Two untouched sets are not zeroes.
+    expect(push?.sets).toBe(3)
+  })
+
+  it('takes a different number through Log other', async () => {
+    seedUser(docWith({ push: 4 }))
+    const { router } = await renderApp(`/?v=medium&i=0&d=0`)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log a different number for this set' }))
+    fireEvent.change(screen.getByLabelText('Reps'), { target: { value: '11' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await playToTheEnd(router, 7)
+    expect(storedDoc().history[0]?.exercises.find((e) => e.pattern === 'push')?.logged).toEqual([
+      11,
+    ])
+  })
+
+  it('does not change what comes next — the schedule is fixed either way', async () => {
+    seedUser(docWith({ push: 4 }))
+    const logged = await (async () => {
+      const { router } = await renderApp(`/?v=medium&i=0&d=0`)
+      fireEvent.click(screen.getByRole('button', { name: /^Log \d+ reps? for this set/ }))
+      await playToTheEnd(router, 7)
+      const doc = storedDoc()
+      cleanup()
+      return doc
+    })()
+
+    resetBrowserState()
+    seedUser(docWith({ push: 4 }))
+    const skipped = await (async () => {
+      const { router } = await renderApp(`/?v=medium&i=0&d=0`)
+      await playToTheEnd(router, 7)
+      const doc = storedDoc()
+      cleanup()
+      return doc
+    })()
+
+    // The governing invariant, from the outside: a logged value reaches nothing
+    // that decides the next session.
+    expect(logged.sessionsDone).toEqual(skipped.sessionsDone)
+    expect(logged.cyclePosition).toBe(skipped.cyclePosition)
+    // And the assertion is not vacuous — one of them really did record a log.
+    expect(logged.history[0]?.exercises[0]?.logged).toBeDefined()
+    expect(skipped.history[0]?.exercises[0]?.logged).toBeUndefined()
+  })
+
+  it('offers nothing to log on the cardio slot, which is prescribed by breathlessness', async () => {
+    seedUser(withCyclePosition(docWith(), 2))
+    await renderApp(`/?v=medium&i=0&d=0`)
+    expect(screen.queryByRole('button', { name: /^Log/ })).toBeNull()
+    expect(document.body.textContent).toContain('There is nothing to log.')
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 describe('the variant is a load dial, never a signal', () => {
   /** Plays a whole Push session — 3 push sets, 2 core, 2 pull — and reads back what was stored. */
   async function playFullSession(variant: string): Promise<StateDoc> {
@@ -208,11 +404,9 @@ describe('the variant is a load dial, never a signal', () => {
     for (let tap = 0; tap < 7; tap += 1) await tapNext(router)
     await screen.findByText('Session complete.')
 
-    const text = localStorage.getItem(STORAGE_KEYS.live(USERNAME))
+    const doc = storedDoc()
     cleanup()
-    const stored = parse(text ?? '', { username: USERNAME })
-    if (!stored.ok) throw new Error(stored.error)
-    return stored.doc
+    return doc
   }
 
   it('advances sessionsDone exactly as medium would when easy is chosen', async () => {
@@ -256,10 +450,6 @@ describe('the cardio slot', () => {
     for (let tap = 0; tap < 9; tap += 1) await tapNext(router)
     await screen.findByText('Session complete.')
 
-    const stored = parse(localStorage.getItem(STORAGE_KEYS.live(USERNAME)) ?? '', {
-      username: USERNAME,
-    })
-    if (!stored.ok) throw new Error(stored.error)
-    expect(stored.doc.history[0]?.exercises.map((e) => e.pattern)).toEqual(['core', 'pull'])
+    expect(storedDoc().history[0]?.exercises.map((e) => e.pattern)).toEqual(['core', 'pull'])
   })
 })

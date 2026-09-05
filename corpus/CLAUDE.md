@@ -50,17 +50,26 @@ explicit revisit plus a `log.md` entry.
 
 ## Project invariants (load-bearing — check before proposing anything)
 
-- **The app measures nothing.** No counter, no completion signal, no adaptation.
-  Pressing Next means only "I'm ready for the next thing". Any feature that needs to
-  know what the user actually did cannot exist here. This is the governing decision
-  and it outranks the rest of this list.
+- **The prescription never adapts to what you logged.** *This replaced "the app
+  measures nothing" on 2026-09-04 — see [wiki/reversals.md](wiki/reversals.md).* The app
+  now records: logged sets, dates, a streak, a calendar, comparison against last time.
+  What did **not** change is the direction of causation. `prescribe()` is a pure
+  function of `sessionsDone` and nothing else, and **no logged value may ever reach
+  it**. The moment it does, the fixed schedule stops being fixed and every number in
+  `wiki/progression-engine.md` becomes a lie. This is the governing invariant and it
+  outranks the rest of this list.
 - **Zero equipment. No purchases.** No bar, bands, rings, or weights. A hard user
   constraint, reaffirmed three times. It is *why* there is no pull strength ladder.
 - **A ladder rung is one movement plus a modifier**, never a different exercise.
   Difficulty comes from tempo, pause, range, leverage, and unilateral work.
-- **The rotation advances on training, never on the calendar**, and **no date appears
-  anywhere in the UI**. No streak, no heatmap, no missed day. History stores
-  `completedAt`; nothing in `client/src/ui/` may read it.
+- **The rotation advances on training, never on the calendar.** This half survives the
+  2026-09-04 reversal and is the half that matters: dates, streaks and a calendar are
+  now *displayed*, but a skipped day still advances nothing. Miss a fortnight and the
+  next session is still the next session. The calendar reports; it does not schedule.
+- **`client/src/domain/` still may not read the clock.** Dates enter through
+  `client/src/persistence/` and are passed in, exactly as `completedAt` always was.
+  Displaying dates did not license the pure core to call `Date.now()` — eslint still
+  fails the build on it.
 - **The prescription is a pure function of sessions completed.** Deterministic,
   clock-free, no LLM planning, no autoregulation in code. One interpolation, no
   branches.

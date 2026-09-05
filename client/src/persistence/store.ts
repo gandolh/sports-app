@@ -75,9 +75,20 @@ import { emptyDoc as buildEmptyDoc, parse, serialise } from './codec.ts'
 // ─── Keys ───────────────────────────────────────────────────────────────────
 
 /**
- * Versioned by schema generation, so a breaking format lands *beside* the old one
- * rather than on top of it. That promise is what makes the v2→v3 upgrade safe:
- * see `LEGACY_STORAGE_KEYS`.
+ * Versioned by **breaking** format change, not by schema number — and v4 is the
+ * case that makes the difference worth spelling out.
+ *
+ * The promise is that an incompatible format lands *beside* the old one rather
+ * than on top of it, which is what makes the v2→v3 upgrade safe: see
+ * `LEGACY_STORAGE_KEYS`. v4 is additive — `logged` is optional and every v3
+ * document is already structurally a valid v4 one — so there is nothing to land
+ * beside, and **these keys deliberately still say `v3`.**
+ *
+ * Renaming them to `v4` would have been the tidy-looking change and a data-loss
+ * bug: every existing document lives under the `v3` key, a `v4` key would find
+ * nothing, and `load` would report `empty` to a user with months of history sitting
+ * two keys away. The document's own `schemaVersion` is what says which generation
+ * it is; the key says where the document *lives*, and that did not move.
  *
  * Exported because sync, the import/export flow and any manual devtools rescue
  * need to name them.
@@ -241,8 +252,9 @@ export type LoadResult =
    */
   | { readonly status: 'recovered'; readonly doc: StateDoc }
   /**
-   * This user has no v3 document, but the browser holds the single pre-v3
-   * document from before the app had accounts. It has been migrated to v3 and
+   * This user has no document under the current keys, but the browser holds the
+   * single pre-v3 document from before the app had accounts. It has been migrated
+   * to the current schema and
    * **attributed to the username that asked for it** — v2 had one user, so there
    * is no owner recorded anywhere to recover. Nothing was written: the caller
    * should save, and may want to confirm with the user first, because on a shared

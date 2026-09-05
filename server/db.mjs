@@ -29,6 +29,27 @@
  * That costs nothing — the charts screen reads the in-memory document. If it
  * ever matters, derive tables *from* the snapshots rather than replacing them.
  *
+ * ── `schema_version` is a column, never a gate ───────────────────────────────
+ *
+ * Nothing in this file compares `schema_version` to anything. It is written from
+ * whatever the document said and read back out; there is no allowlist of accepted
+ * versions, no `CHECK` constraint, and no migration. That is why schema v4 shipped
+ * without touching a line here, exactly as v3 did: **the client owns migration**
+ * (`client/src/persistence/codec.ts`), and the service's job is to store every
+ * version faithfully enough that a client can migrate it later — including a
+ * version newer than anything this build has heard of. Adding a version check here
+ * would turn a service that cannot lose a workout into one that can.
+ *
+ * ── And `logged` is opaque ───────────────────────────────────────────────────
+ *
+ * v4 put per-set numbers inside `history`. They are bytes in `doc_json` and that is
+ * all they will ever be here: **no column, no index, no aggregate over `logged`.**
+ * Wanting `SELECT SUM(...)` over it is the moment this service stops storing the
+ * programme and starts consuming it, which is the same line `Rung` is kept on the
+ * other side of (see `shared/types.ts`, "ids cross the wire, content does not").
+ * The number that *is* worth a column — `sessions_completed` — is a length, and a
+ * length is a fact about the document rather than about the training.
+ *
  * ── Bytes in, same bytes out ─────────────────────────────────────────────────
  *
  * `doc_json` holds the request body **verbatim**. It is never re-serialised on

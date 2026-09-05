@@ -17,7 +17,7 @@ const ZERO: Readonly<Record<Pattern, number>> = { push: 0, squat: 0, hinge: 0, c
 
 function docWith(history: readonly SessionResult[], sessionsDone: Partial<Record<Pattern, number>> = {}): StateDoc {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     username: 'test',
     cyclePosition: 0,
     sessionsDone: { ...ZERO, ...sessionsDone },
