@@ -1,95 +1,208 @@
+/* Tailwind first, and it has to be literally first: `@import` may only be
+   preceded by `@charset` and `@layer`, and this file is itself the first import
+   in `src/index.css`, so the whole cascade hangs off this line. */
+@import 'tailwindcss';
+
 /**
  * The design system, as tokens. `corpus/wiki/design-system.md` is the doctrine;
  * this file is the only place its literal values appear.
  *
- * **This is the one file in `client/src/ui/` allowed to contain a hex colour.**
- * `__tests__/noHexColors.test.ts` fails the build on a hex literal anywhere else
- * under `client/src/ui/`, which is what stops a one-off `#1a1a1a` from quietly forking
- * the palette. Everything else references `var(--…)`.
+ * **This is the one file under `client/src/` allowed to contain a hex colour.**
+ * `__tests__/noHexColors.test.ts` fails the build on a hex literal anywhere else,
+ * which is what stops a one-off `#1a1a1a` from quietly forking the palette.
+ * Everything else references `var(--…)` — or, from brief 26 onward, a Tailwind
+ * utility, which is the same thing by another name (see `@theme inline` below).
  *
- * Two things here are deliberate and look like mistakes:
+ * ── Why the palette moved again ─────────────────────────────────────────────
  *
- *   - **One theme — light — and no `prefers-color-scheme` block.** The app was
- *     dark-only until 2026-07-30 for a stated reason (one user, 7am, a dim room);
- *     the user asked for white instead, so it is white-only. A second theme would
- *     double the palette and halve the number of eyes on each half.
- *   - **`box-shadow` is never used.** Elevation is expressed by surface *tint*
- *     (`--surface-1..3`) and hairlines. There is no `--shadow-*` token to reach
- *     for — shadow on white is the single most common template tell, and the
- *     surfaces here are containers rather than floating cards.
+ * This is the third palette. Dark-only until 2026-07-30 (one user, 7am, a dim
+ * room), then white-only, and now — after the 2026-09-04 direction round — **the
+ * category standard**: near-black ground, one accent chosen from eight, light and
+ * dark at parity, executed at openGym's craft bar. The reference build
+ * (`artifact/819f0350`) is the spec; these are its values, with the divergences
+ * called out where they occur.
+ *
+ * Two rules from the white world are **dead** and their absence is deliberate:
+ *
+ *   - **"One theme."** There are now three theme *states*, below.
+ *   - **"`box-shadow` is never used."** That rule was written for white, where a
+ *     shadow is the single most common template tell. On near-black a card does
+ *     not read as a card without real offset and blur, so there is a `--sh-*`
+ *     scale and it is meant to be used. (`src/index.css` still carries a global
+ *     `box-shadow: none` from the old world; brief 27 owns removing it.)
+ *
+ * ── The three theme states, and why the order is load-bearing ───────────────
+ *
+ *   1. bare `:root` declares the **complete light palette**;
+ *   2. `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`
+ *      redefines those tokens for an unstamped page on a dark OS;
+ *   3. `:root[data-theme="dark"]` redefines them again for an explicit choice.
+ *
+ * A colour whose only definition lives inside (2) or (3) simply does not exist in
+ * the unstamped, light-OS state — the property is unset and every `var(--x)`
+ * using it falls back to nothing. So **every token is declared in bare `:root`
+ * first** and the later blocks only ever overwrite. `__tests__/contrast.test.ts`
+ * asserts this mechanically rather than trusting the comment.
+ *
+ * (2) and (3) are near-identical by necessity — one is a media query and one is a
+ * selector, and CSS gives no way to say "these two conditions produce the same
+ * declarations". Their duplication is the obvious place for drift, so the test
+ * also asserts they declare the same tokens with the same values.
+ *
+ * ── Eight accents, each with its own ink ────────────────────────────────────
+ *
+ * The accent is stamped as `[data-accent="mint|azure|violet|magenta|coral|amber|
+ * lime|slate"]` on the root element; unstamped is mint. Each accent ships its own
+ * `--on-accent`, and that is the point rather than a flourish: one shared ink
+ * cannot clear 4.5:1 against all eight — a near-black that works on lime is 2:1
+ * on violet — and it is exactly the failure the contrast test exists to catch.
+ *
+ * **`--accent` differs by theme; the reference build's does not.** That is the one
+ * substantive divergence here and it is forced. The artifact switches accents by
+ * writing an inline style on `documentElement`, which overrides both themes at
+ * once, so its light mode paints the dark-mode mint (`#2BD9A4`) on white at
+ * **1.8:1** — illegible as text, and below even the 3:1 non-text floor as the
+ * progress ring. Accent-coloured text is real in this design (the current tab
+ * label, the stat delta, the safety eyebrow), so the light theme gets the same
+ * eight hues re-derived at ~6:1 on white, and the light inks are correspondingly
+ * near-white. "Light and dark at parity" is the claim; this is what honouring it
+ * costs.
+ *
+ * `--warn` and `--dang` are separate hues and are **never** wired to the accent.
+ * That is what lets the accent be any of the eight without changing what a
+ * warning looks like. It does not mean a warm accent is perceptually far from
+ * them — light `coral` sits near `--dang`, and in the reference build dark coral
+ * (`#FF7A5C`) and dark danger (`#F2857A`) are all but the same colour. Offering a
+ * coral accent buys that; the separation being protected here is the wiring.
  */
 
-/* Archivo, self-hosted. Deliberately not Inter or Roboto — "Inter everywhere" is
-   the most-cited AI-generated-UI fingerprint. Self-hosted because the app is
-   offline-first: a font CDN is a network dependency on the first paint. The file
-   is the variable latin subset, ~35 KB, preloaded from index.html. */
+/* Inter, self-hosted. The old world used Archivo on the explicit grounds that
+   "Inter everywhere" is the most-cited AI-generated-UI fingerprint; the direction
+   round overruled that on the equally explicit grounds that Inter is the
+   category's face and this build IS the category standard. Committed to, not
+   defaulted to.
+
+   `local()` first so a machine that already has Inter never touches the network,
+   then the self-hosted file — offline-first means no font CDN, ever.
+
+   **The woff2 is not in the tree yet.** `client/public/fonts/` still holds only
+   `archivo-latin-var.woff2`, and `index.html` still preloads it. Both are asset
+   work outside this brief's file list; until they land, `font-display: swap`
+   means the app renders in the system stack rather than breaking. */
 @font-face {
-  font-family: 'Archivo';
+  font-family: 'Inter';
   font-style: normal;
-  font-weight: 400 700;
-  font-stretch: 100%;
-  /* `swap`, not `block`: a session must be readable in the system font while
-     35 KB arrives, and it will already be cached by the service worker. */
+  font-weight: 400 800;
   font-display: swap;
-  src: url('/fonts/archivo-latin-var.woff2') format('woff2');
+  src:
+    local('InterVariable'),
+    local('Inter Variable'),
+    local('Inter'),
+    url('/fonts/inter-latin-var.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
     U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   1 · The complete light palette, plus every scale that does not vary by theme.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 :root {
+  /* Not `light dark` — the stamped states below are authoritative and a UA that
+     decides on its own to invert a form control fights them. The dark blocks set
+     this to `dark` themselves. */
   color-scheme: light;
 
-  /* ── Colour ───────────────────────────────────────────────────────────────
-     White canvas. Every ratio below is measured against the surface the token
-     is actually used on, not against `--bg` — `--text-3` is the placeholder
-     inside a `--surface-2` field, so the floor that matters is 4.7:1 there, not
-     5.3:1 on white.
-
-     Inverting the dark palette was not an option: `#6ee7a8` is 1.5:1 on white,
-     so the accent had to be re-chosen rather than re-tuned. It is still the
-     same green in hue — the identity survives; the lightness does not. */
+  /* ── Ground and surfaces ──────────────────────────────────────────────────
+     Four steps and two hairlines. Elevation is tint *and* shadow; the ramp is
+     deliberately shallow — the contrast test asserts a **ceiling** on each of
+     these against `--bg`, because a surface that reached 3:1 would stop reading
+     as a container and start reading as a border. */
   --bg: #ffffff;
-  --surface-1: #f5f7f8;
-  --surface-2: #eef1f3;
-  --surface-3: #e3e8ea;
-  --hairline: rgba(17, 24, 32, 0.12);
-  --hairline-2: rgba(17, 24, 32, 0.22);
+  --s1: #f4f6f8;
+  --s2: #eaeef2;
+  --s3: #dfe5eb;
 
-  --text-1: #14181d; /* 17.8:1 */
-  --text-2: #4a535d; /*  7.8:1 */
-  --text-3: #646c75; /*  5.3:1 on white, 4.7:1 on --surface-2 — the floor */
+  --line: rgba(12, 17, 23, 0.1);
+  --line2: rgba(12, 17, 23, 0.18);
 
-  --accent: #0b6b3f; /*  6.6:1 on white — AA as text at any size */
-  --accent-press: #085330;
-  --accent-wash: rgba(11, 107, 63, 0.1);
-  --on-accent: #ffffff; /*  6.6:1 on accent, 9.2:1 on accent-press */
+  /* ── Ink ──────────────────────────────────────────────────────────────────
+     Measured against the surface each is actually painted on, not against
+     `--bg`: `--tx3` is the input placeholder inside a `--s2` field, so the floor
+     that matters for it is 4.76:1 there, not 5.55:1 on white.
 
-  /* Regressions and destructive confirms ONLY. There is no red anywhere in this
-     app: green-vs-red comparison affect is guilt with extra steps. The dark
-     theme's #e8b04b amber is 1.9:1 on white, so this is the same ochre taken
-     down to a readable lightness. */
-  --warn: #7d4f00; /* 7.0:1 */
-  --warn-wash: rgba(125, 79, 0, 0.1);
+     Both muted inks are darker than the reference build's. Its `--tx3` (#646E7B)
+     is 4.44:1 on `--s2` — under the floor — and pulling only that one up left it
+     within 11% of `--tx2`, i.e. two tokens that no longer look like two tokens.
+     So the pair was re-spaced together and the ramp survives. */
+  --tx: #0c1117; /* 18.9:1 on --bg */
+  --tx2: #4e5863; /*  7.2:1 on --bg, 6.2:1 on --s2 */
+  --tx3: #616975; /*  5.6:1 on --bg, 4.8:1 on --s2 — the floor */
+
+  /* ── Accent: mint, the unstamped default ──────────────────────────────────
+     Repeated verbatim in `[data-accent="mint"]` below. That duplication is on
+     purpose: this block is what an unstamped root gets, and the stamped block is
+     what an explicit `data-accent="mint"` gets, and neither may depend on the
+     other existing. `--accent-2` is the gradient partner on the primary button —
+     the ink sits on both ends of that gradient, which is why the contrast test
+     pairs `--on-accent` with `--accent-2` as well as with `--accent`. */
+  --accent: #0d7153;
+  --accent-2: #6d41fd;
+  --on-accent: #eef9f6;
+
+  /* ── Semantics ────────────────────────────────────────────────────────────
+     Fixed hues, never the accent. The `-bg` pair is a translucent wash rather
+     than a solid, so it tints whatever it lands on; it has no contrast ratio of
+     its own and the test composites it over `--bg` before measuring. */
+  --warn: #9a5b00;
+  --warn-bg: rgba(154, 91, 0, 0.1);
+  --dang: #b0362b;
+  --dang-bg: rgba(176, 54, 43, 0.09);
+
+  /* The empty cell of the streak grid and the unfilled track of the progress
+     ring. Decorative by design — the numeral inside the ring carries the value —
+     so it is under the 3:1 floor and the test asserts that as a ceiling. */
+  --grid0: #e6ebf0;
+
+  /* ── Elevation ────────────────────────────────────────────────────────────
+     Three steps: resting card, sticky chrome, overlay. Per theme, because a
+     shadow on near-black is a different physical claim than one on white — it
+     needs far more opacity to be visible at all. */
+  --sh-1: 0 1px 2px rgba(12, 17, 23, 0.05);
+  --sh-2:
+    0 1px 2px rgba(12, 17, 23, 0.05), 0 8px 24px -14px rgba(12, 17, 23, 0.28);
+  --sh-3:
+    0 2px 4px rgba(12, 17, 23, 0.06), 0 18px 44px -20px rgba(12, 17, 23, 0.34);
+
+  /* ── Radii ────────────────────────────────────────────────────────────────
+     The reference build's three, plus the pill. Four, down from the old world's
+     five — `--r` is the card/control default and the two neighbours exist so a
+     chip can be tighter and a panel looser. */
+  --r-sm: 8px;
+  --r: 12px;
+  --r-lg: 16px;
+  --r-full: 999px;
 
   /* ── Type ─────────────────────────────────────────────────────────────────
-     Shipped in `rem` with no px `font-size` on `html`, so OS text scaling
-     works. Minimum weight is 400, 500 under 17px. The reason changed with the
-     theme and the rule did not: on dark, thin type halated; on white, dark-on-
-     light optically thins the stroke, so 300 would be spindly rather than
-     glowing. Same floor, opposite cause. */
-  --font-ui: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+     Unchanged by this brief and not re-derived from the reference: `app.css`
+     still lays out against these, and a type scale is not a colour. Shipped in
+     `rem` with no px `font-size` on `html`, so OS text scaling works.
+
+     The minimum-weight rule (400, 500 under 17px) outlived two themes and now
+     has to hold on both at once: on dark, thin type halates; on light, dark-on-
+     light optically thins the stroke. Same floor, opposite causes. */
+  --font-ui: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
 
   --fs-hero: clamp(5.5rem, 26vw, 8.25rem); /* set target, rest countdown */
   --fs-mono: 4.5rem; /* sessions-completed count */
   --fs-display: 2.5rem; /* day title, cardio state label */
   --fs-title: 1.75rem; /* exercise name in session */
   --fs-h: 1.375rem;
-  /* 19px, down from 24px on 2026-07-30 with the button heights. 24px inside a
-     56px control leaves 16px of breathing room top and bottom and reads as a
-     banner; the label should sit in the button, not fill it. Same value as
-     --fs-body-l by arithmetic, kept a separate token because it answers a
-     different question. */
+  /* Same value as --fs-body-l by arithmetic, kept a separate token because it
+     answers a different question: 24px inside a 56px control reads as a banner,
+     and the label should sit in the button rather than fill it. */
   --fs-btn: 1.1875rem;
   --fs-body-l: 1.1875rem; /* cues */
   --fs-body: 1.0625rem; /* floor for body text */
@@ -106,8 +219,10 @@
   --ls-title: -0.015em;
   --ls-label: 0.1em;
 
-  /* ── Spacing, radii, sizing ───────────────────────────────────────────────
-     Nothing uses 6, 10, 14 or 18px. Exactly five radii exist. */
+  /* ── Spacing and sizing ───────────────────────────────────────────────────
+     Nothing uses 6, 10, 14 or 18px. The 44px floor is WCAG 2.2 AAA target size
+     (2.5.8) and is why nothing goes lower; the old floor-phone model that
+     justified a 96px primary is retired. */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -119,33 +234,14 @@
   --sp-12: 48px;
   --sp-16: 64px;
 
-  --r-sm: 8px;
-  --r-md: 14px;
-  --r-lg: 20px;
-  --r-xl: 24px;
-  --r-full: 999px;
-
-  /*
-   * Ordinary control sizes. **Revised 2026-07-30** from 48 / 56 / 96px.
-   *
-   * The old numbers came from a floor-phone model — a sweaty finger aiming at a
-   * phone lying on the ground, viewed obliquely mid-exhale — which justified a
-   * 96px primary. The user scoped the app to phones and desktops, both of which
-   * have good pointing accuracy, so that model is retired and these are the
-   * conventional sizes for those two devices.
-   *
-   * The floor is still 44px, which is WCAG 2.2's AAA target size (2.5.8) and the
-   * reason nothing here goes lower. Going below it to look tidier would be a real
-   * accessibility regression rather than a style choice.
-   */
   --tap-min: 44px; /* icon-sized and link-weight controls */
   --tap-row: 48px; /* secondary buttons and text inputs */
   --tap-primary: 56px; /* the one primary action per screen */
 
   /* ── Motion ───────────────────────────────────────────────────────────────
      Chrome motion only ever confirms a state change. Two content exceptions
-     exist — the countdown ring and the exercise figure — and neither licenses
-     a third. */
+     exist — the countdown ring and the exercise figure — and neither licenses a
+     third. `ui/easing.ts` mirrors these in JS for the one value-driven case. */
   --dur-instant: 90ms;
   --dur-fast: 160ms;
   --dur-base: 240ms;
@@ -155,12 +251,299 @@
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* segment fill, once */
 
   /* ── Stacking ─────────────────────────────────────────────────────────────
-     A named scale, so nobody ever writes 9999. Two entries, because there are
-     exactly two layers: there is no modal anywhere in this app (see the note at
-     the foot of app.css), so a backdrop and dialog tier would be a scale
-     describing a structure the app does not have. */
+     A named scale, so nobody ever writes 9999. Three entries now: the tab bar
+     the direction round introduced is a third layer the old two-tier scale had
+     no name for. Still no modal tier, because there is still no modal. */
   --z-rail: 10;
   --z-footer: 20;
+  --z-tabbar: 30;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1b · The eight accents, light.
+
+   Each is the reference build's hue re-derived to ~6:1 on `--bg` so it survives
+   as text, with a near-white ink tinted toward its own hue — a flat white would
+   also clear the floor here, but on a deep magenta it reads as a hole punched in
+   the fill, and the tint is what stops that.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root[data-accent='mint'] {
+  --accent: #0d7153;
+  --accent-2: #6d41fd;
+  --on-accent: #eef9f6;
+}
+:root[data-accent='azure'] {
+  --accent: #0261c1;
+  --accent-2: #6d41fd;
+  --on-accent: #eff4f8;
+}
+:root[data-accent='violet'] {
+  --accent: #6e30fd;
+  --accent-2: #0658fc;
+  --on-accent: #f2eff8;
+}
+:root[data-accent='magenta'] {
+  --accent: #bf0c71;
+  --accent-2: #8b28fd;
+  --on-accent: #f8eff4;
+}
+:root[data-accent='coral'] {
+  --accent: #b33905;
+  --accent-2: #8f5f0c;
+  --on-accent: #f8f1ef;
+}
+:root[data-accent='amber'] {
+  --accent: #7f5e01;
+  --accent-2: #c0380e;
+  --on-accent: #f9f6ee;
+}
+:root[data-accent='lime'] {
+  --accent: #456e0c;
+  --accent-2: #0d7758;
+  --on-accent: #f4f9ee;
+}
+:root[data-accent='slate'] {
+  --accent: #4c667c;
+  --accent-2: #4a6c8a;
+  --on-accent: #f2f4f5;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2 · Dark by OS preference, for a page that has not been stamped.
+
+   `:not([data-theme="light"])` is the whole mechanism: an explicit light choice
+   opts out of this block, and an explicit dark choice is handled by block 3,
+   which is identical and comes later so it wins the specificity tie.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --bg: #0a0d11;
+    --s1: #12171d;
+    --s2: #181f27;
+    --s3: #212a34;
+
+    --line: rgba(237, 242, 247, 0.09);
+    --line2: rgba(237, 242, 247, 0.17);
+
+    --tx: #edf2f7;
+    --tx2: #95a2b1;
+    --tx3: #8b97a6;
+
+    --accent: #2bd9a4;
+    --accent-2: #9075ff;
+    --on-accent: #04231a;
+
+    --warn: #f0b457;
+    --warn-bg: rgba(240, 180, 87, 0.12);
+    --dang: #f2857a;
+    --dang-bg: rgba(242, 133, 122, 0.12);
+
+    --grid0: #1a222b;
+
+    --sh-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --sh-2: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px -16px rgba(0, 0, 0, 0.8);
+    --sh-3: 0 2px 6px rgba(0, 0, 0, 0.55), 0 22px 50px -22px rgba(0, 0, 0, 0.9);
+  }
+
+  /* The reference build's eight, verbatim, with three `--accent-2` values
+     lifted: mint, azure and slate paired their ink with a partner it only made
+     3.8–4.3:1 against, and the primary button's gradient puts that ink squarely
+     on the partner end. Lifting the partner was the cheap fix; darkening the ink
+     would have cost its contrast on `--accent`. */
+  :root:not([data-theme='light'])[data-accent='mint'] {
+    --accent: #2bd9a4;
+    --accent-2: #9075ff;
+    --on-accent: #04231a;
+  }
+  :root:not([data-theme='light'])[data-accent='azure'] {
+    --accent: #3b9bff;
+    --accent-2: #9075ff;
+    --on-accent: #04182e;
+  }
+  :root:not([data-theme='light'])[data-accent='violet'] {
+    --accent: #9b7bff;
+    --accent-2: #4a7dff;
+    --on-accent: #150a33;
+  }
+  :root:not([data-theme='light'])[data-accent='magenta'] {
+    --accent: #f062b0;
+    --accent-2: #a163ff;
+    --on-accent: #2e0620;
+  }
+  :root:not([data-theme='light'])[data-accent='coral'] {
+    --accent: #ff7a5c;
+    --accent-2: #f0b457;
+    --on-accent: #2e0c04;
+  }
+  :root:not([data-theme='light'])[data-accent='amber'] {
+    --accent: #f5b93c;
+    --accent-2: #ff7a5c;
+    --on-accent: #2b1b00;
+  }
+  :root:not([data-theme='light'])[data-accent='lime'] {
+    --accent: #9be04a;
+    --accent-2: #2bd9a4;
+    --on-accent: #152600;
+  }
+  :root:not([data-theme='light'])[data-accent='slate'] {
+    --accent: #8fa3b8;
+    --accent-2: #6486a7;
+    --on-accent: #0a141e;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3 · Dark by explicit stamp. Identical to block 2 by necessity — see the header.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #0a0d11;
+  --s1: #12171d;
+  --s2: #181f27;
+  --s3: #212a34;
+
+  --line: rgba(237, 242, 247, 0.09);
+  --line2: rgba(237, 242, 247, 0.17);
+
+  --tx: #edf2f7;
+  --tx2: #95a2b1;
+  --tx3: #8b97a6;
+
+  --accent: #2bd9a4;
+  --accent-2: #9075ff;
+  --on-accent: #04231a;
+
+  --warn: #f0b457;
+  --warn-bg: rgba(240, 180, 87, 0.12);
+  --dang: #f2857a;
+  --dang-bg: rgba(242, 133, 122, 0.12);
+
+  --grid0: #1a222b;
+
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --sh-2: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px -16px rgba(0, 0, 0, 0.8);
+  --sh-3: 0 2px 6px rgba(0, 0, 0, 0.55), 0 22px 50px -22px rgba(0, 0, 0, 0.9);
+}
+
+:root[data-theme='dark'][data-accent='mint'] {
+  --accent: #2bd9a4;
+  --accent-2: #9075ff;
+  --on-accent: #04231a;
+}
+:root[data-theme='dark'][data-accent='azure'] {
+  --accent: #3b9bff;
+  --accent-2: #9075ff;
+  --on-accent: #04182e;
+}
+:root[data-theme='dark'][data-accent='violet'] {
+  --accent: #9b7bff;
+  --accent-2: #4a7dff;
+  --on-accent: #150a33;
+}
+:root[data-theme='dark'][data-accent='magenta'] {
+  --accent: #f062b0;
+  --accent-2: #a163ff;
+  --on-accent: #2e0620;
+}
+:root[data-theme='dark'][data-accent='coral'] {
+  --accent: #ff7a5c;
+  --accent-2: #f0b457;
+  --on-accent: #2e0c04;
+}
+:root[data-theme='dark'][data-accent='amber'] {
+  --accent: #f5b93c;
+  --accent-2: #ff7a5c;
+  --on-accent: #2b1b00;
+}
+:root[data-theme='dark'][data-accent='lime'] {
+  --accent: #9be04a;
+  --accent-2: #2bd9a4;
+  --on-accent: #152600;
+}
+:root[data-theme='dark'][data-accent='slate'] {
+  --accent: #8fa3b8;
+  --accent-2: #6486a7;
+  --on-accent: #0a141e;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Tailwind, CSS-first.
+
+   `@theme inline` is what makes Tailwind read *this* file rather than a JS
+   config. `inline` means the generated utilities emit `var(--tx)` at the use
+   site instead of copying the value into a `--color-tx` of their own — which is
+   the only version that works here, because the value has to be re-resolved
+   under `[data-theme]` and `[data-accent]`. A non-inline `@theme` would freeze
+   the light palette into every utility.
+
+   The consequence that matters architecturally: `tokens.css` stays the single
+   source of colour truth, so `noHexColors.test.ts` and `contrast.test.ts` keep
+   working by parsing one CSS file. A `tailwind.config.js` holding colours would
+   silently defeat both. There is deliberately no such file.
+
+   Spacing, durations and the tap sizes are **not** mapped. Tailwind's spacing
+   namespace is a single multiplier and re-keying it against `--sp-*` would give
+   two spellings of the same scale that could drift; those stay `var(--sp-4)`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@theme inline {
+  /* → bg-*, text-*, border-*, fill-*, stroke-*, ring-*, divide-*, … */
+  --color-bg: var(--bg);
+  --color-s1: var(--s1);
+  --color-s2: var(--s2);
+  --color-s3: var(--s3);
+  --color-line: var(--line);
+  --color-line2: var(--line2);
+  --color-tx: var(--tx);
+  --color-tx2: var(--tx2);
+  --color-tx3: var(--tx3);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-on-accent: var(--on-accent);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-dang: var(--dang);
+  --color-dang-bg: var(--dang-bg);
+  --color-grid0: var(--grid0);
+
+  /* → rounded-sm | rounded | rounded-lg | rounded-full */
+  --radius-sm: var(--r-sm);
+  --radius: var(--r);
+  --radius-lg: var(--r-lg);
+  --radius-full: var(--r-full);
+
+  /* → shadow-1 | shadow-2 | shadow-3 */
+  --shadow-1: var(--sh-1);
+  --shadow-2: var(--sh-2);
+  --shadow-3: var(--sh-3);
+
+  /* → font-ui */
+  --font-ui: var(--font-ui);
+
+  /* → text-hero … text-label. No name here collides with a `--color-*` above,
+     which is what keeps `text-tx2` (a colour) and `text-body` (a size) from
+     fighting over the same utility. */
+  --text-hero: var(--fs-hero);
+  --text-mono: var(--fs-mono);
+  --text-display: var(--fs-display);
+  --text-title: var(--fs-title);
+  --text-h: var(--fs-h);
+  --text-btn: var(--fs-btn);
+  --text-body-l: var(--fs-body-l);
+  --text-body: var(--fs-body);
+  --text-meta: var(--fs-meta);
+  --text-label: var(--fs-label);
+
+  /* → ease-out | ease-in | ease-spring */
+  --ease-out: var(--ease-out);
+  --ease-in: var(--ease-in);
+  --ease-spring: var(--ease-spring);
 }
 
 /* `--dur-instant` survives: press feedback is functional, not decorative. The
