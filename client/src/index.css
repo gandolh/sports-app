@@ -1,20 +1,53 @@
 /**
- * Reset and base. The tokens live in `ui/tokens.css`, the interface in
- * `ui/app.css`; this file is only the document-level floor they both stand on.
+ * Reset and base. The tokens live in `ui/tokens.css`; this file is the
+ * document-level floor everything else stands on, plus the handful of
+ * primitives that genuinely cannot be a Tailwind utility.
+ *
+ * ── What belongs here and what does not ─────────────────────────────────────
+ *
+ * Since brief 26 every colour, radius, shadow and type size is a utility, so a
+ * component's appearance is written where the component is. What is left for
+ * this file is the rules that have no element to hang off: the
+ * screen-reader-only clip, the focus ring, the pressed state a `data-`
+ * attribute drives, and the safe-area insets. Adding a `.card` or a `.tile`
+ * here would re-create `app.css` under a new name, which is the thing brief 27
+ * exists to stop.
+ *
+ * `ui/app.css` — the white world's vocabulary — and its import here, along with
+ * the `TEMPORARY` alias block at the foot of `tokens.css`, were deleted by brief
+ * 27b once `/plan`, `/account`, `/login` and the root route's 404 stopped
+ * rendering against them. Nothing may reference either again.
+ *
+ * ── Everything below is `@layer base`, and that is load-bearing ────────────
+ *
+ * `@import 'tailwindcss'` (in `tokens.css`) declares `@layer theme, base,
+ * components, utilities` and puts every generated utility in the last of those.
+ * CSS's own rule is that an **unlayered** style always beats every layered one,
+ * regardless of source order or specificity — so a plain `button { border: 0 }`
+ * written down here, outside any layer, silently wins against `.border` and
+ * every colour utility on every `<button>` in the app, brief 26's whole Tailwind
+ * migration notwithstanding. `SecondaryButton`'s `border border-line2` rendered
+ * with no border at all until this was caught (27b), on both 27a's screens and
+ * this brief's. Putting this file's own rules in `@layer base` — the same layer
+ * Tailwind's own preflight uses — is what lets a component's utility classes
+ * override the reset the way every one of them already assumes they can.
  */
 @import './ui/tokens.css';
-@import './ui/app.css';
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  /* Global, and it is doctrine rather than a reset convenience: elevation is
-     expressed by surface tint and hairlines, never by a shadow. The rule
-     outlived the dark theme that motivated it — a shadow did not read in a dim
-     room, and on white it reads all too well as the default card look. */
-  box-shadow: none;
-}
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+/* There WAS a global `box-shadow: none` on the selector above, and its removal
+   is deliberate rather than tidying. It was doctrine from the white world —
+   "elevation is surface tint and hairlines, never a shadow" — written when a
+   shadow was the most common template tell on white and invisible on the dark
+   theme before it. The ground is near-black again; a card does not read as a
+   card on it without real offset and blur, so `tokens.css` ships a
+   `--sh-1|2|3` scale, and this one line was silently neutralising all of it. */
 
 html {
   /* Never a px font-size here — the whole rem scale is sized off the user's OS
@@ -27,11 +60,18 @@ body {
   margin: 0;
   min-height: 100dvh;
   background: var(--bg);
-  color: var(--text-1);
+  color: var(--tx);
   font-family: var(--font-ui);
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   font-weight: 400;
+  /* Inter's alternate single-storey `a` and disambiguated `1`/`l`. Chosen for
+     the numerals: this app puts a rep target and a countdown at 88px and up,
+     and they have to be unmistakable at a glance from the floor. */
+  font-feature-settings:
+    'cv05' 1,
+    'ss01' 1;
+  -webkit-font-smoothing: antialiased;
   /* The player is tapped hard and often. The grey flash and the text selection
      that a mis-drag produces are both actively unwanted there. */
   -webkit-tap-highlight-color: transparent;
@@ -41,6 +81,7 @@ body {
 h1,
 h2,
 h3,
+h4,
 p,
 ul,
 ol,
@@ -73,6 +114,11 @@ input {
   color: inherit;
 }
 
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
 /* Never removed, at 3px with a 2px offset. A keyboard is a legitimate way to
    drive this app — a phone with a case-keyboard, a desktop rehearsal — and an
    invisible focus ring on a four-control screen is unrecoverable. */
@@ -80,4 +126,59 @@ input {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--r-sm);
+}
+
+/**
+ * Visually hidden, still announced. Duplicated from `app.css` on purpose: this
+ * is the copy that survives 27b's deletion of that file, and the two are
+ * identical so the overlap is inert until then.
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/**
+ * Press feedback, driven by the `data-pressed` attribute `PressButton` sets on
+ * `pointerdown` rather than by `:active`.
+ *
+ * One rule rather than a utility per button, because the attribute is the whole
+ * mechanism: on iOS Safari `:active` does not apply to a plain `<button>`
+ * unless the document carries a touch listener, so the feedback silently
+ * disappears on the one platform where this app runs as an installed PWA.
+ *
+ * `--dur-instant` survives `prefers-reduced-motion` untouched (see the foot of
+ * `tokens.css`). Press feedback is functional, not decorative: a user who asked
+ * for less motion did not ask to stop knowing whether their tap landed.
+ */
+[data-pressed] {
+  transform: scale(0.985);
+  filter: brightness(0.94);
+  transition:
+    transform var(--dur-instant) var(--ease-out),
+    filter var(--dur-instant) var(--ease-out);
+}
+
+/**
+ * The safe areas, as two classes rather than a layout component.
+ *
+ * `viewport-fit=cover` in `index.html` is what lets the app reach under the
+ * home indicator and the notch, and it is also what would put a 56px primary
+ * button half underneath the indicator if nothing paid it back. These are the
+ * two places that pay: the sticky footer, and the tab bar below it.
+ */
+.pad-bottom-safe {
+  padding-bottom: max(var(--sp-3), env(safe-area-inset-bottom));
+}
+
+.pad-top-safe {
+  padding-top: max(var(--sp-2), env(safe-area-inset-top));
+}
 }

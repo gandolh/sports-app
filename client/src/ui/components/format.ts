@@ -1,19 +1,35 @@
 /**
- * The app's whole formatting layer. Numbers and prose only — **there is no date
- * formatter here and there is no place to add one.**
+ * The app's whole formatting layer: numbers, prose, and — since 2026-09-04 —
+ * dates.
  *
- * `__tests__/noDatesInUi.test.ts` greps every file under `client/src/ui/` for the dozen
- * ways a date or a clock read has previously been smuggled into a UI layer, and
- * fails on a hit. That is why `groupDigits` below is hand-rolled rather than
- * delegating to the standard locale-aware number formatter: that formatter's name
- * is on the forbidden list, because the same call with a different argument is a
- * formatted date. Four lines of digit grouping is a cheap price for a rule with no
- * exceptions (corpus/wiki/decisions.md, no dates anywhere in the app).
+ * ── There used to be a rule here, and it is gone ────────────────────────────
  *
- * The test greps for the API names as text, so do not name them here either.
+ * This header said "there is no date formatter here and there is no place to add
+ * one", and `__tests__/noDatesInUi.test.ts` enforced it by grepping every file
+ * under `client/src/ui/` for the dozen ways a clock read had previously been
+ * smuggled into a UI layer. That rule was reversed in the v3 direction round
+ * (corpus/wiki/reversals.md): the app now shows a date, a streak, a heatmap and
+ * a calendar. Brief 27 **deleted** the test rather than weakening it, because a
+ * test kept alive after its rule is gone tells the next reader something false.
+ *
+ * ── Everything below is still hand-rolled, for a different reason ───────────
+ *
+ * `groupDigits` and `formatLongDate` do not call the platform's locale-aware
+ * formatters, and that is now a determinism argument rather than a prohibition.
+ * This app is English-only and its tests assert on rendered strings; a formatter
+ * that answers differently under a different `LANG`, a different ICU build or a
+ * headless runner turns a screen assertion into a flake. Two arrays of names and
+ * four lines of digit grouping are cheap, and they read the same everywhere.
+ *
+ * The rule that did **not** move: `client/src/domain/` still may not read the
+ * clock, and eslint still fails the build on it. Dates enter through
+ * `client/src/persistence/` and are passed in. Nothing in this file calls
+ * `new Date()` either — every function takes the `Date` it is given.
  */
 import type { Pattern, TargetUnit } from '@sports-app/shared/types.ts'
-import type { PrescribedItem } from '../../domain/schedule.ts'
+import { LADDERS } from '../../domain/ladders.ts'
+import { slotAt } from '../../domain/types.ts'
+import type { PrescribedExercise, PrescribedItem, Prescription } from '../../domain/schedule.ts'
 
 /**
  * `12480` → `12,480`. Grouped because the account page's totals reach six
@@ -103,4 +119,132 @@ export const PATTERN_LABEL: Readonly<Record<Pattern, string>> = {
   hinge: 'Hinge',
   core: 'Core',
   pull: 'Posture (pull)',
+}
+
+// ─── Dates ──────────────────────────────────────────────────────────────────
+//
+// New in brief 27. See the header for why they are hand-rolled and why they
+// exist at all.
+
+const WEEKDAY_NAMES: readonly string[] = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+]
+
+const MONTH_NAMES: readonly string[] = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
+
+/**
+ * `Friday, 4 September` — the date rail on the Today screen.
+ *
+ * No year, and that is a choice rather than an omission: the rail answers "what
+ * day is it", which is a question about this week. A year in it would be four
+ * characters of noise on 364 days and mildly startling on the 365th.
+ */
+export function formatLongDate(date: Date): string {
+  const weekday = WEEKDAY_NAMES[date.getDay()] ?? ''
+  const month = MONTH_NAMES[date.getMonth()] ?? ''
+  return `${weekday}, ${date.getDate()} ${month}`
+}
+
+// ─── The prescription, as headings ──────────────────────────────────────────
+
+/**
+ * `rung 5 of 9` for an exercise, `null` for the cardio slot.
+ *
+ * `null` rather than a placeholder string: a cardio slot has no ladder, no rung
+ * and no progression, and `PrescribedCardio` has no field to read. Rendering
+ * "rung 0 of 0" there would invent a ladder the programme deliberately does not
+ * have (`CardioProtocol`, "deliberately not a `Ladder`").
+ */
+export function rungSummary(item: PrescribedItem): string | null {
+  if (item.type === 'cardio') return null
+  return `rung ${item.rungIndex + 1} of ${LADDERS[item.pattern].rungs.length}`
+}
+
+/**
+ * The line under the day title: `Session 142 · rung 5 of 9`.
+ *
+ * The rungs listed are the slot's OWN work, never the daily block. Legs day
+ * trains squat and hinge and shows both; Push day shows one; Cardio day trains
+ * no ladder of its own and says so in words rather than showing the core and
+ * posture rungs it shares with every other session. Listing the daily block here
+ * would put the same two rungs under every single day and make the line
+ * unreadable as a description of *this* session.
+ */
+export function sessionSummary(prescription: Prescription, sessionNumber: number): string {
+  // The slot's own patterns, from `ROTATION`, and never `ladderKind`. The daily
+  // block's core ladder is `kind: 'strength'` too, so filtering on that put
+  // `core rung 2 of 6` under every single day — which is exactly the unreadable
+  // line this filter exists to avoid.
+  const slot = slotAt(prescription.position)
+  const parts = prescription.items
+    .filter(
+      (item): item is PrescribedExercise =>
+        item.type === 'exercise' && slot.patterns.includes(item.pattern),
+    )
+    .map((item) => `${item.pattern} ${rungSummary(item)}`)
+  if (parts.length === 0) parts.push('five hard minutes, no ladder')
+  return `Session ${sessionNumber} · ${parts.join(' · ')}`
+}
+
+// ─── Logged sets ────────────────────────────────────────────────────────────
+
+/**
+ * `[8, 8, 6]` → `8 · 8 · 6`. An empty array is `nothing`, spelled out.
+ *
+ * Three states reach here and all three are real (`shared/types.ts`): the key
+ * absent means not logged and the caller renders an em dash without asking this
+ * function; `[]` means the person logged that they did nothing, which deserves a
+ * word rather than an empty span; anything else is what they did.
+ */
+export function formatLog(values: readonly number[]): string {
+  if (values.length === 0) return 'nothing'
+  return values.join(' · ')
+}
+
+/** The same list as a sentence, for `aria-label`. `8 · 8 · 6` is not speech. */
+export function logLabel(values: readonly number[], unit: TargetUnit): string {
+  if (values.length === 0) return 'Logged: nothing'
+  const spoken = values.map((value) => `${value} ${unitWord(unit, value)}`).join(', ')
+  return `Logged: ${spoken}`
+}
+
+/**
+ * `+2`, `−1`, `0`. A true minus sign, not a hyphen.
+ *
+ * The pair is set in `tabular-nums` beside each other in the comparison strip,
+ * and a hyphen-minus is narrower than a plus at the same size — the two rows
+ * visibly fail to line up. This is the one place the distinction is worth a
+ * character nobody can type.
+ */
+export function signedDelta(value: number): string {
+  if (value > 0) return `+${value}`
+  if (value < 0) return `−${Math.abs(value)}`
+  return '0'
+}
+
+/** The same, as prose: screen readers read `−` inconsistently or not at all. */
+export function deltaLabel(value: number, unit: TargetUnit): string {
+  const word = unitWord(unit, Math.abs(value))
+  if (value > 0) return `${value} ${word} more than last time`
+  if (value < 0) return `${Math.abs(value)} ${word} fewer than last time`
+  return `The same as last time`
 }

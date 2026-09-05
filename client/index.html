@@ -5,23 +5,72 @@
     <!-- viewport-fit=cover so the player screen can reach into the safe areas;
          maximum-scale is deliberately omitted (pinch-zoom must stay available). -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#ffffff" />
+    <!--
+      Two theme-colors, not one. The app has had two themes at parity since the
+      2026-09-04 direction round, and a single value paints the OS chrome the
+      wrong colour for whichever theme loses — visibly, as a white strip above a
+      near-black app. The manifest still carries only the light pair, because a
+      manifest has exactly one of them; these override it in the browser, which
+      is where the app is actually looked at.
+
+      The values are `--bg` from `ui/tokens.css`, light and dark. They are the
+      one pair of hex literals outside that file, because `<meta>` cannot read a
+      custom property — there is no `var()` in an attribute. `noHexColors` globs
+      `client/src/**`, so this file is outside it by construction rather than by
+      exemption.
+    -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0d11" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <!-- `default`, not `black-translucent`: translucent draws the status bar's
-         own text in white over the page, which on a white canvas is invisible.
-         `default` gives a light bar with dark glyphs, which is what the theme
-         wants. -->
+         own text in white over the page, which on the light theme is invisible.
+         iOS has no media-query form of this, so the value that stays legible in
+         both themes is the one that ships. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <!-- The one font, self-hosted and preloaded. Offline-first means no font CDN,
-         and preloading it stops the first paint of a 132px numeral happening in
-         the system font and then reflowing. -->
+    <!-- The one font, self-hosted and preloaded. Inter since the direction round
+         — `archivo-latin-var.woff2` is still on disk but nothing references it.
+         Offline-first means no font CDN, and preloading stops the first paint of
+         a 132px numeral happening in the system stack and then reflowing. -->
     <link
       rel="preload"
-      href="/fonts/archivo-latin-var.woff2"
+      href="/fonts/inter-latin-var.woff2"
       as="font"
       type="font/woff2"
       crossorigin
     />
+    <!--
+      Theme and accent, stamped before the first paint.
+
+      A blocking inline script rather than an effect, because React's first paint
+      happens only after the bundle parses: stamping from a component means one
+      frame of the wrong theme on every cold load, which is the flash the
+      `theme-color` pair above exists to prevent.
+
+      Both stamps are ATTRIBUTES on the root element and never inline styles. An
+      inline `--accent` on `documentElement` overrides both `:root[data-theme]`
+      blocks at once, which is the one known bug in the reference build: its
+      light mode paints the dark-mode mint on white at 1.8:1.
+      `ui/components/theme.ts` owns the same two keys and re-stamps live when
+      the Appearance controls on /account are used; this is only the cold start,
+      and the two must keep agreeing about the key names and the accent pattern
+      below.
+
+      Absent `data-theme` means "follow the OS" and absent `data-accent` means
+      mint, so an unwritten key is a real state rather than a missing one and
+      nothing is stamped for it. Wrapped in try/catch because `localStorage`
+      throws outright in some privacy modes, and a theme preference is not worth
+      a blank page.
+    -->
+    <script>
+      try {
+        var t = localStorage.getItem('sports-app.theme')
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t)
+        var a = localStorage.getItem('sports-app.accent')
+        if (a && /^[a-z]{4,8}$/.test(a)) document.documentElement.setAttribute('data-accent', a)
+      } catch (_) {
+        /* No stored preference is readable. The unstamped default is correct. */
+      }
+    </script>
     <title>Calisthenics</title>
   </head>
   <body>

@@ -3,7 +3,8 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 import type { RouterHistory } from '@tanstack/react-router'
 import { rootRoute } from './routes/__root.tsx'
 import { indexRoute } from './routes/index.tsx'
-import { weekRoute } from './routes/week.tsx'
+import { planRoute } from './routes/plan.tsx'
+import { progressRoute } from './routes/progress.tsx'
 import { accountRoute } from './routes/account.tsx'
 import { loginRoute } from './routes/login.tsx'
 
@@ -14,7 +15,7 @@ import { loginRoute } from './routes/login.tsx'
  * ── Code-based routes, not file-based ───────────────────────────────────────
  *
  * TanStack Router's file-based mode needs a Vite plugin and a generated
- * `routeTree.gen.ts` in the repo. Four routes do not justify a codegen step, a
+ * `routeTree.gen.ts` in the repo. Five routes do not justify a codegen step, a
  * generated file in review diffs, or a build plugin that has to agree with this
  * project's explicit `.ts`/`.tsx` import extensions. The tree below is the whole
  * thing and it is readable in one screen.
@@ -27,7 +28,13 @@ import { loginRoute } from './routes/login.tsx'
  * is what stops one test's cached document from leaking into the next.
  */
 
-const routeTree = rootRoute.addChildren([indexRoute, weekRoute, accountRoute, loginRoute])
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  planRoute,
+  progressRoute,
+  accountRoute,
+  loginRoute,
+])
 
 /**
  * The sub-path the app is served from, without its trailing slash, or `undefined`
