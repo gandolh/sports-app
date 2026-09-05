@@ -1,6 +1,6 @@
 ---
 summary: Locked product and programme calls with the reasoning that settled them — read before proposing an alternative.
-updated: 2026-07-30
+updated: 2026-09-04
 ---
 
 # Decisions
@@ -13,30 +13,26 @@ an explicit revisit plus a [`../log.md`](../log.md) entry.
 > sections are kept only where the old reasoning explains the new choice.
 > [`../../SPEC.md`](../../SPEC.md) describes v1; this page wins where they disagree.
 
-## The governing decision — the app measures nothing
+## REVERSED 2026-09-04 — the governing decision, and what replaced it
 
-*Stated by the user 2026-07-29: "trust the user. Don't adapt. The user can take its
-time to do the reps if it's too hard for him. Only next button."*
+**The app measures again.** Optional logging, dates, streaks, a weekly-goal percentage,
+"last time: 7" and an estimated 1RM are in scope, at the user's explicit direction in the
+v3 direction round ([`../log.md`](../log.md), seed `197b2dd1`). Everything downstream of
+the old rule — the fixed schedule, one integer per pattern, four screens — was justified
+by it and needs its own justification now; the overturned argument is in
+[reversals.md](reversals.md).
 
-There is **no counter, no timer that records, no completion signal, and no
-adaptation**. The app tells you what to do; pressing Next means only that you are
-ready for the next thing. It never infers whether you did the work, and never
-changes its plan because of what it thinks happened.
+**Two guards were deleted rather than weakened:** `noDatesInUi.test.ts` and the
+time-invariance snapshot. A test kept alive after its rule is gone is worse than no test.
 
-This outranks every other product decision, and it deletes a whole category of
-feature: anything that needs to know what you actually did cannot exist. That
-includes the adaptive engine, progress charts against capability, deloads, streaks,
-and any notion of a missed set.
+**Not negotiable:** captured data may not silently drive the prescription. The moment the
+engine adapts off a log, every number in
+[progression-engine.md](progression-engine.md) becomes a lie.
 
-**What it costs, stated plainly:** the prescription is sometimes too easy and
-sometimes too hard, and the app cannot tell which. The user absorbs that, by choice.
+## SUPERSEDED — moved
 
-### Why this is defensible rather than merely simple
-
-Proximity to failure matters most for low-load hypertrophy, and it matters *more* the
-lighter the load ([training-science.md](training-science.md)). The adaptive engine never
-had access to it — it saw reps completed, a poor proxy. **Autoregulation moved from the
-engine to the user**, who is the only party that can actually assess it.
+The original argument for measuring nothing — the whole of it, including why it was
+defensible rather than merely simple — now lives in [reversals.md](reversals.md).
 
 ## Progression is a fixed schedule — a rung takes ~6 weeks
 
@@ -140,16 +136,17 @@ passwords people reuse elsewhere.
 training data on a personal deployment; no later feature may treat the login screen as
 a security boundary.
 
-## No dates anywhere in the app
+## REVERSED 2026-09-04 — no dates anywhere in the app
 
-There is no concept of a missed day: no streak, no heatmap, no red squares, no debt.
-Skip two weeks, open the app, resume at exactly the next session. Returning after a
-long gap must feel identical to returning after one day, because that is when the app
-most needs to feel easy.
+Dates, a calendar, streaks and missed days are in scope. The cost, stated in
+[reversals.md](reversals.md) so it is designed for rather than rediscovered: **returning
+after a long gap no longer looks identical to returning after one day** — the app's worst
+moment, previously answered by construction.
 
-This survived the v2 redesign intact. `/week` shows the next 7 *sessions*, not days;
-milestones key off session number; total-work-ever needs no clock. History does store
-`completedAt` timestamps — nothing in the UI may read them.
+## SUPERSEDED — moved
+
+The original argument for having no dates is in [reversals.md](reversals.md), together
+with the cost its reversal now owes a design answer.
 
 ## Standing decisions from v1, unchanged
 
@@ -177,3 +174,25 @@ project, not a software one.
 high-rep set on an easy movement ends when the muscle quits, not when the
 cardiovascular system is taxed. Protocol and the honest limit it reaches are in
 [programme.md](programme.md#the-cardio-day).
+
+## The visual direction is the category standard, chosen over four alternatives
+
+*Decided 2026-09-04. Round recorded in [`../log.md`](../log.md); the live mockups of all
+four worlds are the artifact published that day.*
+
+Dark ground, gradient progress ring, streak grid, stat tiles, bottom tab bar, Inter
+throughout — **executed straight, at full fidelity, without irony or smuggled quirk.**
+Shown the roll's assignment (a crag guidebook), a pick (a physio handout) and a
+competitive challenger (a split-flap board) as running interfaces, the user took the
+standing exit. Convention is the commitment; this is not a fallback.
+
+**The craft bar is openGym** — light/dark themes, eight accent colours, custom
+iconography, "designed, not assembled". A finish level, not a feature list.
+
+**Stack:** Tailwind + Framer Motion + anime.js. Tailwind replaces `app.css` and retires
+`noHexColors.test.ts`. **The contrast test survives and must be re-pointed at the
+Tailwind theme** — it is then the only mechanical guard left on the palette, and it is
+the one that caught `#6ee7a8` scoring 1.5:1 on white.
+
+Two findings from the losing directions outlived them and are now open work — see
+[open-questions.md](open-questions.md), questions 8 and 9.

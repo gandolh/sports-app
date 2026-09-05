@@ -1,28 +1,23 @@
 ---
 summary: Dated snapshot of where every brief stands and what's next.
-updated: 2026-07-30
+updated: 2026-09-04
 ---
 
-# Status — 2026-07-30
+# Status — 2026-09-04
 
-**Where things stand: the backlog is empty, the app is white, and the deploy exists but
-has not been run.** Briefs 15–20 shipped in three waves; 21 split the tree into
-workspaces and 22 migrated the HTTP layer. **634 tests**, typecheck and lint clean, and
-`npm run build` emits a working service worker at both `/` and a sub-path. Offline was
-proven rather than assumed — a full Push session played to the finish screen with the
-network down.
+**Where things stand: the app is the category standard, it is green, and it builds.**
+Briefs 24–27 shipped on 2026-09-04 on branch `v3-category-standard` — schema v4 with
+optional logging, a Tailwind v4 token system carrying eight accents across light and
+dark, and four rebuilt screens. **1115 tests** (704 at baseline), typecheck and lint
+clean, and the client builds at both `/` and under `SPORTS_APP_BASE=/sports-app/`.
 
-**2026-07-30, no brief — three changes made directly** (see [`../log.md`](../log.md)):
-the theme went dark → white, the side-plank cap rose to 30→90s, and the VPS deploy was
-built at `~/projects/vps-deploy/projects/sports-app/`. **Five of the six open questions
-were answered by the user**, leaving one.
+**The repo had not built since 2026-08-13** and nobody noticed: `0d7d4f3` left
+`Prone.tsx` half-converted while `figures/index.ts` still imported the component it
+deleted. Vitest does not typecheck and no test renders a prone figure, so the suite
+stayed green over a tree that could not be built. Fixed by restoring the component
+alongside the rig; see [`../log.md`](../log.md).
 
-The deploy is written, typechecked and dry-run clean, but **it has never been executed
-against the server** — so nothing is live yet.
-
-The v1 tree is committed as a baseline (`3dd4c49`, the first commit in the repo) and the
-rebuild runs on branch `v2-fixed-schedule`, one commit per brief. v1 as committed was
-green at 407 tests — that is the state to compare a regression against.
+**Nothing is committed.** The branch holds the work; the deploy has still never been run.
 
 ## What changed, in one paragraph
 
@@ -61,7 +56,11 @@ date anywhere in the UI. Full detail in
 | 20 | [Milestones + total work](../briefs/done/20-milestones-and-total-work.md) | **done** | 15 |
 | 21 | [npm workspaces + shared](../briefs/done/21-npm-workspaces-and-shared.md) | **done** | — |
 | 22 | [Fastify API](../briefs/done/22-fastify-api.md) | **done** | 21 |
-| 23 | [Figure rig + morph](../briefs/todo/23-figure-rig-and-morph.md) | **todo** — grilled 2026-07-30, not started | 18 |
+| 23 | [Figure rig + morph](../briefs/todo/23-figure-rig-and-morph.md) | **in flight** — rig + `Prone.tsx` landed in `0d7d4f3`; the crossfade still renders | 18 |
+| 24 | [Schema v4: logging + stop rule](../briefs/done/24-schema-v4-logging-and-stop-rule.md) | **done** | — |
+| 25 | [Persistence v4](../briefs/done/25-persistence-v4.md) | **done** | 24 |
+| 26 | [Tailwind + canon tokens](../briefs/done/26-tailwind-and-canon-tokens.md) | **done** | — |
+| 27 | [The four screens](../briefs/done/27-the-four-screens.md) | **done** | 24, 25, 26 |
 
 ## How it ran
 
@@ -86,22 +85,21 @@ per-side side-plank dose the code splits between sides.
 
 ## What is left
 
-- **Run the deploy.** It is built but unexecuted: `node cli.ts sports-app all` from
-  `~/projects/vps-deploy`. Everything below the first run is unverified against the real
-  box — SSH, the Node version check, `npm ci` on the server, pm2, and the Caddy reload.
-  After it succeeds, the app needs its sync address and secret typed into `/account`
-  once — the deploy project's own README says exactly what to type.
-- **Two design decisions brief 19 left open rather than patching**: `POSTURAL_NOTICE`
-  outweighs the plan it annotates on `/` and is far below the fold on the pull player
-  page; and long rung names wrap to three lines beside the figure, which is the norm
-  rather than an exception since a rung is one movement plus a modifier.
-- **Open question 7** — the only one left. The step *between* rungs exceeds what the ±2
-  variant can absorb, so difficulty is front-loaded inside each rung and the wiki
-  describes it as evenly distributed. See [open-questions.md](open-questions.md).
-- **The white theme has not been looked at on a phone.** Contrast is enforced by test,
-  which is a different claim from "it looks right in a bright room at arm's length".
-- **Brief 23 is written and grilled but not started** — the figure crossfade becomes a
-  rigged morph. It is the first brief since 22 and the only one currently awaiting work.
+- **Commit the branch.** `v3-category-standard` is unpushed and uncommitted.
+- **Run the deploy.** Still never executed against the box. Everything below the first
+  run is unverified: SSH, the Node version check, `npm ci`, pm2, the Caddy reload.
+- **Finish brief 23 or revert `0d7d4f3`.** The rig is authored and tested but nothing
+  renders it, and `Prone.tsx` now carries both the rig and the restored component.
+- **Decide the malformed-`logged` policy.** A hand-edit typo in a display-only field
+  currently blocks training until repaired. Consistent with `cyclePosition`, and it
+  surfaces the typo rather than hiding it — but it cuts against "arrive with the answer
+  already made". See [`../log.md`](../log.md).
+- **Open questions 8 and 9 were answered in the build** (`<HonestNote>` and `<StopRule>`),
+  but 9's data half is not: `stopRule` is now its own field, so nothing is left implicit.
+  Question 7 — the step between rungs — is still open and is still content, not code.
+- **The theme has not been looked at on a phone.** Contrast is enforced across all
+  sixteen palettes by test, which is a different claim from "it looks right in a bright
+  room at arm's length".
 
 ## The deploy, in one paragraph
 
