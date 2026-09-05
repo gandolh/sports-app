@@ -28,6 +28,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RungId, StateDoc, SyncSettings } from '@sports-app/shared/types.ts'
+import { CURRENT_SCHEMA_VERSION } from '@sports-app/shared/types.ts'
 import { parse, serialise } from '../codec.ts'
 import { STORAGE_KEYS, clearReadOnly, emptyDoc, isReadOnly, load, readOnlyReason } from '../store.ts'
 import type { StorageLike } from '../store.ts'
@@ -395,10 +396,36 @@ describe('pull', () => {
   })
 
   it('rejects a document from a build this one does not understand', async () => {
-    const fetchImpl = responder(serialise(docWith(4)).replace('"schemaVersion": 3', '"schemaVersion": 4'))
+    // "The future" is `CURRENT_SCHEMA_VERSION + 1`, computed rather than written
+    // out. This test used a literal 4 until v4 shipped, at which point it was
+    // quietly asserting that the *current* version is refused — it still passed,
+    // because the pull failed for a different reason. Deriving the number is what
+    // makes the next schema bump move the goalposts instead of hollowing this out.
+    const future = CURRENT_SCHEMA_VERSION + 1
+    const fetchImpl = responder(
+      serialise(docWith(4)).replace(
+        `"schemaVersion": ${CURRENT_SCHEMA_VERSION}`,
+        `"schemaVersion": ${future}`,
+      ),
+    )
     const outcome = await pull(TARGET, ALICE, { fetchImpl, log })
     expect(outcome).toMatchObject({ ok: false, reason: 'invalid' })
     if (!outcome.ok) expect(outcome.error).toContain('newer version of the app')
+  })
+
+  it('accepts a v3 document from an older build and migrates it on the way in', () => {
+    // The other side of the same door. A phone that has not updated pushes v3; the
+    // client that pulls it must not treat "older" as "unreadable", because the
+    // whole point of the version being in the document is that migration handles
+    // the gap. Synchronous by construction: the migration is `parse`'s business and
+    // `pull` only hands it the bytes.
+    const v3 = serialise(docWith(4)).replace(
+      `"schemaVersion": ${CURRENT_SCHEMA_VERSION}`,
+      '"schemaVersion": 3',
+    )
+    const parsed = parse(v3)
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) expect(parsed.doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
   })
 
   it('maps 404 to the empty (new-device) case rather than an error', async () => {
