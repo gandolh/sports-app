@@ -37,7 +37,20 @@
  * shape. A schema here that described every field would make the service a second
  * source of truth for the document, and — worse — it would reject a document from
  * a *future* `schemaVersion` that the service is supposed to store blindly. There
- * is a test that a `schemaVersion: 4` document round-trips.
+ * is a test that a document from an unknown version round-trips.
+ *
+ * That is not a hypothetical any more. v4 arrived and **nothing in this file or in
+ * `server/` changed**, which is the design working: the service never held a list
+ * of versions it accepts, so there was no list to add 4 to. Migration is the
+ * client's, in `client/src/persistence/codec.ts`, and the service's contribution is
+ * to store every version faithfully enough that the client can migrate it later.
+ *
+ * **No schema for `ExerciseRecord.logged` either**, and that one is a rule rather
+ * than an omission. `history` is `Type.Array(Type.Unknown())`; logged values cross
+ * the wire as opaque numbers the service copies and never reads. No route may sum,
+ * index, or index-on them — a SQL aggregate over `logged` would make the service a
+ * consumer of the programme, which is the same line `Rung` is kept on the other
+ * side of (see `types.ts`, "ids cross the wire, content does not").
  *
  * **No password.** `LoginRequest` declares `username` and nothing else, and
  * additional properties are allowed, which is how a login body carrying a

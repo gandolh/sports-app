@@ -60,6 +60,27 @@
  * `rungIndexAt` clamps, so an absurd `sessionsDone` degrades to the top rung
  * instead of indexing past the end of an array.
  *
+ * ── v4 added one optional field, and did not soften any of the above ────────
+ *
+ * `ExerciseRecord.logged` is the first optional key this codec has ever had, which
+ * makes it the first place the "no silent repair" rule could plausibly have been
+ * bent — an out-of-range log is easy to truncate and nothing downstream would
+ * notice. It is not bent: see `validateLogged` for why the *save-back* is what
+ * settles it. Three consequences worth stating up front:
+ *
+ *   - **Absent, and `[]`, are different documents.** Absent means "not logged";
+ *     `[]` means "logged, and recorded nothing". `serialise` writes the key only
+ *     when it is there, `validateExercise` sets it only when it was written, and
+ *     `exactOptionalPropertyTypes` makes the compiler agree that those are two
+ *     values rather than one.
+ *   - **The v3 → v4 migration writes nothing.** `adoptLogging` is the identity
+ *     function; the version bump is the entire change.
+ *   - **Nothing in this file reads a logged value for anything but validation.**
+ *     `summarise` does not count them, `serialise` does not total them. The
+ *     governing invariant (corpus/CLAUDE.md) is that no logged value reaches
+ *     `prescribe()`, and the cheapest way to keep that true is for the layer that
+ *     stores them to have no opinion about them either.
+ *
  * ── Serialisation is a feature, not a formality ─────────────────────────────
  *
  * `serialise` is hand-rolled rather than `JSON.stringify(doc, null, 2)` because
@@ -141,10 +162,14 @@ const SYNC_KEYS = ['baseUrl', 'secret'] as const
 const SESSION_KEYS = ['completedAt', 'position', 'variant', 'exercises'] as const
 
 /**
- * No `effort` (v1) and no per-set array (v2). `sets` is a count in v3, because
- * nothing per-set is measured — see `ExerciseRecord`.
+ * No `effort` (v1) and no per-set array (v2). `sets` is still a count in v4,
+ * because it is still the *prescription* — see `ExerciseRecord`.
+ *
+ * `logged` joins it in v4 and is the one optional key in this file. It is listed
+ * here so `checkKeys` allows it; whether it is *present* is decided in
+ * `validateExercise`, and absent is the normal case.
  */
-const EXERCISE_KEYS = ['pattern', 'rungId', 'sets', 'targetValue'] as const
+const EXERCISE_KEYS = ['pattern', 'rungId', 'sets', 'targetValue', 'logged'] as const
 
 // ─── Usernames ──────────────────────────────────────────────────────────────
 //
@@ -399,6 +424,40 @@ function migrateExercise(exercise: unknown): unknown {
   }
 }
 
+/**
+ * v3 → v4: `ExerciseRecord.logged` exists. The document does not change.
+ *
+ * This step is the identity function and that is the whole point, so it is worth
+ * saying why it is a *registered step* rather than a hole in `MIGRATIONS` or a
+ * special case in `migrate`:
+ *
+ *   - **v4 is purely additive.** `logged` is optional and absent means "not
+ *     logged" (`ExerciseRecord` in `shared/types.ts`), so every v3 document is
+ *     already structurally a valid v4 one. There is nothing to rewrite, nothing to
+ *     reconstruct, and — unlike the v2→v3 step — nothing that has to be *invented*
+ *     because the old shape did not record it. A v3 document genuinely contains no
+ *     answer to "what did you do", and inventing `logged: []` would be an answer.
+ *     Absent is the truthful value and it is already there.
+ *   - **The version still bumps**, because the service writes `schemaVersion` into
+ *     an indexed column and "written by a build that could not have recorded logs"
+ *     is a fact worth being able to ask about later. So the only real work here is
+ *     that a v3 document must be *accepted and re-stamped* instead of refused, and
+ *     `migrate`'s loop refuses any version it has no step for. An empty entry in
+ *     the map is exactly the right shape for "this version needs nothing done to
+ *     it": it keeps the "one step per version, no jumps" rule intact, and the next
+ *     schema bump registers `[4, …]` next to it without first having to work out
+ *     why 3 was missing.
+ *
+ * A hand-typed `logged` in a document that still claims v3 is passed through
+ * rather than stripped. That is not leniency, it is the same rule as everywhere
+ * else in this file: migration does not repair, it only re-shapes, and the single
+ * validator downstream judges the field on its merits. Stripping it would silently
+ * delete something a person typed on purpose.
+ */
+function adoptLogging(raw: JsonObject): JsonObject {
+  return raw
+}
+
 function dropRetiredSettings(value: unknown): unknown {
   if (!isPlainObject(value)) return value
   const {
@@ -416,11 +475,15 @@ function dropRetiredSettings(value: unknown): unknown {
  * This machinery existed and was empty from v1, on purpose. Retrofitting
  * migration onto a file that already holds six months of real training history is
  * a problem you only get to have once — and v2 arriving four briefs later, then
- * v3 arriving five after that, each with one line to register, is the payoff.
+ * v3 arriving five after that, then v4 nine after that, each with one line to
+ * register, is the payoff. v4's line registers a function that does nothing, which
+ * is the cheapest possible version of the payoff and still worth having: see
+ * `adoptLogging`.
  */
 const MIGRATIONS: ReadonlyMap<number, MigrationStep> = new Map<number, MigrationStep>([
   [1, dropEffortFromExercises],
   [2, collapseAdaptiveState],
+  [3, adoptLogging],
 ])
 
 /**
@@ -592,16 +655,24 @@ export function serialise(doc: StateDoc): string {
         out.push(`      ${key('exercises')}[`)
         session.exercises.forEach((exercise, ei) => {
           const comma = ei === session.exercises.length - 1 ? '' : ','
-          // One line per exercise. In v3 an exercise record is four scalars, so
-          // a session is four lines plus its exercises and a year of history
-          // stays scannable in an editor.
+          // One line per exercise. In v4 a record is four scalars and at most a
+          // short array, so a session is four lines plus its exercises and a year
+          // of history stays scannable in an editor.
           const fields = [
             `${key('pattern')}${str(exercise.pattern)}`,
             `${key('rungId')}${str(exercise.rungId)}`,
             `${key('sets')}${num(exercise.sets)}`,
             `${key('targetValue')}${num(exercise.targetValue)}`,
-          ].join(', ')
-          out.push(`        { ${fields} }${comma}`)
+          ]
+          // Written only when it is there. Absent means "not logged" and `[]` means
+          // "logged nothing" — two different facts (`ExerciseRecord`), so emitting
+          // an empty array for an absent field would invent an answer, and the
+          // round trip would stop being one. Last on the line, after the whole
+          // prescription, so the eye reads "asked for / got" left to right.
+          if (exercise.logged !== undefined) {
+            fields.push(`${key('logged')}[${exercise.logged.map(num).join(', ')}]`)
+          }
+          out.push(`        { ${fields.join(', ')} }${comma}`)
         })
         out.push('      ]')
       }
@@ -987,15 +1058,107 @@ function validateExercise(ctx: Ctx, path: string, value: unknown): ExerciseRecor
   const sets = intAt(ctx, `${path}.sets`, obj['sets'], 1)
   const targetValue = finiteAt(ctx, `${path}.targetValue`, obj['targetValue'], 0)
 
+  // The one optional field in the document. `undefined` here means the key is not
+  // there at all — `JSON.parse` cannot produce an `undefined` *value*, so there is
+  // no third state to disambiguate on the way in, and `exactOptionalPropertyTypes`
+  // is what stops one being manufactured on the way out (see the spread below).
+  const rawLogged = obj['logged']
+  const logged =
+    rawLogged === undefined ? undefined : validateLogged(ctx, `${path}.logged`, rawLogged, sets)
+
   if (
     pattern === undefined ||
     rungId === undefined ||
     sets === undefined ||
-    targetValue === undefined
+    targetValue === undefined ||
+    (rawLogged !== undefined && logged === undefined)
   ) {
     return undefined
   }
-  return { pattern, rungId, sets, targetValue }
+  // Spread rather than `logged` in the literal: with `exactOptionalPropertyTypes`
+  // on, `{ logged: undefined }` and `{}` are different values, and only the second
+  // is "not logged". Writing the key unconditionally would put a `logged` key on
+  // every record in memory, which `serialise` would then have to re-decide about.
+  return { pattern, rungId, sets, targetValue, ...(logged === undefined ? {} : { logged }) }
+}
+
+/**
+ * `logged`: what the person actually did, per set, when they chose to say.
+ *
+ * ── Why this rejects rather than repairs ────────────────────────────────────
+ *
+ * A `logged` array longer than `sets`, or holding a negative, is a *normal* input
+ * — the document is hand-editable at 2am — and the tempting answer is to degrade
+ * quietly: truncate to `sets`, clamp the negative to zero, or drop the field. This
+ * file already answered that question for `cyclePosition`, and the answer was no.
+ * `cyclePosition` is read by `slotAt`, which clamps an absurd value rather than
+ * throwing, and `validateSessionsDone` says in as many words why that is not a
+ * licence to accept one here: *tolerating it downstream is not a reason to accept
+ * it here.* `sets`, `targetValue` and every counter follow the same rule.
+ *
+ * `logged` gets the same treatment, and the stakes make it the easy call. Guarantee
+ * 2 at the top of this file is that `parse` never returns a partially-valid
+ * document, because the app **saves back** what it loaded — so a truncation here is
+ * not a display quirk, it is the app deleting a set the person recorded and then
+ * writing the shorter version to storage. That is precisely the "hand-edit typo
+ * becomes permanent data loss" failure the guarantee exists to prevent, except with
+ * the codec as the one doing the editing. A precise message with the file left
+ * untouched is strictly better: nothing is lost, and the person can see which entry
+ * they got wrong.
+ *
+ * "Degrades rather than throws" is still honoured in the sense this file means it:
+ * `parse` returns `{ ok: false, error }` and never throws, for every shape below.
+ *
+ * ── The bound is `sets`, and only when `sets` is itself trustworthy ─────────
+ *
+ * `logged` is at most one entry per prescribed set: it records what happened to
+ * the sets that were asked for, so a sixth entry against three sets does not
+ * describe anything. Shorter is fine and expected — logging two of three sets and
+ * stopping is an ordinary evening. When `sets` failed its own validation the length
+ * check is skipped rather than run against a guess; the record is already rejected,
+ * and a second error derived from a number we do not trust would only be noise.
+ */
+function validateLogged(
+  ctx: Ctx,
+  path: string,
+  value: unknown,
+  sets: number | undefined,
+): readonly number[] | undefined {
+  const arr = arrayAt(ctx, path, value)
+  if (!arr) return undefined
+
+  if (sets !== undefined && arr.length > sets) {
+    bad(
+      ctx,
+      path,
+      `expected at most ${sets} ${sets === 1 ? 'entry' : 'entries'} — one per set ` +
+        `this exercise prescribed — got ${arr.length}. Fewer is fine: logging some ` +
+        `of the sets and stopping is normal, and leaving the field out entirely ` +
+        `means "not logged".`,
+    )
+    return undefined
+  }
+
+  const values: number[] = []
+  let complete = true
+
+  // An index loop, not `forEach`, because `forEach` *skips* the holes of a sparse
+  // array. Text input cannot produce one — `JSON.stringify([1, , 3])` writes
+  // `[1,null,3]`, which lands here as an explicit null and is reported — but
+  // `migrate` is exported and takes a tree rather than text, so the one shape that
+  // could slip past a validator silently is the one worth not using `forEach` for.
+  for (let i = 0; i < arr.length; i += 1) {
+    // Zero is legal and means it: "I attempted that set and managed none" is a
+    // fact worth recording, and is not the same as not logging the set at all.
+    const entry = finiteAt(ctx, `${path}[${i}]`, arr[i], 0)
+    if (entry === undefined) {
+      complete = false
+      continue
+    }
+    values.push(entry)
+  }
+
+  return complete ? values : undefined
 }
 
 /**
