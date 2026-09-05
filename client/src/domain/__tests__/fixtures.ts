@@ -32,7 +32,7 @@ import type { StateDoc } from '@sports-app/shared/types.ts'
  * every session. `cyclePosition` 90 is a Push slot: 90 mod 3 = 0.
  */
 export const midProgram: StateDoc = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   username: 'test',
   cyclePosition: 90,
   sessionsDone: { push: 30, squat: 31, hinge: 29, core: 90, pull: 90 },
