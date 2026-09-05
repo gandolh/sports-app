@@ -5,19 +5,23 @@ import type { ReactNode } from 'react'
  *
  * This is one of exactly two things in the app that animate as *content* rather
  * than to confirm a state change, and the design system spells out why: a smooth
- * 60fps sweep reads as a loading spinner, a ring that steps once per second reads
- * as a clock. The stepping comes from `useCountdown`, which recomputes from a
- * timestamp; this component only draws whatever number it is handed and eases
- * each step over `--dur-fast`. Under `prefers-reduced-motion` that duration
- * collapses to 1ms and the ring stays — it is information, not decoration.
+ * 60fps sweep reads as a loading spinner, a ring that steps once per second
+ * reads as a clock. The stepping comes from `useCountdown`, which recomputes
+ * from a timestamp; this component only draws whatever number it is handed and
+ * eases each step over `--dur-fast`. Under `prefers-reduced-motion` that
+ * duration collapses to 1ms and the ring stays — it is information, not
+ * decoration, and it is the one thing on this screen a reduced-motion user still
+ * needs to see move.
  *
  * ── Two accessibility decisions that are not negotiable ─────────────────────
  *
  *   - **The numeral is `aria-hidden` and there is no `aria-live` on it.** A
  *     per-second value in a live region announces sixty times per minute, which
  *     makes the app unusable with a screen reader on precisely the screen that
- *     matters most. The container carries `role="timer"` and one polite region
- *     fires at ten seconds and at zero, and nowhere else.
+ *     matters most. The container carries `role="timer"`, and one polite region
+ *     fires at ten seconds and at zero, and nowhere else. The third
+ *     announcement the design calls for — the set transition — is the player's,
+ *     because it happens on rep exercises too where there is no clock at all.
  *   - **The track is intentionally below 3:1** against the canvas. It is
  *     decorative; the numeral inside carries the value. Brightening it into a
  *     competing grey ring is a documented regression, not a fix.
@@ -26,7 +30,7 @@ import type { ReactNode } from 'react'
 // A 100×100 user-space box, so the ring scales with its CSS width and the
 // geometry below stays readable as plain numbers.
 const RADIUS = 45
-const STROKE = 4
+const STROKE = 6
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
 export interface CountdownRingProps {
@@ -49,26 +53,42 @@ export function CountdownRing({ total, remaining, started, label, children }: Co
 
   return (
     <>
-      <div className="ring" role="timer" aria-label={label}>
-        <svg className="ring__svg" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+      <div
+        className="relative mt-[var(--sp-3)] grid place-items-center"
+        role="timer"
+        aria-label={label}
+      >
+        <svg
+          viewBox="0 0 100 100"
+          className="block h-[13rem] w-[13rem]"
+          aria-hidden="true"
+          focusable="false"
+        >
           <circle
-            className="ring__track"
             cx="50"
             cy="50"
             r={RADIUS}
+            fill="none"
+            stroke="var(--grid0)"
             strokeWidth={STROKE}
           />
           <circle
-            className="ring__progress"
             cx="50"
             cy="50"
             r={RADIUS}
+            fill="none"
+            stroke="var(--accent)"
             strokeWidth={STROKE}
+            strokeLinecap="round"
+            transform="rotate(-90 50 50)"
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={offset}
+            style={{
+              transition: 'stroke-dashoffset var(--dur-fast) var(--ease-out)',
+            }}
           />
         </svg>
-        <div className="ring__inner" aria-hidden="true">
+        <div className="absolute text-center" aria-hidden="true">
           {children}
         </div>
       </div>

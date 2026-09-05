@@ -39,7 +39,7 @@
  */
 import { useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { StateDoc, SyncSettings } from '@sports-app/shared/types.ts'
+import type { SessionResult, StateDoc, SyncSettings } from '@sports-app/shared/types.ts'
 import type { Prescription } from '../domain/schedule.ts'
 import { recordSession, toSessionResult } from '../domain/schedule.ts'
 import {
@@ -153,13 +153,76 @@ export function useDocument(username: string) {
   })
 }
 
+/**
+ * What the player logged, keyed by index into `Prescription.items`.
+ *
+ * Keyed by the *item* index rather than by pattern or by position in
+ * `SessionResult.exercises`, because that is the only index the player actually
+ * has: it walks `prescription.items`, and on a cardio slot the two lists are
+ * different lengths. `attachLogs` below is what reconciles them, once.
+ */
+export type SessionLogs = ReadonlyMap<number, readonly number[]>
+
 export interface CompleteSessionInput {
   readonly doc: StateDoc
   readonly prescription: Prescription
+  /** Absent or empty is the normal case: logging is optional. See `attachLogs`. */
+  readonly logs?: SessionLogs
 }
 
 /**
- * Finishing a session: `toSessionResult` → `recordSession` → save, then upload.
+ * Fold the player's logs into the domain's `SessionResult`.
+ *
+ * ── Why this is here and not in `toSessionResult` ───────────────────────────
+ *
+ * `toSessionResult` lives in `client/src/domain/` and does not attach logs, on
+ * purpose. It defines what a *prescription* records — the shape of the session
+ * that was asked for — and the domain has no business knowing that a person
+ * typed a number into a field. Widening it would also put captured data inside
+ * the pure core, one import away from `prescribe()`, which is the one thing the
+ * governing invariant forbids (corpus/CLAUDE.md). So the UI layer maps over its
+ * output instead, here, where the captured half of the record enters and can be
+ * seen entering.
+ *
+ * ── The three-valued field, held correctly ──────────────────────────────────
+ *
+ * `logged` absent, `logged: []` and `logged: [8, 8, 6]` are three different
+ * values and the codec keeps all three (`shared/types.ts`). Absent is the
+ * normal case and means "not logged"; `[]` means the person logged that they
+ * did nothing. `exactOptionalPropertyTypes` is on, so the key is spread in
+ * conditionally — `{ logged: logs ?? undefined }` is a *type error* here and
+ * would also serialise the wrong thing if it were not.
+ *
+ * ── Alignment ───────────────────────────────────────────────────────────────
+ *
+ * `SessionResult.exercises` is `items.filter(type === 'exercise')`, so its Nth
+ * entry is the Nth *exercise* item and not the Nth item. The index list below is
+ * built by the same filter so the two cannot drift; deriving it by counting
+ * would silently mis-assign every log on a cardio day, where the slot's own work
+ * is not an exercise.
+ */
+export function attachLogs(
+  result: SessionResult,
+  prescription: Prescription,
+  logs: SessionLogs,
+): SessionResult {
+  if (logs.size === 0) return result
+  const exerciseItemIndices = prescription.items.flatMap((item, index) =>
+    item.type === 'exercise' ? [index] : [],
+  )
+  return {
+    ...result,
+    exercises: result.exercises.map((exercise, nth) => {
+      const itemIndex = exerciseItemIndices[nth]
+      const logged = itemIndex === undefined ? undefined : logs.get(itemIndex)
+      return logged === undefined ? exercise : { ...exercise, logged }
+    }),
+  }
+}
+
+/**
+ * Finishing a session: `toSessionResult` → `attachLogs` → `recordSession` →
+ * save, then upload.
  *
  * `toSessionResult` is the domain's, not a hand-built literal, because it defines
  * the shape of a recorded session and a shape defined twice drifts. It also
@@ -174,8 +237,13 @@ export interface CompleteSessionInput {
 export function useCompleteSession(username: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ doc, prescription }: CompleteSessionInput) => {
-      const next = recordSession(doc, toSessionResult(prescription, nowIso()))
+    mutationFn: async ({ doc, prescription, logs }: CompleteSessionInput) => {
+      const result = attachLogs(
+        toSessionResult(prescription, nowIso()),
+        prescription,
+        logs ?? new Map(),
+      )
+      const next = recordSession(doc, result)
       const saved = saveAndPush(next)
       if (!saved.ok) throw new Error(saved.error)
       return next
