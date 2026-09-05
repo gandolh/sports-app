@@ -1,5 +1,6 @@
-import type { MovementArrowProps } from './primitives.tsx'
-import type { Rig } from './types.ts'
+import { MovementArrow, StickFigure } from './primitives.tsx'
+import type { MovementArrowProps, StickFigureProps } from './primitives.tsx'
+import type { FigureProps, Rig } from './types.ts'
 
 /**
  * Prone: face-down, arms trailing by the hips, swinging overhead in a Y. Covers
@@ -101,3 +102,59 @@ export const PRONE_RIG: Rig = {
  * the way the arms are about to sweep.
  */
 export const PRONE_MOVEMENT_ARROW: MovementArrowProps = { x: 48, y1: 138, y2: 80 }
+
+// ─── The shipping renderer, restored 2026-09-04 ──────────────────────────────
+//
+// `PRONE_RIG` above is brief 23's wave-1 work: the rig that will replace the
+// two-pose crossfade with a real angle-interpolated morph. It is authored and
+// tested, and nothing renders it yet.
+//
+// The commit that introduced it (`0d7d4f3`) deleted the `ProneFigure` component
+// in the same breath, while `figures/index.ts` still imports it — which broke
+// `npm run build` and `npm run typecheck` on `main` from 2026-08-13 onward. It
+// went unnoticed for three weeks because Vitest does not typecheck and no test
+// renders a prone figure, so the suite stayed green over a tree that could not
+// be built.
+//
+// This restores the component verbatim from `5bb9e6b`, the commit before that
+// one, so the rig and the renderer coexist: the app builds today, and brief 23
+// deletes everything below this line the moment `motion.ts` can drive the rig.
+// Restoring is deliberately preferred over stubbing — a `ProneFigure` returning
+// `null` also compiles, and silently ships the postural exercise with no figure
+// at all, which is the failure this app can least afford to make quietly.
+
+const START: StickFigureProps = {
+  head: { x: 38, y: 100 },
+  shoulder: { x: 58, y: 104 },
+  hip: { x: 130, y: 110 },
+  handL: { x: 70, y: 138 },
+  handR: { x: 76, y: 144 },
+  footL: { x: 170, y: 118 },
+  footR: { x: 176, y: 124 },
+}
+
+const END: StickFigureProps = {
+  head: { x: 38, y: 100 },
+  shoulder: { x: 58, y: 104 },
+  hip: { x: 130, y: 110 },
+  handL: { x: 20, y: 72 },
+  handR: { x: 26, y: 62 },
+  footL: { x: 170, y: 118 },
+  footR: { x: 176, y: 124 },
+}
+
+/**
+ * Prone: face-down, arms at sides, to arms raised overhead in a Y/T shape.
+ * Covers the postural pull work — Y raise, T raise, Y-T-W combo, reverse
+ * snow angels, lat slides, end-range holds. Labelled "postural," never "pull,"
+ * per the locked equipment decision (corpus/wiki/decisions.md).
+ */
+export function ProneFigure({ phase }: FigureProps) {
+  const pose = phase === 'start' ? START : END
+  return (
+    <>
+      <StickFigure {...pose} />
+      <MovementArrow x={PRONE_MOVEMENT_ARROW.x} y1={PRONE_MOVEMENT_ARROW.y1} y2={PRONE_MOVEMENT_ARROW.y2} />
+    </>
+  )
+}
