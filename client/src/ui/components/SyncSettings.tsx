@@ -4,8 +4,9 @@ import { useForm } from 'react-hook-form'
 import type { StateDoc, SyncSettings as SyncTarget } from '@sports-app/shared/types.ts'
 import type { SyncStatus } from '../../persistence/sync.ts'
 import { useBackupNow, useSaveSync, useSyncCheck } from '../document.ts'
-import { Banner } from './Notices.tsx'
-import { PressButton } from './PressButton.tsx'
+import { AlertBanner } from './AlertBanner.tsx'
+import { QuietButton, SecondaryButton } from './Buttons.tsx'
+import { Eyebrow, SectionHeading } from './Shell.tsx'
 
 /**
  * The sync settings — the service address and the deployment secret.
@@ -17,6 +18,19 @@ import { PressButton } from './PressButton.tsx'
  * unreachable and `db/` would never have received a backup. This form is that way
  * in. It is deliberately the *last* section of the page — a deployment detail on a
  * screen otherwise about training, and nothing on the way to a first set.
+ *
+ * ── This file is one line item outside brief 27b's normal boundary ──────────
+ *
+ * Every other file under `components/` was 27a's, or `TabBar.tsx`, called out by
+ * name as the one exception 27b may edit. This one is neither, and it is edited
+ * anyway: it is a hard dependency of `/account`, it rendered entirely against
+ * `app.css`'s class vocabulary (`.section`, `.field`, `.actions`, `.result`), and
+ * 27b deleted that file — a listed deliverable, not a side effect — leaving
+ * nowhere for those class names to resolve to. Recreating them in
+ * `index.css` would just rebuild `app.css` under a new name, which that file's own
+ * header says brief 27 exists to stop. So this is a mechanical reskin: same hooks,
+ * same validation, same copy, same `data-testid`s — only the class names moved
+ * to the same Tailwind vocabulary the rest of brief 27b uses.
  *
  * ── The secret is write-only, and that is a hard rule ───────────────────────
  *
@@ -51,6 +65,13 @@ interface SyncValues {
   readonly baseUrl: string
   readonly secret: string
 }
+
+const FIELD_LABEL = 'block text-meta font-semibold text-tx2'
+const FIELD_INPUT =
+  'mt-[var(--sp-1)] block min-h-[var(--tap-row)] w-full rounded border border-line2 ' +
+  'bg-s1 px-[var(--sp-3)] text-body text-tx'
+const FIELD_DESCRIPTION = 'mt-[var(--sp-1)] text-meta text-tx3'
+const FIELD_ERROR = 'mt-[var(--sp-1)] text-meta font-semibold text-dang'
 
 /**
  * Empty is valid and means same-origin — that is how the Vite dev proxy and a
@@ -211,19 +232,19 @@ export function SyncSettings({
   const hasSecret = stored !== null && stored.secret !== ''
 
   return (
-    <form className="section" onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
-      <p className="section__title">Backup</p>
-      <p className="prose">
+    <form onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
+      <SectionHeading>Backup</SectionHeading>
+      <p className="text-body text-tx2">
         Training history is saved on this device first and always. If a state service is running,
         each finished session is also uploaded to it — the app never waits for that, and a failed
         upload never blocks a session.
       </p>
 
-      <div className="fields">
-        <Field.Root className="field" invalid={errors.baseUrl !== undefined}>
-          <Field.Label className="field__label">Service address</Field.Label>
+      <div className="mt-[var(--sp-3)] flex flex-col gap-[var(--sp-3)]">
+        <Field.Root invalid={errors.baseUrl !== undefined}>
+          <Field.Label className={FIELD_LABEL}>Service address</Field.Label>
           <Field.Control
-            className="field__input"
+            className={FIELD_INPUT}
             type="url"
             inputMode="url"
             autoCapitalize="none"
@@ -235,31 +256,32 @@ export function SyncSettings({
               meaningful reads as a stored value, and the one thing this field must
               never do is make somebody think they have configured a service they
               have not. The example goes in the description instead. */}
-          <p className="field__description">
-            Something like <span className="mono">http://192.168.1.20:8787</span>. Leave it empty to
-            use this app&rsquo;s own origin, which is what a co-hosted service and the dev proxy both
-            want.
+          <p className={FIELD_DESCRIPTION}>
+            Something like{' '}
+            <span className="font-mono text-tx2">http://192.168.1.20:8787</span>. Leave it empty
+            to use this app&rsquo;s own origin, which is what a co-hosted service and the dev proxy
+            both want.
           </p>
           {errors.baseUrl === undefined ? null : (
-            <Field.Error className="field__error" match>
+            <Field.Error className={FIELD_ERROR} match>
               {errors.baseUrl.message}
             </Field.Error>
           )}
         </Field.Root>
 
-        <div className="field">
-          <label className="field__label" htmlFor={secretId}>
+        <div>
+          <label className={FIELD_LABEL} htmlFor={secretId}>
             {hasSecret ? 'Replace the secret' : 'Secret'}
           </label>
           <input
             id={secretId}
-            className="field__input"
+            className={FIELD_INPUT}
             type="password"
             autoComplete="off"
             aria-describedby={`${secretId}-note`}
             {...register('secret')}
           />
-          <p className="field__description" id={`${secretId}-note`}>
+          <p className={FIELD_DESCRIPTION} id={`${secretId}-note`}>
             {hasSecret
               ? 'A secret is stored. It is never shown again, here or anywhere else — leave this blank to keep it, or type a new one to replace it.'
               : 'Only needed if the service was started with one. It is stored in the document and never displayed back.'}
@@ -267,31 +289,40 @@ export function SyncSettings({
         </div>
       </div>
 
-      {saveSync.error === null ? null : <Banner label="Not saved" text={saveSync.error.message} />}
-      {backup.error === null ? null : <Banner label="Not uploaded" text={backup.error.message} />}
+      {saveSync.error === null ? null : (
+        <AlertBanner label="Not saved" text={saveSync.error.message} />
+      )}
+      {backup.error === null ? null : (
+        <AlertBanner label="Not uploaded" text={backup.error.message} />
+      )}
 
       {described === null ? null : (
-        <div className="result" data-testid="sync-status">
-          <span className="result__label">{described.label}</span>
-          <p className="result__text">{described.text}</p>
+        <div
+          data-testid="sync-status"
+          className="mt-[var(--sp-3)] rounded border border-line bg-s1 p-[var(--sp-3)] shadow-1"
+        >
+          <Eyebrow>{described.label}</Eyebrow>
+          <p className="mt-[2px] text-body text-tx2">{described.text}</p>
         </div>
       )}
       {backup.isSuccess ? (
-        <div className="result">
-          <span className="result__label">Uploaded</span>
-          <p className="result__text">The service now holds this device&rsquo;s history.</p>
+        <div className="mt-[var(--sp-3)] rounded border border-line bg-s1 p-[var(--sp-3)] shadow-1">
+          <Eyebrow>Uploaded</Eyebrow>
+          <p className="mt-[2px] text-body text-tx2">
+            The service now holds this device&rsquo;s history.
+          </p>
         </div>
       ) : null}
 
-      {check.error === null ? null : <Banner label="Check failed" text={check.error.message} />}
+      {check.error === null ? null : (
+        <AlertBanner label="Check failed" text={check.error.message} />
+      )}
 
-      <div className="actions">
-        <PressButton className="btn-secondary" type="submit">
-          {saveSync.isPending ? 'Saving…' : 'Save'}
-        </PressButton>
-        <PressButton className="btn-secondary" onClick={() => void runCheck()}>
+      <div className="mt-[var(--sp-3)] flex items-center gap-[var(--sp-2)]">
+        <SecondaryButton type="submit">{saveSync.isPending ? 'Saving…' : 'Save'}</SecondaryButton>
+        <SecondaryButton onClick={() => void runCheck()}>
           {check.isPending ? 'Checking…' : 'Check connection'}
-        </PressButton>
+        </SecondaryButton>
       </div>
 
       {/* Offered only where `checkSync` has said the remote is empty or behind.
@@ -299,18 +330,16 @@ export function SyncSettings({
           discard local sessions, and no automatic rule can know whether that is
           what somebody wanted. */}
       {described?.canBackUp === true ? (
-        <div className="actions">
-          <PressButton className="btn-secondary" onClick={() => backup.mutate(doc)}>
+        <div className="mt-[var(--sp-2)]">
+          <SecondaryButton onClick={() => backup.mutate(doc)}>
             {backup.isPending ? 'Uploading…' : 'Back up now'}
-          </PressButton>
+          </SecondaryButton>
         </div>
       ) : null}
 
       {stored === null ? null : (
-        <div className="actions actions--apart">
-          <PressButton className="btn-secondary btn-quiet--warn" onClick={stopSyncing}>
-            Stop syncing
-          </PressButton>
+        <div className="mt-[var(--sp-2)]">
+          <QuietButton onClick={stopSyncing}>Stop syncing</QuietButton>
         </div>
       )}
     </form>

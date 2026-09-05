@@ -3,20 +3,35 @@ import { Link, createRoute, redirect, useNavigate } from '@tanstack/react-router
 import { isVariant } from '@sports-app/shared/types.ts'
 import type { StateDoc, Variant } from '@sports-app/shared/types.ts'
 import { prescribe } from '../../domain/schedule.ts'
-import type { PrescribedItem } from '../../domain/schedule.ts'
+import { totalWork } from '../../domain/milestones.ts'
 import type { PlayerPosition } from '../../session/useSession.ts'
 import { rootRoute } from './__root.tsx'
 import { useAdoptLegacy, useDocument, useRequestPersistence } from '../document.ts'
+import { AlertBanner } from '../components/AlertBanner.tsx'
+import { PrimaryButton, SecondaryButton } from '../components/Buttons.tsx'
 import { CountUp } from '../components/CountUp.tsx'
-import { Banner, PosturalNotice } from '../components/Notices.tsx'
+import { ExerciseRow } from '../components/ExerciseRow.tsx'
+import { Heatmap } from '../components/Heatmap.tsx'
 import { Player } from '../components/Player.tsx'
-import { PressButton } from '../components/PressButton.tsx'
-import { Body, Footer, Rail, Screen } from '../components/Screen.tsx'
-import { itemName, targetLabel, targetText } from '../components/format.ts'
+import { Ring } from '../components/Ring.tsx'
+import { StatTiles } from '../components/StatTiles.tsx'
+import { StreakPill } from '../components/StreakPill.tsx'
+import { TabBar } from '../components/TabBar.tsx'
+import {
+  Eyebrow,
+  SectionHeading,
+  Shell,
+  ShellBody,
+  ShellFooter,
+  ShellRail,
+  ShellTitle,
+} from '../components/Shell.tsx'
+import { currentStreak, heatmap, sessionsByDay, weekProgress } from '../components/history.ts'
+import { formatLongDate, groupDigits, sessionSummary } from '../components/format.ts'
 
 /**
  * `/` — today's session, then the player, then done. The only route on the path
- * to a first set.
+ * to a first set, and nothing on that path touches the network.
  *
  * ── The whole of the player's state is three search params ──────────────────
  *
@@ -32,9 +47,21 @@ import { itemName, targetLabel, targetText } from '../components/format.ts'
  * value is clamped rather than validated (`clampPosition`): a stale bookmark
  * carrying `?i=9` is an expected input, not an error worth a blank screen.
  *
- * Nothing here reads `completedAt`. `doc.history.length` is the only thing the
- * history is asked for, which is why the home screen renders identically whether
- * the last session was yesterday or fourteen months ago — there is a test.
+ * ── This screen reads the clock now, and did not used to ────────────────────
+ *
+ * The header of this file used to end: "Nothing here reads `completedAt`.
+ * `doc.history.length` is the only thing the history is asked for, which is why
+ * the home screen renders identically whether the last session was yesterday or
+ * fourteen months ago — there is a test." That decision was reversed on
+ * 2026-09-04 (corpus/wiki/reversals.md), the test was deleted rather than
+ * weakened, and the date rail, the streak, the ring and the heatmap below are
+ * what replaced it.
+ *
+ * The half that survived is the half that matters: **the rotation advances on
+ * training, never on the calendar.** Miss a fortnight and `prescribe()` returns
+ * exactly the same next session, because it is a pure function of
+ * `sessionsDone` and no derived value here may ever reach it (corpus/CLAUDE.md).
+ * The calendar reports; it does not schedule.
  */
 
 export interface PlayerSearch {
@@ -158,104 +185,138 @@ function PlayerRoute(props: {
 // ─── Home ───────────────────────────────────────────────────────────────────
 
 /**
- * Today's session and three ways to start it.
+ * Today: where the week stands, what today is, and one tap to start it.
  *
- * The variant is a **load dial, never a signal**: it shifts today's numbers by
- * two reps or five seconds and touches nothing else, so an easy day banks no debt
- * and costs no progress (corpus/wiki/decisions.md). That is the whole reason a bad
- * day is free, and the footer says it in one line rather than hiding it.
+ * ── The order down the page is an argument ──────────────────────────────────
  *
- * Medium is the 96px primary and the other two are the 56px secondary row above
- * it, so **every variant is one tap** — a segmented picker plus a start button
- * would put the common case two taps away to make the rare cases symmetrical. The
- * numbers listed are medium's, because that is what the primary will do.
+ * Ring, tiles, heatmap, then the plan. That puts three screens' worth of history
+ * above the thing the user came to do, which is only defensible because the
+ * thing they came to do is a **fixed-position primary button** at the foot —
+ * reachable with a thumb without reading any of it. Somebody who opens the app
+ * to train taps Start; somebody who opens it to see how they are doing scrolls.
+ * Neither is made to do the other's work.
+ *
+ * ── The variant is a load dial, never a signal ──────────────────────────────
+ *
+ * It shifts today's numbers by two reps or five seconds and touches nothing
+ * else, so an easy day banks no debt and costs no progress
+ * (corpus/wiki/decisions.md). That is the whole reason a bad day is free, and the
+ * footer says it in one line rather than hiding it. Medium is the 56px primary
+ * and the other two are the 48px row above it, so **every variant is one tap** —
+ * a segmented picker plus a start button would put the common case two taps away
+ * to make the rare cases symmetrical. The numbers listed are medium's, because
+ * that is what the primary will do.
  */
 function Home({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: string | null }) {
   const navigate = useNavigate()
   const prescription = useMemo(() => prescribe(doc, 'medium'), [doc])
 
+  /**
+   * The one clock read on this screen, taken once per mount.
+   *
+   * `useMemo` with no dependencies rather than a bare `new Date()` in the body:
+   * every derived value below keys off it, and a fresh instant on each render
+   * would give the heatmap new React keys and re-run the ring's fill animation
+   * on every unrelated state change. It is also the only place a date enters —
+   * everything in `components/history.ts` takes it as a parameter, exactly as
+   * `client/src/domain/` is required to.
+   */
+  const now = useMemo(() => new Date(), [])
+
+  const stats = useMemo(() => {
+    const byDay = sessionsByDay(doc.history)
+    return {
+      week: weekProgress(byDay, now),
+      streak: currentStreak(byDay, now),
+      cells: heatmap(byDay, now),
+      reps: totalWork(doc).reps,
+    }
+  }, [doc, now])
+
   function start(variant: Variant): void {
     void navigate({ to: '/', search: { v: variant, i: 0, d: 0 } })
   }
 
-  return (
-    <Screen>
-      <Rail status={`Session ${doc.history.length + 1}`}>
-        <Link to="/week" className="btn-quiet">
-          Week
-        </Link>
-        <Link to="/account" className="btn-quiet">
-          Account
-        </Link>
-      </Rail>
+  const percent = Math.round(stats.week.fraction * 100)
 
-      <Body>
-        {readOnly === null ? null : <Banner label="Read-only" text={readOnly} />}
-        <h1 className="day-title">{prescription.label}</h1>
-        <ol className="plan">
+  return (
+    <Shell>
+      <ShellRail trailing={<StreakPill days={stats.streak} />}>{formatLongDate(now)}</ShellRail>
+
+      <ShellTitle
+        title={`${prescription.label} day`}
+        subtitle={sessionSummary(prescription, doc.history.length + 1)}
+      />
+
+      <ShellBody>
+        {readOnly === null ? null : <AlertBanner label="Read-only" text={readOnly} />}
+
+        <Ring
+          fraction={stats.week.fraction}
+          value={`${percent}%`}
+          caption="Weekly goal"
+          label={`This week: ${stats.week.done} of ${stats.week.goal} sessions.`}
+        />
+
+        <StatTiles
+          stats={[
+            {
+              value: groupDigits(doc.history.length),
+              label: 'Sessions',
+              srLabel: `${doc.history.length} sessions completed.`,
+            },
+            {
+              value: groupDigits(stats.streak),
+              label: 'Day streak',
+              srLabel: `${stats.streak} days in a row.`,
+            },
+            {
+              value: groupDigits(stats.reps),
+              label: 'Reps ever',
+              srLabel: `${stats.reps} reps prescribed and completed, all time.`,
+            },
+          ]}
+        />
+
+        <Heatmap cells={stats.cells} />
+
+        <SectionHeading>Today</SectionHeading>
+        <ol>
           {prescription.items.map((item, index) => (
-            <PlanRow key={index} item={item} />
+            <ExerciseRow key={index} item={item} />
           ))}
         </ol>
-      </Body>
+      </ShellBody>
 
-      <Footer
+      <ShellFooter
         above={
-          <div className="footer__group">
-            <p className="footer__note">
+          <>
+            <p className="text-center text-label text-tx3">
               Easier and harder shift today&rsquo;s numbers by two reps or five seconds. Neither
               changes what comes next.
             </p>
-            <div className="footer__secondary">
-              <PressButton
-                className="btn-secondary"
+            <div className="flex gap-[var(--sp-2)]">
+              <SecondaryButton
                 onClick={() => start('easy')}
                 aria-label="Start today's session, easier"
               >
                 Easier
-              </PressButton>
-              <PressButton
-                className="btn-secondary"
+              </SecondaryButton>
+              <SecondaryButton
                 onClick={() => start('hard')}
                 aria-label="Start today's session, harder"
               >
                 Harder
-              </PressButton>
+              </SecondaryButton>
             </div>
-          </div>
+          </>
         }
       >
-        <PressButton className="btn-primary" onClick={() => start('medium')}>
-          Start
-        </PressButton>
-      </Footer>
-    </Screen>
-  )
-}
+        <PrimaryButton onClick={() => start('medium')}>Start workout</PrimaryButton>
+      </ShellFooter>
 
-function PlanRow({ item }: { readonly item: PrescribedItem }) {
-  const postural = item.type === 'exercise' && item.ladderKind === 'postural'
-  return (
-    <li className="plan__item">
-      <div className="plan__row">
-        <span className="plan__name">{itemName(item)}</span>
-        <span className="plan__target" aria-hidden="true">
-          {targetText(item)}
-        </span>
-        <span className="sr-only">{targetLabel(item)}</span>
-      </div>
-      {/* On the cardio slot the item's name and the day's title are the same word,
-          so the row alone says nothing the heading did not. The movements are what
-          somebody standing on a mat actually wants from this line, and they are the
-          protocol's own words. */}
-      {item.type === 'cardio' ? (
-        <p className="plan__detail">{item.protocol.movements.join('  ·  ')}</p>
-      ) : null}
-      {/* Verbatim, and on every screen a pull exercise appears on. Presenting
-          postural work as pulling strength is a misrepresentation with a physical
-          consequence. */}
-      {postural ? <PosturalNotice inset /> : null}
-    </li>
+      <TabBar active="today" />
+    </Shell>
   )
 }
 
@@ -265,37 +326,41 @@ function PlanRow({ item }: { readonly item: PrescribedItem }) {
  * Done, and it asks nothing.
  *
  * No effort rating, no "how did that feel", no notes field. Asking after the work
- * is asking at the worst possible moment, and the app has nothing it could do with
- * the answer. The count-up of the sessions number is the entire celebration
- * budget: no confetti, no badge, no personal record.
+ * is asking at the worst possible moment, and the app has nothing it could do
+ * with the answer — `prescribe()` is a pure function of sessions completed and
+ * no captured value may reach it. Logging was offered *during* the session,
+ * beside each set, where the answer was still in the room; it is deliberately not
+ * offered again here, because a second ask after a first refusal is a nag.
+ *
+ * The count-up of the sessions number is the entire celebration budget: no
+ * confetti, no badge, no personal record.
  */
 function Finish({ doc }: { readonly doc: StateDoc }) {
   const navigate = useNavigate()
   return (
-    <Screen>
-      <Rail status="Done">
-        <Link to="/week" className="btn-quiet">
-          Week
-        </Link>
-        <Link to="/account" className="btn-quiet">
-          Account
-        </Link>
-      </Rail>
-      <Body>
-        <div className="finish">
-          <h1 className="day-title">Session complete.</h1>
-          <CountUp value={doc.history.length} className="finish__value" />
-          <p className="stat__label">
-            {doc.history.length === 1 ? 'session completed' : 'sessions completed'}
-          </p>
+    <Shell>
+      <ShellRail>Done</ShellRail>
+      <ShellBody>
+        <div className="grid place-items-center py-[var(--sp-12)] text-center">
+          <h1 className="text-display leading-[var(--lh-display)] font-extrabold tracking-[var(--ls-display)]">
+            Session complete.
+          </h1>
+          <CountUp
+            value={doc.history.length}
+            className="mt-[var(--sp-6)] block text-mono leading-none font-extrabold tracking-[var(--ls-hero)] tabular-nums"
+          />
+          <span className="mt-[var(--sp-2)] block">
+            <Eyebrow>
+              {doc.history.length === 1 ? 'session completed' : 'sessions completed'}
+            </Eyebrow>
+          </span>
         </div>
-      </Body>
-      <Footer>
-        <PressButton className="btn-primary" onClick={() => void navigate({ to: '/', search: {} })}>
-          Done
-        </PressButton>
-      </Footer>
-    </Screen>
+      </ShellBody>
+      <ShellFooter>
+        <PrimaryButton onClick={() => void navigate({ to: '/', search: {} })}>Done</PrimaryButton>
+      </ShellFooter>
+      <TabBar active="today" />
+    </Shell>
   )
 }
 
@@ -311,64 +376,58 @@ function LegacyPrompt({
   const adopt = useAdoptLegacy(username)
   const sessions = legacy.history.length
   return (
-    <Screen>
-      <Rail status="Existing history" />
-      <Body>
-        <h1 className="page-title">There is already a training history on this browser.</h1>
-        <p className="prose">
+    <Shell>
+      <ShellRail>Existing history</ShellRail>
+      <ShellTitle title="There is already a training history on this browser." size="movement" />
+      <ShellBody>
+        <p className="mt-[var(--sp-3)] text-body text-tx2">
           It was saved before this app had accounts, so no owner is recorded in it —{' '}
           {sessions === 1 ? '1 session' : `${sessions} sessions`}. Nothing has been written yet.
         </p>
-        <p className="prose">
+        <p className="mt-[var(--sp-3)] text-body text-tx2">
           If you recorded it, keep it and it becomes {username}&rsquo;s. If this browser is shared,
           start fresh: the old file stays exactly where it is either way.
         </p>
-        {adopt.error === null ? null : <Banner label="Not saved" text={adopt.error.message} />}
-      </Body>
-      <Footer
+        {adopt.error === null ? null : (
+          <AlertBanner label="Not saved" text={adopt.error.message} />
+        )}
+      </ShellBody>
+      <ShellFooter
         above={
-          <div className="footer__secondary">
-            <PressButton
-              className="btn-secondary btn-quiet--warn"
-              onClick={() => adopt.mutate({ doc: legacy, keep: false })}
-            >
-              Start fresh
-            </PressButton>
-          </div>
+          <SecondaryButton onClick={() => adopt.mutate({ doc: legacy, keep: false })}>
+            Start fresh
+          </SecondaryButton>
         }
       >
-        <PressButton
-          className="btn-primary"
-          onClick={() => adopt.mutate({ doc: legacy, keep: true })}
-        >
+        <PrimaryButton onClick={() => adopt.mutate({ doc: legacy, keep: true })}>
           Keep this history
-        </PressButton>
-      </Footer>
-    </Screen>
+        </PrimaryButton>
+      </ShellFooter>
+    </Shell>
   )
 }
 
 function Unreadable({ message }: { readonly message: string }) {
   return (
-    <Screen>
-      <Rail status="Read-only">
-        <Link to="/account" className="btn-quiet">
-          Account
-        </Link>
-      </Rail>
-      <Body>
-        <h1 className="page-title">The saved training history could not be read.</h1>
-        <Banner label="Nothing was changed" text={message} />
-        <p className="prose">
+    <Shell>
+      <ShellRail>Read-only</ShellRail>
+      <ShellTitle title="The saved training history could not be read." size="movement" />
+      <ShellBody>
+        <AlertBanner label="Nothing was changed" text={message} />
+        <p className="mt-[var(--sp-3)] text-body text-tx2">
           The stored text is untouched and is usually repairable by hand — it is plain JSON in this
           browser&rsquo;s local storage. Training is blocked rather than started from zero, because
           starting from zero here would look exactly like months of work having never happened.
         </p>
-        <p className="prose">
-          <Link to="/account">Account</Link> has the file to download, and the way to replace it if
-          you decide it is not worth repairing.
+        <p className="mt-[var(--sp-3)] text-body text-tx2">
+          <Link to="/account" className="text-accent underline">
+            Account
+          </Link>{' '}
+          has the file to download, and the way to replace it if you decide it is not worth
+          repairing.
         </p>
-      </Body>
-    </Screen>
+      </ShellBody>
+      <TabBar active="today" />
+    </Shell>
   )
 }

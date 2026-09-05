@@ -5,8 +5,8 @@ import { useForm } from 'react-hook-form'
 import { USERNAME_RULE, isValidUsername } from '@sports-app/shared/username.ts'
 import { setCurrentUsername } from '../../persistence/session.ts'
 import { rootRoute } from './__root.tsx'
-import { PressButton } from '../components/PressButton.tsx'
-import { Body, Footer, Rail, Screen } from '../components/Screen.tsx'
+import { PrimaryButton } from '../components/Buttons.tsx'
+import { Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from '../components/Shell.tsx'
 
 /**
  * `/login` — a username, a password that is not checked, and a sentence saying so.
@@ -45,6 +45,12 @@ import { Body, Footer, Rail, Screen } from '../components/Screen.tsx'
  * synchronous `localStorage` write and nothing else. Nothing on the session
  * -critical path may await the network, and this is the strongest form of that:
  * there is no request to fail.
+ *
+ * ── No tab bar ───────────────────────────────────────────────────────────────
+ *
+ * This is the one screen that is not one of the four destinations — it is where
+ * you arrive before there is a "you" to navigate as, so it renders no `<TabBar>`,
+ * the same way the player renders none while a session is in progress.
  */
 
 export const loginRoute = createRoute({
@@ -56,6 +62,14 @@ export const loginRoute = createRoute({
 interface LoginValues {
   readonly username: string
 }
+
+/** Shared by every text field on this screen and on `SyncSettings`. */
+const FIELD_LABEL = 'block text-meta font-semibold text-tx2'
+const FIELD_INPUT =
+  'mt-[var(--sp-1)] block min-h-[var(--tap-row)] w-full rounded border border-line2 ' +
+  'bg-s1 px-[var(--sp-3)] text-body text-tx'
+const FIELD_DESCRIPTION = 'mt-[var(--sp-1)] text-meta text-tx3'
+const FIELD_ERROR = 'mt-[var(--sp-1)] text-meta font-semibold text-dang'
 
 function LoginRoute() {
   const navigate = useNavigate()
@@ -93,61 +107,56 @@ function LoginRoute() {
   })
 
   return (
-    <Screen>
-      <Rail status="Sign in" />
+    <Shell>
+      <ShellRail>Sign in</ShellRail>
       <form
-        className="screen__form"
+        className="flex min-h-0 flex-1 flex-col"
         onSubmit={(event) => void handleSubmit(submit)(event)}
         noValidate
       >
-        <Body>
-          <h1 className="day-title">Calisthenics</h1>
+        <ShellTitle title="Calisthenics" />
+        <ShellBody>
+          <Field.Root className="mt-[var(--sp-2)]" invalid={error !== null}>
+            <Field.Label className={FIELD_LABEL}>Username</Field.Label>
+            <Field.Control
+              className={FIELD_INPUT}
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="go"
+              {...username}
+            />
+            {error === null ? null : (
+              <Field.Error className={FIELD_ERROR} match>
+                {error}
+              </Field.Error>
+            )}
+          </Field.Root>
 
-          <div className="login">
-            <Field.Root className="field" invalid={error !== null}>
-              <Field.Label className="field__label">Username</Field.Label>
-              <Field.Control
-                className="field__input"
-                autoComplete="username"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                enterKeyHint="go"
-                {...username}
-              />
-              {error === null ? null : (
-                <Field.Error className="field__error" match>
-                  {error}
-                </Field.Error>
-              )}
-            </Field.Root>
-
-            <div className="field">
-              <label className="field__label" htmlFor={passwordId}>
-                Password
-              </label>
-              {/* Uncontrolled, and never read. See the note at the top of the file. */}
-              <input
-                id={passwordId}
-                className="field__input"
-                type="password"
-                autoComplete="current-password"
-                aria-describedby={`${passwordId}-note`}
-              />
-              <p className="field__description" id={`${passwordId}-note`}>
-                The password is not checked. It is accepted and discarded, so anyone who knows a
-                username can open that username&rsquo;s training history.
-              </p>
-            </div>
+          <div className="mt-[var(--sp-4)]">
+            <label className={FIELD_LABEL} htmlFor={passwordId}>
+              Password
+            </label>
+            {/* Uncontrolled, and never read. See the note at the top of the file. */}
+            <input
+              id={passwordId}
+              className={FIELD_INPUT}
+              type="password"
+              autoComplete="current-password"
+              aria-describedby={`${passwordId}-note`}
+            />
+            <p className={FIELD_DESCRIPTION} id={`${passwordId}-note`}>
+              The password is not checked. It is accepted and discarded, so anyone who knows a
+              username can open that username&rsquo;s training history.
+            </p>
           </div>
-        </Body>
+        </ShellBody>
 
-        <Footer>
-          <PressButton className="btn-primary" type="submit">
-            Continue
-          </PressButton>
-        </Footer>
+        <ShellFooter>
+          <PrimaryButton type="submit">Continue</PrimaryButton>
+        </ShellFooter>
       </form>
-    </Screen>
+    </Shell>
   )
 }

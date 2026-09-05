@@ -12,12 +12,18 @@
  * loss. So `expectRejected` asserts both the failure *and* the absence of a doc,
  * and every case goes through it.
  *
- * Two things are new in v3 and get their own sections at the bottom:
+ * Three things get their own sections at the bottom:
  *
- *   1. **The v2 → v3 migration**, which is the first one to drop a required
- *      field. The v2 fixture is built here rather than imported, because the
- *      shape it describes no longer exists anywhere in `client/src/`.
- *   2. **The service's own shallow check**, imported from the `server` workspace
+ *   1. **The migration chain**, v1 → v2 → v3 → v4. The v1 and v2 fixtures are built
+ *      here rather than imported, because the shapes they describe no longer exist
+ *      anywhere in `client/src/`. The v3 fixture is *derived* from the v4 one
+ *      rather than hand-written — see `v3Doc`.
+ *   2. **`logged`**, v4's one optional field, and every way a hand-edit can get it
+ *      wrong. The property under test is not "bad input is rejected" but "bad input
+ *      is rejected *without repairing the file*": a truncated log the app then
+ *      saves back is deleted training data, which is the exact failure the codec's
+ *      second guarantee exists to prevent.
+ *   3. **The service's own shallow check**, imported from the `server` workspace
  *      and run over this codec's output. Nothing else in the tree proves that what
  *      `serialise` writes is something `PUT /api/state` will accept, and a client
  *      that saves documents the service refuses would look fine until the day
@@ -272,14 +278,18 @@ describe('parse rejects malformed input', () => {
   })
 
   it('a document from a newer build, without misreading it', () => {
-    // v4 does not exist. It must be refused, never coerced down to v3 — a field
-    // v4 renamed would otherwise be read as the v3 field of the same name.
+    // v5 does not exist. It must be refused, never coerced down to v4 — a field
+    // v5 renamed would otherwise be read as the v4 field of the same name. The
+    // number is `CURRENT_SCHEMA_VERSION + 1` rather than a literal so the next
+    // schema bump moves the goalposts instead of quietly retiring this test: when
+    // 4 became current, the old literal 4 here stopped meaning "the future".
+    const future = CURRENT_SCHEMA_VERSION + 1
     const error = expectRejected(
-      corrupt((d) => (d['schemaVersion'] = 4)),
+      corrupt((d) => (d['schemaVersion'] = future)),
       'newer version of the app',
     )
     expect(error).toContain('update the app')
-    expect(error).toContain('version 4')
+    expect(error).toContain(`version ${future}`)
   })
 
   it('a missing or misspelled username', () => {
@@ -735,6 +745,27 @@ function v1Doc(): JsonObject {
   return raw
 }
 
+/**
+ * A v3 document: exactly the current shape, minus `logged`, stamped 3.
+ *
+ * **Derived from `serialise(midProgram)` rather than hand-written**, which is the
+ * opposite of the choice made for v1 and v2 above, and the reason is the same one:
+ * write the fixture from whatever still exists. The v2 shape is gone from `src/`
+ * so it has to be transcribed; the v3 shape is *the v4 shape without an optional
+ * field*, so transcribing it would produce a second copy of a document that already
+ * exists, free to drift and proving nothing when it did. `midProgram` carries no
+ * `logged`, so lowering the version number is genuinely all a v3 document is.
+ *
+ * That is not a weaker test than a hand-written fixture. It is a stronger claim:
+ * it says the v3 → v4 step is the identity, and it would fail the moment the step
+ * started touching anything.
+ */
+function v3Doc(): JsonObject {
+  const raw = JSON.parse(serialise(midProgram)) as Record<string, unknown>
+  raw['schemaVersion'] = 3
+  return raw
+}
+
 /** Sessions in which `pattern` appears — the definition of `sessionsDone`. */
 function appearances(pattern: Pattern): number {
   return V2_HISTORY.filter((session) =>
@@ -781,6 +812,17 @@ describe('migrate', () => {
     }
   })
 
+  it('has a step for v3, and that step returns the document it was handed', () => {
+    // Both halves matter. The *step existing* is the whole of brief 25's migration
+    // — without an entry in the map the loop refuses version 3 outright. The step
+    // being the identity is what says v4 is purely additive: it hands back the very
+    // same object, so there is no clone to have quietly rewritten anything.
+    const raw = v3Doc()
+    const result = migrate(raw, 3)
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value).toBe(raw)
+  })
+
   it('counts a pattern recorded twice in one session once', () => {
     // A hand-edit can duplicate an exercise. `sessionsDone` counts sessions, and
     // the schedule divides it by sessionsPerRung, so double-counting would
@@ -806,7 +848,7 @@ describe('migrate', () => {
   })
 })
 
-describe('a v2 document migrates to v3', () => {
+describe('a v2 document migrates to v4', () => {
   const doc = expectAccepted(JSON.stringify(v2Doc(), null, 2), 'dana')
 
   it('reconstructs every counter from the history, not from the rung indices', () => {
@@ -895,10 +937,25 @@ describe('a v2 document migrates to v3', () => {
     expect(doc.cyclePosition).toBe(4)
   })
 
-  it('re-serialises as clean v3 that loads again', () => {
+  it('re-serialises as clean v4 that loads again', () => {
     const text = serialise(doc)
-    expect(text).toContain('"schemaVersion": 3')
+    expect(text).toContain(`"schemaVersion": ${CURRENT_SCHEMA_VERSION}`)
     expect(expectAccepted(text)).toEqual(doc)
+  })
+
+  it('adds no logs, because a v2 document has no answer to add', () => {
+    // The v3→v4 step is the identity function and this is what that means in
+    // practice: `logged` is absent everywhere, not `[]`. v2 recorded `actualValue`
+    // per set, so there was a number available to carry over — and carrying it over
+    // would have been wrong twice, once because v2's number was an input to the
+    // adaptive rules rather than a log, and once because it would put a value into
+    // a field the engine is forbidden to ever read.
+    for (const session of doc.history) {
+      for (const exercise of session.exercises) {
+        expect('logged' in exercise, JSON.stringify(exercise)).toBe(false)
+      }
+    }
+    expect(serialise(doc)).not.toContain('logged')
   })
 
   it('refuses a v2 document that is broken for reasons other than its version', () => {
@@ -910,13 +967,14 @@ describe('a v2 document migrates to v3', () => {
   })
 })
 
-describe('a v1 document migrates all the way to v3 in one call', () => {
-  it('composes both steps rather than needing a v1→v3 shortcut', () => {
-    const v3 = expectAccepted(JSON.stringify(v1Doc(), null, 2), 'dana')
+describe('a v1 document migrates all the way to v4 in one call', () => {
+  it('composes all three steps rather than needing a v1→v4 shortcut', () => {
+    const v4 = expectAccepted(JSON.stringify(v1Doc(), null, 2), 'dana')
     // Identical to the v2 document's outcome: the effort ratings the first step
     // strips are the only difference between the two inputs.
-    expect(v3).toEqual(expectAccepted(JSON.stringify(v2Doc(), null, 2), 'dana'))
-    expect(serialise(v3)).not.toContain('effort')
+    expect(v4).toEqual(expectAccepted(JSON.stringify(v2Doc(), null, 2), 'dana'))
+    expect(serialise(v4)).not.toContain('effort')
+    expect(v4.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
   })
 
   it('runs one step at a time, so each step only knows its own version', () => {
@@ -924,9 +982,369 @@ describe('a v1 document migrates all the way to v3 in one call', () => {
     expect(once.ok).toBe(true)
     if (!once.ok) throw new Error('unreachable')
     // The v1 step ran (no effort survives) and so did the v2 step (no ladders).
+    // The v3 step is the identity function, so there is nothing of its own to see
+    // — its only observable effect is that the loop reached the end at all.
     expect(JSON.stringify(once.value)).not.toContain('effort')
     expect(once.value['ladders']).toBeUndefined()
     expect(once.value['sessionsDone']).toBeDefined()
+  })
+})
+
+describe('a v3 document migrates to v4', () => {
+  it('is accepted and re-stamped rather than refused', () => {
+    // The whole of the migration, and the only reason it exists: before brief 25
+    // this exact input produced "no migration from version 3 to 4".
+    const doc = expectAccepted(JSON.stringify(v3Doc(), null, 2))
+    expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+  })
+
+  it('changes nothing else at all', () => {
+    // Equal to `midProgram` itself, which is the strongest available statement
+    // that the step is the identity: `midProgram` *is* the v4 document, and the
+    // fixture differs from it only in the version number.
+    expect(expectAccepted(JSON.stringify(v3Doc(), null, 2))).toEqual(midProgram)
+  })
+
+  it('does not invent an empty log for a document that has no answer', () => {
+    // `logged: []` would say "trained and recorded nothing", which is a claim about
+    // a session a v3 build could not have made. Absent is the truthful value and it
+    // is already there, so the migration's job is to leave it alone.
+    const doc = expectAccepted(JSON.stringify(v3Doc(), null, 2))
+    for (const session of doc.history) {
+      for (const exercise of session.exercises) {
+        expect('logged' in exercise).toBe(false)
+      }
+    }
+  })
+
+  it('passes a hand-typed log through to the validator rather than stripping it', () => {
+    // A `logged` in a document still claiming v3 is a hand-edit. Migration does not
+    // repair and does not tidy: the field is legal in v4, so it survives the step
+    // and is judged on its merits — which here means it is kept.
+    const raw = v3Doc() as Record<string, unknown>
+    exerciseAt(raw, 0, 0)['logged'] = [8, 8, 6]
+    expect(expectAccepted(JSON.stringify(raw)).history[0]?.exercises[0]?.logged).toEqual([8, 8, 6])
+
+    // …and, being judged rather than waved through, a bad one is still refused.
+    const bent = v3Doc() as Record<string, unknown>
+    exerciseAt(bent, 0, 0)['logged'] = [8, -1]
+    expectRejected(JSON.stringify(bent), 'history[0].exercises[0].logged[1]')
+  })
+
+  it('refuses a v3 document that is broken for reasons other than its version', () => {
+    // Same rule as the v2 step: migration is not a repair tool.
+    const broken = v3Doc() as Record<string, unknown>
+    sessionAt(broken, 1)['variant'] = 'brutal'
+    expectRejected(JSON.stringify(broken), 'history[1].variant')
+  })
+})
+
+describe('every schema this build has ever written reaches v4 and settles there', () => {
+  // One table rather than three near-identical tests, because the property is the
+  // same for all three and stating it once makes the *absence* of a version
+  // obvious if one is ever added to the chain without being added here.
+  const fixtures: readonly (readonly [number, () => JsonObject])[] = [
+    [1, v1Doc],
+    [2, v2Doc],
+    [3, v3Doc],
+  ]
+
+  for (const [version, build] of fixtures) {
+    it(`a v${version} document migrates and then round-trips stably`, () => {
+      const doc = expectAccepted(JSON.stringify(build(), null, 2), 'dana')
+      expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+
+      // encode → decode → encode. The second encoding must be byte-identical to the
+      // first: a migration that left something the validator merely *tolerates*
+      // would show up here as text that changes shape every time it is saved, which
+      // on a file people keep in git is a diff on every session.
+      const once = serialise(doc)
+      const twice = serialise(expectAccepted(once))
+      expect(twice).toBe(once)
+      expect(expectAccepted(twice)).toEqual(doc)
+
+      // And migrating the already-migrated text is a no-op rather than a second
+      // pass through the chain — it is v4 now, so there is no step left to run.
+      expect(parse(once).ok).toBe(true)
+    })
+  }
+})
+
+// ─── logged: v4's one optional field ────────────────────────────────────────
+
+/**
+ * A v4 document with real logs on it, built from `midProgram` so the only
+ * difference between the two is the field under test.
+ *
+ * Three shapes on purpose: a full log (three of three sets), a partial one (two of
+ * two, then one of two — stopping part way through is an ordinary evening), and a
+ * zero, which is a fact rather than a gap. The cardio session keeps no logs at all,
+ * so one document exercises absent and present side by side.
+ */
+const LOGGED: StateDoc = {
+  ...midProgram,
+  history: midProgram.history.map((session, si) => ({
+    ...session,
+    // The cardio session at index 2 keeps no logs, so absent and present sit in
+    // one document and the round trip has to preserve both.
+    exercises:
+      si === 2
+        ? session.exercises
+        : session.exercises.map((exercise, ei) => ({
+            ...exercise,
+            // One partial log (one entry against two sets), everything else full.
+            // The leading zero is deliberate: "attempted, managed none" is a fact.
+            logged: si === 0 && ei === 1 ? [27] : [0, 8, 7].slice(0, exercise.sets),
+          })),
+  })),
+}
+
+describe('logged round-trips', () => {
+  it('survives serialise → parse → serialise unchanged', () => {
+    const first = serialise(LOGGED)
+    const doc = expectAccepted(first)
+    expect(doc).toEqual(LOGGED)
+    expect(serialise(doc)).toBe(first)
+  })
+
+  it('is written last on the exercise line, after the whole prescription', () => {
+    expect(serialise(LOGGED)).toContain(
+      '{ "pattern": "push", "rungId": "push-05-full-3s-down", "sets": 3, "targetValue": 8, "logged": [0, 8, 7] }',
+    )
+  })
+
+  it('keeps absent and empty apart, because they are different facts', () => {
+    // Absent: "not logged". `[]`: "logged, and recorded nothing". A codec that
+    // collapsed the two would make the second unsayable, and would also break the
+    // round trip in the direction nobody tests — writing `[]` and reading back
+    // nothing.
+    const absent = midProgram.history[0]?.exercises[0]
+    expect(absent && 'logged' in absent).toBe(false)
+    expect(serialise(midProgram)).not.toContain('logged')
+
+    const empty: StateDoc = {
+      ...midProgram,
+      history: [
+        {
+          ...midProgram.history[0]!,
+          exercises: [{ ...midProgram.history[0]!.exercises[0]!, logged: [] }],
+        },
+      ],
+    }
+    expect(serialise(empty)).toContain('"logged": []')
+    const back = expectAccepted(serialise(empty))
+    expect(back.history[0]?.exercises[0]?.logged).toEqual([])
+    expect(back).toEqual(empty)
+  })
+
+  it('accepts a shorter log than there were sets', () => {
+    // Logging two of three and stopping is normal. Nothing pads it.
+    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [8, 7])))
+    expect(doc.history[0]?.exercises[0]?.logged).toEqual([8, 7])
+    expect(doc.history[0]?.exercises[0]?.sets).toBe(3)
+  })
+
+  it('accepts a zero and a log far above the target', () => {
+    // Zero is "I attempted it and managed none", which is worth recording. A log
+    // above `targetValue` is "I had a good day" — history is a record of what
+    // happened, and nothing re-derives a prescription from it.
+    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [0, 200, 8])))
+    expect(doc.history[0]?.exercises[0]?.logged).toEqual([0, 200, 8])
+  })
+
+  it('accepts a fractional log, because held time is not whole seconds', () => {
+    // `targetValue` is `finiteAt`, not `intAt`, and a log is measured in the same
+    // unit as the target it sits next to. A 27.5-second hollow hold is a fact.
+    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 1)['logged'] = [27.5, 26])))
+    expect(doc.history[0]?.exercises[1]?.logged).toEqual([27.5, 26])
+  })
+})
+
+/**
+ * The corruption table, and the property it is really asserting.
+ *
+ * Every case below is a *hand-edit*, so the bar is not "it does not crash" — it is
+ * that `parse` reports the exact entry at fault and hands back **no document**, so
+ * the caller cannot save a repaired version over the original. `expectRejected`
+ * asserts all three at once (no throw, `ok: false`, no doc under any key).
+ *
+ * This is the same policy the file applies to `cyclePosition`, `sets` and every
+ * counter, and choosing it over truncate-or-clamp is the load-bearing decision in
+ * brief 25 — see `validateLogged`. Truncating a too-long log would delete a set the
+ * person recorded *and then write the shorter version back to storage* on the next
+ * save, which is the exact "hand-edit becomes permanent data loss" failure the
+ * codec's second guarantee exists to prevent.
+ */
+describe('a hand-corrupted logged is refused, and the file is left alone', () => {
+  it('longer than sets — the entry describes a set that was never prescribed', () => {
+    const error = expectRejected(
+      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [8, 8, 8, 8])),
+      'history[0].exercises[0].logged',
+      'at most 3 entries',
+    )
+    // The message says what to do about it rather than only what is wrong.
+    expect(error).toContain('Fewer is fine')
+    expect(error).toContain('not logged')
+  })
+
+  it('longer than sets, when sets is 1 — the message stays grammatical', () => {
+    expectRejected(
+      corrupt((d) => {
+        exerciseAt(d, 0, 0)['sets'] = 1
+        exerciseAt(d, 0, 0)['logged'] = [8, 8]
+      }),
+      'at most 1 entry ',
+    )
+  })
+
+  it('a negative entry, reported by index', () => {
+    expectRejected(
+      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [8, -3, 7])),
+      'history[0].exercises[0].logged[1]',
+      '>= 0',
+    )
+  })
+
+  it('a NaN, which JSON cannot even hold and arrives as null', () => {
+    // `JSON.stringify(NaN)` is `null`, so the way a NaN reaches a document at all
+    // is as a null — and that is what has to be reported, at the right index.
+    expectRejected(
+      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [8, Number.NaN, 7])),
+      'history[0].exercises[0].logged[1]',
+      'expected a number',
+    )
+    // And spelled out by hand, which is the shape a person actually types. `NaN`
+    // is not a JSON token at all, so it never reaches the validator — the parse
+    // error is the right answer and points at the character.
+    expectRejected(
+      serialise(midProgram).replace('"targetValue": 8 }', '"targetValue": 8, "logged": [NaN] }'),
+      'not valid JSON',
+    )
+  })
+
+  it('an Infinity, likewise', () => {
+    expectRejected(
+      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [Number.POSITIVE_INFINITY])),
+      'history[0].exercises[0].logged[0]',
+      'expected a number',
+    )
+  })
+
+  it('not an array', () => {
+    for (const wrong of [8, '8, 8, 7', { '0': 8 }, true]) {
+      expectRejected(
+        corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = wrong)),
+        'history[0].exercises[0].logged',
+        'expected an array',
+      )
+    }
+  })
+
+  it('null, which is what an explicitly blanked field looks like', () => {
+    // Not treated as absent. Absent is the key not being there; `null` is somebody
+    // having typed something, and guessing what they meant is repair.
+    expectRejected(
+      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = null)),
+      'history[0].exercises[0].logged',
+      'expected an array',
+    )
+  })
+
+  it('a hole, which is a null once it has been through JSON', () => {
+    // `JSON.stringify([8, , 7])` writes `[8,null,7]` — a hole has no other
+    // representation in a document — so this is the corruption shape, and it is
+    // reported at the index that has it rather than silently skipped.
+    // Built by assignment rather than as `[8, , 7]`, which eslint refuses on the
+    // grounds that a comma-hole in a literal is almost always a typo. Here the hole
+    // is the subject, so it is spelled out.
+    const sparse: unknown[] = []
+    sparse[0] = 8
+    sparse[2] = 7
+    expect(sparse).toHaveLength(3)
+    expect(JSON.stringify(sparse)).toBe('[8,null,7]')
+    expectRejected(
+      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = sparse)),
+      'history[0].exercises[0].logged[1]',
+      'null',
+    )
+  })
+
+  it('a string entry among good ones', () => {
+    expectRejected(
+      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [8, 'eight', 7])),
+      'history[0].exercises[0].logged[1]',
+      'expected a number',
+    )
+  })
+
+  it('reports every bad entry, not just the first', () => {
+    const error = expectRejected(
+      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [-1, null, 'x'])),
+      'problems in the state document',
+    )
+    for (const index of [0, 1, 2]) {
+      expect(error).toContain(`history[0].exercises[0].logged[${index}]`)
+    }
+  })
+
+  it('says nothing about the length when sets is itself broken', () => {
+    // The record is already rejected. A second error derived from a `sets` we do
+    // not trust would be noise pointing at the wrong field.
+    const error = expectRejected(
+      corrupt((d) => {
+        exerciseAt(d, 0, 0)['sets'] = 'three'
+        exerciseAt(d, 0, 0)['logged'] = [8, 8, 8, 8, 8]
+      }),
+      'history[0].exercises[0].sets',
+    )
+    expect(error).not.toContain('at most')
+  })
+
+  it('never throws, on any of it', () => {
+    // The guarantee restated over the whole table at once, including inputs no
+    // `corrupt()` case above can build.
+    const shapes: unknown[] = [
+      [],
+      [8],
+      -0,
+      [-0],
+      [[8]],
+      [{ reps: 8 }],
+      Array.from({ length: 5000 }, () => 8),
+      'x'.repeat(1000),
+      { length: 3 },
+    ]
+    for (const shape of shapes) {
+      const text = corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = shape))
+      expect(() => parse(text), JSON.stringify(shape)?.slice(0, 40)).not.toThrow()
+    }
+  })
+})
+
+/**
+ * The invariant that outranks everything else in corpus/CLAUDE.md, checked at the
+ * layer that stores the value.
+ *
+ * The domain-side half of this lives in `client/src/domain/__tests__/schedule.test.ts`
+ * (writing arbitrary logs anywhere in history changes nothing `prescribe()`
+ * returns). This half is narrower and belongs here: the codec must not *derive*
+ * anything from a logged value either, because a summary that totalled them would
+ * be the first consumer, and the first consumer is how a field ends up in a
+ * decision.
+ */
+describe('the codec has no opinion about what a logged value means', () => {
+  it('summarise reports nothing derived from logs', () => {
+    // Same summary for a document with logs and the same document without them.
+    expect(summarise(LOGGED)).toEqual(summarise(midProgram))
+  })
+
+  it('two documents differing only in their logs are equally valid', () => {
+    // No threshold, no "you logged less than the target" rejection. The codec
+    // stores what happened; judging it is not its job, and would not be anyone's.
+    const lowRungs = corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [1, 1, 1]))
+    const highRungs = corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [80, 80, 80]))
+    expect(parse(lowRungs).ok).toBe(true)
+    expect(parse(highRungs).ok).toBe(true)
   })
 })
 
@@ -968,7 +1386,7 @@ describe('the sync service accepts what serialise writes', () => {
   it('passes the shallow check, with the fields the receipt is built from', () => {
     expect(checkDocument(serialise(midProgram))).toEqual({
       ok: true,
-      schemaVersion: 3,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       username: midProgram.username,
       historyLength: midProgram.history.length,
     })
@@ -983,7 +1401,7 @@ describe('the sync service accepts what serialise writes', () => {
     const migrated = expectAccepted(JSON.stringify(v2Doc()), 'dana')
     expect(checkDocument(serialise(migrated))).toMatchObject({
       ok: true,
-      schemaVersion: 3,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       username: 'dana',
       historyLength: 9,
     })

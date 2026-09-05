@@ -806,3 +806,136 @@ reduced-motion assertion in `ExerciseFigure.test.tsx` queries by
 true. Its name also contradicts the CSS, which holds the `end` pose. Brief 23 fixes it.
 The generalisable shape is now stated twice in the corpus: **a test that greps files it
 failed to open, or asserts the selector it just queried, is green and worthless.**
+
+## [2026-09-04] decision | v3 visual direction: the category standard, and three invariants reversed with it
+
+Ran an Impeccable direction round (seed `197b2dd1`, mode Operate, code-led) against a
+brief of "keep the business idea, think of a better design", with openGym offered as
+inspiration. Four worlds were built as live phone mockups carrying real ladder content
+rather than described in prose: **the Crag Guidebook** (the roll's assignment — 35 rungs
+as 35 graded routes, a fixed grade ramp, the topo line as the movement path, and a
+guidebook's native voice for access and safety notes), **the Physio Handout**
+(Impeccable's pick), **Split-Flap Concourse** (a competitive challenger), and **the
+category standard** played straight. Five further challengers were declined, each
+donating one discipline before it left.
+
+**The user took the standing exit.** Convention is now the commitment: dark ground,
+gradient progress ring, streak grid, stat tiles, bottom tab bar, Inter throughout,
+executed at full fidelity without irony. **The craft bar is openGym** — light/dark
+themes, custom iconography, eight accent colours, "designed, not assembled".
+
+The direction round is recorded because the *reasoning* is worth keeping even though the
+grounded directions lost. Two findings survive the choice and are worth more than the
+cards they came on:
+
+- **A guidebook's access-note voice was the only vocabulary any world offered for the
+  app's three honest warnings** (`POSTURAL_NOTICE`, the cardio dose limit, the
+  safety-critical first cue). The chosen direction has no such slot, and the warnings
+  still have to live somewhere.
+- **Every rung's fourth cue is already a stop rule** — "stop the set when your hips
+  sag", "stop the clock when your shoulders creep toward your ears". A physio sheet has
+  a conventional boxed slot for exactly that. Nothing in the category standard does, and
+  the shipped app buries it as cue four. This is a content structure the ladders already
+  have and no design has ever surfaced.
+
+**Three reversals, taken deliberately and at the user's explicit direction.** Each is
+recorded in `decisions.md`; none should be treated as a design detail:
+
+1. **"The app measures nothing" is reversed.** It was the top-ranked product decision.
+2. **"No dates anywhere in the app" is reversed.** Dates, streaks, missed days and a
+   weekly-goal percentage are in scope. `noDatesInUi.test.ts` and the time-invariance
+   snapshot are deleted rather than weakened — a test kept while its rule is gone is
+   worse than no test.
+3. **Comparison affect is admitted** — "last time: 7" and an estimated 1RM. The rule
+   against green-vs-red comparison was argued as "guilt with extra steps"; it loses.
+
+**Stack:** Tailwind + Framer Motion + anime.js, at the user's choice. Tailwind replaces
+`app.css`, which retires `noHexColors.test.ts` in its current form. The **contrast test
+survives and must be re-pointed at the Tailwind theme** — it is the only mechanical
+guard left on the palette once the hex-literal rule is gone, and it is the one that
+caught the dark→white accent failure.
+
+`PRODUCT.md` was written at the repo root during this round (the direction flow gates on
+it) and now carries the category-standard commitment as a brand commitment.
+
+## [2026-09-04] build | briefs 24–27: the category standard, shipped
+
+Ran the v3 direction as four briefs in waves (`24a ‖ 26 → 24b → 25 → 27a → 27b`),
+dispatched to subagents with the controller verifying each wave against the integrated
+tree rather than trusting the agents' own reports. **704 tests at baseline → 1115.**
+Typecheck clean, lint clean, and the client builds at both `/` and `/sports-app/`.
+
+**Two rate-limit terminations mid-run**, one on each model tier. Neither lost work: 27a
+had finished its code and died writing its report. Worth knowing the failure is
+survivable and that the tree, not the agent's summary, is the source of truth.
+
+### The repo had not built since 2026-08-13, and nobody knew
+
+`0d7d4f3` ("SAVE") converted `Prone.tsx` from a `ProneFigure` component to a `PRONE_RIG`
+data export while `figures/index.ts` still imported the component. That broke
+`npm run build` and `npm run typecheck` for three weeks. **It went unnoticed because
+Vitest does not typecheck and no test renders a prone figure**, so 704 tests stayed green
+over a tree that could not be built. The generalisable shape, and it is the third of its
+family in this corpus: *a green suite is not a green repo.*
+
+Fixed by restoring the component verbatim from `5bb9e6b` alongside the rig, so brief 23
+loses nothing and deletes the old renderer when its morph lands. A subagent had instead
+stubbed `ProneFigure` to return `null` — which compiles, takes typecheck from 3 errors to
+2, and **silently ships the postural exercise with no figure at all**. Reverted. Prefer
+the loud restore to the quiet stub.
+
+### What the review gate caught that the briefs did not
+
+- **The eight-accent system was unreachable.** `theme.ts` was complete, correct, and
+  imported by nothing; `index.html`'s cold-start script stamped what was stored, but no
+  screen could change it. `contrast.test.ts` was meanwhile proving all sixteen palettes
+  legible. **Legible and reachable are different claims, and only one had a test.** An
+  Appearance section on `/account` now owns both settings, with three tests.
+- **A swatch that lies is worse than a name that is true.** The first version of that
+  picker stamped `data-accent` per button to preview each hue. Every accent block is
+  `:root[data-accent='…']`, so it matched nothing and all eight dots rendered the
+  accent already in use. Element-scoping them would mean duplicating the theme logic
+  into each block; the picker is named options instead, and the app itself is the preview.
+- **`StreakPill` had an `aria-label` on a bare `<span>`** with both children
+  `aria-hidden` — the generic role does not carry an author-supplied name, so the element
+  looked at most often was never announced. `Ring` and `Heatmap` already set `role="img"`
+  on the same shape; this was the one place it was dropped. Testing-library's `getByText`
+  reads text content rather than the computed accessible name, which is why nothing
+  caught it.
+- **`noHexColors.test.ts` caught the controller** writing a hex triplet inside a comment.
+  Working exactly as intended.
+
+### Decisions taken during the run
+
+- **Malformed `logged` is rejected, not clamped.** The app saves back what it loaded, so
+  truncating a too-long array would delete a recorded set and persist the deletion. The
+  precedent already existed: `cyclePosition` reports rather than clamps. The cost is that
+  a hand-edit typo in a display-only field blocks training until repaired — **left open
+  for the user**, since it cuts against "arrive with the answer already made".
+- **The service accepts any `schemaVersion`, unchanged.** It never gated on one, not for
+  3-vs-2 either; migration ownership already sat with the client. `server/**` gained tests
+  and comments recording that this is the design working, and no functional change.
+- **`noHexColors.test.ts` survived** rather than being retired as the direction round
+  predicted. Tailwind v4 is CSS-first, so the palette stays in `tokens.css` and the test
+  keeps working — it now also catches arbitrary-value classes like `bg-[#123456]`.
+- **`contrast.test.ts` grew to 352 assertions** (22 pairs × 16 palettes). Building it
+  found a real defect in the reference artifact: its accent switcher writes an inline
+  style on `documentElement`, overriding both theme blocks, so its light mode painted
+  dark-mode mint on white at 1.8:1. The light eight were re-derived at ~6:1; the dark
+  eight are the artifact's, verbatim. No threshold was lowered and no pair dropped.
+
+### Deleted, and why nothing replaced them
+
+`noDatesInUi.test.ts` and `timeInvariance.test.tsx` enforce rules that no longer exist.
+Deleted rather than weakened — a test outliving its rule tells the next reader something
+false. **The half of time-invariance that survived the reversal was re-tested**, though:
+`screens.test.tsx` now asserts the same session is prescribed after a fortnight away as
+after a night's sleep. The rotation still advances on training and never on the calendar;
+only the screen's description of you changed.
+
+`app.css`, `Screen.tsx`, `Notices.tsx` and the twelve-alias token shim are gone.
+
+### Open
+
+Brief 23 is still mid-flight and is the only thing in `todo/`. The rig is authored and
+tested; the crossfade it replaces is still what renders.

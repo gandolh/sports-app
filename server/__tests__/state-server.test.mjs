@@ -983,16 +983,79 @@ describe('PUT then GET round-trips byte-identically', () => {
 
   it('stores the bytes verbatim and echoes whatever schemaVersion it was given', async () => {
     const { base, store } = await startService()
-    // 4 is not a version this build knows. The service does not know versions —
-    // it copies the number into a column, and a test that pinned it to the
-    // client's current constant would be asserting the codec's business.
-    const sent = docText('alice', 4, { schemaVersion: 4 })
+    // 97 is not a version anything knows, and that is the point: the service does
+    // not know versions — it copies the number into a column. This used to say 4
+    // back when 4 was imaginary; the client shipped v4 and this test did not
+    // change, which is the property being asserted. A number pinned to the client's
+    // current constant would be asserting the codec's business instead.
+    const sent = docText('alice', 4, { schemaVersion: 97 })
     await put(base, 'alice', sent)
 
     const latest = store.latest('alice')
     expect(latest.docJson).toBe(sent)
     expect(latest.historyLength).toBe(4)
+    expect(latest.schemaVersion).toBe(97)
+  })
+
+  it('accepts 3 and 4 alike, because it has no list of versions to be on', async () => {
+    // The client owns migration, so both versions are in circulation at once: a
+    // phone that has not updated pushes v3 and a browser that has pushes v4. The
+    // service stores each as it arrived and refuses neither — there is no allowlist
+    // here to add a version to, which is why v4 shipped without touching `server/`.
+    const { base, store } = await startService()
+    for (const version of [3, 4]) {
+      const sent = docText('alice', 2, { schemaVersion: version })
+      const response = await put(base, 'alice', sent)
+      expect(response.status, String(version)).toBe(200)
+      expect(store.latest('alice').docJson, String(version)).toBe(sent)
+      expect(store.latest('alice').schemaVersion, String(version)).toBe(version)
+    }
+  })
+
+  it('stores a v4 document with logged sets in it and derives nothing from them', async () => {
+    // `logged` is training content. It crosses the wire as opaque numbers, and the
+    // only column derived from `history` is its *length* — a fact about the
+    // document, not about the training. If this ever needs a SQL aggregate over
+    // `logged`, the service has become a consumer of the programme.
+    const { base, store } = await startService()
+    const sent = [
+      '{',
+      '  "schemaVersion": 4,',
+      '  "username": "alice",',
+      '  "cyclePosition": 1,',
+      '',
+      '  "sessionsDone": { "push": 1, "squat": 0, "hinge": 0, "core": 1, "pull": 1 },',
+      '',
+      '  "settings": {',
+      '    "persistGranted": null,',
+      '    "sync": null',
+      '  },',
+      '',
+      '  "history": [',
+      '    {',
+      '      "completedAt": "2026-09-01T07:00:00.000Z",',
+      '      "position": 0,',
+      '      "variant": "medium",',
+      '      "exercises": [',
+      '        { "pattern": "push", "rungId": "push-05-full-3s-down", "sets": 3, "targetValue": 8, "logged": [8, 8, 6] },',
+      '        { "pattern": "core", "rungId": "core-04-hollow-hold", "sets": 2, "targetValue": 27 }',
+      '      ]',
+      '    }',
+      '  ]',
+      '}',
+      '',
+    ].join('\n')
+
+    expect((await put(base, 'alice', sent)).status).toBe(200)
+
+    const latest = store.latest('alice')
+    // Byte-for-byte, logs included. The GET hands the same bytes back.
+    expect(latest.docJson).toBe(sent)
     expect(latest.schemaVersion).toBe(4)
+    // One session, whatever is inside it.
+    expect(latest.historyLength).toBe(1)
+
+    expect(await (await get(base, 'alice')).text()).toBe(sent)
   })
 
   it('holds history.length in the sessions_completed column', async () => {
