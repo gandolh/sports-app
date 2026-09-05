@@ -3,6 +3,7 @@
 // test config, which then silently does nothing.
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 /**
@@ -30,6 +31,14 @@ export default defineConfig({
   base,
   plugins: [
     react(),
+    // Tailwind v4, as a Vite plugin rather than through PostCSS. The difference
+    // is not ergonomic: the plugin reads `@theme` out of `src/ui/tokens.css`
+    // itself, which is what lets that file stay the single source of colour
+    // truth. There is deliberately no `tailwind.config.js` — a JS config holding
+    // the palette would put the colours somewhere `__tests__/noHexColors.test.ts`
+    // and `__tests__/contrast.test.ts` cannot parse, and both work by reading
+    // exactly one CSS file.
+    tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
@@ -42,10 +51,16 @@ export default defineConfig({
         name: 'Calisthenics',
         short_name: 'Calisthenics',
         description: 'Zero-equipment calisthenics trainer',
-        // Matches `--bg` in tokens.css. These two are the splash and the OS
+        // Matches light `--bg` in tokens.css. These two are the splash and the OS
         // chrome, so a mismatch here shows up as a coloured flash between the
         // splash and the first paint — the one place the theme is visible
         // before any of the app's own CSS has loaded.
+        //
+        // A manifest has one pair of these and the app now has two themes, so one
+        // of them will flash. Light is the value that stays because it is the
+        // unstamped default in `tokens.css`; making the flash follow the user's
+        // choice needs a `<meta name="theme-color" media="…">` pair in
+        // `index.html`, which is brief 27's file.
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
