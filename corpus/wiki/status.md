@@ -1,9 +1,9 @@
 ---
 summary: Dated snapshot of where every brief stands and what's next.
-updated: 2026-09-04
+updated: 2026-09-06
 ---
 
-# Status — 2026-09-04
+# Status — 2026-09-06
 
 **Where things stand: the app is the category standard, it is green, and it builds.**
 Briefs 24–27 shipped on 2026-09-04 on branch `v3-category-standard` — schema v4 with

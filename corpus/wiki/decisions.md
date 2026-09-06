@@ -1,6 +1,6 @@
 ---
 summary: Locked product and programme calls with the reasoning that settled them — read before proposing an alternative.
-updated: 2026-09-04
+updated: 2026-09-06
 ---
 
 # Decisions
@@ -196,3 +196,9 @@ the one that caught `#6ee7a8` scoring 1.5:1 on white.
 
 Two findings from the losing directions outlived them and are now open work — see
 [open-questions.md](open-questions.md), questions 8 and 9.
+
+## Licensing — moved
+
+The repository became **AGPL v3.0** on 2026-09-06 when the exercise reference was
+imported. That decision, its cost and the clean way out are in
+[licensing.md](licensing.md).

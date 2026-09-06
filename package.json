@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Zero-equipment calisthenics trainer. Offline-first PWA plus a state service.",
+  "license": "AGPL-3.0-only",
   "workspaces": [
     "shared",
     "client",

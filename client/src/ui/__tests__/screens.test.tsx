@@ -521,6 +521,64 @@ describe('/account', () => {
 
 // ─── The document states that are not a session ─────────────────────────────
 
+describe('/library', () => {
+  it('loads the reference lazily and filters it', async () => {
+    seedUser(trained(2))
+    await renderApp('/library')
+
+    // Lazily imported: the ~190KB chunk is not in the critical path of the one
+    // screen that has to paint fast, so the list arrives after a tick.
+    const search = await screen.findByRole('searchbox', { name: /search the exercise reference/i })
+    expect(await screen.findByText(/325 bodyweight exercises/)).toBeTruthy()
+
+    fireEvent.change(search, { target: { value: 'plank' } })
+    await waitFor(() => {
+      expect(screen.getByRole('status', { name: '' }).textContent).toMatch(/of 325$/)
+    })
+  })
+
+  it('does not repeat a muscle that upstream lists twice', async () => {
+    seedUser(trained(2))
+    await renderApp('/library')
+    await screen.findByRole('searchbox', { name: /search the exercise reference/i })
+
+    // The raw record for a 3/4 sit-up carries "hip flexors" as BOTH the major
+    // muscle and a secondary one, so the naive join reads "Hip Flexors · Hip
+    // Flexors · Lower Back".
+    // Lowercase: the list capitalises with CSS, so the text content is the
+    // record's own `"3/4 sit-up"`. A screenshot hides that difference entirely.
+    const row = screen.getByText('3/4 sit-up').closest('details')
+    expect(row).not.toBeNull()
+    const listed = (row!.querySelector('[data-testid="muscles"]')?.textContent ?? '')
+      .split('·')
+      .map((muscle) => muscle.trim().toLowerCase())
+      .filter((muscle) => muscle.length > 0)
+
+    expect(listed.length).toBeGreaterThan(1)
+    expect(new Set(listed).size).toBe(listed.length)
+  })
+
+  it('says plainly that nothing in it is scheduled', async () => {
+    seedUser(trained(2))
+    await renderApp('/library')
+    expect(screen.getByTestId('honest-note').textContent).toMatch(/A reference, not a plan/)
+  })
+
+  /**
+   * The reference is reachable from Account and NOT from the tab bar. That is
+   * the design: this app's thesis is that there is nothing to browse on the way
+   * to a set, and a fifth tab would make browsing a primary destination.
+   */
+  it('is not a tab bar destination', async () => {
+    seedUser(trained(2))
+    await renderApp('/account')
+
+    const bar = screen.getByRole('navigation', { name: 'Sections' })
+    expect(bar.textContent).not.toMatch(/reference|library/i)
+    expect(screen.getByRole('link', { name: 'Open the reference' })).toBeTruthy()
+  })
+})
+
 describe('an unreadable document', () => {
   it('is reported, not silently replaced with a fresh one', async () => {
     localStorage.setItem(SESSION_KEY, USERNAME)

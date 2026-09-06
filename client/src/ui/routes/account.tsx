@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { createRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { Link, createRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { LADDERS, getRung, topRungIndex } from '../../domain/ladders.ts'
 import { rangeAt, rungIndexAt } from '../../domain/schedule.ts'
 import { milestonesReached, totalWork } from '../../domain/milestones.ts'
@@ -93,6 +93,21 @@ function AccountRoute() {
         )}
 
         {snapshot.doc === null ? null : <SyncSettings doc={snapshot.doc} username={username} />}
+
+        <SectionHeading>Reference</SectionHeading>
+        <p className="text-body text-tx2">
+          A bodyweight exercise reference — 325 movements with instructions, for looking
+          something up. Nothing in it is scheduled, and reading it changes nothing about
+          what you are asked to do next.
+        </p>
+        <div className="mt-[var(--sp-2)]">
+          <Link
+            to="/library"
+            className="inline-flex min-h-[var(--tap-row)] items-center rounded border border-line2 px-[var(--sp-4)] text-btn font-semibold text-tx"
+          >
+            Open the reference
+          </Link>
+        </div>
 
         <Appearance />
 

@@ -939,3 +939,80 @@ only the screen's description of you changed.
 
 Brief 23 is still mid-flight and is the only thing in `todo/`. The rig is authored and
 tested; the crossfade it replaces is still what renders.
+
+## [2026-09-06] decision | the phone pass, and an exercise reference that relicensed the repo
+
+Two unrelated pieces of work on the same day. The first was owed; the second
+changed the licence of the whole repository.
+
+### The phone pass, finally
+
+`status.md` had carried "the white theme has not been looked at on a phone" since
+2026-07-30. Driven at 402x874 with 24 seeded sessions, both themes, all eight
+accents. **Two composition defects that only exist at that width:**
+
+- **Today put the session below the fold.** 513px of band against 844px of
+  content — the first paint showed the ring, three tiles, the heatmap and *one*
+  of three exercises. The shipped docstring defended this ("the primary is a
+  fixed-position button, so a training user never reads any of it"), and the
+  defence is wrong: the button being reachable is not the session being knowable,
+  and the app's first principle is that it arrives with the answer already made.
+  Plan first now; history under its own heading.
+- **The stop rule truncated mid-clause.** It was already above the cues, which is
+  what brief 27 specified and what its test asserts — but the comparison strip
+  sat between the numeral and it, and the sentence cut at "...your chest stops
+  reaching a fist off the" while still *looking* complete. **A safety line that
+  stays legible right up to the point where it stops being legible is worse than
+  one plainly below the fold**, because nothing tells the reader to scroll.
+  Comparison yields; it is the least urgent thing on that screen.
+
+Both orderings now have tests asserted by **document order, not pixels**, so they
+hold at every width, and both were verified to fail against the old order.
+
+The generalisable finding: **presence tests and ordering tests are different
+claims, and neither is a fold test.** Brief 27 asserted the stop rule was above
+the cues and that assertion stayed green while the line was unreadable.
+
+### The exercise reference, and the AGPL
+
+The user asked for openGym's exercises. **The repository is now AGPL v3.0**
+because of it — see [`../NOTICE.md`](../NOTICE.md) and
+[decisions.md](wiki/decisions.md).
+
+The concern was raised before any code moved and the user reaffirmed the request,
+which is recorded here because the reasons not to do it did not go away:
+
+- **openGym is AGPL v3.0 with a network clause.** sports-app is served over a
+  network, so §13 attaches to the whole repo, including code with nothing to do
+  with the import.
+- **openGym does not own the data.** Its `NOTICE.md` attributes MuscleMap for
+  body geometry and is silent on the exercises, which are shaped like ExerciseDB
+  (`id: "0001"`, `gif: "0001-2gPfomN.gif"`) — distributed commercially. **There is
+  no clean chain of title**, and an AGPL grant cannot convey rights the grantor
+  lacks. Recorded in NOTICE.md rather than papered over.
+- The clean substitute, if this is ever revisited: **free-exercise-db**, 876
+  exercises, 188 bodyweight, public domain (Unlicense), images in-repo. It would
+  remove both the obligation and the uncertainty.
+
+**What was filtered, and why it is not negotiable:** 325 of 1,324 entries are
+bodyweight; the other 999 need barbells, dumbbells, cables or machines. Zero
+equipment was **not** among the decisions reversed on 2026-09-04, so importing
+them would have contradicted a live invariant. Image and animation fields were
+dropped: openGym names assets its own repository does not ship, and the user
+asked for no images in the tree. **No binary was copied.**
+
+`scripts/import-library.mjs` regenerates the module, so the filters are auditable
+rather than arriving as an 800KB paste. The reference is a **route reached from
+`/account`, deliberately not a fifth tab** — a tab would make browsing a primary
+destination and contradict "there is nothing to browse on the way to a set" — and
+it is **lazily loaded**, so its 190KB chunk never enters the critical path of the
+screen that has to paint fast on a floor.
+
+The structural guard is the important part: `library.test.ts` asserts by **import
+graph** that nothing in `domain/` imports the library, so "the reference now feeds
+the engine" trips before anyone can write the line that reads it.
+
+**A content bug the screenshots hid:** upstream repeats the major muscle inside
+the secondary list, so a 3/4 sit-up read "Hip Flexors · Hip Flexors · Lower Back".
+Deduped, with a test — which itself had to match the *lowercase* record text,
+because the list capitalises in CSS and a screenshot cannot tell the two apart.
