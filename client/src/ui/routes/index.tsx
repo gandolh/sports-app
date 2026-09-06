@@ -187,14 +187,25 @@ function PlayerRoute(props: {
 /**
  * Today: where the week stands, what today is, and one tap to start it.
  *
- * ── The order down the page is an argument ──────────────────────────────────
+ * ── The order down the page is an argument, and it lost one ─────────────────
  *
- * Ring, tiles, heatmap, then the plan. That puts three screens' worth of history
- * above the thing the user came to do, which is only defensible because the
- * thing they came to do is a **fixed-position primary button** at the foot —
- * reachable with a thumb without reading any of it. Somebody who opens the app
- * to train taps Start; somebody who opens it to see how they are doing scrolls.
- * Neither is made to do the other's work.
+ * **The plan comes first, then the history.** It shipped the other way round on
+ * 2026-09-04 — ring, tiles, heatmap, then the plan — on the argument that the
+ * primary is a fixed-position button at the foot, so somebody who opens the app
+ * to train taps Start without reading any of it.
+ *
+ * Driving the build on a 402x874 phone on 2026-09-06 disproved that. The
+ * scrolling band is 513px against 844px of content, so **331px sat below the
+ * fold and the first paint showed one of the three exercises.** The button being
+ * reachable is not the same as the session being knowable, and this app's first
+ * principle is that it arrives with the answer already made
+ * (`PRODUCT.md`). An app whose whole claim is "you do not have to decide" cannot
+ * put what you are doing today under three screens of how you have been doing.
+ *
+ * So the history block moved below the plan and gained a heading of its own. It
+ * is not demoted — somebody opening the app to see how they are doing still
+ * scrolls one thumb-flick — but it no longer stands between the user and the
+ * only thing on this screen that is load-bearing.
  *
  * ── The variant is a load dial, never a signal ──────────────────────────────
  *
@@ -251,6 +262,15 @@ function Home({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: st
       <ShellBody>
         {readOnly === null ? null : <AlertBanner label="Read-only" text={readOnly} />}
 
+        <SectionHeading>Today</SectionHeading>
+        <ol>
+          {prescription.items.map((item, index) => (
+            <ExerciseRow key={index} item={item} />
+          ))}
+        </ol>
+
+        <SectionHeading>How it is going</SectionHeading>
+
         <Ring
           fraction={stats.week.fraction}
           value={`${percent}%`}
@@ -279,13 +299,6 @@ function Home({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: st
         />
 
         <Heatmap cells={stats.cells} />
-
-        <SectionHeading>Today</SectionHeading>
-        <ol>
-          {prescription.items.map((item, index) => (
-            <ExerciseRow key={index} item={item} />
-          ))}
-        </ol>
       </ShellBody>
 
       <ShellFooter

@@ -316,6 +316,24 @@ function PlayerPage({
           />
         </div>
 
+        {/* Above the cues AND above the comparison strip, which is a change made
+            on 2026-09-06 after the build was driven on a 402x874 phone.
+
+            It was already above the cues, which is what the brief asked for and
+            what the test asserts. On a real phone that was not enough: the
+            comparison strip sat between the numeral and the stop rule and
+            pushed it far enough down that the sentence truncated mid-clause at
+            the fold — "...your chest stops reaching a fist off the" — while
+            still *looking* complete. A safety line that is legible right up to
+            the moment it stops being legible is worse than one plainly below
+            the fold, because nothing tells the reader to scroll.
+
+            Comparison is the thing that yields, and it should: "last time 9"
+            is the least urgent element on the page, and the only one here that
+            exists because the measurement decision was reversed rather than
+            because the exercise needs it. */}
+        {cardio ? null : <StopRule text={item.rung.stopRule} />}
+
         {cardio || item.type !== 'exercise' ? null : (
           <Comparison
             unit={item.unit}
@@ -324,10 +342,6 @@ function PlayerPage({
             lastLogged={previous?.logged ?? null}
           />
         )}
-
-        {/* Above the cues, and outranked by nothing on the page except the
-            safety block. There is a test asserting exactly this ordering. */}
-        {cardio ? null : <StopRule text={item.rung.stopRule} />}
 
         <CueList cues={listedCues} />
 
