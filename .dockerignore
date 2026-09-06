@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+client/dist
+dist
+.git
+corpus
+*.md
+.env
+infrastructure/.env
+server/data
+**/*.map
+__tests__

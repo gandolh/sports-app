@@ -1,0 +1,28 @@
+# sports-app's state service. Build context is the repo root (..).
+#
+# `.env` here is written by the deploy (0600) and read twice: compose
+# interpolates ${...} below from it, and the service declares it as env_file.
+# It carries SPORTS_APP_SYNC_SECRET, so it is git-ignored.
+services:
+  sports-app-api:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile
+      target: prod
+    image: sports-app-api:1.0
+    ports:
+      # LOOPBACK ONLY. Without the 127.0.0.1 prefix this would be published on
+      # every interface, reachable over plain HTTP past Caddy and its TLS.
+      - "127.0.0.1:${SPORTS_APP_PORT:-8794}:${SPORTS_APP_PORT:-8794}"
+    env_file:
+      - .env
+    volumes:
+      # The state database. Bind-mounted from the host so containerizing
+      # migrated nothing — the file stays exactly where pm2 left it.
+      - ${SPORTS_APP_DATA_DIR:-../server/data}:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- \"http://127.0.0.1:${SPORTS_APP_PORT:-8794}/api/health\""]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
