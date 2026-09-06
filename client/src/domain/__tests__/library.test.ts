@@ -14,18 +14,38 @@ const sources = import.meta.glob(['../*.ts', '!../library.ts'], {
 
 describe('the exercise reference library', () => {
   it('imported the bodyweight subset and nothing else', () => {
-    // 325 of openGym's 1324. The number is asserted rather than described so a
-    // re-import that silently loses the equipment filter fails here rather than
-    // shipping barbell rows into a zero-equipment app.
-    expect(LIBRARY.length).toBe(325)
+    // 186 of free-exercise-db's 876: 188 are bodyweight, and two of those
+    // (Side_Bridge, Side_Jackknife) ship with no instructions and are dropped.
+    // Asserted as a number rather than described, so a re-import that silently
+    // loses either filter fails here instead of shipping barbell rows into a
+    // zero-equipment app, or rows that open onto nothing.
+    expect(LIBRARY.length).toBe(186)
   })
 
-  it('gives every entry a name, a target and at least one step', () => {
+  it('gives every entry a name, a category and at least one instruction', () => {
     for (const exercise of LIBRARY) {
       expect(exercise.name.length).toBeGreaterThan(0)
-      expect(exercise.target.length).toBeGreaterThan(0)
-      expect(exercise.steps.length).toBeGreaterThan(0)
+      expect(exercise.category.length).toBeGreaterThan(0)
+      expect(exercise.level.length).toBeGreaterThan(0)
+      expect(exercise.instructions.length).toBeGreaterThan(0)
     }
+  })
+
+  /**
+   * `force` is why this source replaced the previous one, so it is worth an
+   * assertion rather than a comment: push / pull / static is the axis the five
+   * ladders are built on, and a re-import that dropped it would leave the
+   * reference unable to agree with the programme about anything.
+   */
+  it('keeps force as push, pull, static or nothing at all', () => {
+    const seen = new Set(LIBRARY.map((exercise) => exercise.force))
+    for (const force of seen) {
+      expect(['push', 'pull', 'static', null]).toContain(force)
+    }
+    // Non-vacuous: all three values really occur.
+    expect(seen.has('push')).toBe(true)
+    expect(seen.has('pull')).toBe(true)
+    expect(seen.has('static')).toBe(true)
   })
 
   it('keeps every id unique, so a re-import can be diffed against this one', () => {
@@ -38,6 +58,11 @@ describe('the exercise reference library', () => {
    * contain, and no binary was copied here. A reference that resolves to nothing
    * is worse than no reference, so the fields were dropped at import — this is
    * what stops them coming back.
+   */
+  /**
+   * free-exercise-db DOES ship its images, so this is a choice rather than a
+   * repair — which makes it more likely to be undone by a well-meaning
+   * re-import than the previous version of this assertion was.
    */
   it('carries no image or animation reference', () => {
     const serialised = JSON.stringify(LIBRARY)

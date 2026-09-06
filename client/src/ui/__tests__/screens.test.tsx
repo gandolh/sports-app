@@ -529,25 +529,26 @@ describe('/library', () => {
     // Lazily imported: the ~190KB chunk is not in the critical path of the one
     // screen that has to paint fast, so the list arrives after a tick.
     const search = await screen.findByRole('searchbox', { name: /search the exercise reference/i })
-    expect(await screen.findByText(/325 bodyweight exercises/)).toBeTruthy()
+    expect(await screen.findByText(/186 bodyweight exercises/)).toBeTruthy()
 
     fireEvent.change(search, { target: { value: 'plank' } })
     await waitFor(() => {
-      expect(screen.getByRole('status', { name: '' }).textContent).toMatch(/of 325$/)
+      expect(screen.getByRole('status', { name: '' }).textContent).toMatch(/of 186$/)
     })
   })
 
-  it('does not repeat a muscle that upstream lists twice', async () => {
+  it('does not repeat a muscle listed in both lists', async () => {
     seedUser(trained(2))
     await renderApp('/library')
     await screen.findByRole('searchbox', { name: /search the exercise reference/i })
 
-    // The raw record for a 3/4 sit-up carries "hip flexors" as BOTH the major
-    // muscle and a secondary one, so the naive join reads "Hip Flexors · Hip
-    // Flexors · Lower Back".
-    // Lowercase: the list capitalises with CSS, so the text content is the
-    // record's own `"3/4 sit-up"`. A screenshot hides that difference entirely.
-    const row = screen.getByText('3/4 sit-up').closest('details')
+    // free-exercise-db keeps its two muscle lists disjoint far more reliably
+    // than the previous source, so this now guards a bug that shipped once
+    // rather than one visible in the current data. Kept deliberately: the
+    // dedupe costs nothing and a future re-import is exactly when it returns.
+    // The list capitalises with CSS, so the text content is the record's own
+    // casing — a screenshot cannot tell the two apart.
+    const row = screen.getByText('Clock Push-Up').closest('details')
     expect(row).not.toBeNull()
     const listed = (row!.querySelector('[data-testid="muscles"]')?.textContent ?? '')
       .split('·')

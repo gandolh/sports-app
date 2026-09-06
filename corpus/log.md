@@ -1016,3 +1016,46 @@ the engine" trips before anyone can write the line that reads it.
 the secondary list, so a 3/4 sit-up read "Hip Flexors · Hip Flexors · Lower Back".
 Deduped, with a test — which itself had to match the *lowercase* record text,
 because the list capitalises in CSS and a screenshot cannot tell the two apart.
+
+## [2026-09-06] decision | the reference swaps to free-exercise-db, and the AGPL becomes optional
+
+One commit after the openGym import, at the user's direction. `library.ts` is now
+derived from **free-exercise-db** (public domain, Unlicense), which removes both
+problems the previous source carried: the copyleft obligation, and the fact that
+openGym could not convey rights in ExerciseDB data it does not own.
+
+**It is also the better dataset, which was not the reason for the swap but is the
+reason not to regret it.** 186 usable entries against 325 — but each carries
+`force` (push / pull / static), `category` and `level`, which are the axes the
+five ladders are built on. openGym gave a body-part string that mapped onto
+nothing here. Fewer rows, and every row says something the programme can agree
+with.
+
+**Two upstream entries ship with no instructions at all** — `Side_Bridge` and
+`Side_Jackknife` — and are dropped at import. A reference entry that cannot tell
+you how to do the movement is not a reference entry, and an empty disclosure is
+worse than an absent one because the row invites a tap that returns nothing. This
+is a third filter in all but name, and it is asserted rather than described: the
+count test says 186, so a re-import that loses either filter fails.
+
+**The image-stripping changed character and the test says so.** openGym named
+assets its repository did not ship, so dropping the fields was a repair.
+free-exercise-db *does* ship its images, so the same code is now a choice — which
+makes it likelier to be undone by a well-meaning re-import, and worth a comment
+at the assertion rather than only at the filter.
+
+### The AGPL is no longer required, and was deliberately not removed
+
+`LICENSE` is still in the tree. The obligation is discharged — but **deleting a
+file does not remove `4d93f47` from history**, and that commit contains
+openGym-derived data. Moot while the repo is unpublished and unpushed; not moot
+the moment it is distributed.
+
+Two closures are recorded in [wiki/licensing.md](wiki/licensing.md): rewrite the
+one unpushed commit out of history and go back to unlicensed, or keep AGPL v3.0
+on purpose. **The user's copyright, so the user's call** — and staying
+over-restrictive is the safe direction to wait in, which is why nothing was
+removed pre-emptively.
+
+The generalisable bit: **a licence acquired from a dependency does not leave when
+the dependency does.** It leaves when the history does.
