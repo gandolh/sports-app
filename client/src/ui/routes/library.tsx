@@ -86,11 +86,13 @@ function LibraryRoute() {
 interface Entry {
   readonly id: string
   readonly name: string
-  readonly bodyPart: string
-  readonly target: string
-  readonly majorMuscle: string | null
+  readonly category: string
+  readonly force: 'push' | 'pull' | 'static' | null
+  readonly level: string
+  readonly mechanic: string | null
+  readonly primaryMuscles: readonly string[]
   readonly secondaryMuscles: readonly string[]
-  readonly steps: readonly string[]
+  readonly instructions: readonly string[]
 }
 
 /**
@@ -110,9 +112,11 @@ function List({ exercises }: { readonly exercises: readonly Entry[] }) {
     return exercises.filter(
       (e) =>
         e.name.toLowerCase().includes(needle) ||
-        e.target.toLowerCase().includes(needle) ||
-        e.bodyPart.toLowerCase().includes(needle) ||
-        (e.majorMuscle ?? '').toLowerCase().includes(needle),
+        e.category.toLowerCase().includes(needle) ||
+        e.level.toLowerCase().includes(needle) ||
+        (e.force ?? '').toLowerCase().includes(needle) ||
+        e.primaryMuscles.some((muscle) => muscle.toLowerCase().includes(needle)) ||
+        e.secondaryMuscles.some((muscle) => muscle.toLowerCase().includes(needle)),
     )
   }, [exercises, deferred])
 
@@ -124,7 +128,7 @@ function List({ exercises }: { readonly exercises: readonly Entry[] }) {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search by name, muscle or body part"
+          placeholder="Search by name, muscle, force or level"
           className="min-h-[var(--tap-row)] w-full rounded border border-line2 bg-s1 px-[var(--sp-3)] text-body text-tx placeholder:text-tx3"
         />
       </label>
@@ -158,26 +162,27 @@ function List({ exercises }: { readonly exercises: readonly Entry[] }) {
  * findable by in-page search without any of it being written here.
  */
 function Row({ exercise }: { readonly exercise: Entry }) {
-  // Deduplicated, because upstream frequently repeats the major muscle inside
-  // the secondary list — "hip flexors · hip flexors · lower back" is what the
-  // raw record gives for a 3/4 sit-up. A Set keeps first-seen order, so the
-  // major muscle stays first without sorting it there.
-  const muscles = [
-    ...new Set(
-      [exercise.majorMuscle, ...exercise.secondaryMuscles].filter(
-        (muscle): muscle is string => muscle !== null && muscle.length > 0,
-      ),
-    ),
-  ]
+  // Deduplicated. free-exercise-db keeps its two muscle lists disjoint far more
+  // reliably than the previous source did, but a Set costs nothing and the bug
+  // it prevents — "hip flexors · hip flexors · lower back" — shipped once
+  // already. First-seen order keeps the primary muscles first without sorting.
+  const muscles = [...new Set([...exercise.primaryMuscles, ...exercise.secondaryMuscles])].filter(
+    (muscle) => muscle.length > 0,
+  )
+
+  // `force` is the one field worth surfacing beside the category: it is the axis
+  // the five ladders are built on, so "static" next to a hold is the reference
+  // agreeing with the programme rather than restating a body part.
+  const meta = [exercise.category, exercise.force, exercise.level].filter(
+    (part): part is string => part !== null && part.length > 0,
+  )
   return (
     <li>
       <details className="rounded border border-line bg-s1">
         <summary className="flex min-h-[var(--tap-row)] cursor-pointer items-center justify-between gap-[var(--sp-3)] px-[var(--sp-3)] py-[var(--sp-2)]">
           <span>
             <span className="block text-body font-semibold capitalize">{exercise.name}</span>
-            <span className="block text-label text-tx3 capitalize">
-              {exercise.target} · {exercise.bodyPart}
-            </span>
+            <span className="block text-label text-tx3 capitalize">{meta.join(' · ')}</span>
           </span>
         </summary>
         <div className="border-t border-line px-[var(--sp-3)] py-[var(--sp-3)]">
@@ -190,7 +195,7 @@ function Row({ exercise }: { readonly exercise: Entry }) {
             </>
           )}
           <ol className="mt-[var(--sp-3)] grid gap-[var(--sp-2)]">
-            {exercise.steps.map((step, index) => (
+            {exercise.instructions.map((step, index) => (
               <li
                 key={index}
                 className="grid grid-cols-[1.3rem_minmax(0,1fr)] gap-[var(--sp-1)] text-meta text-tx2"
