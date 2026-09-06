@@ -22,6 +22,7 @@ pages. See [CLAUDE.md](CLAUDE.md) for the conventions and the retrieval budget.
 - [wiki/decisions.md](wiki/decisions.md) — Locked product and programme calls with the reasoning that settled them — read before proposing an alternative.
 - [wiki/design-guardrails.md](wiki/design-guardrails.md) — The rules that keep the design system honest — the banned patterns, the floor-phone accessibility floor, and the four tests that enforce both mechanically.
 - [wiki/design-system.md](wiki/design-system.md) — Design tokens and the doctrine governing them — colour, type, spacing and motion. The banned patterns and accessibility floor live in design-guardrails.md.
+- [wiki/licensing.md](wiki/licensing.md) — Why the repository is AGPL v3.0, what the exercise reference cost to import, the unresolved chain of title behind it, and the public-domain substitute that would undo both.
 - [wiki/open-questions.md](wiki/open-questions.md) — Only the genuinely unresolved. Answered questions are deleted from here, not archived.
 - [wiki/overview.md](wiki/overview.md) — What sports-app is in one paragraph, who it's for, and the constraints that shaped it.
 - [wiki/programme.md](wiki/programme.md) — What the training actually is — the three-day rotation, what each session contains, the per-rung hold caps, and the cardio protocol.

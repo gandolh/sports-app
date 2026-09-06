@@ -236,6 +236,22 @@ export default tseslint.config(
   // by pointing it at a glob that matches nothing, which turns every `process`,
   // `Buffer` and `URLSearchParams` in the service into a `no-undef` error.
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Build-time scripts. Node globals, and deliberately a SEPARATE block from the
+  // service's below rather than a widened glob: the service is a long-lived
+  // runtime with a web-API surface (fetch, Response, Headers) and these are
+  // one-shot generators that only ever read argv, write a file and log. Sharing
+  // one block would hand `scripts/` a runtime vocabulary it has no business
+  // reaching for, and would make the service's globals list stop describing the
+  // service.
+  // ---------------------------------------------------------------------------
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: { process: 'readonly', console: 'readonly' },
+    },
+  },
+
   {
     files: ['server/**/*.mjs'],
     languageOptions: {

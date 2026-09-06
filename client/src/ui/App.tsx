@@ -6,6 +6,7 @@ import { indexRoute } from './routes/index.tsx'
 import { planRoute } from './routes/plan.tsx'
 import { progressRoute } from './routes/progress.tsx'
 import { accountRoute } from './routes/account.tsx'
+import { libraryRoute } from './routes/library.tsx'
 import { loginRoute } from './routes/login.tsx'
 
 /**
@@ -33,6 +34,7 @@ const routeTree = rootRoute.addChildren([
   planRoute,
   progressRoute,
   accountRoute,
+  libraryRoute,
   loginRoute,
 ])
 
