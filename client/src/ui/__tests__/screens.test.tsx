@@ -139,6 +139,35 @@ describe('/ — Today', () => {
    * which is the point: the family in `icons.tsx` is the only source of
    * iconography in this app.
    */
+  /**
+   * The plan outranks the history block, and this is the mechanical statement
+   * of a decision the phone pass forced.
+   *
+   * Today shipped as ring, tiles, heatmap, then the plan, on the argument that
+   * the primary is a fixed-position button so a training user never has to read
+   * any of it. Driven on a 402x874 phone that gave 331px below the fold and a
+   * first paint showing one of three exercises. The button being reachable is
+   * not the session being knowable, and this app's first principle is that it
+   * arrives with the answer already made.
+   *
+   * Asserted by document order rather than by pixels, because a fold test would
+   * bind the assertion to one viewport and this rule holds at every width.
+   */
+  it('puts today’s plan above the history block', async () => {
+    seedUser(endingDaysAgo(0))
+    await renderApp('/')
+
+    const headings = [...document.querySelectorAll('h2')].map((h) => h.textContent)
+    expect(headings).toContain('Today')
+    expect(headings).toContain('How it is going')
+    expect(headings.indexOf('Today')).toBeLessThan(headings.indexOf('How it is going'))
+
+    const plan = document.querySelector('h2')
+    const ring = screen.getByRole('img', { name: /This week: \d+ of \d+ sessions\./ })
+    expect(plan?.textContent).toBe('Today')
+    expect(plan?.compareDocumentPosition(ring) ?? 0 & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('renders no emoji anywhere, including the streak pill', async () => {
     seedUser(endingDaysAgo(0))
     await renderApp('/')

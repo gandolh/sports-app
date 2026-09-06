@@ -11,6 +11,7 @@ import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { POSTURAL_NOTICE, getRung } from '../../domain/ladders.ts'
 import type { Pattern, StateDoc } from '@sports-app/shared/types.ts'
+import { prescribe, recordSession, toSessionResult } from '../../domain/schedule.ts'
 import { parse } from '../../persistence/codec.ts'
 import { STORAGE_KEYS, emptyDoc } from '../../persistence/store.ts'
 import { currentUrl, renderApp, resetBrowserState, seedUser } from './harness.tsx'
@@ -21,6 +22,20 @@ const USERNAME = 'alice'
 function docWith(sessionsDone: Partial<Record<Pattern, number>> = {}): StateDoc {
   const base = emptyDoc(USERNAME)
   return { ...base, sessionsDone: { ...base.sessionsDone, ...sessionsDone } }
+}
+
+/**
+ * A document carrying one real recorded session, so `Comparison` has a previous
+ * record to show. It returns null when the pattern has never been recorded,
+ * which is why `docWith()` alone is not enough for an ordering assertion that
+ * involves it.
+ */
+function docWithHistory(): StateDoc {
+  const base = docWith()
+  const result = toSessionResult(prescribe(base, 'medium'), '2026-09-01T07:00:00.000Z')
+  // Recording advances the rotation, so pin it back to the same slot: the point
+  // is a session whose pattern HAS a previous record, and Legs day's would not.
+  return withCyclePosition(recordSession(base, result), base.cyclePosition)
 }
 
 function withCyclePosition(doc: StateDoc, cyclePosition: number): StateDoc {
@@ -135,6 +150,31 @@ describe('the stop rule', () => {
     expect(screen.getByTestId('stop-rule').textContent).toContain(rung.stopRule)
     // And it is no longer the last cue, which is where it lived before brief 24.
     expect(screen.getByTestId('cue-list').textContent).not.toContain(rung.stopRule)
+  })
+
+  /**
+   * Ordering, not presence — and it is a separate assertion from "above the
+   * cues" on purpose.
+   *
+   * The stop rule was already above the cues when the build shipped, and that
+   * was still not enough on a 402x874 phone: the comparison strip sat between
+   * the numeral and the stop rule and pushed the sentence far enough down that
+   * it truncated mid-clause at the fold while still looking complete. Presence
+   * and order relative to the cues are both satisfiable while the line is
+   * unreadable at the moment it matters, so the position that actually needed
+   * locking is this one.
+   */
+  it('outranks the comparison strip, not just the cues', async () => {
+    seedUser(docWithHistory())
+    await renderApp('/?v=medium&i=0&d=0')
+
+    const stop = screen.getByTestId('stop-rule')
+    const comparison = screen.getByTestId('comparison')
+    const cues = screen.getByTestId('cue-list')
+
+    // Node.compareDocumentPosition: FOLLOWING means the argument comes after.
+    expect(stop.compareDocumentPosition(comparison) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(stop.compareDocumentPosition(cues) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('is absent on the cardio slot, which has no rung and no stop rule', async () => {
