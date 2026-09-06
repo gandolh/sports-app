@@ -25,24 +25,38 @@ It is also the better dataset for this app despite being smaller than openGym's
 the axes the five ladders are built on, where openGym gave a body-part string
 that mapped onto nothing here.
 
-### The AGPL is no longer required — and is not yet removed
+### The licence is gone from the tree; the history is a separate question
 
-**LICENSE (AGPL v3.0) is still in the tree, deliberately.** It was added because
-of the openGym import, that import is gone, and the obligation with it — but
-**deleting the file did not remove commit `4d93f47` from history**, and that
-commit contains openGym-derived data.
+**`LICENSE` and the `license` field were removed on 2026-09-06.** The current tree
+contains no openGym-derived material, so it needs no AGPL, and the project is back
+to where it was: **no licence, all rights reserved.**
 
-While the repository stays unpublished and unpushed this is moot. It stops being
-moot the moment it is distributed. Two clean closures, and this is the user's
-call because it is the user's copyright:
+**What that does not settle.** `4d93f47` carried the openGym data and **was pushed to the
+project's public GitHub remote**, before it was replaced. It
+was distributed. Three things follow, and none of them are undone by deleting a
+file:
 
-| Option | What it takes | What it leaves |
+- The AGPL attached to *that distributed version*. Whoever obtained it has AGPL
+  rights **to that version**. That is not retroactively removable.
+- Purging the commit would stop *further* distribution, not past distribution.
+- **Purging it now means force-pushing a public repository.** Clones and forks
+  keep the commit, and GitHub serves orphaned commits by SHA long after the
+  branch stops pointing at them.
+
+The original plan recorded here — "rewrite the one unpushed commit" — **was
+written on a false premise.** The work was already pushed; the controller checked
+`git status` (which reported the upstream as gone) rather than `git ls-remote`,
+and stated it was unpushed. Corrected the same day. The generalisable version:
+**a tracking ref is not the remote, and "unpushed" is a claim to verify, not
+infer** — especially before offering a history rewrite as cheap.
+
+Whether to purge anyway is open, and it is a judgement about tidiness and
+provenance rather than about obligation:
+
+| | For | Against |
 |---|---|---|
-| **Drop the licence** | Rewrite the one unpushed commit out of history, then delete `LICENSE` and the `license` field | The repository as it was: unlicensed, all rights reserved |
-| **Keep AGPL v3.0** | Nothing | A copyleft licence chosen on purpose rather than inherited by accident |
-
-Staying over-restrictive is the safe direction to wait in, which is why nothing
-was removed pre-emptively.
+| **Purge** | The repo stops carrying data whose chain of title was never established | Force-push on a public repo; forks and clones keep it; orphans remain reachable by SHA |
+| **Leave** | Honest history; nothing further is distributed once the tip no longer contains it | A commit containing unattributed third-party data stays reachable |
 
 ## SUPERSEDED — The repository is AGPL v3.0, and the exercise reference is why
 

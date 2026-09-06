@@ -1059,3 +1059,31 @@ removed pre-emptively.
 
 The generalisable bit: **a licence acquired from a dependency does not leave when
 the dependency does.** It leaves when the history does.
+
+## [2026-09-06] correction | the licence is dropped, and "unpushed" was wrong
+
+`LICENSE` and the `license` field are removed. The current tree carries no
+openGym-derived material, so it needs no AGPL, and the project is back to
+unlicensed — all rights reserved, as before the import.
+
+**The correction is the part worth keeping.** The offer to drop it was made on the
+grounds that the openGym commit was "a single unpushed commit, so it's cheap right
+now". That was false. `git status` reported the upstream as gone and the
+controller inferred unpushed from it; `git ls-remote` shows the project's
+public GitHub remote already at the current tip. The commit had been distributed before the swap replaced it.
+
+So the decision changed shape after the user had already answered it, and the
+honest move was to say so rather than proceed on consent given for a cheaper
+action. What was safe and non-destructive (removing the licence going forward) was
+done; what is outward-facing and irreversible (force-pushing a public repo to
+purge `4d93f47`) was left for an explicit call, with the trade written up in
+[wiki/licensing.md](wiki/licensing.md).
+
+**A tracking ref is not the remote.** `origin/main` is a local cache and
+`git status`'s "upstream is gone" says something about configuration, not about
+what the server holds. "Unpushed" is a claim to verify with `ls-remote`, not to
+infer — and it is exactly the claim that makes a history rewrite sound cheap.
+
+Second finding, same shape as the first: **this repository is public and is being pushed
+to by a parallel session.** Anything committed here is distributed within
+minutes and without a review step. That is worth knowing before the next import.
