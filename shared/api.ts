@@ -52,10 +52,12 @@
  * consumer of the programme, which is the same line `Rung` is kept on the other
  * side of (see `types.ts`, "ids cross the wire, content does not").
  *
- * **No password.** `LoginRequest` declares `username` and nothing else, and
- * additional properties are allowed, which is how a login body carrying a
- * credential is accepted without any part of this repository naming the field.
- * See `corpus/wiki/technical-decisions.md § "Authentication is a nameplate"`.
+ * **No credential of any kind is declared here, and none can be.** The login
+ * body that used to be described in this file is gone: identity is Ward's, and
+ * the browser proves it with a cookie rather than a body this package would
+ * have to name. A password never reaches this repository at all now, which is a
+ * stronger statement than the old one — that a login body was accepted without
+ * the field being named.
  */
 import { Type, type Static } from '@sinclair/typebox'
 import { USERNAME_PATTERN, USERNAME_RULE } from './username.ts'
@@ -69,13 +71,19 @@ import { USERNAME_PATTERN, USERNAME_RULE } from './username.ts'
 // same two copies as before rather than adding a third, and puts the definition
 // somewhere the client can delete its copy *into*.
 
-export const SECRET_HEADER = 'x-sync-secret'
 export const HEALTH_PATH = '/api/health'
-export const LOGIN_PATH = '/api/login'
 export const STATE_PATH = '/api/state'
 
-/** The query parameter that names whose stream a `/api/state` request is about. */
-export const USER_PARAM = 'user'
+/*
+ * `SECRET_HEADER`, `LOGIN_PATH` and `USER_PARAM` are gone (2026-09-06).
+ *
+ * The first two went with the shared secret and the login route. `USER_PARAM`
+ * is the interesting one: `?user=` was how a caller said whose stream a request
+ * was about, because the service had no way to know who was calling. It reads
+ * the session's subject now, so there is nothing left to name — and the
+ * parameter is removed rather than kept-and-ignored, because a parameter that
+ * still exists looks like it still selects something.
+ */
 
 // ─── The username, as a schema ──────────────────────────────────────────────
 
@@ -112,37 +120,15 @@ export const HealthResponse = Type.Object(
 )
 export type HealthResponse = Static<typeof HealthResponse>
 
-// ─── POST /api/login ────────────────────────────────────────────────────────
-
-/**
- * What a login body must contain. Additional properties are allowed — see the
- * file header for why that is the whole mechanism by which a credential is
- * accepted and never named.
- */
-export const LoginRequest = Type.Object({ username: Username })
-export type LoginRequest = Static<typeof LoginRequest>
-
-/**
- * The username back, and nothing else. No token, no session id, no expiry: there
- * is no session to represent and inventing one would imply a boundary that does
- * not exist.
- */
-export const LoginResponse = Type.Object({ username: Username }, { additionalProperties: false })
-export type LoginResponse = Static<typeof LoginResponse>
-
 // ─── /api/state ─────────────────────────────────────────────────────────────
 
-/**
- * `?user=alice`, on `GET` and `PUT` alike.
+/*
+ * There is no query schema.
  *
- * Additional query parameters are allowed, because they are meaningless to this
- * service and rejecting them would break nothing but a caller that appended a
- * cache-buster. `user` itself is required: on `GET` it is the only statement of
- * whose document is wanted, and on `PUT` it is the independent target that the
- * document's own `username` is compared against.
+ * `StateQuery` described `?user=`, which was the only schema-validated input
+ * this service had. The stream key is the session's subject now, so the query
+ * string carries nothing and there is nothing for a validator to reject.
  */
-export const StateQuery = Type.Object({ [USER_PARAM]: Username })
-export type StateQuery = Static<typeof StateQuery>
 
 /**
  * **The shallow check, and deliberately nothing more.** Three fields, because

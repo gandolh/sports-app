@@ -12,12 +12,18 @@
  *
  * ── What is stored, and what is not ─────────────────────────────────────────
  *
- * One key, holding one username in plain text. Not a token, not a session id, not
- * a password — there is nothing to store, because there is nothing to verify:
- * the username identifies a state document and the password is discarded in the
- * service's request handler (corpus/wiki/technical-decisions.md, "Authentication
- * is a nameplate, not a boundary"). That is also why "logging in" works offline
- * and why `clearCurrentUsername` is the whole of logging out.
+ * One key, holding one username in plain text. Not a token, not a session id,
+ * not a password — and since the Ward cutover that is a much stronger statement
+ * than it used to be. The real credential is Ward's `ward_session` cookie,
+ * which this module never sees and must never copy: an httpOnly cookie in
+ * `localStorage` would be a credential an XSS could read, which is the entire
+ * thing httpOnly exists to prevent.
+ *
+ * So what remains here is a **cache of the signed-in name**, not an identity.
+ * The service decides whose document a request touches, from the session — this
+ * value cannot change that, and a stale or edited one costs a wrong name in the
+ * header until the next sync corrects it. That is also why the app still opens
+ * offline: nothing here is verified, because nothing here is trusted.
  *
  * It is deliberately *not* in the state document. A document is exported, synced
  * and hand-edited; "which account this browser is showing" is a property of the
@@ -43,7 +49,7 @@ export type SetUsernameResult =
  * Who this browser is acting as, or `null` when nobody is logged in.
  *
  * A stored value that is not a valid username reads as `null` and is left in
- * place: the only consequence is a trip through the login screen, which costs
+ * place: the only consequence is a trip through Ward's sign-in, which costs
  * nothing and creates nothing, so there is no repair worth attempting and no
  * warning worth showing. (Contrast `store.load`, which is loud about an
  * unreadable *document* — that one is irreplaceable.)

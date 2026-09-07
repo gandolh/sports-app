@@ -66,14 +66,20 @@ on startup. **That warning is expected and is not a reason to add a dependency.*
 ## Running it
 
 ```sh
-# Generate a secret once and keep it somewhere safe (a password manager).
-node -e 'console.log(require("node:crypto").randomBytes(32).toString("hex"))'
-
-SPORTS_APP_SYNC_SECRET=<that value> npm run server
+# Issue the app key once, in Ward's console: the sports-app page, "Service
+# keys". It is shown ONCE and cannot be read back — Ward stores only a digest.
+WARD_PUBLIC_ORIGIN=https://gandolh.ro \
+WARD_API_BASE_PATH=/ward-api \
+WARD_APP_KEY=wak_... \
+  npm run server
 ```
 
-The service refuses to start without a secret. There is no default and no fallback: a
-service with a built-in secret looks authenticated and is not.
+The service refuses to start without all three. There is no default and no fallback: a
+service that cannot tell its callers apart looks authenticated and is not.
+
+`WARD_API_BASE_PATH` is undefaulted for a specific reason — an empty value resolves
+Ward's JWKS to `<origin>/.well-known/jwks.json`, a path nothing serves, so every token
+would be rejected with a clean log on the deploy that shipped the mistake.
 
 In development, `npm run dev` proxies `/api` to `http://127.0.0.1:8787`, so the app and
 the service share an origin and there is no CORS to configure. Leave **Service
@@ -84,15 +90,18 @@ address** empty in Settings and it will use the proxy. If you change
 
 | Variable                     | Default            | Notes                                                              |
 | ---------------------------- | ------------------ | ------------------------------------------------------------------ |
-| `SPORTS_APP_SYNC_SECRET`     | *(none)*           | **Required.** Compared with `crypto.timingSafeEqual`. Never commit it. |
+| `WARD_PUBLIC_ORIGIN`         | *(none)*           | **Required.** Ward's origin, and the exact `iss` on every access token. |
+| `WARD_API_BASE_PATH`         | *(none)*           | **Required.** `/ward-api`. Undefaulted on purpose — see above.      |
+| `WARD_APP_KEY`               | *(none)*           | **Required.** This service's own key. A secret. Never commit it.    |
 | `SPORTS_APP_HOST`            | `127.0.0.1`        | Loopback by default so running it cannot expose your history.       |
 | `SPORTS_APP_PORT`            | `8787`             |                                                                    |
 | `SPORTS_APP_DB`              | `<repo>/db/app.db` | Created on startup, with its parent directory.                      |
 | `SPORTS_APP_MAX_BODY_BYTES`  | `4194304` (4 MiB)  | Request body cap.                                                   |
 | `SPORTS_APP_QUIET`           | unset              | `1` silences the request log.                                       |
 
-The secret appears in **no committed file**. It is passed in the environment, and the
-app stores its own copy in browser storage inside the state document.
+The app key appears in **no committed file**. It is passed in the environment and never
+reaches the browser: it authenticates the *service* to Ward, and is a completely
+different thing from the session cookie that authenticates a *person* to the service.
 
 ## Routes
 
@@ -255,12 +264,17 @@ it at both the store and the HTTP layer.
   user picks. `navigator.onLine` is never consulted: brief 01 observed it reporting
   `true` while the network was demonstrably offline.
 
-### The secret ends up in exported files
+### An old secret may still be in exported files
 
-`settings.sync` lives inside the state document, so **an exported JSON file contains the
-shared secret** once sync is configured. The Settings screen says so next to the sync
-fields. Treat an export as a credential, and rotate the secret (restart the service with
-a new `SPORTS_APP_SYNC_SECRET`, then update it in Settings) if an export leaks.
+`settings.sync.secret` is a leftover. The service stopped accepting a shared secret when
+identity moved to Ward, and the client stopped sending one — but the **field is still in
+the document schema**, so a document configured before the cutover still carries whatever
+was typed into it, and an export still contains that string. It authenticates nothing
+now.
+
+Removing the field is a schema version bump, deliberately not folded into the auth
+change. Until then: an old export is worth treating as a credential only insofar as that
+secret was reused somewhere else, and the Settings screen says the stored value is inert.
 
 ## Tests
 

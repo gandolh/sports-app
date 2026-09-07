@@ -77,13 +77,16 @@ import { isReadOnly, save } from './store.ts'
 
 // ─── Wire contract (mirrors server/state-server.mjs) ────────────────────────
 
-export const SECRET_HEADER = 'x-sync-secret'
 export const STATE_PATH = '/api/state'
 export const HEALTH_PATH = '/api/health'
-export const LOGIN_PATH = '/api/login'
 
-/** The query parameter naming whose stream a `/api/state` request is about. */
-export const USER_PARAM = 'user'
+/**
+ * Ward's login page, for the one thing this client can do about a 401.
+ *
+ * A path, never an absolute URL: Ward validates `next` against the estate's own
+ * path roots and refuses anything absolute.
+ */
+export const WARD_LOGIN_PATH = '/ward/login'
 
 /**
  * Long enough for a slow phone on a slow connection, short enough that a
@@ -112,15 +115,19 @@ export function endpoint(baseUrl: string, path: string): string {
 }
 
 /**
- * `/api/state` for one user.
+ * `/api/state`. It names no user, and that absence is the change.
  *
- * The username is percent-encoded even though a valid one needs no escaping. It
- * arrives from a document that a person is invited to edit by hand, and an
- * unescaped `&` or `#` in it would silently retarget the request at a *different*
- * user's stream instead of being rejected.
+ * The username used to travel here as `?user=`, because the service had no way
+ * to know who was calling — one shared secret authenticated the installation
+ * and the query parameter chose the stream. The service reads the **session's**
+ * subject now, so there is nothing to name and nothing to percent-encode: a
+ * caller reads their own stream because it is the only one they can reach.
+ *
+ * The parameter is not sent at all rather than sent and ignored. Sending it
+ * would suggest it still selected something.
  */
-export function stateEndpoint(baseUrl: string, username: string): string {
-  return `${endpoint(baseUrl, STATE_PATH)}?${USER_PARAM}=${encodeURIComponent(username)}`
+export function stateEndpoint(baseUrl: string): string {
+  return endpoint(baseUrl, STATE_PATH)
 }
 
 // ─── push ───────────────────────────────────────────────────────────────────
@@ -185,7 +192,7 @@ export async function push(doc: StateDoc, options: SyncOptions = {}): Promise<Pu
   let response: Response
   try {
     // No onLine check. See the header.
-    response = await send(target, stateEndpoint(target.baseUrl, doc.username), options, {
+    response = await send(target, stateEndpoint(target.baseUrl), options, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: text,
@@ -246,7 +253,7 @@ export async function pull(
 
   let response: Response
   try {
-    response = await send(target, stateEndpoint(target.baseUrl, username), options, {
+    response = await send(target, stateEndpoint(target.baseUrl), options, {
       method: 'GET',
     })
   } catch (cause) {
@@ -306,78 +313,82 @@ export async function pull(
 
 // ─── login ──────────────────────────────────────────────────────────────────
 
-export type LoginOutcome =
-  | { readonly ok: true; readonly username: string }
+/**
+ * The result of `checkSession`.
+ *
+ * `ok` carries nothing: the service knows who the caller is from the session,
+ * so there is no username for it to echo and nothing for this client to
+ * compare. That echo used to be a real check — the old `/api/login` could
+ * answer about a *different* name than the one sent — and it is gone because
+ * the question is gone.
+ */
+export type SessionCheckOutcome =
+  | { readonly ok: true }
   | {
       readonly ok: false
-      readonly reason: 'not-configured' | 'network' | 'unauthorized' | 'rejected' | 'invalid'
+      readonly reason: 'not-configured' | 'network' | 'unauthorized' | 'rejected'
       readonly error: string
     }
 
 /**
- * Ask the service to acknowledge a username. **Advisory: the answer must never
- * gate entry to the app.**
+ * Check that the service is reachable and that this browser holds a session it
+ * accepts. **Advisory: the answer must never gate entry to the app.**
  *
- * The service checks nothing — it validates the shape of the username, discards
- * the password without reading it, and echoes the name back
- * (corpus/wiki/technical-decisions.md, "Authentication is a nameplate"). So this
- * call exists only to tell a user that their *deployment secret* or *service
- * address* is wrong, at the moment they are most likely to be typing them in. A
- * failure here means "sync will not work", never "you may not train": logging in
- * has to work offline, and it trivially does, because there is nothing to verify.
+ * This replaces `login`, and the difference is the whole cutover. That function
+ * posted a username and a password to `/api/login`, which checked neither — it
+ * validated the shape of the name, discarded the password unread, and echoed
+ * the name back (corpus/wiki/technical-decisions.md, "Authentication is a
+ * nameplate"). Signing in is Ward's now, at one page for the estate, so there is
+ * nothing here to post.
  *
- * The password is passed through untouched and is not stored anywhere by this
- * module. Never throws.
+ * What is left is worth keeping: telling somebody their **service address** is
+ * wrong, or that they are not signed in, at the moment they are most likely to
+ * be looking at Settings. A failure still means "sync will not work", never
+ * "you may not train" — training offline has to work and trivially does, because
+ * nothing here is consulted to open the app.
+ *
+ * Never throws.
  */
-export async function login(
+export async function checkSession(
   target: SyncSettings | null,
-  username: string,
-  password: string,
   options: SyncOptions = {},
-): Promise<LoginOutcome> {
+): Promise<SessionCheckOutcome> {
   if (target === null) {
     return { ok: false, reason: 'not-configured', error: 'Sync is not configured.' }
   }
 
   let response: Response
   try {
-    response = await send(target, endpoint(target.baseUrl, LOGIN_PATH), options, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    })
+    // `GET /api/state` rather than a dedicated probe: it is the route sync
+    // actually uses, so this exercises the same gate, the same cookie and the
+    // same origin. A dedicated endpoint would be a second answer to "will sync
+    // work", free to disagree with the first.
+    response = await send(target, stateEndpoint(target.baseUrl), options, { method: 'GET' })
   } catch (cause) {
-    ;(options.log ?? warn)('Login check failed; the app works offline regardless.', cause)
+    ;(options.log ?? warn)('Session check failed; the app works offline regardless.', cause)
     return { ok: false, reason: 'network', error: messageOf(cause) }
   }
 
   if (response.status === 401 || response.status === 403) {
-    return {
-      ok: false,
-      reason: 'unauthorized',
-      error: 'The sync service rejected the secret. Check the secret in Settings.',
-    }
-  }
-  if (!response.ok) {
-    return { ok: false, reason: 'rejected', error: describeStatus(response.status) }
+    return { ok: false, reason: 'unauthorized', error: describeStatus(response.status) }
   }
 
-  let body: unknown
-  try {
-    body = await response.json()
-  } catch (cause) {
-    return { ok: false, reason: 'invalid', error: messageOf(cause) }
-  }
-  const echoed =
-    typeof body === 'object' && body !== null ? (body as { username?: unknown }).username : undefined
-  if (echoed !== username) {
-    return {
-      ok: false,
-      reason: 'invalid',
-      error: `The sync service answered about a different username than the one sent.`,
-    }
-  }
-  return { ok: true, username }
+  /*
+   * 404 is success here. It means the service answered, accepted the session,
+   * and holds no document for this person yet — which is exactly the state a
+   * new device is in, and the state somebody checking their settings for the
+   * first time will most often see.
+   */
+  if (response.status === 404 || response.ok) return { ok: true }
+
+  return { ok: false, reason: 'rejected', error: describeStatus(response.status) }
+}
+
+/** Ward's login page, returning to wherever the person is now. */
+export function wardLoginUrl(): string {
+  const next =
+    typeof window === 'undefined' ? '/' : window.location.pathname + window.location.search
+  return `${WARD_LOGIN_PATH}?next=${encodeURIComponent(next)}`
 }
 
 // ─── Comparison and the conflict prompt ─────────────────────────────────────
@@ -542,8 +553,17 @@ interface SendInit {
   readonly body?: string
 }
 
+/**
+ * `_target` is unused and kept in the signature deliberately.
+ *
+ * It carried the shared secret, which was the only per-target value a request
+ * needed; the credential is now Ward's cookie, which the browser attaches
+ * without being asked. Every call site already has the target and reads
+ * naturally passing it, and a future per-target concern — a header, a timeout
+ * override — belongs here rather than being threaded back in.
+ */
 async function send(
-  target: SyncSettings,
+  _target: SyncSettings,
   url: string,
   options: SyncOptions,
   init: SendInit,
@@ -557,12 +577,18 @@ async function send(
 
   const request: RequestInit = {
     method: init.method,
-    // The secret travels in a header, never in the URL — a URL ends up in proxy
-    // logs, browser history, and referrers.
-    headers: { ...init.headers, [SECRET_HEADER]: target.secret },
+    headers: { ...init.headers },
     cache: 'no-store',
-    // No cookies are involved anywhere in this design, so none are sent.
-    credentials: 'omit',
+    /*
+     * `include`, where this used to be `omit`.
+     *
+     * The credential is Ward's `ward_session` cookie, and the service is a
+     * different origin whenever `baseUrl` is set — which is the ordinary
+     * deployment. Without this the cookie is dropped and every request 401s,
+     * while a same-origin build works perfectly: the worst kind of split to
+     * debug.
+     */
+    credentials: 'include',
     ...(init.body === undefined ? {} : { body: init.body }),
     ...(signal === null ? {} : { signal }),
   }
@@ -584,8 +610,19 @@ function timeoutSignal(timeoutMs: number): AbortSignal | null {
 }
 
 function describeStatus(status: number): string {
-  if (status === 401 || status === 403) {
-    return `The sync service rejected the secret (${status}). Check the secret in Settings.`
+  if (status === 401) {
+    return 'You are not signed in. Sign in again to sync.'
+  }
+  if (status === 403) {
+    // A live session with no `sports-app` grant. Signing in again cannot fix
+    // it, so the message must not suggest it.
+    return 'This account does not have access to sync. Ask the administrator to grant it.'
+  }
+  if (status === 503) {
+    // Ward is unreachable. The distinction from 401 is the whole reason the
+    // service answers 503: this is worth retrying, and signing out is not the
+    // remedy.
+    return 'The sign-in service is temporarily unavailable. Sync will retry.'
   }
   if (status === 413) {
     return `The sync service refused the document as too large (${status}).`

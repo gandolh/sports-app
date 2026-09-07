@@ -16,7 +16,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StateDoc } from '@sports-app/shared/types.ts'
 import { POSTURAL_NOTICE } from '../../domain/ladders.ts'
 import { prescribe, recordSession, toSessionResult } from '../../domain/schedule.ts'
-import { SESSION_KEY, currentUsername } from '../../persistence/session.ts'
+import { SESSION_KEY } from '../../persistence/session.ts'
 import { STORAGE_KEYS, emptyDoc } from '../../persistence/store.ts'
 import { ACCENTS } from '../components/theme.ts'
 import { currentUrl, renderApp, resetBrowserState, seedUser } from './harness.tsx'
@@ -208,17 +208,20 @@ describe('/ — Today', () => {
 // ─── /login ─────────────────────────────────────────────────────────────────
 
 describe('/login', () => {
+  /*
+   * This block asserted a screen that no longer exists. It had a username
+   * field, a password field that was never read, and two sentences admitting
+   * that anyone who knew a username could open that person's training history.
+   *
+   * The honesty was the right response to the old design. Ward authenticates a
+   * person now and the service keys each document on their subject, so there is
+   * no name for a stranger to guess and nothing true left for that copy to say.
+   * `/login` is a hand-off to Ward.
+   */
+
   it('is where a browser with nobody logged in ends up', async () => {
     const { router } = await renderApp('/')
     expect(currentUrl(router)).toBe('/login')
-  })
-
-  it('states plainly that the password is not checked', async () => {
-    await renderApp('/login')
-    expect(document.body.textContent).toContain('The password is not checked.')
-    expect(document.body.textContent).toContain(
-      'anyone who knows a username can open that username’s training history',
-    )
   })
 
   it('has no tab bar — it is not one of the four destinations', async () => {
@@ -226,9 +229,40 @@ describe('/login', () => {
     expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
   })
 
-  it('works with no network at all — there is nothing to verify', async () => {
-    // Every path out of this screen would have to go through `fetch`, so making
-    // it throw is the strongest available statement of "offline".
+  /**
+   * The screen takes no credential, and cannot.
+   *
+   * Asserted as an absence rather than left implicit: a password field here
+   * would be the exact dishonesty the old copy was written to avoid — a box
+   * that looks like a sign-in, on a page that has no way to check one.
+   */
+  it('offers no username or password field — the credential is Ward\'s', async () => {
+    await renderApp('/login')
+    expect(screen.queryByLabelText('Username')).toBeNull()
+    expect(screen.queryByLabelText('Password')).toBeNull()
+    expect(document.body.textContent).not.toContain('The password is not checked.')
+  })
+
+  it('hands off to Ward, carrying where to come back to', async () => {
+    await renderApp('/login')
+    const link = screen.getByRole('link', { name: 'Continue' })
+    const href = link.getAttribute('href') ?? ''
+
+    expect(href.startsWith('/ward/login?next=')).toBe(true)
+    // A path, never an absolute URL: Ward validates `next` against the estate's
+    // own path roots and refuses anything absolute.
+    expect(decodeURIComponent(href.split('next=')[1] ?? '').startsWith('/')).toBe(true)
+    expect(href).not.toContain('http')
+  })
+
+  /**
+   * Signing in needs the network now, because it needs Ward — and that is not
+   * the regression it looks like. The property that mattered was that the
+   * **app** opens offline for somebody already signed in, which it still does:
+   * `session.ts` reads the cached name synchronously and nothing on the
+   * session-critical path awaits anything.
+   */
+  it('still lets an established session open the app with fetch throwing', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => {
@@ -236,29 +270,14 @@ describe('/login', () => {
       }),
     )
 
-    const { router } = await renderApp('/login')
-    fireEvent.change(screen.getByLabelText('Username'), { target: { value: USERNAME } })
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'anything at all' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    seedUser(trained(0))
+    const { router } = await renderApp('/')
 
     await waitFor(() => expect(currentUrl(router)).toBe('/'))
-    expect(currentUsername()).toBe(USERNAME)
-    // The whole way to a first set, with `fetch` throwing on every call.
     expect(screen.getByRole('button', { name: 'Start workout' })).toBeTruthy()
   })
-
-  it('shows the store’s own rejection message verbatim, and does not log anybody in', async () => {
-    await renderApp('/login')
-    // Uppercase is rejected rather than folded: two people must not end up
-    // sharing one document while believing they have separate accounts.
-    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'Alice' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
-
-    const error = await screen.findByText(/That username will not work/)
-    expect(error.textContent).toContain('starting with a lowercase letter or a digit')
-    expect(currentUsername()).toBeNull()
-  })
 })
+
 
 // ─── /plan ──────────────────────────────────────────────────────────────────
 

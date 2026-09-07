@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import { Field } from '@base-ui/react/field'
 import { useForm } from 'react-hook-form'
 import type { StateDoc, SyncSettings as SyncTarget } from '@sports-app/shared/types.ts'
@@ -159,7 +159,6 @@ export function SyncSettings({
   readonly username: string
 }) {
   const stored = doc.settings.sync
-  const secretId = useId()
   const saveSync = useSaveSync(username)
   const check = useSyncCheck()
   const backup = useBackupNow()
@@ -269,24 +268,25 @@ export function SyncSettings({
           )}
         </Field.Root>
 
-        <div>
-          <label className={FIELD_LABEL} htmlFor={secretId}>
-            {hasSecret ? 'Replace the secret' : 'Secret'}
-          </label>
-          <input
-            id={secretId}
-            className={FIELD_INPUT}
-            type="password"
-            autoComplete="off"
-            aria-describedby={`${secretId}-note`}
-            {...register('secret')}
-          />
-          <p className={FIELD_DESCRIPTION} id={`${secretId}-note`}>
-            {hasSecret
-              ? 'A secret is stored. It is never shown again, here or anywhere else — leave this blank to keep it, or type a new one to replace it.'
-              : 'Only needed if the service was started with one. It is stored in the document and never displayed back.'}
+        {/*
+          The secret field is gone.
+          
+          The service no longer accepts one: it authenticates the person from
+          Ward's session cookie, which the browser holds and this app never
+          sees. Leaving the field would invite somebody to type a credential
+          into a box that is read by nothing.
+          
+          A previously typed secret is still in the document — the schema field
+          outlives this input and is removed by its own version bump — and the
+          note below says so rather than letting it sit there unmentioned.
+        */}
+        {!hasSecret ? null : (
+          <p className={FIELD_DESCRIPTION}>
+            This device still has an old sync secret saved from before sign-in moved to the
+            estate&rsquo;s single sign-in. It is no longer sent anywhere and no longer does
+            anything; it will be dropped from the saved document by a later update.
           </p>
-        </div>
+        )}
       </div>
 
       {saveSync.error === null ? null : (

@@ -147,6 +147,7 @@ import { createHash, timingSafeEqual } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import { TypeCompiler } from '@sinclair/typebox/compiler'
 import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from './db.mjs'
+import { createWardClient, WardUnavailableError } from './ward.mjs'
 // The wire contract, from the one place it is declared. `shared/` may not import
 // `node:` anything, so nothing in here can drag a Node-only module into the client
 // bundle or a browser-only one into this process. Node ≥22.18 strips the types at
@@ -155,21 +156,15 @@ import { LEGACY_USERNAME, USERNAME_RULE } from '@sports-app/shared/username.ts'
 import {
   HEALTH_PATH,
   HealthResponse,
-  LOGIN_PATH,
-  LoginRequest,
-  LoginResponse,
-  SECRET_HEADER,
   STATE_PATH,
   SnapshotReceipt,
   StateDocumentEnvelope,
-  StateQuery,
-  USER_PARAM,
 } from '@sports-app/shared/api.ts'
 
 // Re-exported rather than redeclared: the routes are part of the wire contract, so
 // they are declared beside the schemas that describe them. Callers keep naming
 // them through this module, which is the module they are talking to.
-export { HEALTH_PATH, LOGIN_PATH, SECRET_HEADER, STATE_PATH, USER_PARAM }
+export { HEALTH_PATH, STATE_PATH }
 
 export const DEFAULT_HOST = '127.0.0.1'
 export const DEFAULT_PORT = 8787
@@ -196,32 +191,10 @@ const JSON_CONTENT_TYPE_UTF8 = `${JSON_CONTENT_TYPE}; charset=utf-8`
 // entry points into one schema, because a raw-string body cannot be handed to a
 // body schema — see the file header.
 
-const checkStateQuery = TypeCompiler.Compile(StateQuery)
-const checkLoginRequest = TypeCompiler.Compile(LoginRequest)
 const checkStateDocument = TypeCompiler.Compile(StateDocumentEnvelope)
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
-/**
- * Constant-time secret comparison.
- *
- * `timingSafeEqual` throws unless both buffers are the same length, and the
- * obvious `if (a.length !== b.length) return false` guard leaks the secret's
- * length through timing. Hashing both sides first gives two buffers that are
- * *always* 32 bytes, so the comparison is genuinely constant-time over every
- * input including a wrong-length one, and the length of the real secret never
- * affects how long a rejection takes.
- *
- * @param {unknown} provided
- * @param {string} expected
- * @returns {boolean}
- */
-export function secretMatches(provided, expected) {
-  const supplied = typeof provided === 'string' ? provided : ''
-  const a = createHash('sha256').update(supplied, 'utf8').digest()
-  const b = createHash('sha256').update(expected, 'utf8').digest()
-  return timingSafeEqual(a, b)
-}
 
 // ─── Small helpers ──────────────────────────────────────────────────────────
 
@@ -252,31 +225,6 @@ function messageOf(cause) {
  * attacker-controlled text into a response body that some client will eventually
  * render, and the rule is the only part that helps the person reading it anyway.
  */
-export const USERNAME_ERROR = `user: expected ${USERNAME_RULE}`
-
-/** The message a missing `?user=` gets — a different mistake, so a different message. */
-export const USER_REQUIRED_ERROR = `user: required. Name whose document this is with ?${USER_PARAM}=…`
-
-/**
- * Pull `?user=` off a request URL and validate it against `StateQuery`.
- *
- * Two callers, both real: the error handler, which turns Fastify's AJV rejection
- * into the contract's wording, and anything that needs to answer "is this a
- * serviceable target" without a socket — which is how the tests reach it.
- *
- * @param {string} url the raw request URL
- * @returns {{ok: true, username: string} | {ok: false, error: string}}
- */
-export function readUsername(url) {
-  const mark = url.indexOf('?')
-  // `URLSearchParams` handles the percent-decoding, so `%2e%2e` and `a+b` are
-  // decoded *before* the allowlist sees them rather than after — a check that
-  // runs on the encoded form can be walked straight past.
-  const raw = new URLSearchParams(mark === -1 ? '' : url.slice(mark + 1)).get(USER_PARAM)
-  if (raw === null) return { ok: false, error: USER_REQUIRED_ERROR }
-  if (!checkStateQuery.Check({ [USER_PARAM]: raw })) return { ok: false, error: USERNAME_ERROR }
-  return { ok: true, username: raw }
-}
 
 // ─── Shallow document check ─────────────────────────────────────────────────
 
@@ -335,39 +283,6 @@ export function checkDocument(text) {
 
 // ─── The login body ─────────────────────────────────────────────────────────
 
-/**
- * Read a username out of a login body.
- *
- * **Only `username` is read.** See the file header: that is the decision, not an
- * oversight, and this function is the one place it could be broken. `LoginRequest`
- * declares one property and allows others, so a body carrying a credential is
- * accepted without anything here naming the field.
- *
- * Note what the failure path deliberately does *not* do: it does not include the
- * `JSON.parse` message. V8's parse errors quote a slice of the input, so an
- * unparseable login body would put part of a real credential into a response and
- * into the log. The generic message is worth strictly more than the diagnostic
- * detail here — this body has exactly two fields and the client constructs it.
- *
- * @param {string} text
- * @returns {{ok: true, username: string} | {ok: false, error: string}}
- */
-export function checkCredentials(text) {
-  let raw
-  try {
-    raw = JSON.parse(text)
-  } catch {
-    return { ok: false, error: 'expected a JSON object with a username' }
-  }
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    return { ok: false, error: 'expected a JSON object at the top level' }
-  }
-
-  if (!checkLoginRequest.Check(raw)) {
-    return { ok: false, error: `username: expected ${USERNAME_RULE}` }
-  }
-  return { ok: true, username: raw.username }
-}
 
 // ─── The service ────────────────────────────────────────────────────────────
 
@@ -389,7 +304,7 @@ export function checkCredentials(text) {
 /**
  * @param {{
  *   store: import('./db.mjs').SnapshotStore,
- *   secret: string,
+ *   ward: { authenticate: (cookieHeader: string | undefined) => Promise<{subject: string, username: string}> },
  *   maxBodyBytes?: number,
  *   log?: (message: string) => void,
  * }} config
@@ -397,14 +312,15 @@ export function checkCredentials(text) {
  */
 export function createStateServer(config) {
   const { store } = config
-  const secret = config.secret
+  const ward = config.ward
   const maxBodyBytes = config.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES
   const log = config.log ?? (() => {})
 
-  if (typeof secret !== 'string' || secret === '') {
-    // Refusing here rather than defaulting is the point. A service with a blank
-    // or built-in secret looks authenticated and is not.
-    throw new Error('createStateServer requires a non-empty shared secret')
+  if (ward === undefined || typeof ward.authenticate !== 'function') {
+    // Refusing here rather than defaulting is the point, and it is the same
+    // point the shared secret used to make: a service with no way to identify
+    // its callers looks authenticated and is not.
+    throw new Error('createStateServer requires a Ward client')
   }
 
   const app = Fastify({
@@ -460,18 +376,42 @@ export function createStateServer(config) {
   })
 
   /**
-   * The secret gate, as the earliest hook Fastify has.
+   * The session gate, as the earliest hook Fastify has.
    *
-   * Route-level rather than global, which is what keeps two orderings right at
-   * once: an unauthorised caller on a real route gets `401` *before* any
-   * validation runs, and a caller on a path that does not exist gets `404`
-   * without the secret being consulted at all — the same answer whether or not
-   * they hold it.
+   * Route-level rather than global, which keeps two orderings right at once: an
+   * unauthorised caller on a real route is refused *before* any validation
+   * runs, and a caller on a path that does not exist gets `404` without a
+   * session being consulted at all — the same answer whether or not they hold
+   * one.
+   *
+   * The resolved subject is put on the request. **That subject is the document
+   * key** — see the `?user=` note in the file header for what that replaced.
    */
-  async function requireSecret(request, reply) {
-    if (secretMatches(request.headers[SECRET_HEADER], secret)) return
-    log(`401 ${request.method} ${pathOf(request.url)}`)
-    return reply.code(401).send({ error: 'unauthorized' })
+  async function requireSession(request, reply) {
+    try {
+      const session = await ward.authenticate(request.headers.cookie)
+      request.ward = session
+      return
+    } catch (error) {
+      /*
+       * 503, not 401, when Ward cannot be reached. The distinction is the whole
+       * reason `WardUnavailableError` exists: telling a client it is signed out
+       * when the identity service is down sends somebody to a login page that
+       * cannot work either, and — worse — a sync client would treat it as a
+       * reason to drop its session rather than to retry.
+       */
+      if (error instanceof WardUnavailableError) {
+        log(`503 ${request.method} ${pathOf(request.url)}: ward unavailable`)
+        return reply.code(503).send({ error: 'identity service unavailable' })
+      }
+
+      // 401 for no session, 403 for a live session with no `sports-app` grant.
+      // The client can act on the first and not the second, which is why they
+      // are not folded together.
+      const status = error.statusCode === 403 ? 403 : 401
+      log(`${status} ${request.method} ${pathOf(request.url)}`)
+      return reply.code(status).send({ error: status === 403 ? 'forbidden' : 'unauthorized' })
+    }
   }
 
   function methodNotAllowed(reply, allow) {
@@ -497,18 +437,24 @@ export function createStateServer(config) {
 
     if (path === HEALTH_PATH) return methodNotAllowed(reply, 'GET, HEAD')
 
-    if (path !== STATE_PATH && path !== LOGIN_PATH) {
+    if (path !== STATE_PATH) {
       // Deliberately identical for "route does not exist" and "route exists but
       // you are not allowed to know". No listing, no hints.
       return reply.code(404).send({ error: 'not found' })
     }
 
-    if (!secretMatches(request.headers[SECRET_HEADER], secret)) {
+    try {
+      await ward.authenticate(request.headers.cookie)
+    } catch {
+      // Deliberately collapsed to 401 here, unlike `requireSession`: this is the
+      // not-found handler, and the point of checking at all is that an
+      // unauthorised caller cannot use a `405` to learn a route exists. Telling
+      // them *why* they were refused would leak the same thing more slowly.
       log(`401 ${request.method} ${path}`)
       return reply.code(401).send({ error: 'unauthorized' })
     }
 
-    return methodNotAllowed(reply, path === LOGIN_PATH ? 'POST' : 'GET, PUT')
+    return methodNotAllowed(reply, 'GET, PUT')
   })
 
   // ── Framework errors, in the contract's words ─────────────────────────────
@@ -524,24 +470,21 @@ export function createStateServer(config) {
       // not going to be read, and leaving it half-consumed would stall the socket
       // until it timed out.
       reply.header('Connection', 'close')
-      if (pathOf(request.url) === LOGIN_PATH) {
-        // No echo of any kind beyond the limit itself: a body this route rejected
-        // may well have carried a credential.
-        return reply.code(413).send({ error: 'login body is too large', limit: maxBodyBytes })
-      }
       return reply
         .code(413)
         .send({ error: `body exceeds the ${maxBodyBytes} byte limit`, limit: maxBodyBytes })
     }
 
-    if (error.validation !== undefined) {
-      // `?user=` is the only schema-validated input — the two JSON bodies are
-      // checked by `checkDocument` / `checkCredentials`, which answer for
-      // themselves. So a validation failure here is always about the target, and
-      // `readUsername` states it in the contract's wording rather than AJV's.
-      const who = readUsername(request.url ?? '')
-      return reply.code(400).send({ error: who.ok ? USERNAME_ERROR : who.error })
-    }
+    /*
+     * There is no schema-validated input left.
+     *
+     * `?user=` was the only one, and it is gone: the stream key is the session's
+     * subject now, so there is nothing on the query string for AJV to reject.
+     * The JSON body is checked by `checkDocument`, which answers in the
+     * contract's own wording. This branch is therefore unreachable, and it is
+     * removed rather than left as dead code that would quietly start firing if
+     * a future route added a schema and forgot to word its own errors.
+     */
 
     const status = error.statusCode ?? 500
     if (typeof error.code === 'string' && error.code.startsWith('FST_') && status < 500) {
@@ -569,40 +512,14 @@ export function createStateServer(config) {
     handler: () => ({ status: 'ok' }),
   })
 
-  // ── POST /api/login ───────────────────────────────────────────────────────
-  //
-  // Accept a username, ignore everything else, answer with the username.
-  //
-  // That really is the whole handler. It exists so that the login screen has
-  // something to fail against when the service is unreachable or the deployment
-  // secret is wrong, and so the username is validated once before it becomes a
-  // stream key — not to decide whether anybody may proceed. Nothing is written:
-  // an account comes into existence when a document is stored under its name, and
-  // until then there is nothing to create.
-  app.route({
-    method: 'POST',
-    url: LOGIN_PATH,
-    onRequest: requireSecret,
-    schema: { response: { 200: LoginResponse } },
-    handler: (request, reply) => {
-      const text = request.body
-      // Fastify skips parsing entirely when a request has no body *and* no
-      // content type, so there is nothing to have been a media-type error. It is
-      // still one: this route accepts exactly one media type and got none.
-      if (text === undefined) return unsupportedMediaType(reply)
-
-      const checked = checkCredentials(text)
-      if (!checked.ok) {
-        // `checked.error` is one of a fixed set of messages that never contains
-        // any part of the request body. That is what makes it safe to log.
-        log(`400 POST ${LOGIN_PATH}: ${checked.error}`)
-        return reply.code(400).send({ error: checked.error })
-      }
-
-      log(`login ${checked.username} (no password was read, compared, or stored)`)
-      return reply.code(200).send({ username: checked.username })
-    },
-  })
+  /*
+   * `POST /api/login` is gone.
+   *
+   * It never authenticated anybody — it validated a username and echoed it back,
+   * so a login screen had something to fail against. Signing in is Ward's now,
+   * at one page for the estate, and the username this service uses comes from
+   * the session rather than from a client claiming one.
+   */
 
   // ── GET /api/state ────────────────────────────────────────────────────────
   //
@@ -612,10 +529,22 @@ export function createStateServer(config) {
   app.route({
     method: 'GET',
     url: STATE_PATH,
-    onRequest: requireSecret,
-    schema: { querystring: StateQuery },
+    onRequest: requireSession,
     handler: (request, reply) => {
-      const username = request.query[USER_PARAM]
+      /*
+       * The stream key is the SESSION's subject, not a query parameter.
+       *
+       * This is the security change the Ward cutover is worth here. `?user=`
+       * used to be the only way to say whose document was wanted, and the
+       * shared secret authenticated the installation rather than a person — so
+       * anyone holding it could read anyone's training history by changing a
+       * name in a URL. The file header said so plainly and accepted it for a
+       * single-user deployment on loopback.
+       *
+       * Now there is nothing to choose: a caller reads their own stream because
+       * it is the only one they can name.
+       */
+      const username = request.ward.subject
 
       const snapshot = store.latest(username)
       if (snapshot === null) {
@@ -646,10 +575,11 @@ export function createStateServer(config) {
   app.route({
     method: 'PUT',
     url: STATE_PATH,
-    onRequest: requireSecret,
-    schema: { querystring: StateQuery, response: { 200: SnapshotReceipt } },
+    onRequest: requireSession,
+    schema: { response: { 200: SnapshotReceipt } },
     handler: (request, reply) => {
-      const username = request.query[USER_PARAM]
+      // The session's subject, for the reason `GET` gives above.
+      const username = request.ward.subject
 
       const text = request.body
       if (text === undefined) return unsupportedMediaType(reply)
@@ -662,17 +592,26 @@ export function createStateServer(config) {
       }
 
       if (checked.username !== username) {
-        // The one check that needs both the target and the document. A client bug
-        // that sends the wrong document — a stale one from a previous account, say,
-        // after a logout that missed a code path — would otherwise write silently
-        // into a stream it does not belong to, and the overwritten snapshot would
-        // be somebody else's training history.
-        //
-        // 400 and not 409: nothing is in conflict. One of the two names is simply
-        // wrong, and folding them together is precisely what `shared/username.ts`
-        // refuses to do.
+        /*
+         * The document names somebody other than the caller.
+         *
+         * This check survives the cutover and is *more* useful than before, not
+         * less. It used to compare two client-supplied values — `?user=` and
+         * the document's own name — which caught a client bug but could not
+         * catch a malicious caller, since they controlled both. Now one side is
+         * the session's subject, so this refuses a caller trying to write into
+         * somebody else's stream as well as a client that got confused.
+         *
+         * 400 and not 409: nothing is in conflict. One of the two names is
+         * simply wrong, and folding them together is precisely what
+         * `shared/username.ts` refuses to do.
+         *
+         * In practice a client should put the subject in the document; the
+         * ordinary cause of this in the field will be a document written before
+         * the cutover, under the old username.
+         */
         const error =
-          `username mismatch: ?${USER_PARAM}=${username} but the document says ` +
+          `username mismatch: the session is ${username} but the document says ` +
           `${checked.username}. Nothing was stored.`
         log(`400 PUT ${STATE_PATH}: ${error}`)
         return reply.code(400).send({ error })
@@ -744,7 +683,9 @@ export function readConfig(env) {
   const maxBodyBytes = rawMax === undefined || rawMax === '' ? DEFAULT_MAX_BODY_BYTES : Number(rawMax)
 
   return {
-    secret: env.SPORTS_APP_SYNC_SECRET ?? '',
+    wardPublicOrigin: env.WARD_PUBLIC_ORIGIN ?? '',
+    wardApiBasePath: env.WARD_API_BASE_PATH ?? '',
+    wardAppKey: env.WARD_APP_KEY ?? '',
     host: env.SPORTS_APP_HOST ?? DEFAULT_HOST,
     port,
     dbFile: env.SPORTS_APP_DB ?? DEFAULT_DB_FILE,
@@ -762,13 +703,29 @@ export function readConfig(env) {
 export function main(env, out = console) {
   const config = readConfig(env)
 
-  if (config.secret === '') {
+  /*
+   * All three Ward variables are required, and none is defaulted.
+   *
+   * The old refusal here was about a blank shared secret looking like auth and
+   * not being it. The same argument applies, one layer up: without these there
+   * is no way to identify a caller at all, and `WARD_API_BASE_PATH` in
+   * particular must never default to empty — that resolves Ward's JWKS to
+   * `<origin>/.well-known/jwks.json`, a path nothing serves, so every token
+   * would be rejected with a clean log on the deploy that shipped it.
+   */
+  const missing = ['WARD_PUBLIC_ORIGIN', 'WARD_API_BASE_PATH', 'WARD_APP_KEY'].filter(
+    (name) => (env[name] ?? '') === '',
+  )
+  if (missing.length > 0) {
     out.error(
-      'SPORTS_APP_SYNC_SECRET is not set, so there would be nothing to check ' +
-        'requests against. Generate one and pass it in the environment:\n\n' +
-        '  SPORTS_APP_SYNC_SECRET="$(node -e \'console.log(require("node:crypto").randomBytes(32).toString("hex"))\')" \\\n' +
+      `${missing.join(', ')} not set, so there would be no way to tell callers apart.\n\n` +
+        'This service uses Ward, the estate\'s identity service. Issue an app key in\n' +
+        "Ward's console (the sports-app page, \"Service keys\") — it is shown once — then:\n\n" +
+        '  WARD_PUBLIC_ORIGIN=https://gandolh.ro \\\n' +
+        '  WARD_API_BASE_PATH=/ward-api \\\n' +
+        '  WARD_APP_KEY=wak_… \\\n' +
         '    npm run server\n\n' +
-        'See server/README.md. Never commit it.',
+        'See server/README.md. Never commit the key.',
     )
     return null
   }
@@ -781,7 +738,11 @@ export function main(env, out = console) {
   const log = config.quiet ? () => {} : (message) => out.log(`[state] ${message}`)
   const server = createStateServer({
     store,
-    secret: config.secret,
+    ward: createWardClient({
+      publicOrigin: config.wardPublicOrigin,
+      apiBasePath: config.wardApiBasePath,
+      appKey: config.wardAppKey,
+    }),
     maxBodyBytes: config.maxBodyBytes,
     log,
   })
