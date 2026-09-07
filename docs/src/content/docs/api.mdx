@@ -1,0 +1,109 @@
+---
+title: The four routes
+description: The whole wire contract — and the five things Fastify does helpfully by default that this service is not allowed to do.
+---
+
+The state service has **four routes, one table, and Fastify underneath**.
+Anything else is a `404`. No static files, no directory listing, no fallback
+handler.
+
+> A service whose only job is to hold documents has no business serving anything
+> else, and **every route that does not exist is a route that cannot be wrong.**
+
+It is served behind `handle_path /sports-app-api/*`, which strips the prefix, so
+the service keeps serving its own bare `/api/*` paths.
+
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/api/health` | Liveness. No auth, no database read, no information. |
+| `POST` | `/api/login` | `{ username, … }` → `{ username }`. |
+| `GET` | `/api/state?user=…` | That user's newest snapshot bytes, or `404`. |
+| `PUT` | `/api/state?user=…` | Validate shallowly, store verbatim, prune to the cap. |
+
+## Login checks nothing, and that is the design
+
+**The credential is never read.** Not hashed, not compared, not stored, not
+logged, not echoed. There is deliberately no expression anywhere in the handler
+that evaluates that field — it reads `username` and nothing else.
+
+That is a stronger guarantee than deleting the value afterwards would be,
+because it cannot be weakened by a later edit that forgets why. Read
+[Identity](/wiki/decisions-identity/) before changing anything in `login()`;
+"authentication is a nameplate, not a boundary" is the recorded call.
+
+The actual boundary is Ward.
+
+## What Ward changed
+
+The service used to hold **one shared secret in a header** — the same string for
+every caller, with `?user=` naming whose document was wanted.
+
+That secret authenticated the *installation*, never a person. Anyone holding it
+could read or write anyone's training history by changing a query parameter, and
+the file header said so plainly rather than pretending otherwise.
+
+Ward's session authenticates a **person**, and the subject it returns **is** the
+document key. So `?user=` stops being a target a caller chooses and becomes a
+value the server already knows. That is the whole security change, and it is the
+largest one in the repo's history.
+
+## The five things Fastify must not do
+
+Brief 22 replaced hand-rolled `node:http` routing with Fastify **without
+changing one byte of the REST contract** — same paths, methods, status codes,
+headers and bodies. The 73 tests in `server/__tests__/` are what make that claim
+checkable rather than hopeful: they were written against the wire, not the
+implementation.
+
+Five framework conveniences are switched off. Each is load-bearing and each is
+pinned by a test.
+
+1. **`GET /api/state` returns the stored bytes verbatim.** Fastify would parse
+   and re-serialise JSON for you, which destroys the codec's layout while
+   remaining "valid JSON". So the JSON body parser is replaced with one that
+   hands the handler the **raw string**, the stored document goes out as a
+   `Buffer`, and there is deliberately **no `response` schema on that route's
+   200** — a serialiser attached to it would rewrite the very bytes it exists to
+   preserve. The client's crash-safe save round-trips through a byte comparison,
+   so this is not cosmetic.
+2. **The credential check runs before any validation.** It is a route-level
+   `onRequest` hook — the earliest point in Fastify's lifecycle, ahead of body
+   parsing and ahead of schema validation. A wrong caller therefore gets a `401`
+   and never a `400` that would leak whether a username is even well-formed, or
+   that `/api/login` exists.
+3. **A `?user=` / document-`username` mismatch is a `400`, not a `409`,** and
+   stores nothing. It is a client bug, not a concurrent edit.
+4. **Usernames are rejected, never case-folded.** Folding would make the stream
+   key disagree with the document's own `username`, which is exactly what (3)
+   refuses. The rule lives in `shared/username.ts` and says why.
+5. **Paths match exactly.** `ignoreTrailingSlash` stays off and
+   `exposeHeadRoutes` is switched **off** — otherwise Fastify would helpfully add
+   `HEAD /api/state`, which today is a `405`.
+
+:::caution[And one more, the loudest]
+**Fastify logs requests by default.** `logger: false` turns the framework's
+logging off completely, so there is no logger for a request body to reach even
+in principle. The only log in the process is a callback called with fixed
+strings the caller composes.
+
+The test block is named "the password is never stored, logged, echoed, or
+compared".
+:::
+
+## Validation comes from one declaration
+
+The wire shapes are **TypeBox** declarations in `shared/api.ts`, so the same
+declaration that guards the service also types the client.
+
+A `Type.Object({...})` value *is* a JSON Schema object, so Fastify's AJV reads
+them directly with no adapter, and `Static<typeof X>` gives the TypeScript type
+from the same expression. Hand-written JSON Schema plus a separately maintained
+interface would recreate exactly the duplication `shared/` exists to delete.
+
+The two JSON **bodies** are checked with `TypeCompiler` rather than by Fastify,
+because they must stay raw strings (see 1 above) and a body schema would require
+Fastify to have parsed them first. **One declaration, two entry points into it —
+not two declarations.**
+
+The generated [wire contract reference](/reference/) is TypeDoc over that
+package.

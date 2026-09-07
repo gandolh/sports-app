@@ -1087,3 +1087,96 @@ infer — and it is exactly the claim that makes a history rewrite sound cheap.
 Second finding, same shape as the first: **this repository is public and is being pushed
 to by a parallel session.** Anything committed here is distributed within
 minutes and without a review step. That is worth knowing before the next import.
+
+## [2026-09-06] change | sports-app moves to Ward, and gains the per-user boundary it never had
+
+This is the app whose cutover changed the most, because it is the one that had the
+least. `SPORTS_APP_SYNC_SECRET`, the `x-sync-secret` header, `POST /api/login`,
+`?user=` and the client's login screen are all gone.
+
+**What was actually true before, restated because it is what changed.** The shared
+secret authenticated the *deployment*, never a person: one string for every caller,
+with `?user=` naming whose stream a request was about. **Anyone holding it could read
+or write anyone's training history by editing a query parameter.** The service said so
+in its own file header and `technical-decisions.md` called it "a nameplate, not a
+boundary" — honest, and correct for a personal deployment on loopback.
+
+**The stream key is now the session's subject.** That is the whole change. `?user=` is
+removed rather than kept-and-ignored, because a parameter that still exists looks like
+it still selects something, and `stateEndpoint` takes no username at all. A caller reads
+their own stream because it is the only one they can name — there is no target left to
+corrupt, which also deletes a whole class of bug the client used to defend against by
+percent-encoding a hand-editable name.
+
+**The document-versus-target check on `PUT` survived and is stronger.** It used to
+compare two client-supplied values, so it caught a confused client but could not catch a
+malicious one. One side is the session now, so it refuses a caller writing into somebody
+else's stream as well.
+
+**Three failures, three codes**, and the 503 is the one worth naming: a sync client that
+read "signed out" for an unreachable Ward would drop its session rather than retry.
+401 is no session, 403 is a live session with no `sports-app` grant — which prm's open
+registration makes an ordinary thing to receive here.
+
+**Offline: the claim narrowed honestly.** *Signing in* now needs the network, because it
+needs Ward, and `/login` became a hand-off rather than a form. The **app** still opens
+offline for an established session, which was the property that mattered. The cached
+username in `session.ts` is now explicitly a display cache rather than an identity — the
+service decides whose document a request touches and that value cannot influence it,
+which is a stronger statement than the old module could make.
+
+**One loose end, left deliberately.** `settings.sync.secret` is still in the document
+schema. Nothing sends it, the Settings field is gone, and the screen tells anyone with
+an old value that it is inert — but removing it is a schema version bump, and putting
+two irreversible migrations in one release is how a bad afternoon happens. The test
+that asserts the secret never travels is scoped to headers and the URL, and says in a
+comment that the body still carries it, rather than looking stronger than it is.
+
+1114 tests pass across server, client and shared; typecheck clean. Nothing has been run
+against a real browser or a deployed Ward.
+
+## [2026-09-06] done | A documentation site at `/sports-app/docs`
+
+`docs/` — Astro + Starlight, built by `npm run docs -w @sports-app/docs-site`,
+deployed at the estate's `/<project>/docs` convention.
+
+**Three authored pages**, plus the sixteen corpus pages rendered on every build:
+an orientation page, **the four routes** (with the five things Fastify does by
+default that this service is not allowed to do, each pinned by a test), and
+**state and sync** (offline-first as a structural property, whole-document
+snapshots rather than normalised tables, and why the snapshot cap is a
+correctness-of-scale limit rather than a tuning knob).
+
+**Reference is TypeDoc over `shared/`** — the TypeBox declarations that are
+simultaneously the AJV schema, the client's types and the service's guard. One
+declaration, two entry points into it.
+
+**One archify diagram**: the client, the state service, and what Ward changed —
+drawn so the dashed sync edge and the "device" boundary make the offline-first
+claim visible rather than asserted.
+
+**The docs are an instrument too.** `wiki/design-system.md`'s doctrine is
+enforced rather than quoted: `box-shadow: none` globally (shadow-on-white is
+named there as the most recognisable template look, and Starlight uses it by
+default on cards and the search box), no gradients, Archivo Variable rather than
+Inter, tabular numerals on every table, and **one theme, and it is light** — the
+toggle is removed rather than disabled. Doctrine 2 is honoured in prose as well
+as in numbers: nothing on the site uses colour to mark something as bad, and
+`--warn` is the only non-accent colour. One deliberate extension is stated in
+the stylesheet rather than smuggled in — the accent additionally carries links,
+because documentation needs them distinguishable.
+
+**A lint regression was caught and fixed rather than shipped.** `eslint .` at the
+root picked up the docs build output — Astro's type cache, TypeDoc's bundled
+viewer scripts, archify's artifacts — taking the repo from 6 errors to 393. Those
+are third-party build products, so they are now ignored by path; `docs/`'s own
+hand-written files are **not** ignored and do lint, joining the existing
+`scripts/**/*.mjs` Node-globals block rather than getting a new one. Back to the
+6-error baseline exactly.
+
+1114 tests pass, typecheck clean. `docs` added to the root `workspaces` array.
+
+**Pre-existing and untouched:** those 6 lint errors are unused imports left in
+`server/` by the Ward cutover — `createHash` and `timingSafeEqual` are no longer
+called now that the shared secret is gone, and `SECRET` is still referenced in a
+test. `npm run check` was already red before this change and still is.

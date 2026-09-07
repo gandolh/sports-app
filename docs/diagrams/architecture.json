@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "sports-app — the client, the state service, and what Ward changed",
+    "viewBox": [
+      1120,
+      760
+    ],
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "offline",
+        "label": "Offline is the normal case",
+        "focus": [
+          "phone",
+          "client",
+          "local"
+        ],
+        "note": "Everything the app does happens against local state; the service is somewhere to put a copy."
+      },
+      {
+        "id": "sync",
+        "label": "Sync, when there is a network",
+        "focus": [
+          "client",
+          "caddy",
+          "service",
+          "db"
+        ],
+        "note": "One document per user, stored verbatim, pruned to a fixed cap."
+      },
+      {
+        "id": "identity",
+        "label": "What Ward replaced",
+        "focus": [
+          "ward",
+          "service"
+        ],
+        "note": "The subject is the document key, so ?user= stopped being a target a caller picks."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "phone",
+      "type": "external",
+      "label": "Phone on the floor",
+      "sublabel": "installed PWA",
+      "pos": [
+        20,
+        350
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "client",
+      "type": "frontend",
+      "label": "client/",
+      "sublabel": "React + Vite",
+      "tag": "works offline",
+      "pos": [
+        300,
+        350
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "local",
+      "type": "database",
+      "label": "Local state",
+      "sublabel": "the authoritative copy",
+      "pos": [
+        300,
+        590
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "caddy",
+      "type": "cloud",
+      "label": "Caddy",
+      "sublabel": "gandolh.ro :443",
+      "pos": [
+        600,
+        350
+      ],
+      "size": [
+        140,
+        60
+      ]
+    },
+    {
+      "id": "service",
+      "type": "backend",
+      "label": "server/",
+      "sublabel": "Fastify, four routes",
+      "tag": "logger: false",
+      "pos": [
+        880,
+        350
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "ward",
+      "type": "security",
+      "label": "Ward",
+      "sublabel": "subject = document key",
+      "pos": [
+        880,
+        130
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "SQLite",
+      "sublabel": "whole-document snapshots",
+      "tag": "capped per user",
+      "pos": [
+        880,
+        590
+      ],
+      "size": [
+        170,
+        60
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "One origin — sub-paths, no subdomains",
+      "wraps": [
+        "caddy",
+        "service",
+        "ward",
+        "db"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "the device — fully usable alone",
+      "wraps": [
+        "client",
+        "local"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "p-c",
+      "from": "phone",
+      "to": "client",
+      "label": "twelve minutes",
+      "variant": "emphasis"
+    },
+    {
+      "id": "c-local",
+      "from": "client",
+      "to": "local",
+      "label": "read + crash-safe save",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        380,
+        470
+      ]
+    },
+    {
+      "id": "c-caddy",
+      "from": "client",
+      "to": "caddy",
+      "label": "sync, when online",
+      "variant": "dashed"
+    },
+    {
+      "id": "caddy-svc",
+      "from": "caddy",
+      "to": "service",
+      "label": "/sports-app-api"
+    },
+    {
+      "id": "svc-ward",
+      "from": "service",
+      "to": "ward",
+      "label": "verify + introspect",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "svc-db",
+      "from": "service",
+      "to": "db",
+      "label": "store verbatim, prune",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        965,
+        470
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Offline-first is structural",
+      "items": [
+        "The client owns the state; the service is somewhere to put a copy",
+        "With the service unreachable the app does not degrade, it just does not sync",
+        "A change that makes a screen wait on the network breaks the product's promise"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Whole documents, not tables",
+      "items": [
+        "One JSON snapshot row per save, one stream per user",
+        "Recovery is a single sqlite3 SELECT with no application code running",
+        "Bytes are preserved exactly — which is why GET has no response schema"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "What Ward closed",
+      "items": [
+        "One shared secret used to authenticate the INSTALLATION, not a person",
+        "Anyone holding it could read any history by editing ?user=",
+        "The session's subject is now the key, so the target is not caller-chosen"
+      ]
+    }
+  ]
+}

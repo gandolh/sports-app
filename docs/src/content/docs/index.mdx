@@ -1,0 +1,71 @@
+---
+title: sports-app
+description: A zero-equipment calisthenics trainer, installed as an offline-first PWA. It measures nothing, and that is the governing design decision.
+tableOfContents: false
+---
+
+import Diagram from '../../components/Diagram.astro'
+
+**sports-app** is a zero-equipment calisthenics trainer, installed as an
+offline-first PWA. You open it, it already knows what today's session is, you
+pick how hard a day you are having, and you work through the exercises one page
+at a time tapping Next. It takes about twelve minutes. It never asks you
+anything else.
+
+<dl class="doc-facts">
+  <dt>Runs at</dt>
+  <dd><code>/sports-app</code> (client) and <code>/sports-app-api</code> (state service)</dd>
+  <dt>Made of</dt>
+  <dd>Three workspaces — <code>client/</code>, <code>server/</code>, <code>shared/</code></dd>
+  <dt>The service is</dt>
+  <dd>Four routes, one table, Fastify underneath</dd>
+  <dt>Identity</dt>
+  <dd>Ward — the session's subject <em>is</em> the document key</dd>
+  <dt>Measures</dt>
+  <dd>Nothing</dd>
+</dl>
+
+## The app measures nothing
+
+There is no counter, no completion signal, and no adaptation. The prescription
+grows on a **fixed schedule** — roughly one ladder rung every six weeks — and
+pressing Next means only that you are ready for the next thing.
+
+That is the governing design decision, and it is what makes everything else
+small. An app that measured would need a model of you, a way to be wrong about
+you, and a way to tell you it had changed its mind. This one needs a calendar.
+
+:::note[`SPEC.md` is partly superseded]
+The v1 design document describes the adaptive engine this app no longer has.
+Where it disagrees with the corpus, **the corpus wins** until SPEC.md is revised.
+:::
+
+## The constraints that shaped everything
+
+- **Zero equipment, no purchases.** A hard constraint, reaffirmed three times.
+  Its consequence is stated openly rather than hidden: the app cannot train
+  pulling *strength*, only scapular retraction and upper-back endurance.
+- **Sweaty hands, phone on the floor.** Mid-workout every tap is expensive. This
+  is why the numerals are oversized and why nothing on any screen reads the
+  clock.
+- **One user, then two.** v2 added weak multi-user support so a second person can
+  train on the same deployment. The product is still shaped by one person's
+  constraints, not by a market.
+
+<Diagram
+  name="architecture"
+  title="sports-app — the client, the state service, and what Ward changed"
+  caption="Read the dashed line first: the client is fully usable with the service unreachable, and sync is a convenience rather than a dependency"
+  height={800}
+/>
+
+## Where to go next
+
+| If you want to | Read |
+|---|---|
+| Understand the shape | [Overview](/wiki/overview/) · [Architecture](/wiki/architecture/) |
+| Call the service | [The four routes](/api/) |
+| Understand offline and sync | [State and sync](/state/) |
+| Know what the training actually is | [The programme](/wiki/programme/) · [Training science](/wiki/training-science/) |
+| Touch anything visual | [Design system](/wiki/design-system/) · [Guardrails](/wiki/design-guardrails/) |
+| Know why login checks nothing | [Identity](/wiki/decisions-identity/) |

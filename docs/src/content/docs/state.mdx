@@ -1,0 +1,84 @@
+---
+title: State and sync
+description: One document holds everything, snapshots are whole rather than normalised, and the client works entirely without the service — sync is a convenience, not a dependency.
+---
+
+The app is **offline-first**, and that is not a feature bolted on. The client
+owns the state; the service is somewhere to put a copy.
+
+## The client works with the service unreachable
+
+Everything the app does — knowing today's session, showing the ladder, advancing
+a rung — happens against local state. If the state service is down, the app does
+not degrade; it simply does not sync.
+
+That ordering matters for anyone changing `client/src/persistence/`: a change
+that makes a screen wait on the network has broken the product's central
+promise, not just its latency.
+
+## One document, stored verbatim
+
+The service holds **whole-document JSON snapshot rows, one stream per user** —
+not normalised tables.
+
+The reason is that the document is authoritative. Normalising it would create a
+second representation of the same facts, and every write would then have to keep
+two things in agreement. Instead the row is the document, byte for byte:
+
+```sh
+sqlite3 db/app.db \
+  "SELECT doc_json FROM snapshots WHERE username = 'alice' ORDER BY id DESC LIMIT 1"
+```
+
+That command is the whole recovery story, and it works with no application code
+running.
+
+:::note[If querying ever matters, derive — do not replace]
+The recorded call is explicit: should tables ever be wanted for querying, derive
+them *from* the snapshots rather than replacing the snapshots with them.
+:::
+
+**Byte-preservation is why `GET /api/state` has no response schema.** A
+serialiser would rewrite the layout the codec produced. The client's crash-safe
+save round-trips through a byte comparison, so a "harmless" re-serialisation
+would fail it. See [the four routes](/api/#the-five-things-fastify-must-not-do).
+
+## The snapshot cap is a correctness limit, not a tuning knob
+
+Only a fixed number of snapshots are kept **per username**, and the reasoning is
+arithmetic rather than taste.
+
+Every snapshot embeds the **entire** history, so snapshot size grows linearly
+with sessions completed — and total storage grows as sessions × snapshots kept.
+At three years of daily training one snapshot is roughly a megabyte:
+
+| Snapshots kept | Storage per person |
+|---|---|
+| 20 | ~20 MB — fine |
+| 1000 | multiple gigabytes — the story |
+
+The cap exists so that the second row never happens. **Raising it is a real
+capacity decision**, not a config tweak.
+
+## Usernames are rejected, never folded
+
+`shared/username.ts` owns the rule, including why the first character is
+constrained and why the cap is 32.
+
+Case-folding is refused deliberately: the stream key must agree with the
+document's own `username` field, and folding would make them disagree — which is
+exactly the mismatch the service answers `400` for. Rejecting is the only
+outcome that keeps the two definitionally equal.
+
+## The subject is the key
+
+Since the Ward cutover, the document key is **the session's subject**, not a
+value the caller chooses.
+
+`?user=` remains in the URL as part of the wire contract — the whole point of
+brief 22 was that moving to Fastify changed no bytes — but the server checks it
+against the session rather than trusting it. A mismatch is a `400`.
+
+Before that, one shared secret authenticated the *installation* and `?user=`
+chose the target, so anyone holding it could read anyone's training history by
+editing a query parameter. That is the hole Ward closed.

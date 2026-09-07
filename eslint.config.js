@@ -27,7 +27,25 @@ import reactHooks from 'eslint-plugin-react-hooks'
 export default tseslint.config(
   // `**/` prefixes rather than bare `dist/`: build output now lives inside a
   // workspace (`client/dist`, `client/dev-dist`) rather than at the root.
-  { ignores: ['**/dist/', '**/dev-dist/', '**/coverage/', '**/node_modules/'] },
+  //
+  // The `docs/` entries are all GENERATED, and all of them are third-party
+  // output rather than anything this repo wrote: Astro's type cache, TypeDoc's
+  // bundled viewer scripts, and archify's self-contained diagram artifacts.
+  // Linting them added 387 errors to a 6-error baseline and told us nothing —
+  // they are build products that happen to be committed or cached, not source.
+  // `docs/`'s own hand-written files (astro.config.mjs, scripts/) are NOT
+  // ignored and do lint.
+  {
+    ignores: [
+      '**/dist/',
+      '**/dev-dist/',
+      '**/coverage/',
+      '**/node_modules/',
+      'docs/.astro/',
+      'docs/public/reference/',
+      'docs/public/diagrams/',
+    ],
+  },
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -245,8 +263,13 @@ export default tseslint.config(
   // reaching for, and would make the service's globals list stop describing the
   // service.
   // ---------------------------------------------------------------------------
+  //
+  // `docs/` joins this block rather than getting one of its own: its two build
+  // scripts and its Astro config are exactly the same shape — one-shot generators
+  // that read an env var, write files and log. `astro.config.mjs` is included by
+  // name because it reads `process.env.DOCS_BASE` and nothing else.
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'docs/scripts/**/*.mjs', 'docs/astro.config.mjs'],
     languageOptions: {
       globals: { process: 'readonly', console: 'readonly' },
     },
