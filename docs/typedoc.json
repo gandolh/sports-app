@@ -1,0 +1,11 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["../shared/api.ts", "../shared/types.ts", "../shared/username.ts"],
+  "tsconfig": "../shared/tsconfig.json",
+  "out": "public/reference",
+  "name": "@sports-app/shared — the wire contract",
+  "hideGenerator": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "sort": ["source-order"]
+}
