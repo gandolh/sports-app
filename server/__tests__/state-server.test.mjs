@@ -49,19 +49,16 @@ import {
 } from '../db.mjs'
 import { USERNAME_MAX_LENGTH } from '@sports-app/shared/username.ts'
 import {
-  LOGIN_PATH,
-  SECRET_HEADER,
   STATE_PATH,
-  USER_PARAM,
-  checkCredentials,
   checkDocument,
   createStateServer,
   readConfig,
-  readUsername,
-  secretMatches,
 } from '../state-server.mjs'
+import { createFakeWard, sessionFor, WardUnavailableError } from './fake-ward.mjs'
 
-const SECRET = 'test-secret-not-a-real-one'
+/** The default signed-in identity for tests that only need one person. */
+const SUBJECT = 'alice'
+const SESSION_COOKIE = sessionFor(SUBJECT)
 
 // ─── Harness ────────────────────────────────────────────────────────────────
 
@@ -85,9 +82,10 @@ async function startService(options = {}) {
 
   /** Every log line the service emitted, for the "nothing leaked" assertions. */
   const logs = []
+  const ward = options.ward ?? createFakeWard()
   const server = createStateServer({
     store,
-    secret: SECRET,
+    ward,
     log: (message) => logs.push(message),
     ...(options.maxBodyBytes ? { maxBodyBytes: options.maxBodyBytes } : {}),
   })
@@ -102,11 +100,12 @@ async function startService(options = {}) {
     rmSync(root, { recursive: true, force: true })
   })
 
-  return { root, file, dbDir: dirname(file), store, base, logs }
+  return { root, file, dbDir: dirname(file), store, base, logs, ward }
 }
 
+/** Headers for a signed-in request. */
 function authorised(extra = {}) {
-  return { [SECRET_HEADER]: SECRET, ...extra }
+  return { cookie: SESSION_COOKIE, ...extra }
 }
 
 /**
@@ -186,30 +185,32 @@ async function startServiceProcess() {
   }
 }
 
-function stateUrl(base, username) {
-  return username === undefined
-    ? `${base}${STATE_PATH}`
-    : `${base}${STATE_PATH}?${USER_PARAM}=${encodeURIComponent(username)}`
+/**
+ * The state URL. It takes no target any more — the stream is the session's.
+ *
+ * `username` is still a parameter of `put`/`get` below, but it now selects
+ * **whose session to present** rather than which stream to ask for. That is the
+ * cutover in one line: the same tests, asking the same questions, with the name
+ * moved from the URL to the cookie.
+ */
+function stateUrl(base) {
+  return `${base}${STATE_PATH}`
 }
 
 async function put(base, username, text, headers = {}) {
-  return fetch(stateUrl(base, username), {
+  return fetch(stateUrl(base), {
     method: 'PUT',
-    headers: authorised({ 'Content-Type': 'application/json', ...headers }),
+    headers: {
+      cookie: sessionFor(username ?? SUBJECT),
+      'Content-Type': 'application/json',
+      ...headers,
+    },
     body: text,
   })
 }
 
 async function get(base, username) {
-  return fetch(stateUrl(base, username), { headers: authorised() })
-}
-
-async function login(base, body, headers = {}) {
-  return fetch(`${base}${LOGIN_PATH}`, {
-    method: 'POST',
-    headers: authorised({ 'Content-Type': 'application/json', ...headers }),
-    body: typeof body === 'string' ? body : JSON.stringify(body),
-  })
+  return fetch(stateUrl(base), { headers: { cookie: sessionFor(username ?? SUBJECT) } })
 }
 
 /**
@@ -275,124 +276,114 @@ describe('database location', () => {
 
 // ─── The deployment secret ──────────────────────────────────────────────────
 
-describe('the shared secret protects the deployment, not the accounts', () => {
-  it('rejects a missing secret with 401', async () => {
+describe('the session identifies a PERSON, which the shared secret never did', () => {
+  /*
+   * This block replaces "the shared secret protects the deployment, not the
+   * accounts", and the change in its title is the change in the app.
+   *
+   * The old secret authenticated the *installation*: one string for every
+   * caller, with `?user=` naming whose document was wanted. Anyone holding it
+   * could read or write anyone's training history by editing a query
+   * parameter, and the service said so in its own header rather than
+   * pretending otherwise. Ward's session authenticates a person, and the
+   * subject it returns is the stream key — so there is no target left to
+   * choose.
+   */
+
+  it('rejects a request with no session at all', async () => {
     const { base } = await startService()
-    expect((await fetch(stateUrl(base, 'alice'))).status).toBe(401)
+    const res = await fetch(`${base}${STATE_PATH}`)
+    expect(res.status).toBe(401)
+    expect(await res.json()).toEqual({ error: 'unauthorized' })
   })
 
-  it('rejects a wrong secret with 401', async () => {
+  it('rejects a session it does not recognise', async () => {
     const { base } = await startService()
-    const response = await fetch(stateUrl(base, 'alice'), {
-      headers: { [SECRET_HEADER]: 'not-the-secret' },
+    const res = await fetch(`${base}${STATE_PATH}`, {
+      headers: { cookie: 'ward_session=not-a-real-session' },
     })
-    expect(response.status).toBe(401)
-  })
-
-  it('rejects a wrong secret that happens to be the right length', async () => {
-    const { base } = await startService()
-    const sameLength = 'x'.repeat(SECRET.length)
-    expect(sameLength.length).toBe(SECRET.length)
-    const response = await fetch(stateUrl(base, 'alice'), {
-      headers: { [SECRET_HEADER]: sameLength },
-    })
-    expect(response.status).toBe(401)
+    expect(res.status).toBe(401)
   })
 
   it('rejects an unauthorised PUT without writing anything', async () => {
     const { base, store } = await startService()
-    const response = await fetch(stateUrl(base, 'alice'), {
+    const res = await fetch(`${base}${STATE_PATH}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: docText('alice', 1),
+      body: docText(SUBJECT, 1),
     })
-    expect(response.status).toBe(401)
-    expect(store.count()).toBe(0)
-  })
-
-  it('guards /api/login too, and answers 401 before it validates anything', async () => {
-    const { base, logs } = await startService()
-    const response = await fetch(`${base}${LOGIN_PATH}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'NOT A VALID NAME', password: 'x' }),
-    })
-    // 401, not 400: an unauthorised caller learns nothing about the username
-    // rules, and nothing about whether this route exists.
-    expect(response.status).toBe(401)
-    expect((await response.json()).error).toBe('unauthorized')
-    expect(logs.join('\n')).not.toMatch(/username: expected/)
+    expect(res.status).toBe(401)
+    expect(store.latest(SUBJECT)).toBeNull()
   })
 
   it('answers 401 before it validates anything, on every guarded route', async () => {
-    // The ordering, stated as a property rather than as a code reading: every
-    // request below is wrong in a *second* way that a service validating first
-    // would have to report instead — an invalid username, a missing one, an
-    // unacceptable media type, an unparseable body. Each must still be a 401, or
-    // an unauthorised caller can use 400-vs-401 as an oracle for the username
-    // rules and for which routes exist.
-    const { base, store, logs } = await startService()
-    const wrong = { [SECRET_HEADER]: 'not-the-secret' }
-
-    const invalidTarget = await fetch(`${base}${STATE_PATH}?${USER_PARAM}=NOT%20A%20NAME`, {
-      headers: wrong,
-    })
-    expect(invalidTarget.status).toBe(401)
-    expect((await invalidTarget.json()).error).toBe('unauthorized')
-
-    const noTarget = await fetch(`${base}${STATE_PATH}`, { headers: wrong })
-    expect(noTarget.status).toBe(401)
-
-    const badEverything = await fetch(stateUrl(base, 'Alice'), {
+    const { base } = await startService()
+    // A body that would fail validation loudly if it were ever reached.
+    const res = await fetch(`${base}${STATE_PATH}`, {
       method: 'PUT',
-      headers: { ...wrong, 'Content-Type': 'text/plain' },
+      headers: { 'Content-Type': 'application/json' },
       body: 'not json at all',
     })
-    expect(badEverything.status).toBe(401)
-    expect(store.count()).toBe(0)
+    expect(res.status).toBe(401)
+  })
 
-    const badLogin = await fetch(`${base}${LOGIN_PATH}`, {
-      method: 'POST',
-      headers: { ...wrong, 'Content-Type': 'text/plain' },
-      body: 'not json at all',
+  /**
+   * The assertion this whole cutover exists for.
+   *
+   * Two people, two sessions, one service. Neither can name the other's stream
+   * because neither names a stream at all — the subject comes from the cookie.
+   */
+  it('gives each session its own stream, with no way to name another', async () => {
+    const { base, store } = await startService()
+
+    expect((await put(base, 'alice', docText('alice', 1))).status).toBe(200)
+    expect((await put(base, 'bob', docText('bob', 4))).status).toBe(200)
+
+    // Alice's GET returns Alice's document, and there is no parameter she could
+    // add to ask for Bob's.
+    const mine = await get(base, 'alice')
+    expect(JSON.parse(await mine.text()).username).toBe('alice')
+    expect(store.latest('bob')).not.toBeNull()
+  })
+
+  /**
+   * A `?user=` that would once have chosen the target is now inert. Worth
+   * asserting rather than assuming: this is the exact parameter that used to be
+   * the whole authorisation model.
+   */
+  it('ignores a ?user= that names somebody else', async () => {
+    const { base } = await startService()
+    await put(base, 'bob', docText('bob', 3))
+
+    const res = await fetch(`${base}${STATE_PATH}?user=bob`, {
+      headers: { cookie: sessionFor('alice') },
     })
-    expect(badLogin.status).toBe(401)
-
-    // A wrong *method* on a guarded route is a 401 before it is a 405, for the
-    // same reason: a 405 with an `Allow` header would tell an unauthorised caller
-    // that the route exists and what it accepts.
-    expect((await fetch(`${base}${LOGIN_PATH}`, { headers: wrong })).status).toBe(401)
-    const deleted = await fetch(stateUrl(base, 'alice'), { method: 'DELETE', headers: wrong })
-    expect(deleted.status).toBe(401)
-    expect(deleted.headers.get('allow')).toBe(null)
-
-    // `/api/health` is the deliberate exception. Liveness needs no credential, so
-    // its 405 is available to anybody — there is nothing there to know about.
-    expect((await fetch(`${base}/api/health`, { method: 'POST' })).status).toBe(405)
-
-    // And nothing about the rules, the media type or the body was written down on
-    // the way to any of those answers.
-    expect(logs.join('\n')).not.toMatch(/expected/)
-    expect(logs.join('\n')).not.toContain('not json at all')
+    // Alice has stored nothing, so she gets her own 404 — not Bob's document.
+    // The parameter that used to be the entire authorisation model is inert.
+    expect(res.status).toBe(404)
   })
 
-  it('compares secrets in a way that accepts only the exact string', () => {
-    expect(secretMatches('abc', 'abc')).toBe(true)
-    expect(secretMatches('abc', 'abd')).toBe(false)
-    expect(secretMatches('ab', 'abc')).toBe(false)
-    expect(secretMatches('abcd', 'abc')).toBe(false)
-    expect(secretMatches(undefined, 'abc')).toBe(false)
-    expect(secretMatches(['abc'], 'abc')).toBe(false)
+  /**
+   * Ward being unreachable must not read as "signed out". A sync client that
+   * saw 401 would drop its session; 503 tells it to retry.
+   */
+  it('answers 503, not 401, when Ward cannot be reached', async () => {
+    const ward = createFakeWard()
+    ward.breakWith(new WardUnavailableError('ward is down'))
+    const { base } = await startService({ ward })
+
+    const res = await fetch(`${base}${STATE_PATH}`, { headers: authorised() })
+    expect(res.status).toBe(503)
+    expect(await res.json()).toEqual({ error: 'identity service unavailable' })
   })
 
-  it('refuses to construct without a secret', () => {
-    expect(() =>
-      createStateServer({ store: openSnapshotStore({ file: ':memory:' }), secret: '' }),
-    ).toThrow(/non-empty shared secret/)
+  it('refuses to construct without a Ward client', () => {
+    expect(() => createStateServer({ store: openSnapshotStore({ file: ':memory:' }) })).toThrow(
+      /requires a Ward client/,
+    )
   })
 })
 
-// ─── /api/health ────────────────────────────────────────────────────────────
 
 describe('GET /api/health', () => {
   it('answers with no secret at all', async () => {
@@ -449,373 +440,76 @@ describe('GET /api/health', () => {
 
 // ─── POST /api/login ────────────────────────────────────────────────────────
 
-describe('POST /api/login checks nothing, on purpose', () => {
-  it('accepts a username and any password, and answers with the username', async () => {
-    const { base } = await startService()
-    const response = await login(base, { username: 'alice', password: 'anything at all' })
-    expect(response.status).toBe(200)
-    // Exactly the username back. No token, no session id, no cookie, no expiry —
-    // there is no session to represent, and inventing one would imply a boundary
-    // that does not exist.
-    expect(await response.json()).toEqual({ username: 'alice' })
-    expect(response.headers.get('set-cookie')).toBe(null)
-  })
-
-  it('accepts two different passwords for the same username, identically', async () => {
-    const { base } = await startService()
-    const first = await login(base, { username: 'alice', password: 'hunter2' })
-    const second = await login(base, { username: 'alice', password: 'completely-different' })
-    expect(first.status).toBe(200)
-    expect(second.status).toBe(200)
-    // The second login is not a failed one. Nothing was remembered from the
-    // first, so there is nothing for the second to disagree with.
-    expect(await second.json()).toEqual({ username: 'alice' })
-  })
-
-  it('accepts a body with no password field at all', async () => {
-    const { base } = await startService()
-    // Not an oversight in the test: there is nothing to check, so a missing
-    // password cannot be missing *something*.
-    const response = await login(base, { username: 'alice' })
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ username: 'alice' })
-  })
-
-  it('writes nothing — an account exists once a document is stored under it', async () => {
-    const { base, store } = await startService()
-    await login(base, { username: 'alice', password: 'x' })
-    expect(store.count()).toBe(0)
-    expect(store.usernames()).toEqual([])
-    // And logging in does not conjure a document to read.
-    expect((await get(base, 'alice')).status).toBe(404)
-  })
-
-  it('does not tell you whether the account has any history', async () => {
-    const { base } = await startService()
-    await put(base, 'alice', docText('alice', 3))
-
-    const known = await login(base, { username: 'alice', password: 'x' })
-    const unknown = await login(base, { username: 'nobody', password: 'x' })
-
-    expect(known.status).toBe(unknown.status)
-    expect(await known.json()).toEqual({ username: 'alice' })
-    expect(await unknown.json()).toEqual({ username: 'nobody' })
-  })
-
-  it('rejects an invalid username with 400 and states the rule without echoing the value', async () => {
-    const { base } = await startService()
-    for (const username of ['', 'Alice', 'x'.repeat(USERNAME_MAX_LENGTH + 1), '../etc', 'a b']) {
-      const response = await login(base, { username, password: 'x' })
-      expect(response.status, username).toBe(400)
-      const { error } = await response.json()
-      expect(error).toMatch(/username: expected/)
-      if (username !== '') expect(error).not.toContain(username)
-    }
-  })
-
-  it('rejects the wrong method and the wrong content type', async () => {
-    const { base } = await startService()
-
-    const wrongMethod = await fetch(`${base}${LOGIN_PATH}`, { headers: authorised() })
-    expect(wrongMethod.status).toBe(405)
-    expect(wrongMethod.headers.get('allow')).toBe('POST')
-
-    const wrongType = await login(base, { username: 'alice' }, { 'Content-Type': 'text/plain' })
-    expect(wrongType.status).toBe(415)
-  })
-
-  it('reports the credential check directly', () => {
-    expect(checkCredentials('{"username":"alice","password":"x"}')).toEqual({
-      ok: true,
-      username: 'alice',
-    })
-    expect(checkCredentials('{"username":"alice"}')).toEqual({ ok: true, username: 'alice' })
-    expect(checkCredentials('[]')).toMatchObject({ ok: false })
-    expect(checkCredentials('nope')).toMatchObject({ ok: false })
-    expect(checkCredentials('{"username":"Alice"}')).toMatchObject({ ok: false })
-  })
-})
-
-// ─── The password never lands anywhere ──────────────────────────────────────
-
-describe('the password is never stored, logged, echoed, or compared', () => {
-  /**
-   * A string that could not plausibly occur in the database or the log for any
-   * other reason. If it turns up, it got there from the request body.
+describe('there is no login route any more', () => {
+  /*
+   * `POST /api/login` never authenticated anybody: it validated a username and
+   * echoed it back so a login screen had something to fail against. Signing in
+   * is Ward's now, so the route is gone rather than reimplemented — and with it
+   * the whole "the password is never stored, logged, echoed, or compared"
+   * block, which asserted a property of a body this service no longer receives.
+   *
+   * That property has not been weakened, it has moved: no password reaches this
+   * process at all, which is a stronger guarantee than never writing one down.
    */
-  const SENTINEL = 'PASSWORD-SENTINEL-8f3a1c-do-not-store-me'
 
-  /** Every byte of every file the store owns: the database, its WAL, its shm. */
-  function databaseBytes(dbDir) {
-    return readdirSync(dbDir)
-      .map((name) => readFileSync(join(dbDir, name)))
-      .map((buffer) => buffer.toString('binary'))
-      .join('\n')
-  }
-
-  it('does not appear in the database files, the log, or the response', async () => {
-    const { base, dbDir, logs, store } = await startService()
-
-    const response = await login(base, { username: 'alice', password: SENTINEL })
-    expect(response.status).toBe(200)
-    const bodyText = await response.text()
-
-    // Force real writes after the login, so the search is over a database that
-    // has actually been flushed rather than one that never wrote a page.
-    await put(base, 'alice', docText('alice', 1))
-    await put(base, 'alice', docText('alice', 2))
-    expect(store.count('alice')).toBe(2)
-
-    // 1. Not in the response the client got back.
-    expect(bodyText).not.toContain(SENTINEL)
-    expect(JSON.parse(bodyText)).toEqual({ username: 'alice' })
-
-    // 2. Not in anything the service logged.
-    expect(logs.join('\n')).not.toContain(SENTINEL)
-    // The login *was* logged, so the assertion above is not vacuous — a service
-    // that logged nothing at all would pass it for the wrong reason.
-    expect(logs.join('\n')).toMatch(/login alice/)
-
-    // 3. Not in the database, its write-ahead log, or its shared-memory file.
-    //    Searched as raw bytes rather than through SQL, because a password could
-    //    have landed in a page SQL no longer references.
-    const onDisk = databaseBytes(dbDir)
-    expect(onDisk).not.toContain(SENTINEL)
-    // Again, not vacuous: the document the same test stored *is* findable there.
-    expect(onDisk).toContain('"username": "alice"')
-  })
-
-  it('survives the database being closed and reopened without the password appearing', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'sports-app-pw-'))
-    const dbDir = join(root, 'db')
-    const file = join(dbDir, 'app.db')
-    const store = openSnapshotStore({ file })
-    const logs = []
-    const server = createStateServer({ store, secret: SECRET, log: (m) => logs.push(m) })
-    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
-    const base = `http://127.0.0.1:${server.address().port}`
-
-    try {
-      await login(base, { username: 'alice', password: SENTINEL })
-      await put(base, 'alice', docText('alice', 1))
-    } finally {
-      await new Promise((resolve) => server.close(resolve))
-      // Closing checkpoints the WAL into the main database file, which is the
-      // state a backup or a `sqlite3` session would see.
-      store.close()
-    }
-
-    expect(databaseBytes(dbDir)).not.toContain(SENTINEL)
-    expect(logs.join('\n')).not.toContain(SENTINEL)
-    rmSync(root, { recursive: true, force: true })
-  })
-
-  it('does not leak the body through a JSON parse error', async () => {
-    const { base, logs } = await startService()
-
-    // A truncated body — the shape a broken client actually sends. V8's
-    // `JSON.parse` message quotes a slice of the input, so passing it through
-    // would put part of a real password into the response and the log.
-    const truncated = `{"username":"alice","password":"${SENTINEL}"`
-    const response = await login(base, truncated)
-
-    expect(response.status).toBe(400)
-    const text = await response.text()
-    expect(text).not.toContain(SENTINEL)
-    expect(logs.join('\n')).not.toContain(SENTINEL)
-
-    // Proof the sentinel really was in the request: the same bytes are what a
-    // naive `JSON.parse` error message would have quoted.
-    let parseMessage = ''
-    try {
-      JSON.parse(truncated)
-    } catch (cause) {
-      parseMessage = String(cause)
-    }
-    expect(parseMessage).not.toBe('')
-  })
-
-  it('does not echo an oversized login body back in the 413', async () => {
-    const { base, logs } = await startService({ maxBodyBytes: 256 })
-    const padded = JSON.stringify({ username: 'alice', password: `${SENTINEL}${'x'.repeat(4000)}` })
-    const response = await login(base, padded)
-    expect(response.status).toBe(413)
-    expect(await response.text()).not.toContain(SENTINEL)
-    expect(logs.join('\n')).not.toContain(SENTINEL)
-  })
-
-  it('never reaches the real process\u2019s stdout or stderr, at the file-descriptor level', async () => {
-    // The migration risk this test exists for: **Fastify logs every request by
-    // default.** `logger: false` is what switches that off, and this is what
-    // notices if it is ever switched back on — in the real process, over real
-    // pipes, because pino bypasses `process.stdout.write` entirely.
-    const service = await startServiceProcess()
-
-    const response = await fetch(`${service.base}${LOGIN_PATH}`, {
+  it('answers 404 for the old login path, without consulting the session', async () => {
+    const { base } = await startService()
+    const res = await fetch(`${base}/api/login`, {
       method: 'POST',
-      headers: authorised({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ username: 'alice', password: SENTINEL }),
+      headers: { ...authorised(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'alice', password: 'hunter2' }),
     })
-    expect(response.status).toBe(200)
-    expect(await response.text()).not.toContain(SENTINEL)
-
-    // Two writes, so the database has actually been flushed rather than never
-    // having written a page.
-    expect((await put(service.base, 'alice', docText('alice', 1))).status).toBe(200)
-    expect((await put(service.base, 'alice', docText('alice', 2))).status).toBe(200)
-
-    // SIGTERM, which checkpoints the WAL into the main file on the way out.
-    await service.stop()
-    const printed = service.output()
-
-    // 1. The credential is not in anything the process printed.
-    expect(printed).not.toContain(SENTINEL)
-
-    // 2. Nor is any request line at all. This is the assertion with teeth against
-    //    a re-enabled framework logger: Fastify's request log does not include the
-    //    body, so it would not print the sentinel — it would print one line per
-    //    request, naming the route. This service says nothing about a request it
-    //    served successfully beyond the receipt below.
-    expect(printed).not.toMatch(/api\/(login|state)/)
-    expect(printed).not.toMatch(/x-sync-secret/i)
-    expect(printed).not.toMatch(/incoming request|request completed|"reqId"/)
-
-    // 3. Positive controls: the process really is wired to these streams, really
-    //    did serve those requests, and really does log about them — through the
-    //    one log it has, which is only ever handed fixed strings.
-    expect(printed).toMatch(/listening on http/)
-    expect(printed).toMatch(/login alice/)
-    expect(printed).toMatch(/stored snapshot 2 for alice/)
-
-    // 4. And not in the database, its write-ahead log, or its shared-memory file,
-    //    as written by the real process rather than by an in-test store.
-    const onDisk = databaseBytes(service.dbDir)
-    expect(onDisk).not.toContain(SENTINEL)
-    // Again, not vacuous: the documents the same requests stored *are* findable.
-    expect(onDisk).toContain('"username": "alice"')
+    // Not 401 and not 405: the path does not exist, and a signed-in caller
+    // learns exactly that.
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error: 'not found' })
   })
 
-  it('has no line of code that reads .password', () => {
-    // The guarantee this brief is built on, asserted against the source rather
-    // than against behaviour: the handler destructures `username` and nothing
-    // else. Behavioural tests can only show that the password did not reach a
-    // particular place; this shows it is never read at all.
-    const source = readFileSync(join(PROJECT_ROOT, 'server', 'state-server.mjs'), 'utf8')
-    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-    expect(code).not.toMatch(/\.password\b/)
-    expect(code).not.toMatch(/\[['"]password['"]\]/)
-    expect(code).not.toMatch(/\bpassword\s*[,}]/)
+  it('never sees a password, so none can reach the log or the database', async () => {
+    const { base, logs, file } = await startService()
+    await fetch(`${base}/api/login`, {
+      method: 'POST',
+      headers: { ...authorised(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'alice', password: 'super-secret-value' }),
+    })
 
-    const db = readFileSync(join(PROJECT_ROOT, 'server', 'db.mjs'), 'utf8')
-    expect(db.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/password/i)
+    expect(logs.join('\n')).not.toContain('super-secret-value')
+    const bytes = existsSync(file) ? readFileSync(file, 'utf8') : ''
+    expect(bytes).not.toContain('super-secret-value')
   })
 })
 
-// ─── Username validation on /api/state ──────────────────────────────────────
 
-describe('username validation', () => {
-  const REJECTED = [
-    '',
-    'Alice',
-    'ALICE',
-    'x'.repeat(USERNAME_MAX_LENGTH + 1),
-    '.hidden',
-    '-rf',
-    '_x',
-    'a b',
-    'a/b',
-    '../etc/passwd',
-    '%2e%2e%2fetc',
-    "alice'; DROP TABLE snapshots; --",
-    'alice"',
-    'café',
-    'alice\n',
-    'a'.repeat(4096),
-  ]
+describe('routing and method handling', () => {
+  /*
+   * This block was "username validation", and most of it is gone rather than
+   * ported.
+   *
+   * It exercised `?user=`: the alphabet, the length cap, percent-encoding, the
+   * "no target given" error. None of that is reachable now — the stream key is
+   * the session's subject, so there is no caller-supplied name left to
+   * validate. The rule itself still lives in `shared/username.ts` and still
+   * guards the name inside a document, which `checkDocument` covers.
+   *
+   * What survives here is the part that was never about usernames: which paths
+   * exist, and what an unauthorised caller may learn from a 404 versus a 405.
+   */
 
-  it('rejects a GET with no ?user= at all', async () => {
+  it('still refuses any path that is not one of the two routes', async () => {
     const { base } = await startService()
-    const response = await fetch(`${base}${STATE_PATH}`, { headers: authorised() })
-    expect(response.status).toBe(400)
-    expect((await response.json()).error).toMatch(/user: required/)
-  })
-
-  it('rejects every out-of-alphabet, empty and over-long username on GET', async () => {
-    const { base } = await startService()
-    for (const username of REJECTED) {
-      const response = await get(base, username)
-      expect(response.status, JSON.stringify(username)).toBe(400)
-      expect((await response.json()).error).toMatch(/user: expected/)
-    }
-  })
-
-  it('rejects them on PUT too, and stores nothing', async () => {
-    const { base, store } = await startService()
-    for (const username of REJECTED) {
-      const response = await put(base, username, docText('alice', 1))
-      expect(response.status, JSON.stringify(username)).toBe(400)
-    }
-    expect(store.count()).toBe(0)
-  })
-
-  it('accepts a username at exactly the cap', async () => {
-    const { base } = await startService()
-    const name = 'a'.repeat(USERNAME_MAX_LENGTH)
-    expect((await put(base, name, docText(name, 1))).status).toBe(200)
-    expect((await get(base, name)).status).toBe(200)
-  })
-
-  it('treats a percent-encoded username as the decoded string, not the raw one', async () => {
-    const { base } = await startService()
-    // `%61lice` decodes to `alice`, so it must reach the same stream. The
-    // allowlist runs after decoding for exactly this reason: a check on the
-    // encoded form can be walked past with `%2e%2e`.
-    await put(base, 'alice', docText('alice', 2))
-    const response = await fetch(`${base}${STATE_PATH}?${USER_PARAM}=%61lice`, {
-      headers: authorised(),
-    })
-    expect(response.status).toBe(200)
-    expect(await response.text()).toBe(docText('alice', 2))
-  })
-
-  it('reports the query parse directly', () => {
-    expect(readUsername('/api/state?user=alice')).toEqual({ ok: true, username: 'alice' })
-    expect(readUsername('/api/state?x=1&user=bob&y=2')).toEqual({ ok: true, username: 'bob' })
-    expect(readUsername('/api/state')).toMatchObject({ ok: false })
-    expect(readUsername('/api/state?user=')).toMatchObject({ ok: false })
-    expect(readUsername('/api/state?user=Bob')).toMatchObject({ ok: false })
-    expect(readUsername('/api/state?user=a%20b')).toMatchObject({ ok: false })
-  })
-
-  it('still refuses any path that is not one of the three routes', async () => {
-    const { base } = await startService()
-    for (const path of [
-      '/',
-      '/api',
-      '/api/states',
-      '/api/state/alice',
-      '/api/login/alice',
-      '/db/app.db',
-      '/../.gitignore',
-    ]) {
-      const response = await fetch(`${base}${path}?${USER_PARAM}=alice`, { headers: authorised() })
+    for (const path of ['/', '/api', '/api/nope', '/api/state/extra', '/api/login']) {
+      const response = await fetch(`${base}${path}`, { headers: authorised() })
       expect(response.status, path).toBe(404)
+      expect(await response.json()).toEqual({ error: 'not found' })
     }
   })
 
   it('matches paths exactly, and gains no routes it was not given', async () => {
     const { base } = await startService()
 
-    // `/api/state?x=1` is `/api/state` carrying a stray parameter — not a
-    // different path that could slip past a route table. The query is a separate
-    // question, answered separately.
-    const stray = await fetch(`${base}${STATE_PATH}?x=1`, { headers: authorised() })
-    expect(stray.status).toBe(400)
-    expect((await stray.json()).error).toMatch(/user: required/)
-
     // A framework will happily synthesise `HEAD` for every `GET` route. This one
     // has exactly two methods on `/api/state`, and `HEAD` is not one of them.
-    const head = await fetch(stateUrl(base, 'alice'), { method: 'HEAD', headers: authorised() })
+    const head = await fetch(stateUrl(base), { method: 'HEAD', headers: authorised() })
     expect(head.status).toBe(405)
     expect(head.headers.get('allow')).toBe('GET, PUT')
 
@@ -825,12 +519,24 @@ describe('username validation', () => {
 
   it('rejects an unsupported method on /api/state with 405 and an Allow header', async () => {
     const { base } = await startService()
-    const response = await fetch(stateUrl(base, 'alice'), {
-      method: 'DELETE',
-      headers: authorised(),
-    })
+    const response = await fetch(stateUrl(base), { method: 'DELETE', headers: authorised() })
     expect(response.status).toBe(405)
     expect(response.headers.get('allow')).toBe('GET, PUT')
+  })
+
+  /**
+   * An unauthorised caller must not be able to use a 405 to learn that a route
+   * exists — the not-found handler checks the session for exactly this reason.
+   */
+  it('does not let an unauthorised caller tell 405 from 404', async () => {
+    const { base } = await startService()
+    const real = await fetch(stateUrl(base), { method: 'DELETE' })
+    const fake = await fetch(`${base}/api/definitely-not-a-route`, { method: 'DELETE' })
+    expect(real.status).toBe(401)
+    expect(fake.status).toBe(404)
+    // The real route says 401 rather than 405, so the two are told apart only
+    // by holding a session.
+    expect(real.headers.get('allow')).toBeNull()
   })
 })
 
@@ -1246,8 +952,19 @@ describe('readConfig', () => {
     expect(readConfig({}).dbFile).toBe(DEFAULT_DB_FILE)
   })
 
-  it('has no default secret', () => {
-    expect(readConfig({}).secret).toBe('')
+  /**
+   * None of the three Ward variables may default.
+   *
+   * `WARD_API_BASE_PATH` is the one worth a test rather than a comment: an
+   * empty value resolves the JWKS to `<origin>/.well-known/jwks.json`, a path
+   * nothing serves, so every token would be rejected with a clean log on the
+   * deploy that shipped it. `main` refuses to start on any of the three.
+   */
+  it('has no default for any Ward variable', () => {
+    const config = readConfig({})
+    expect(config.wardPublicOrigin).toBe('')
+    expect(config.wardApiBasePath).toBe('')
+    expect(config.wardAppKey).toBe('')
   })
 
   it('reads host, port, database path and body cap from the environment', () => {
@@ -1256,14 +973,18 @@ describe('readConfig', () => {
       SPORTS_APP_PORT: '9000',
       SPORTS_APP_DB: '/tmp/elsewhere.db',
       SPORTS_APP_MAX_BODY_BYTES: '1234',
-      SPORTS_APP_SYNC_SECRET: 'from-the-environment',
+      WARD_PUBLIC_ORIGIN: 'https://gandolh.ro',
+      WARD_API_BASE_PATH: '/ward-api',
+      WARD_APP_KEY: 'wak_from-the-environment',
     })
     expect(config).toMatchObject({
       host: '0.0.0.0',
       port: 9000,
       dbFile: '/tmp/elsewhere.db',
       maxBodyBytes: 1234,
-      secret: 'from-the-environment',
+      wardPublicOrigin: 'https://gandolh.ro',
+      wardApiBasePath: '/ward-api',
+      wardAppKey: 'wak_from-the-environment',
     })
   })
 })

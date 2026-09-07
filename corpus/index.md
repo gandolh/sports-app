@@ -30,6 +30,7 @@ pages. See [CLAUDE.md](CLAUDE.md) for the conventions and the retrieval budget.
 - [wiki/reversals.md](wiki/reversals.md) — The three v3 reversals, the original reasoning each one overturned, and the cost each purchase carries — read before re-deriving a rule that was deliberately dropped.
 - [wiki/status.md](wiki/status.md) — Dated snapshot of where every brief stands and what's next.
 - [wiki/technical-decisions.md](wiki/technical-decisions.md) — Locked stack, storage, routing, timer and rendering choices — read before proposing an alternative implementation.
+- [wiki/decisions-identity.md](wiki/decisions-identity.md) — How this app knows who is asking: the superseded shared-secret-and-nameplate design, and the Ward session that replaced it.
 - [wiki/training-science.md](wiki/training-science.md) — Evidence base for the programme — what the five slots actually train, which muscles get nothing, the isometric and concurrent-training ceilings, and what the fixed schedule costs.
 
 <!-- END CATALOG -->

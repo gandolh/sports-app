@@ -15,7 +15,6 @@ import { prescribe, recordSession, toSessionResult } from '../../domain/schedule
 import { parse, serialise } from '../../persistence/codec.ts'
 import { SESSION_KEY } from '../../persistence/session.ts'
 import { STORAGE_KEYS, emptyDoc, isReadOnly } from '../../persistence/store.ts'
-import { SECRET_HEADER } from '../../persistence/sync.ts'
 import { renderApp, resetBrowserState, seedUser } from './harness.tsx'
 
 const USERNAME = 'alice'
@@ -67,31 +66,43 @@ beforeEach(() => {
 // ─── Saving ─────────────────────────────────────────────────────────────────
 
 describe('the sync settings form', () => {
-  it('writes the address and the secret into the document', async () => {
+  it('writes the address into the document', async () => {
     seedUser(trained(2))
     await renderApp('/account')
 
     fireEvent.change(field('Service address'), { target: { value: ADDRESS } })
-    fireEvent.change(field('Secret'), { target: { value: SECRET } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    await waitFor(() =>
-      expect(storedDoc().settings.sync).toEqual({ baseUrl: ADDRESS, secret: SECRET }),
-    )
+    await waitFor(() => expect(storedDoc().settings.sync?.baseUrl).toBe(ADDRESS))
     // The training history is untouched by a settings write.
     expect(storedDoc().history).toHaveLength(2)
   })
 
-  it('never renders the stored secret back, in any form', async () => {
+  /**
+   * There is no secret field, and that absence is the assertion.
+   *
+   * The service authenticates the person from Ward's session cookie, which this
+   * app never sees. A password box here would be read by nothing, which is the
+   * exact dishonesty the old login screen's copy was written to avoid.
+   */
+  it('offers no secret field — the credential is Ward\'s cookie', async () => {
+    seedUser(trained(2))
+    await renderApp('/account')
+
+    expect(screen.queryByLabelText('Secret')).toBeNull()
+    expect(screen.queryByLabelText(/Replace the secret/)).toBeNull()
+  })
+
+  it('never renders a stored secret back, and says it is now inert', async () => {
     seedUser(withSync(trained(2), ADDRESS, SECRET))
     const { container } = await renderApp('/account')
 
     // Not as text, not as a value attribute, not in the serialised markup.
     expect(container.innerHTML).not.toContain(SECRET)
     expect(document.body.textContent).not.toContain(SECRET)
-    expect(field(/Replace the secret/).value).toBe('')
-    // It says that one exists, which is not the same as showing it.
-    expect(document.body.textContent).toContain('A secret is stored.')
+    // A leftover from before the cutover is named rather than left sitting
+    // there unmentioned — it is a value somebody once typed a credential into.
+    expect(document.body.textContent).toContain('no longer sent anywhere')
   })
 
   it('keeps the stored secret when the field is left blank', async () => {
@@ -105,16 +116,11 @@ describe('the sync settings form', () => {
     expect(storedDoc().settings.sync?.secret).toBe(SECRET)
   })
 
-  it('empties the field after a save, so the typed secret does not linger', async () => {
-    seedUser(trained(1))
-    await renderApp('/account')
-
-    fireEvent.change(field('Secret'), { target: { value: SECRET } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => expect(storedDoc().settings.sync?.secret).toBe(SECRET))
-    expect(field(/Replace the secret/).value).toBe('')
-  })
+  /*
+   * "empties the field after a save" is gone with the field. Its point — that a
+   * typed secret must not linger in form state — is answered more strongly now:
+   * there is no field, so there is nothing to linger.
+   */
 
   it('rejects an address that is not a full http address, and saves nothing', async () => {
     seedUser(trained(1))
@@ -152,7 +158,7 @@ describe('the sync settings form', () => {
 // ─── Checking ───────────────────────────────────────────────────────────────
 
 describe('the connection check', () => {
-  it('reports being in sync, and sends the secret in the header rather than the URL', async () => {
+  it('reports being in sync, and names nobody in the URL', async () => {
     const doc = withSync(trained(3), ADDRESS, SECRET)
     seedUser(doc)
     const fetchImpl = serviceHolding(doc)
@@ -166,9 +172,14 @@ describe('the connection check', () => {
     expect(status.textContent).toContain('3 sessions')
 
     const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit]
-    expect(url).toContain(`${ADDRESS}/api/state?user=alice`)
+    // No `?user=`: the service reads the session's subject, so there is no
+    // target in the URL for a crafted username to corrupt.
+    expect(url).toBe(`${ADDRESS}/api/state`)
     expect(url).not.toContain(SECRET)
-    expect((init.headers as Record<string, string>)[SECRET_HEADER]).toBe(SECRET)
+    // The stored secret is vestigial and must not travel as a credential. The
+    // real one is Ward's cookie, which is why the request asks for cookies.
+    expect(JSON.stringify(init.headers)).not.toContain(SECRET)
+    expect(init.credentials).toBe('include')
   })
 
   it('tests the address currently in the field, not the one last saved', async () => {

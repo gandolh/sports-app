@@ -34,19 +34,24 @@ import { STORAGE_KEYS, clearReadOnly, emptyDoc, isReadOnly, load, readOnlyReason
 import type { StorageLike } from '../store.ts'
 import {
   DEFAULT_TIMEOUT_MS,
-  SECRET_HEADER,
   applyRemote,
   checkSync,
   compareSessions,
   endpoint,
-  login,
+  checkSession,
   pull,
   push,
   saveAndPush,
   stateEndpoint,
 } from '../sync.ts'
 
-const TARGET: SyncSettings = { baseUrl: 'http://127.0.0.1:8787', secret: 'shared-test-secret' }
+/*
+ * `secret` is still in `SyncSettings` because it is still in the document
+ * schema — the field is unused since the Ward cutover and its removal needs its
+ * own schema version bump, which is deliberately not folded into an auth
+ * change. Nothing reads it; the assertions below prove it never leaves.
+ */
+const TARGET: SyncSettings = { baseUrl: 'http://127.0.0.1:8787', secret: 'no-longer-used' }
 const ALICE = 'alice'
 const BOB = 'bob'
 
@@ -177,47 +182,67 @@ describe('endpoint', () => {
 })
 
 describe('stateEndpoint', () => {
-  it('names the subject in the query string, which is where the service reads it', () => {
-    expect(stateEndpoint('http://host:8787', 'alice')).toBe(
-      'http://host:8787/api/state?user=alice',
-    )
-    expect(stateEndpoint('', 'alice')).toBe('/api/state?user=alice')
+  /**
+   * It names nobody, and that is the change.
+   *
+   * This used to append `?user=` and percent-encode it, because a `&` in a
+   * hand-edited username would otherwise silently retarget the request at
+   * another person's stream. That whole class of bug is gone rather than
+   * defended against: the service reads the session's subject, so the URL
+   * carries no target to corrupt.
+   */
+  it('names no user — the service reads the session', () => {
+    expect(stateEndpoint('http://host:8787')).toBe('http://host:8787/api/state')
+    expect(stateEndpoint('')).toBe('/api/state')
   })
 
-  it('percent-encodes the username, so a hand-edited one cannot retarget the request', () => {
-    // The codec would refuse this username, but `push` is handed a document in
-    // memory and a `&` here would otherwise silently address another stream.
-    expect(stateEndpoint('', 'a&user=bob')).toBe('/api/state?user=a%26user%3Dbob')
-    expect(stateEndpoint('', 'a b')).toBe('/api/state?user=a%20b')
+  it('cannot be made to address another stream, whatever the username contains', () => {
+    // The old failure mode, asserted as impossible: there is no parameter for a
+    // crafted username to appear in.
+    expect(stateEndpoint('http://host:8787')).not.toContain('?')
+    expect(stateEndpoint('http://host:8787')).not.toContain('user')
   })
 })
 
 // ─── push ───────────────────────────────────────────────────────────────────
 
 describe('push', () => {
-  it('sends the serialised document to PUT /api/state?user=… with the secret in a header', async () => {
+  it('sends the serialised document to PUT /api/state, with the session cookie', async () => {
     const fetchImpl = responder('{"id":1}')
     const doc = docWith(5)
 
     const outcome = await push(doc, { fetchImpl, log })
 
     expect(outcome).toEqual({ ok: true, status: 200, bytes: serialise(doc).length })
-    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state?user=alice')
+    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state')
 
     const init = initOf(fetchImpl)
     expect(init?.method).toBe('PUT')
     expect(init?.body).toBe(serialise(doc))
-    expect(headersOf(fetchImpl)[SECRET_HEADER]).toBe(TARGET.secret)
     expect(headersOf(fetchImpl)['Content-Type']).toBe('application/json')
+    // The credential is Ward's cookie, which the browser attaches — so the
+    // request must ask for it. `omit` here would 401 every cross-origin deploy
+    // while a same-origin build worked perfectly.
+    expect(init?.credentials).toBe('include')
   })
 
-  it('takes the subject from the document, so ?user= and the body cannot disagree', async () => {
-    // The service answers 400 when they differ. Filling both from `doc.username`
-    // is what makes that response unreachable from this client.
+  /**
+   * The stored `secret` is vestigial and must stay that way until the schema
+   * bump that removes the field. Asserted rather than assumed: it is a value a
+   * person once typed a real credential into.
+   *
+   * **Headers and URL only.** The field is part of the state document, and the
+   * document is what `push` uploads — so it does still cross the wire, inside
+   * the body, exactly as it always did. That is a reason to finish removing it
+   * from the schema, and it is recorded here rather than hidden by a narrower
+   * assertion that looked stronger than it is.
+   */
+  it('never sends the stored secret as a credential', async () => {
     const fetchImpl = responder('{}')
-    await push(docWith(2, TARGET, BOB), { fetchImpl, log })
-    expect(urlOf(fetchImpl)).toContain('?user=bob')
-    expect(initOf(fetchImpl)?.body).toContain('"username": "bob"')
+    await push(docWith(1), { fetchImpl, log })
+
+    expect(urlOf(fetchImpl)).not.toContain(TARGET.secret)
+    expect(JSON.stringify(headersOf(fetchImpl))).not.toContain(TARGET.secret)
   })
 
   it('keeps the secret out of the URL', async () => {
@@ -268,7 +293,10 @@ describe('push', () => {
     const fetchImpl = responder('{"error":"unauthorized"}', { status: 401 })
     const outcome = await push(docWith(5), { fetchImpl, log })
     expect(outcome).toMatchObject({ ok: false, reason: 'rejected' })
-    if (!outcome.ok) expect(outcome.error).toMatch(/secret/)
+    // The message names the thing a person can act on. It used to say "check
+    // the secret in Settings"; there is no secret to check any more, and
+    // signing in again is the whole remedy.
+    if (!outcome.ok) expect(outcome.error).toMatch(/signed in/)
   })
 
   it('does nothing when sync is not configured', async () => {
@@ -306,7 +334,7 @@ describe('push', () => {
     const outcome = await push(docWith(5, TARGET, BOB), { fetchImpl, log })
 
     expect(outcome.ok).toBe(true)
-    expect(urlOf(fetchImpl)).toContain('?user=bob')
+    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state')
   })
 
   it('never reads navigator.onLine — it lies (brief 01)', async () => {
@@ -353,9 +381,9 @@ describe('pull', () => {
       expect(outcome.doc).toEqual(remote)
       expect(outcome.text).toBe(serialise(remote))
     }
-    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state?user=alice')
+    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state')
     expect(initOf(fetchImpl)?.method).toBe('GET')
-    expect(headersOf(fetchImpl)[SECRET_HEADER]).toBe(TARGET.secret)
+    expect(initOf(fetchImpl)?.credentials).toBe('include')
   })
 
   it('refuses a document belonging to somebody else, so adopting cannot switch identity', async () => {
@@ -452,21 +480,45 @@ describe('pull', () => {
 })
 
 // ─── login ──────────────────────────────────────────────────────────────────
+// ─── checkSession ───────────────────────────────────────────────────────────
 
-describe('login', () => {
-  it('posts the credentials and accepts the echoed username', async () => {
-    const fetchImpl = responder('{"username":"alice"}')
-    const outcome = await login(TARGET, ALICE, 'anything', { fetchImpl, log })
+describe('checkSession', () => {
+  /*
+   * This block was `login`. That function posted a username and a password to
+   * `/api/login`, which checked neither — the service validated the shape of
+   * the name, discarded the password unread, and echoed the name back. Signing
+   * in is Ward's now, so there is nothing to post and no echo to compare.
+   *
+   * What survives is the reason the call existed: telling somebody, in
+   * Settings, that their service address is wrong or that they are not signed
+   * in. It is still advisory and still must never gate entry to the app.
+   */
 
-    expect(outcome).toEqual({ ok: true, username: ALICE })
-    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/login')
-    expect(initOf(fetchImpl)?.method).toBe('POST')
-    expect(initOf(fetchImpl)?.body).toBe('{"username":"alice","password":"anything"}')
-    expect(headersOf(fetchImpl)[SECRET_HEADER]).toBe(TARGET.secret)
+  it('probes the real state route, so it exercises the gate sync actually uses', async () => {
+    const fetchImpl = responder('{}', { status: 404 })
+    const outcome = await checkSession(TARGET, { fetchImpl, log })
+
+    expect(outcome).toEqual({ ok: true })
+    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state')
+    expect(initOf(fetchImpl)?.method).toBe('GET')
+    expect(initOf(fetchImpl)?.credentials).toBe('include')
   })
 
-  it('is advisory: a failure resolves rather than throwing, because login works offline', async () => {
-    const outcome = await login(TARGET, ALICE, 'pw', {
+  /**
+   * 404 is success. It means the service answered, accepted the session, and
+   * holds no document yet — which is exactly what a new device looks like, and
+   * what somebody opening Settings for the first time will usually see.
+   */
+  it('treats "no document yet" as a working connection, not a failure', async () => {
+    const outcome = await checkSession(TARGET, {
+      fetchImpl: responder('{"error":"no state"}', { status: 404 }),
+      log,
+    })
+    expect(outcome).toEqual({ ok: true })
+  })
+
+  it('is advisory: a failure resolves rather than throwing, because the app works offline', async () => {
+    const outcome = await checkSession(TARGET, {
       fetchImpl: failer(new TypeError('Failed to fetch')),
       log,
     })
@@ -474,42 +526,51 @@ describe('login', () => {
     expect(logged[0]?.message).toMatch(/works offline/)
   })
 
-  it('reports a wrong deployment secret, which is the reason this call exists', async () => {
-    const outcome = await login(TARGET, ALICE, 'pw', {
+  it('reports not being signed in, which is now the reason this call exists', async () => {
+    const outcome = await checkSession(TARGET, {
       fetchImpl: responder('{"error":"unauthorized"}', { status: 401 }),
       log,
     })
     expect(outcome).toMatchObject({ ok: false, reason: 'unauthorized' })
+    if (!outcome.ok) expect(outcome.error).toMatch(/signed in/)
+  })
+
+  /**
+   * A live session with no `sports-app` grant. Distinct from 401 in the message
+   * even though both are `unauthorized` to the caller: signing in again cannot
+   * fix it, so the copy must not tell somebody to try.
+   */
+  it('reports a missing grant differently from a missing session', async () => {
+    const outcome = await checkSession(TARGET, {
+      fetchImpl: responder('{"error":"forbidden"}', { status: 403 }),
+      log,
+    })
+    expect(outcome).toMatchObject({ ok: false, reason: 'unauthorized' })
+    if (!outcome.ok) {
+      expect(outcome.error).toMatch(/does not have access/)
+      expect(outcome.error).not.toMatch(/Sign in again/)
+    }
+  })
+
+  it('says an unreachable Ward is worth retrying, rather than saying you are signed out', async () => {
+    const outcome = await checkSession(TARGET, {
+      fetchImpl: responder('{"error":"identity service unavailable"}', { status: 503 }),
+      log,
+    })
+    expect(outcome).toMatchObject({ ok: false, reason: 'rejected' })
+    if (!outcome.ok) expect(outcome.error).toMatch(/temporarily unavailable/)
   })
 
   it('does not touch the network when sync is not configured', async () => {
     const fetchImpl = responder('{}')
-    expect(await login(null, ALICE, 'pw', { fetchImpl, log })).toMatchObject({
+    expect(await checkSession(null, { fetchImpl, log })).toMatchObject({
       ok: false,
       reason: 'not-configured',
     })
     expect(fetchImpl).not.toHaveBeenCalled()
   })
-
-  it('refuses an answer about a different username', async () => {
-    const outcome = await login(TARGET, ALICE, 'pw', {
-      fetchImpl: responder('{"username":"bob"}'),
-      log,
-    })
-    expect(outcome).toMatchObject({ ok: false, reason: 'invalid' })
-  })
-
-  it('stores nothing, least of all the password', async () => {
-    await login(TARGET, ALICE, 'correct-horse-battery-staple', {
-      fetchImpl: responder('{"username":"alice"}'),
-      log,
-    })
-    expect(storage.ops).toEqual([])
-    expect([...storage.map.values()].join('')).not.toContain('correct-horse')
-  })
 })
 
-// ─── Conflict handling ──────────────────────────────────────────────────────
 
 describe('compareSessions', () => {
   it('is a plain comparison of two session counts', () => {
@@ -580,7 +641,7 @@ describe('checkSync', () => {
   it('asks about the username it was given, even with no local document', async () => {
     const fetchImpl = responder(serialise(docWith(7, TARGET, BOB)))
     await checkSync(BOB, null, TARGET, { fetchImpl, log })
-    expect(urlOf(fetchImpl)).toContain('?user=bob')
+    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state')
   })
 
   it('reports not-configured without touching the network', async () => {

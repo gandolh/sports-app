@@ -142,15 +142,11 @@ can move a clock backwards.
 Browser storage is **not** durable: iOS evicts IndexedDB under pressure and one "clear
 site data" wipes everything. Losing history means losing ladder position entirely.
 
-### Authentication is a nameplate, not a boundary
-Username identifies a state document; the password is accepted and **discarded in the
-request handler** — never stored, never compared. Storing an unchecked password buys
-nothing and collects real passwords people reuse elsewhere. `/login` must work offline,
-which it trivially does because there is nothing to verify.
-
-Constant-time comparison still applies to the deployment's own shared secret, where one
-exists: `timingSafeEqual` over SHA-256 digests, which is constant-time even for
-wrong-length input.
+### Authentication — see decisions-identity.md
+Identity moved to [Ward](../../../wzd_auth/corpus/wiki/overview.md) on 2026-09-06,
+superseding the "authentication is a nameplate" call that lived here. Both the old
+decision and its replacement are in
+[decisions-identity.md](decisions-identity.md) — it outgrew a section on this page.
 
 ### Timestamp-based countdown, and a wake lock
 A hold's countdown is computed from a stored start time; `setInterval` continuity is
