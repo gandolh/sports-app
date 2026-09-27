@@ -5,6 +5,7 @@ coverage/
 .codegraph/
 .env
 .env.*
+!.env.example
 *.local
 .DS_Store
 *.tsbuildinfo

@@ -2,6 +2,7 @@
 // `test` block below. Importing it from 'vite' typechecks everything except the
 // test config, which then silently does nothing.
 import { defineConfig } from 'vitest/config'
+import type { ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -17,15 +18,47 @@ declare const process: { readonly env: Readonly<Record<string, string | undefine
 /**
  * Where the app is served from, with a guaranteed leading and trailing slash.
  *
- * Defaults to `/` so local dev, `npm run preview` and every test are unchanged;
- * the VPS deploy sets `SPORTS_APP_BASE=/sports-app/` because the box serves a
- * dozen projects as sub-paths of one domain. It has to be a build-time constant
+ * Defaults to `/` so `npm run preview` and every test are unchanged; the VPS
+ * deploy sets `SPORTS_APP_BASE=/sports-app/` because the box serves a dozen
+ * projects as sub-paths of one domain, and `npm run dev` reads the same value
+ * from the repo-root .env so local dev is laid out like the deploy (see the
+ * `server` block). It has to be a build-time constant
  * rather than runtime config: Vite bakes it into every asset URL, and the PWA
  * manifest and service-worker scope below have to agree with it exactly or the
  * installed app resolves its own start URL outside its own scope.
  */
 const baseSegment = (process.env.SPORTS_APP_BASE ?? '').replace(/^\/+|\/+$/g, '')
 const base = baseSegment === '' ? '/' : `/${baseSegment}/`
+
+/**
+ * Dev only: `/ward` + `/ward-api` on this dev server's origin, the way Caddy puts
+ * them on the deployed one, pointed at WARD_PUBLIC_ORIGIN — the Ward the state
+ * service trusts, locally the container in wzd_auth/infrastructure/local. One
+ * origin is what lets Ward's cookie, its redirect back into the app and signing
+ * out work as they do in the deploy.
+ *
+ * Ward refuses /refresh and /logout unless the request's Origin is its own. A
+ * request from a page on this dev server would be same-origin in the deploy, so
+ * its Origin is rewritten to say so. Anything else keeps its Origin and its
+ * Sec-Fetch-Site, and Ward still refuses it.
+ */
+function wardProxy(): Record<string, ProxyOptions> {
+  if (!process.env.WARD_PUBLIC_ORIGIN) return {}
+  const ward = new URL(process.env.WARD_PUBLIC_ORIGIN).origin
+  return {
+    '^/ward(-api)?(/|$)': {
+      target: ward,
+      configure: (server) => {
+        server.on('proxyReq', (proxyReq, req) => {
+          const origin = req.headers.origin
+          if (origin && URL.canParse(origin) && new URL(origin).host === req.headers.host) {
+            proxyReq.setHeader('origin', ward)
+          }
+        })
+      },
+    },
+  }
+}
 
 export default defineConfig({
   base,
@@ -96,10 +129,11 @@ export default defineConfig({
   // SPORTS_APP_PORT, override this too. Splitting the repo into workspaces changed
   // nothing here — the proxy target is a port on the loopback interface, not a
   // path, so the service being a sibling package rather than a sibling directory
-  // is invisible to it.
+  // is invisible to it. Ward's pages ride along on the same origin (`wardProxy`).
   server: {
     proxy: {
       '/api': { target: 'http://127.0.0.1:8787', changeOrigin: false },
+      ...wardProxy(),
     },
   },
   test: {

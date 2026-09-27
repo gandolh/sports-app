@@ -66,8 +66,19 @@ on startup. **That warning is expected and is not a reason to add a dependency.*
 ## Running it
 
 ```sh
-# Issue the app key once, in Ward's console: the sports-app page, "Service
-# keys". It is shown ONCE and cannot be read back — Ward stores only a digest.
+cp .env.example .env   # at the repo root, once
+npm run server
+```
+
+`npm run server` loads the repo-root `.env` (Node's `--env-file-if-exists`), so the
+three Ward variables live there. Locally they point at Ward's container in
+`../wzd_auth/infrastructure/local`, whose `seed.mjs` registers sports-app, grants your
+account and writes `WARD_APP_KEY` into `.env`. Anything set in the shell wins over the
+file, so passing them inline still works:
+
+```sh
+# Against another Ward: issue the app key in its console, on the sports-app page,
+# "Service keys". It is shown ONCE and cannot be read back.
 WARD_PUBLIC_ORIGIN=https://gandolh.ro \
 WARD_API_BASE_PATH=/ward-api \
 WARD_APP_KEY=wak_... \
@@ -81,9 +92,11 @@ service that cannot tell its callers apart looks authenticated and is not.
 Ward's JWKS to `<origin>/.well-known/jwks.json`, a path nothing serves, so every token
 would be rejected with a clean log on the deploy that shipped the mistake.
 
-In development, `npm run dev` proxies `/api` to `http://127.0.0.1:8787`, so the app and
-the service share an origin and there is no CORS to configure. Leave **Service
-address** empty in Settings and it will use the proxy. If you change
+In development, `npm run dev` serves the app at `http://localhost:5173/sports-app/` and
+proxies `/api` to `http://127.0.0.1:8787`, so the app and the service share an origin and
+there is no CORS to configure. It proxies `/ward` and `/ward-api` to `WARD_PUBLIC_ORIGIN`
+too, which is what lets the app's own sign-in go through Ward and come back. Leave
+**Service address** empty in Settings and it will use the proxy. If you change
 `SPORTS_APP_PORT`, change the proxy target in `vite.config.ts` to match.
 
 ## Environment variables

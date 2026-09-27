@@ -9,7 +9,7 @@
     "./state-server.mjs": "./state-server.mjs"
   },
   "scripts": {
-    "start": "node state-server.mjs",
+    "start": "node --env-file-if-exists=../.env state-server.mjs",
     "test": "vitest run"
   },
   "dependencies": {

@@ -1180,3 +1180,34 @@ hand-written files are **not** ignored and do lint, joining the existing
 `server/` by the Ward cutover — `createHash` and `timingSafeEqual` are no longer
 called now that the shared secret is gone, and `SECRET` is still referenced in a
 test. `npm run check` was already red before this change and still is.
+
+## [2026-09-27] change | Local dev runs against a local Ward; the sign-in loop it exposed is not fixed
+
+On the owner's call, for every Ward app at once: `npm run dev` serves the client at
+`/sports-app/` (the root `.env` now carries `SPORTS_APP_BASE`), and the client dev server
+proxies `/ward` and `/ward-api` to `WARD_PUBLIC_ORIGIN` beside the existing `/api` proxy,
+so the browser sees one origin as it does behind Caddy. Locally that is Ward's container
+in `wzd_auth/infrastructure/local`, whose `seed.mjs` registers sports-app, grants the
+owner account and writes `WARD_APP_KEY`. The proxy rewrites `Origin` to Ward's only for
+requests from a page on the dev server, which is what Ward's same-origin check on
+`/refresh` and `/logout` needs. `npm run server` and the client's `dev` script now load
+the root `.env` with Node's `--env-file-if-exists`; the deploy starts
+`server/state-server.mjs` directly, so it is unaffected. New `.env.example`, un-ignored
+with `!.env.example`; `server/README.md`'s "Running it" follows.
+
+Checked against the local Ward on a scratch `SPORTS_APP_DB`: through the dev server,
+`/api/state` answers 401 without a session and, signed in through the proxied Ward,
+404 "no state has been stored yet for this user", so the Ward integration holds.
+1114 tests pass and typecheck is clean. `npm run lint` fails on six errors that predate
+this change, all in `server/state-server.mjs` and its test (an undefined `SECRET`,
+unused imports left from the Ward move).
+
+**Found, not fixed: in a browser, sign-in loops.** The route guards in `plan.tsx` and
+`account.tsx` send anyone without a cached username to `/login`, and `/login` always
+hands off to Ward with `next` set to itself. But nothing calls `setCurrentUsername`
+outside tests, and the service has no endpoint that says who is signed in, so after
+Ward's sign-in the browser lands on `/sports-app/login` and is sent straight back to
+Ward. The 2026-09-06 entry noted nothing had been run in a real browser; this is what
+that hid, and it holds in the deploy as well. The fix needs a way for the client to
+learn the signed-in person (an `/api/me` on the service, like prm's) and a `/login` that
+checks it before handing off. Left for the owner to decide.
