@@ -65,15 +65,6 @@ describe('PRONE_RIG shape', () => {
     expect(Number.isFinite(PRONE_RIG.neck.angleDeg.end)).toBe(true)
   })
 
-  it('declares no foreshorten anywhere — the field is dead as of wave 2', () => {
-    expect(PRONE_RIG.torso.foreshorten).toBeUndefined()
-    expect(PRONE_RIG.neck.foreshorten).toBeUndefined()
-    for (const id of LIMB_IDS) {
-      const limb = PRONE_RIG.limbs[id]
-      expect(limb.foreshorten, id).toBeUndefined()
-    }
-  })
-
   it('torso, hip and legs are identical in both phases — only the arms move', () => {
     expect(PRONE_RIG.shoulder.start).toEqual(PRONE_RIG.shoulder.end)
     expect(PRONE_RIG.torso.angleDeg.start).toBe(PRONE_RIG.torso.angleDeg.end)
@@ -202,11 +193,8 @@ describe('no hand comes within 12 units of the torso segment', () => {
     // torso instead of up past the head.
     //
     // Narrowed to the `fk` branch before spreading rather than re-asserting
-    // `kind: 'fk'` inside the literal. `RigLimb` is a union and only its `fk`
-    // arm carries `angleDeg`, so spreading the union and overriding `kind`
-    // leaves `foreshorten` typed as possibly-undefined from the `ik` side —
-    // which `exactOptionalPropertyTypes` rejects, because an explicit
-    // `undefined` is not the same as an absent key here.
+    // `kind: 'fk'` inside the literal: `RigLimb` is a union and only its `fk`
+    // arm carries `angleDeg`, so the spread has to start from that arm.
     const { armL, armR } = PRONE_RIG.limbs
     if (armL.kind !== 'fk' || armR.kind !== 'fk') {
       throw new Error('prone arms are authored as fk limbs; this test assumes it')

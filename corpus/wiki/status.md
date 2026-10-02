@@ -1,6 +1,6 @@
 ---
 summary: Dated snapshot of where every brief stands and what's next.
-updated: 2026-09-06
+updated: 2026-10-02
 ---
 
 # Status — 2026-09-06
@@ -56,7 +56,7 @@ date anywhere in the UI. Full detail in
 | 20 | [Milestones + total work](../briefs/done/20-milestones-and-total-work.md) | **done** | 15 |
 | 21 | [npm workspaces + shared](../briefs/done/21-npm-workspaces-and-shared.md) | **done** | — |
 | 22 | [Fastify API](../briefs/done/22-fastify-api.md) | **done** | 21 |
-| 23 | [Figure rig + morph](../briefs/todo/23-figure-rig-and-morph.md) | **in flight** — rig + `Prone.tsx` landed in `0d7d4f3`; the crossfade still renders | 18 |
+| 23 | [Figure rig + morph](../briefs/done/23-figure-rig-and-morph.md) | **done** 2026-10-02 — the rig renders; the crossfade is gone | 18 |
 | 24 | [Schema v4: logging + stop rule](../briefs/done/24-schema-v4-logging-and-stop-rule.md) | **done** | — |
 | 25 | [Persistence v4](../briefs/done/25-persistence-v4.md) | **done** | 24 |
 | 26 | [Tailwind + canon tokens](../briefs/done/26-tailwind-and-canon-tokens.md) | **done** | — |
@@ -88,8 +88,9 @@ per-side side-plank dose the code splits between sides.
 - **Commit the branch.** `v3-category-standard` is unpushed and uncommitted.
 - **Run the deploy.** Still never executed against the box. Everything below the first
   run is unverified: SSH, the Node version check, `npm ci`, pm2, the Caddy reload.
-- **Finish brief 23 or revert `0d7d4f3`.** The rig is authored and tested but nothing
-  renders it, and `Prone.tsx` now carries both the rig and the restored component.
+- **Watch the figures move on a phone.** Brief 23 replaced the crossfade with a rigged
+  morph; it was checked as frozen 132px frames in headless Chrome, not watched live.
+  R3 (easing the turnaround) waits on that look.
 - **Decide the malformed-`logged` policy.** A hand-edit typo in a display-only field
   currently blocks training until repaired. Consistent with `cyclePosition`, and it
   surfaces the typo rather than hiding it — but it cuts against "arrive with the answer

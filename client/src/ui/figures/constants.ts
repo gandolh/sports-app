@@ -6,8 +6,8 @@
  * import the pose components to build the registry.
  */
 
-/** Every figure is drawn to this exact viewBox. The crossfade in
- * `ExerciseFigure.tsx` stacks two frames absolutely, one per phase, so both
+/** Every figure is drawn to this exact viewBox, and the overlay layer in
+ * `ExerciseFigure.tsx` is stacked on the figure absolutely, so the two
  * must agree on coordinates pixel-for-pixel. */
 export const FIGURE_VIEWBOX = '0 0 200 200'
 

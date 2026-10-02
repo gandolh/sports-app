@@ -1,8 +1,8 @@
 # Improving the figure animation, researched against ~/projects/game-engine
 
 Captured 2026-07-30. **R1 is done** (see below). R2 became
-[brief 23](../briefs/todo/23-figure-rig-and-morph.md) after a grill; R3 is deferred
-with a stated reason there.
+[brief 23](../briefs/done/23-figure-rig-and-morph.md) after a grill and shipped
+2026-10-02; R3 is deferred with a stated reason there.
 
 The question was what the game-engine monorepo has that would improve this app's
 animations. The useful answer turned out not to be a technique to copy but a

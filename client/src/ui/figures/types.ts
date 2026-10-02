@@ -1,15 +1,6 @@
-import type { ComponentType } from 'react'
-
 /** A figure never knows which rung it is drawing — only which half of the
  * movement it is showing. See `figures/index.ts` for the full contract. */
 export type FigurePhase = 'start' | 'end'
-
-export interface FigureProps {
-  readonly phase: FigurePhase
-}
-
-/** Every registered figure is a plain function component of this shape. */
-export type FigureComponent = ComponentType<FigureProps>
 
 /** A point in the 200×200 figure coordinate space. */
 export interface Joint {
@@ -45,8 +36,10 @@ export type PhasePair<T> = Readonly<Record<FigurePhase, T>>
  *
  * Concretely: the glute bridge's knee sits *above* the hip→heel line, so
  * `hinge` legs declare `-1`. A push-up's elbow points back toward the feet,
- * which in the side view used by `Push.tsx` is clockwise of the shoulder→hand
- * line, so `push` arms declare `1`.
+ * which in the side view used by `Push.tsx` (head left, feet right) is
+ * anticlockwise of the shoulder→hand line, so `push` arms declare `-1` too.
+ * Read the sign off anatomy, never off an old drawing: the pre-rig `push` END
+ * had the elbow on the wrong side, which is how an inverted joint gets copied.
  *
  * It is declared **per limb, not per phase**, and that is the whole safety
  * property: an IK solver has two mirror solutions at every position, and
@@ -63,21 +56,18 @@ export type LimbRoot = 'shoulder' | 'hip'
 /**
  * One rigid segment: a length declared once, a direction declared per phase.
  *
- * `foreshorten` is the single documented escape hatch, and it is deliberately
- * awkward to reach for. A limb rotating out of the picture plane really does
- * project shorter — `Squat.tsx` is drawn front-on and its arms swing toward the
- * viewer — and without a name for that, the only way to draw it is to shorten
- * the bone, which is indistinguishable from the bug this file's shape exists to
- * prevent. Declaring it says "this is projection, and here is how much", so a
- * reader can tell the two apart and a test can still hold the *rest* of the
- * skeleton to an exact length. Absent means 1 (no projection). Values above 1
- * are clamped away rather than honoured: lengthening a bone is the bug.
+ * There is no foreshortening. Wave 1 carried a `foreshorten` factor for limbs
+ * swinging out of the picture plane, whose only user was the front-view squat;
+ * squat was redrawn side-on, so all five figures share one projection and every
+ * limb moves in the picture plane. With no user left the field was deleted, and
+ * bone length is now invariant unconditionally rather than "invariant times a
+ * declared scalar". A limb that seems to need it is a pose drawn from the wrong
+ * side.
  */
 export interface RigBone {
   readonly length: number
   /** Absolute direction from the bone's root to its tip, degrees, y-down. */
   readonly angleDeg: PhasePair<number>
-  readonly foreshorten?: PhasePair<number>
 }
 
 /**
@@ -85,7 +75,7 @@ export interface RigBone {
  *
  * Used where the tip is in the air and the angle is the thing the drawing is
  * *about* — `prone` arms sweeping 150° from the hips to overhead, `squat` arms
- * swinging 82° forward for balance.
+ * swinging forward to the horizontal for balance.
  *
  * **The two angles are interpolated as written, not by shortest arc**, so the
  * author chooses which way round the sweep goes. This matters: `prone`'s left
@@ -124,9 +114,6 @@ export interface IkLimb {
   readonly lower: number
   readonly bend: BendSign
   readonly target: PhasePair<Joint>
-  /** Scales *both* bones. See `RigBone.foreshorten` — same escape hatch, same
-   * warning; a front-view squat's femur swings away from the viewer too. */
-  readonly foreshorten?: PhasePair<number>
 }
 
 export type RigLimb = FkLimb | IkLimb
@@ -166,4 +153,24 @@ export interface Rig {
    * the neck when the torso pitches. */
   readonly neck: RigBone
   readonly limbs: Readonly<Record<RigLimbId, RigLimb>>
+}
+
+/** The one accent element: a vertical arrow beside the body, pointing the way
+ * the movement's main phase goes. Fixed coordinates — an annotation, not part of
+ * the skeleton, so it stays still while the body moves under it. */
+export interface MovementArrowSpec {
+  readonly x: number
+  readonly y1: number
+  readonly y2: number
+}
+
+/**
+ * Everything a registered figure is: data, no component. The renderer
+ * (`RigFigure`, `primitives.tsx`) draws any rig — limbs, head, the hair spike
+ * and the trouser flare — so a figure file holds numbers and nothing that could
+ * drift from another figure's drawing rules.
+ */
+export interface FigureDefinition {
+  readonly rig: Rig
+  readonly arrow: MovementArrowSpec
 }

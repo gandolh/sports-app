@@ -357,3 +357,79 @@ Rules that keep the parallelism safe:
   within 12 units of the torso at any sample. You do not need the renderer to prove
   your geometry.
 - **Only B touches `figures/index.ts`.** A C agent that edits it will conflict.
+
+---
+
+# Outcome — 2026-10-02 (wave 2, done)
+
+The crossfade is gone. `ExerciseFigure` draws one `<svg>`: `RigFigure`
+(`primitives.tsx`) renders any rig as nested groups, one per bone, where the
+shoulder anchor translates and every bone rotates by its angle relative to its
+parent (`localAngles`, `rig.ts`). Lengths live in the static geometry, so neither
+a keyframe nor CSS interpolation between two keyframes can stretch a bone or pull
+a joint off its parent. `motionStyles(timeline, rig)` samples the timeline at
+`SAMPLES_PER_MOVING_SEGMENT`, solves FK/IK once per rung and emits one
+`@keyframes` per part (11 for push). It is `transform` only and `linear`, and
+`buildTimeline` was not touched. Keyframe names hash the rig as well as the clock
+(`rigSlug`): `@keyframes` are global, and a push card and a squat card on one
+screen can share a clock.
+
+Figures are data (`FigureDefinition` = rig + arrow), and the registry maps ids to
+definitions. `getFigure` now uses `Object.hasOwn`, so an id like `constructor`
+cannot resolve to a prototype member. `foreshorten` is deleted from the types and
+the solver, and bone length is invariant unconditionally. `StickFigure`, the
+restored `ProneFigure` and the two-frame CSS are gone. The static `transform`
+attributes describe the `end` pose, so reduced motion gets `end` with no pose
+logic of its own.
+
+**The rigs.**
+- **push:** a rigid pivot of −21.03° about the left foot (correction 7). The
+  shoulder goes (62, 82) → (44.93, 126), the torso is 71.39 in both phases, and
+  the legs stay straight. Arms are 2×47.05, `bend −1`, folding ~39 units at the
+  bottom.
+- **squat:** redrawn side-on, facing right. The legs are 2×39.06 IK to feet
+  planted at x 97/104. The hip goes (100, 100) → (75.7, 139.6), level with the
+  knee. The torso pitches 32°, and the arms (FK, 64) swing from 68°/62° to the
+  horizontal.
+- **hinge:** as corrected, with the start hip at (123.5, 158). Thighs are 33 and
+  39.5, because legR's drawn 34 cannot reach its heel from the bridged hip and
+  clamped. Both knees land within ~3 units of the drawn ones.
+- **plank:** FK, as corrected, plus a 3° neck lift.
+- **prone:** unchanged from wave 1.
+
+Measured across all 35 rungs, the worst planted-tip drift is 0.82 (push), 0.81
+(squat) and 0.33 (hinge); prone and plank are all FK. Torso clearance is 51.5,
+23.8, 20.4, 40.8 and 53.3. Nothing clamps.
+
+**Beyond the brief: the movement arrows.** Four of the five arrows were drawn
+through the body. push's crossed the back, hinge's ran up the thigh, prone's sat
+inside the head circle, and plank's lay on the legs. A dissolve hid that; a body
+moving under a fixed arrow does not. All five are moved to spots the body never
+reaches, and a new test holds them ≥12 units centre-to-centre from every bone and
+the head, at every stop and stop midpoint of every rung. Mutation check: push's
+old arrow fails it.
+
+**Tests.** `rig.test.ts` now runs on the shipped rigs instead of wave 1's
+transcribed fixtures, and asserts they are the objects the registry renders. The
+bone-length test compares against the rig's *declared* length, absolutely. Two
+tests are new: a `foreshorten` cast-in guard and the arrow clearance test.
+`motion.test.ts`'s `buildTimeline` assertions and `is linear` are unmodified.
+The CSS tests are rewritten for per-part keyframes and include a
+hold-is-exactly-two-stops check. The vacuous reduced-motion test now reads the
+anchor's painted `transform` and checks it against the rig's `end` shoulder, not
+`start`. `npm test`: 1117 pass, and typecheck is clean. Client lint is clean;
+server lint was already red from the Ward move and is fixed in a separate commit.
+
+**Verdict at 132px.** This was rendered in headless Chrome at 132px and frozen
+at fractions of the loop; it was not watched live on a phone. The morph reads as
+a body moving: push's elbows fold back while the hands stay on the floor,
+prone's arm visibly sweeps past the head instead of double-exposing, and the
+bridge's hip climbs. The crossfade showed none of that. On the pause, the trade
+the brief named is real. A paused rung no longer *snaps into focus*, because the
+figure is crisp at every frame; it **stops**, mid-loop, for 1.2 s, on a body
+that was moving at a constant rate a moment before. With linear timing that stop
+is unambiguous, and the static `AngleArc` overlay carries "this rung holds, and
+here" on its own. The blur was a third signal, and losing it costs less than the
+note feared. R3 (easing the turnaround) should stay deferred until someone
+watches it on a phone: the bones turn at constant angular rate, and that may
+already read as organic.

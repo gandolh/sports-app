@@ -13,13 +13,19 @@
  * ## The position axis
  *
  * A timeline is a walk along **one number**: `0` is the figure's drawn `start`
- * pose, `1` is its drawn `end` pose. `ExerciseFigure.tsx` realises that number as
- * a crossfade between the two stacked frames, which is the only interpolation the
- * drawing system can express — the poses have different path *shapes* (a bent
- * elbow appears at the bottom of a push-up), so there is nothing to tween
- * geometrically. Keeping the timeline as an abstract 0..1 position rather than as
- * CSS means the mapping is unit-testable without a DOM, and a future morphing
- * renderer would consume the same timeline.
+ * pose, `1` is its drawn `end` pose. Every figure is a rig (`rig.ts`): one
+ * skeleton, a length per bone, an angle per bone per phase. So a position is a
+ * pose — the same skeleton part-rotated — and `motionStyles` samples the
+ * timeline, solves each sample, and emits one `@keyframes` per bone.
+ *
+ * (Until brief 23 the two poses were independent drawings, crossfaded, and this
+ * comment said there was nothing to tween because their path shapes differed.
+ * That was never the blocker: the poses shared a topology. The blocker was that
+ * their bone lengths disagreed, and a rig makes that unrepresentable.)
+ *
+ * Keeping the timeline as an abstract 0..1 position rather than as CSS is what
+ * keeps the clock unit-testable without a DOM, and it is why the rig could
+ * replace the crossfade without touching `buildTimeline`.
  *
  * ## Which pose is "lowered" — the decision that has no test
  *
@@ -42,7 +48,10 @@
  * another survives intact. See the constant for why 0.6.
  */
 import type { Modifier } from '../../domain/types.ts'
-import type { FigurePhase } from './types.ts'
+import type { RigPartId } from './primitives.tsx'
+import { boneEntries, localAngles, resolvePhasePose, sampleTimeline } from './rig.ts'
+import type { RigPose } from './rig.ts'
+import type { FigurePhase, Rig } from './types.ts'
 
 /**
  * Which drawn phase is the **lowered / de-loaded** end of each pattern's rep —
@@ -51,20 +60,20 @@ import type { FigurePhase } from './types.ts'
  * Read off the actual drawings and the actual rung cues, pattern by pattern:
  *
  *   - **push** — `Push.tsx` draws `start` with straight arms (head y 70) and
- *     `end` with bent elbows and the chest low (head y 116). `end` is the
+ *     `end` with bent elbows and the chest low (head y 120). `end` is the
  *     bottom. `push-05`: "three full seconds on the way down only… then press
  *     back up". Eccentric runs `start` → `end`.
  *   - **squat** — `Squat.tsx` draws `start` standing (hip y 100) and `end` in the
- *     hole (hip y 142, knees bent). `end` is the bottom. `squat-03`: "three full
+ *     hole (hip y 140, thighs parallel). `end` is the bottom. `squat-03`: "three full
  *     seconds… from standing to thighs parallel". Eccentric runs `start` → `end`.
- *   - **hinge** — `Hinge.tsx` draws `start` lying with the hips down (hip y 156)
+ *   - **hinge** — `Hinge.tsx` draws `start` lying with the hips down (hip y 158)
  *     and `end` bridged (hip y 112). **`end` is the TOP.** `hinge-01`: "lift your
  *     hips… then lower until your backside just brushes the floor", and
  *     `hinge-02` holds at the top, which is the bridged pose. The eccentric —
  *     `hinge-06`'s five-second slide-out, which ends with the legs straight and
  *     the hips coming down — runs `end` → `start`.
  *   - **prone** — `Prone.tsx` draws `start` face-down with the hands by the hips
- *     (y 138/144) and `end` with the arms overhead in a Y (y 72/62). **`end` is
+ *     (y 151/152) and `end` with the arms overhead in a Y (y 72/62). **`end` is
  *     the raised, loaded pose.** `pull-05`'s comment in `ladders.ts` is explicit
  *     that its `pauseAt: 'bottom'` means "the bottom of the pull, elbows driven
  *     past the ribs" — arms *down*, which is the drawn `start`. So `'bottom'`
@@ -239,70 +248,117 @@ export function buildTimeline(
   }
 }
 
-/**
- * The two CSS animation names for a timeline — one per stacked frame, since a
- * true crossfade needs the outgoing pose to fade *out* as the incoming one fades
- * in. (Leaving the `start` frame opaque underneath would leave a permanent ghost
- * of the top of the rep sitting behind the bottom of it.)
- *
- * Derived from the timeline rather than from the rung id, so the 20-odd rungs
- * that share a clock share one pair of `@keyframes`, and the name itself reads
- * as the timeline in devtools: `…e0-100-1800_h100-100-1200_c100-0-600`.
- */
-export function motionAnimationNames(timeline: MotionTimeline): {
-  readonly start: string
-  readonly end: string
-} {
-  const slug = timeline.segments
+/** The timeline as a CSS identifier fragment, readable in devtools as the
+ * clock itself: `e0-100-1800_h100-100-1200_c100-0-600`. */
+function timelineSlug(timeline: MotionTimeline): string {
+  return timeline.segments
     .map(
       (s) =>
         `${s.phase.slice(0, 1)}${Math.round(s.from * 100)}-${Math.round(s.to * 100)}-${s.durationMs}`,
     )
     .join('_')
-  const base = `exercise-figure-clock-${slug}`
-  return { start: `${base}-a`, end: `${base}-b` }
-}
-
-function keyframesFor(
-  name: string,
-  timeline: MotionTimeline,
-  opacityAt: (position: number) => number,
-): string {
-  const stops = [`  0% { opacity: ${opacityAt(timeline.segments[0]?.from ?? 0)}; }`]
-  let elapsed = 0
-  for (const segment of timeline.segments) {
-    elapsed += segment.durationMs
-    const percent = ((elapsed / timeline.totalMs) * 100).toFixed(4).replace(/\.?0+$/, '')
-    stops.push(`  ${percent}% { opacity: ${opacityAt(segment.to)}; }`)
-  }
-  return `@keyframes ${name} {\n${stops.join('\n')}\n}`
 }
 
 /**
- * The timeline as a stylesheet fragment: two `@keyframes` blocks, the two rules
- * that bind them, and a reduced-motion guard.
+ * A short, stable name for a rig's geometry (32-bit FNV-1a over its JSON, in
+ * base 36).
+ *
+ * The keyframes depend on the rig as well as the clock, and `@keyframes` names
+ * are global to the document. Several exercise cards are on screen at once, and
+ * a push-up and a squat can share a clock; named by the clock alone, whichever
+ * card rendered last would silently drive the other's bones. Hashing the
+ * geometry rather than taking a figure id keeps the function honest — the name
+ * changes exactly when the keyframes would — and identical rigs still share.
+ */
+function rigSlug(rig: Rig): string {
+  let hash = 0x811c9dc5
+  for (const char of JSON.stringify(rig)) {
+    hash ^= char.charCodeAt(0)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return hash.toString(36)
+}
+
+/**
+ * The animation (and class) name for every moving part of a rig on a clock: the
+ * shoulder anchor plus each bone `boneEntries` names. A one-bone limb is one
+ * part, a two-bone limb two, so the set depends on the rig.
+ *
+ * The 20-odd rungs that share both a clock and a figure share one set of
+ * `@keyframes`, so duplicated `<style>` tags are identical and harmless.
+ */
+export function motionClassNames(
+  timeline: MotionTimeline,
+  rig: Rig,
+): ReadonlyMap<RigPartId, string> {
+  const base = `exercise-figure-clock-${timelineSlug(timeline)}-${rigSlug(rig)}`
+  const names = new Map<RigPartId, string>([['anchor', `${base}-anchor`]])
+  for (const [id] of boneEntries(resolvePhasePose(rig, 'start'))) names.set(id, `${base}-${id}`)
+  return names
+}
+
+/** Percentages and angles to four and three decimals, trailing zeros dropped. */
+function trim(value: number, digits: number): string {
+  return value.toFixed(digits).replace(/\.?0+$/, '') || '0'
+}
+
+function partTransform(pose: RigPose, local: ReadonlyMap<RigPartId, number>, part: RigPartId): string {
+  if (part === 'anchor') {
+    return `translate(${trim(pose.shoulder.x, 3)}px, ${trim(pose.shoulder.y, 3)}px)`
+  }
+  return `rotate(${trim(local.get(part) ?? 0, 3)}deg)`
+}
+
+/**
+ * The timeline as a stylesheet fragment: one `@keyframes` per moving part, the
+ * rules that bind them, and a reduced-motion guard.
+ *
+ * Stops come from `sampleTimeline`: every segment boundary, plus
+ * `SAMPLES_PER_MOVING_SEGMENT` interior samples per moving segment, each solved
+ * by FK or IK into concrete angles. The JS runs once per rung, when this string
+ * is built; CSS interpolates between the stops, and since every stop is a
+ * rotation of a fixed-length bone, nothing can stretch between them either. The
+ * one approximation — a planted hand drifting slightly between stops, because an
+ * IK path is not linear in its angles — is measured by `worstTipDrift` and held
+ * under a unit by the sample count.
  *
  * **`linear`, deliberately, and this is not a style preference.** Any easing that
  * decelerates into the turnaround makes a rung *without* a pause appear to dwell
  * at the bottom, which is precisely the signal a rung *with* a pause is supposed
  * to own. The eased-motion instinct in `corpus/wiki/design-system.md` is about
  * discrete state changes; here a constant rate is what carries the information.
+ * (Within a segment, constant rate means constant progress along the timeline;
+ * a bone turning at a varying angular speed is the IK solution, not easing.)
  *
  * The `@media` block is belt-and-braces. `ExerciseFigure.tsx` branches in JS and
  * emits none of this when reduced motion is set — but `matchMedia` is absent
  * under SSR and in some test environments, and a figure that animates for
  * somebody who asked it not to is an accessibility failure, not a cosmetic one.
+ * With the animation off, each part falls back to its static `transform`
+ * attribute, which is the `end` pose (`RigFigure`).
  */
-export function motionStyles(timeline: MotionTimeline): string {
-  const names = motionAnimationNames(timeline)
+export function motionStyles(timeline: MotionTimeline, rig: Rig): string {
+  const names = motionClassNames(timeline, rig)
+  const samples = sampleTimeline(rig, timeline).map((sample) => ({
+    percent: trim(sample.percent, 4),
+    pose: sample.pose,
+    local: localAngles(sample.pose) as ReadonlyMap<RigPartId, number>,
+  }))
   const duration = `${timeline.totalMs}ms`
+  const keyframes: string[] = []
+  const rules: string[] = []
+  for (const [part, name] of names) {
+    const stops = samples.map(
+      (sample) => `  ${sample.percent}% { transform: ${partTransform(sample.pose, sample.local, part)}; }`,
+    )
+    keyframes.push(`@keyframes ${name} {\n${stops.join('\n')}\n}`)
+    rules.push(`.${name} { animation: ${name} ${duration} linear infinite; }`)
+  }
   return [
-    keyframesFor(names.end, timeline, (p) => p),
-    keyframesFor(names.start, timeline, (p) => 1 - p),
-    `.${names.end} { animation: ${names.end} ${duration} linear infinite; }`,
-    `.${names.start} { animation: ${names.start} ${duration} linear infinite; }`,
+    ...keyframes,
+    ...rules,
     '@media (prefers-reduced-motion: reduce) {',
-    `  .${names.end}, .${names.start} { animation: none; }`,
+    `  ${[...names.values()].map((name) => `.${name}`).join(', ')} { animation: none; }`,
     '}',
   ].join('\n')
 }

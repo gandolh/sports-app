@@ -750,7 +750,7 @@ left alone — those are about viewing distance, not aim.
 ### 2026-07-30, later still — brief 23 written: the figures get a rig
 
 Researched the animation system against `~/projects/game-engine`, then grilled the
-result into [briefs/todo/23-figure-rig-and-morph.md](briefs/todo/23-figure-rig-and-morph.md).
+result into [briefs/done/23-figure-rig-and-morph.md](briefs/done/23-figure-rig-and-morph.md).
 Nothing implemented.
 
 **The engine turned out not to be the answer.** It has easing curves, an injected-time
@@ -1211,3 +1211,26 @@ Ward. The 2026-09-06 entry noted nothing had been run in a real browser; this is
 that hid, and it holds in the deploy as well. The fix needs a way for the client to
 learn the signed-in person (an `/api/me` on the service, like prm's) and a `/login` that
 checks it before handing off. Left for the owner to decide.
+
+## [2026-10-02] done | Brief 23: the figures are rigs, and they move
+
+The crossfade is gone. Each of the five figures is a rig (one skeleton, a length
+per bone, two angle sets), drawn by one renderer as nested bone groups and
+animated by per-bone `@keyframes` that `motion.ts` solves once per rung from the
+unchanged timeline. Bone length is invariant by construction and asserted against
+the declared lengths at every stop. Planted hands and feet drift at most 0.82
+units between stops. `foreshorten` is deleted: squat was redrawn side-on, so every
+figure shares one projection.
+
+Two findings beyond the brief:
+- Four of the five movement arrows were drawn through the body, which a dissolve
+  hid. They are moved, and a test holds them clear.
+- `getFigure` could resolve prototype keys such as `constructor`.
+
+**Question 4 revisited, as the brief asked.** The note said the crossfade's blur
+was what made a 2-second pause legible, and that a true morph would weaken it.
+Measured at 132px in frozen frames: true, a paused rung no longer snaps into
+focus. It does stop dead on a body that was moving at a constant rate, and the
+static `AngleArc` overlay names the hold on its own, so the blur was a redundant
+third signal. Not yet watched live on a phone; R3 waits for that look. Full
+outcome on the brief.

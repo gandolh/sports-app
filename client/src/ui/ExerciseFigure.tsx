@@ -1,8 +1,9 @@
-import { createElement, useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Modifier, Rung } from '../domain/types.ts'
 import { AngleArc, ElevationMarker, HandPositionDots, TempoDot } from './figures/overlays.tsx'
 import { FIGURE_VIEWBOX, getFigure } from './figures/index.ts'
-import { buildTimeline, motionAnimationNames, motionStyles } from './figures/motion.ts'
+import { buildTimeline, motionClassNames, motionStyles } from './figures/motion.ts'
+import { RigFigure } from './figures/primitives.tsx'
 
 export interface ExerciseFigureProps {
   /** Only the fields the figure system needs — callers can pass a full
@@ -38,12 +39,9 @@ function usePrefersReducedMotion(): boolean {
  * that lets a new rung reuse an existing drawing (see `figures/index.ts`).
  * Nothing here knows or cares which pose it is stacked on top of.
  *
- * They render **once**, in their own static layer, rather than inside each
- * pose frame. When the two frames were only ever crossfaded at 4s intervals a
- * duplicated overlay was invisible; now that the frames' opacities are driven
- * by a clock, a duplicated overlay would pulse in and out along with the body
- * — an annotation flickering is noise, and the accent-coloured ones are the
- * brightest thing on the drawing.
+ * They render **once**, in their own static layer, outside the animated
+ * skeleton. An annotation that moved or pulsed with the body would be noise,
+ * and the accent-coloured ones are the brightest thing on the drawing.
  */
 function renderOverlays(modifier: Modifier | undefined) {
   if (!modifier) return null
@@ -80,17 +78,13 @@ const STYLES = `
   width: 100%;
   height: 100%;
 }
-.exercise-figure__frame--start { opacity: 1; }
-.exercise-figure__frame--end { opacity: 0; }
-/* The reduced-motion end state, expressed twice on purpose. The class is set by
-   a real JS branch that also emits no @keyframes at all; the media query is the
-   net for environments with no matchMedia (SSR, some test runners), where the
-   branch cannot fire. Both resolve to the same still frame: the end pose. */
-.exercise-figure--static .exercise-figure__frame--start { opacity: 0; }
-.exercise-figure--static .exercise-figure__frame--end { opacity: 1; }
-@media (prefers-reduced-motion: reduce) {
-  .exercise-figure__frame--start { opacity: 0; }
-  .exercise-figure__frame--end { opacity: 1; }
+/* Every bone group rotates about its own origin, which is the joint it hangs
+   from: the renderer puts each bone's root at (0,0) of its group. This is the
+   SVG default already; it is stated so a global transform-origin rule cannot
+   swing a limb about the middle of the canvas. */
+.exercise-figure__frame g {
+  transform-box: view-box;
+  transform-origin: 0 0;
 }
 .exercise-figure--placeholder {
   flex-direction: column;
@@ -110,8 +104,8 @@ const STYLES = `
 `
 
 /**
- * Renders a rung's figure by its `figureId`, animating between the `start` and
- * `end` poses **on a clock derived from `Rung.modifier`** (`figures/motion.ts`).
+ * Renders a rung's figure by its `figureId`, moving the rig between its `start`
+ * and `end` poses **on a clock derived from `Rung.modifier`** (`figures/motion.ts`).
  * That derivation is the whole point: five drawings cover 35 rungs, and what
  * separates two rungs sharing a pose is when the figure moves and when it stops.
  * A 3-second lowering takes three (scaled) seconds; a 2-second bottom hold
@@ -126,58 +120,42 @@ const STYLES = `
  */
 export function ExerciseFigure({ rung, size = 120, className }: ExerciseFigureProps) {
   const reducedMotion = usePrefersReducedMotion()
-  const Figure = getFigure(rung.figureId)
-  const timeline = buildTimeline(rung.figureId, rung.modifier)
-  const clock = motionAnimationNames(timeline)
+  const figure = getFigure(rung.figureId)
   // A real branch, not a slowed animation: under reduced motion no keyframes are
-  // generated, no animation class is applied, and the still `end` pose is shown.
-  const animated = !reducedMotion && Figure !== undefined
+  // generated, no animation class is applied, and the figure's static `end` pose
+  // is what shows.
+  const animated = !reducedMotion && figure !== undefined
+  // Solving the rig and writing ~300 keyframe stops is cheap but not free, and
+  // this re-renders on every tick of the countdown beside it. Keyed on what the
+  // CSS actually depends on.
+  const motion = useMemo(() => {
+    if (!animated || !figure) return undefined
+    const timeline = buildTimeline(rung.figureId, rung.modifier)
+    return { classes: motionClassNames(timeline, figure.rig), css: motionStyles(timeline, figure.rig) }
+  }, [animated, figure, rung.figureId, rung.modifier])
 
   const rootClassName = [
     'exercise-figure',
-    Figure ? null : 'exercise-figure--placeholder',
+    figure ? null : 'exercise-figure--placeholder',
     animated ? null : 'exercise-figure--static',
     className,
   ]
     .filter(Boolean)
     .join(' ')
-  const frameClassName = (phase: 'start' | 'end') =>
-    [
-      'exercise-figure__frame',
-      `exercise-figure__frame--${phase}`,
-      animated ? 'exercise-figure__frame--animated' : null,
-      animated ? clock[phase] : null,
-    ]
-      .filter(Boolean)
-      .join(' ')
 
   return (
     <div className={rootClassName} role="img" aria-label={rung.name} style={{ width: size, height: size }}>
       <style>{STYLES}</style>
-      {animated ? <style>{motionStyles(timeline)}</style> : null}
-      {Figure ? (
+      {motion ? <style>{motion.css}</style> : null}
+      {figure ? (
         <>
           <svg
-            className={frameClassName('start')}
+            className="exercise-figure__frame"
             viewBox={FIGURE_VIEWBOX}
             aria-hidden="true"
             focusable="false"
           >
-            {/* `Figure` is resolved from the registry by id, so it is not a
-                statically-known JSX tag — rendered via `createElement`
-                rather than `<Figure />` so this legitimate dynamic-dispatch
-                pattern doesn't trip the "components must not be created
-                during render" lint heuristic, which is written for the
-                unrelated anti-pattern of defining a *new* component inline. */}
-            {createElement(Figure, { phase: 'start' })}
-          </svg>
-          <svg
-            className={frameClassName('end')}
-            viewBox={FIGURE_VIEWBOX}
-            aria-hidden="true"
-            focusable="false"
-          >
-            {createElement(Figure, { phase: 'end' })}
+            <RigFigure rig={figure.rig} arrow={figure.arrow} motion={motion?.classes} />
           </svg>
           <svg
             className="exercise-figure__overlays"

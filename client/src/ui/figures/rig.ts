@@ -27,7 +27,7 @@
  * ## FK and IK, and why both are needed
  *
  * A freely swinging limb is one rotation: `solveFk`. That covers `prone` arms
- * (150° sweep) and `squat` arms (82°), where the angle *is* the movement.
+ * (150° sweep) and `squat` arms (~70°), where the angle *is* the movement.
  *
  * The interesting half is the planted limbs. `push` keeps its hands at y=176 and
  * its feet at y=150/158 in *both* phases while the shoulder drops 44 units.
@@ -53,7 +53,6 @@ import type {
   IkLimb,
   Joint,
   LimbRoot,
-  PhasePair,
   Rig,
   RigBone,
   RigBoneId,
@@ -111,20 +110,6 @@ function lerpJoint(a: Joint, b: Joint, t: number): Joint {
  * limb backwards, which reads as an inverted joint rather than as a typo. */
 function boneLength(value: number): number {
   return Math.max(0, finite(value))
-}
-
-/**
- * The foreshorten factor at a position, defaulting to 1.
- *
- * Clamped to `[0, 1]`, and the upper bound is the load-bearing half: a factor
- * above 1 would *lengthen* a bone, which is precisely the defect this module is
- * built to make unrepresentable. Silently clamping is better than honouring it,
- * because a rig that declared 1.2 would otherwise pass every length test — the
- * test compares against `length × foreshorten`.
- */
-function foreshortenAt(pair: PhasePair<number> | undefined, position: number): number {
-  if (!pair) return 1
-  return clamp(lerp(clamp(finite(pair.start), 0, 1), clamp(finite(pair.end), 0, 1), position), 0, 1)
 }
 
 /** Forward kinematics, entire: one rotation and one translation. */
@@ -270,11 +255,8 @@ export interface ResolvedBone {
    * the same motion. Either nesting works; absolute is what the canonical
    * skeleton table is written in. */
   readonly angleDeg: number
-  /** As drawn: `restLength × foreshorten`. */
+  /** As declared, and therefore as drawn: nothing scales a bone. */
   readonly length: number
-  /** As declared. `length !== restLength` only where a phase declares
-   * foreshortening, which makes the bone-length test self-describing. */
-  readonly restLength: number
 }
 
 export interface ResolvedLimb {
@@ -302,10 +284,9 @@ export interface RigPose {
 }
 
 function resolveBone(from: Joint, bone: RigBone, position: number): ResolvedBone {
-  const restLength = boneLength(bone.length)
-  const length = restLength * foreshortenAt(bone.foreshorten, position)
+  const length = boneLength(bone.length)
   const angleDeg = lerp(finite(bone.angleDeg.start), finite(bone.angleDeg.end), position)
-  return { from, to: solveFk(from, angleDeg, length), angleDeg, length, restLength }
+  return { from, to: solveFk(from, angleDeg, length), angleDeg, length }
 }
 
 function resolveLimb(limb: RigLimb, root: Joint, position: number): ResolvedLimb {
@@ -322,11 +303,10 @@ function resolveLimb(limb: RigLimb, root: Joint, position: number): ResolvedLimb
     }
   }
 
-  const factor = foreshortenAt(limb.foreshorten, position)
-  const upperRest = boneLength(limb.upper)
-  const lowerRest = boneLength(limb.lower)
+  const upper = boneLength(limb.upper)
+  const lower = boneLength(limb.lower)
   const target = lerpJoint(limb.target.start, limb.target.end, position)
-  const solution = solveIk(root, target, upperRest * factor, lowerRest * factor, limb.bend)
+  const solution = solveIk(root, target, upper, lower, limb.bend)
   return {
     rootId: limb.root,
     bones: [
@@ -334,15 +314,13 @@ function resolveLimb(limb: RigLimb, root: Joint, position: number): ResolvedLimb
         from: root,
         to: solution.mid,
         angleDeg: solution.upperAngleDeg,
-        length: upperRest * factor,
-        restLength: upperRest,
+        length: upper,
       },
       {
         from: solution.mid,
         to: solution.tip,
         angleDeg: solution.lowerAngleDeg,
-        length: lowerRest * factor,
-        restLength: lowerRest,
+        length: lower,
       },
     ],
     root,
@@ -362,8 +340,8 @@ function resolveLimb(limb: RigLimb, root: Joint, position: number): ResolvedLimb
  *
  *   - the shoulder anchor is **lerped as a point**, because it is a translation
  *     and CSS lerps `translate()` the same way, so the two agree exactly;
- *   - bone angles and foreshorten factors are **lerped as numbers**, and every
- *     length stays constant through the rotation;
+ *   - bone angles are **lerped as numbers**, and every length stays constant
+ *     through the rotation;
  *   - IK mid joints are **re-solved**, never interpolated, so the planted tip is
  *     exact at every position this function is asked about.
  *
@@ -410,6 +388,42 @@ export function boneEntries(pose: RigPose): readonly (readonly [RigBoneId, Resol
     }
   }
   return entries
+}
+
+/**
+ * Each bone's angle relative to the bone it is drawn inside — what an SVG
+ * `rotate()` on a nested group needs.
+ *
+ * The renderer nests bones the way the skeleton hangs: legs inside the torso
+ * (they hang from the hip, its tip), a lower bone inside its upper bone, and the
+ * neck, the torso and the arms directly on the shoulder anchor, which only
+ * translates. Nesting is what keeps the figure in one piece *between* keyframe
+ * stops: every joint is its parent's tip by construction, so no interpolation
+ * can pull a knee off a thigh. Drawing each bone flat at an interpolated root
+ * would not have that property — a root lerped as a point cuts the chord of the
+ * arc its parent swings through, and the limb would detach mid-tween.
+ *
+ * Absolute angles in, so the difference of two continuous (unwrapped) sequences
+ * is continuous too, and CSS can interpolate local angles stop to stop exactly
+ * as it would absolute ones.
+ */
+export function localAngles(pose: RigPose): ReadonlyMap<RigBoneId, number> {
+  const absolute = new Map(boneEntries(pose).map(([id, bone]) => [id, bone.angleDeg]))
+  const local = new Map<RigBoneId, number>()
+  for (const [id, angle] of absolute) {
+    const parent = boneParent(pose, id)
+    local.set(id, parent === undefined ? angle : angle - (absolute.get(parent) ?? 0))
+  }
+  return local
+}
+
+/** The bone a bone is nested inside, or `undefined` when it sits on the
+ * shoulder anchor. See `localAngles`. */
+export function boneParent(pose: RigPose, id: RigBoneId): RigBoneId | undefined {
+  if (id === 'neck' || id === 'torso') return undefined
+  const [limbId, part] = id.split('-') as [RigLimbId, 'upper' | 'lower' | undefined]
+  if (part === 'lower') return `${limbId}-upper`
+  return pose.limbs[limbId].rootId === 'hip' ? 'torso' : undefined
 }
 
 /** True when both phases name the same target — the limb the drift test cares
@@ -586,7 +600,6 @@ export function blendPoses(a: RigPose, b: RigPose, t: number): RigPose {
       to: solveFk(from, angleDeg, length),
       angleDeg,
       length,
-      restLength: first.restLength,
     }
   }
 

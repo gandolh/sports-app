@@ -8,10 +8,13 @@ import {
   BASE_PHASE_SECONDS,
   MOTION_SCALE,
   buildTimeline,
-  motionAnimationNames,
+  motionClassNames,
   motionStyles,
 } from '../motion.ts'
 import type { MotionTimeline } from '../motion.ts'
+import { figures } from '../index.ts'
+import { PUSH_RIG } from '../Push.tsx'
+import { SQUAT_RIG } from '../Squat.tsx'
 
 /** Real seconds a modifier prescribes, undoing the display compression. */
 function realSeconds(ms: number): number {
@@ -45,8 +48,10 @@ describe('the timeline is what distinguishes adjacent rungs', () => {
     expect(six.totalMs).not.toBe(five.totalMs)
     // And they must not merely differ — they must differ *as CSS*, or the DOM
     // ends up identical however different the data was.
-    expect(motionStyles(six)).not.toBe(motionStyles(five))
-    expect(motionAnimationNames(six).end).not.toBe(motionAnimationNames(five).end)
+    expect(motionStyles(six, PUSH_RIG)).not.toBe(motionStyles(five, PUSH_RIG))
+    expect(motionClassNames(six, PUSH_RIG).get('anchor')).not.toBe(
+      motionClassNames(five, PUSH_RIG).get('anchor'),
+    )
   })
 
   it('they differ by exactly the hold: same lowering, same lift, one extra still segment', () => {
@@ -169,7 +174,7 @@ describe('the eccentric runs toward the lowered pose, which differs per pattern'
     // timeline is built before that is known, so it must not throw.
     const timeline = buildTimeline('not-a-pose', { eccentricSeconds: 3, pauseSeconds: 2, pauseAt: 'top' })
     expect(timeline.totalMs).toBeGreaterThan(0)
-    expect(() => motionStyles(timeline)).not.toThrow()
+    expect(() => motionStyles(timeline, PUSH_RIG)).not.toThrow()
   })
 })
 
@@ -199,7 +204,9 @@ describe('all 35 rungs', () => {
         if (index > 0) expect(s.from).toBe(timeline.segments[index - 1]?.to)
       }
       expect(timeline.segments.at(-1)?.to).toBe(timeline.segments[0]?.from)
-      expect(() => motionStyles(timeline)).not.toThrow()
+      const figure = rung.figureId ? figures[rung.figureId] : undefined
+      expect(figure, `${rung.id} has no registered figure`).toBeDefined()
+      expect(() => motionStyles(timeline, figure!.rig)).not.toThrow()
     })
   }
 
@@ -252,50 +259,87 @@ describe('all 35 rungs', () => {
 
 describe('generated CSS', () => {
   const timeline = buildTimeline('push', { eccentricSeconds: 3, pauseSeconds: 2, pauseAt: 'bottom' })
-  const css = motionStyles(timeline)
-  const names = motionAnimationNames(timeline)
+  const css = motionStyles(timeline, PUSH_RIG)
+  const names = motionClassNames(timeline, PUSH_RIG)
 
-  it('emits one @keyframes per frame, bound to the animation duration', () => {
-    expect(css).toContain(`@keyframes ${names.end} {`)
-    expect(css).toContain(`@keyframes ${names.start} {`)
-    expect(css).toContain(`animation: ${names.end} ${timeline.totalMs}ms linear infinite`)
-    expect(css).toContain(`animation: ${names.start} ${timeline.totalMs}ms linear infinite`)
+  /** Every stop of one named `@keyframes` block, in order. */
+  function stopsOf(name: string): { at: number; transform: string }[] {
+    const block = new RegExp(`@keyframes ${name} \\{\\n([\\s\\S]*?)\\n\\}`).exec(css)
+    expect(block, `no @keyframes ${name}`).not.toBeNull()
+    return [...block![1]!.matchAll(/([\d.]+)% \{ transform: ([^;]+); \}/g)].map(([, at, transform]) => ({
+      at: Number(at),
+      transform: transform!,
+    }))
+  }
+
+  it('emits one @keyframes per moving part, bound to the animation duration', () => {
+    // The anchor, the neck, the torso, and push's four two-bone limbs.
+    expect(names.size).toBe(1 + 2 + 4 * 2)
+    for (const name of names.values()) {
+      expect(css).toContain(`@keyframes ${name} {`)
+      expect(css).toContain(`.${name} { animation: ${name} ${timeline.totalMs}ms linear infinite; }`)
+      // A stop per sample, not per segment: a two-stop block would let CSS
+      // interpolate an IK limb straight through its own plant.
+      expect(stopsOf(name).length).toBeGreaterThan(timeline.segments.length + 1)
+    }
+  })
+
+  it('moves the anchor by translation and every bone by rotation, nothing else', () => {
+    // Lengths live in the static geometry. A keyframe that scaled, skewed or
+    // translated a bone could stretch it between stops, which is the defect the
+    // rig was built to make impossible.
+    for (const [part, name] of names) {
+      for (const stop of stopsOf(name)) {
+        expect(stop.transform, `${part}`).toMatch(
+          part === 'anchor' ? /^translate\(-?[\d.]+px, -?[\d.]+px\)$/ : /^rotate\(-?[\d.]+deg\)$/,
+        )
+      }
+    }
   })
 
   it('carries a reduced-motion guard for environments with no matchMedia', () => {
     expect(css).toContain('@media (prefers-reduced-motion: reduce)')
     expect(css).toContain('animation: none')
+    const guard = css.slice(css.indexOf('@media'))
+    for (const name of names.values()) expect(guard).toContain(`.${name}`)
   })
 
   it('is linear — any easing into the turnaround would fake a hold', () => {
     expect(css).not.toMatch(/ease|cubic-bezier/)
   })
 
-  it('holds the same opacity across the pause, and the two frames are complements', () => {
+  it('holds every part still across the pause, and only there', () => {
     // 3s down + 2s hold + 1s up, scaled: the hold spans 3/6 → 5/6 of the loop.
-    const stops = [...css.matchAll(/([\d.]+)% \{ opacity: ([\d.]+); \}/g)].map(([, at, opacity]) => ({
-      at: Number(at),
-      opacity: Number(opacity),
-    }))
-    // The `end` frame's keyframes come first; it must reach 1 and stay there.
-    const endStops = stops.slice(0, timeline.segments.length + 1)
-    const full = endStops.filter((stop) => stop.opacity === 1)
-    expect(full).toHaveLength(2)
-    expect(full[1]!.at - full[0]!.at).toBeCloseTo(
-      (Math.round(2000 * MOTION_SCALE) / timeline.totalMs) * 100,
-      3,
-    )
-    // Complementary: the `start` frame's stops mirror the `end` frame's.
-    const startStops = stops.slice(timeline.segments.length + 1)
-    expect(startStops).toHaveLength(endStops.length)
-    for (const [index, stop] of startStops.entries()) {
-      expect(stop.at).toBeCloseTo(endStops[index]!.at, 5)
-      expect(stop.opacity).toBeCloseTo(1 - endStops[index]!.opacity, 5)
+    const holdStart = (Math.round(3000 * MOTION_SCALE) / timeline.totalMs) * 100
+    const holdEnd = holdStart + (Math.round(2000 * MOTION_SCALE) / timeline.totalMs) * 100
+    let moved = 0
+    for (const [part, name] of names) {
+      const stops = stopsOf(name)
+      const first = stops.find((stop) => Math.abs(stop.at - holdStart) < 1e-3)
+      const last = stops.find((stop) => Math.abs(stop.at - holdEnd) < 1e-3)
+      expect(first, `${part} has no stop at the start of the hold`).toBeDefined()
+      expect(last, `${part} has no stop at the end of the hold`).toBeDefined()
+      expect(last!.transform, part).toBe(first!.transform)
+      // Exactly two stops bound the hold — nothing between them to smear it.
+      expect(stops.filter((stop) => stop.at > holdStart + 1e-3 && stop.at < holdEnd - 1e-3)).toEqual([])
+      if (new Set(stops.map((stop) => stop.transform)).size > 1) moved += 1
     }
+    // …and the figure does move outside the hold, or the test above is vacuous.
+    expect(moved).toBeGreaterThan(4)
   })
 
-  it('produces a CSS-safe identifier', () => {
-    expect(names.end).toMatch(/^[A-Za-z][A-Za-z0-9_-]*$/)
-    expect(names.start).toMatch(/^[A-Za-z][A-Za-z0-9_-]*$/)
+  it('names keyframes by rig as well as clock, so two figures on screen cannot collide', () => {
+    // `@keyframes` names are global to the document. A push-up and a squat card
+    // on one screen can share a clock; named by the clock alone, whichever
+    // rendered last would drive the other's bones.
+    const clock = buildTimeline('squat', undefined)
+    const push = new Set(motionClassNames(clock, PUSH_RIG).values())
+    for (const name of motionClassNames(clock, SQUAT_RIG).values()) expect(push.has(name)).toBe(false)
+    // …while the same rig on the same clock shares, so 35 rungs stay cheap.
+    expect([...motionClassNames(clock, PUSH_RIG).values()]).toEqual([...push])
+  })
+
+  it('produces CSS-safe identifiers', () => {
+    for (const name of names.values()) expect(name).toMatch(/^[A-Za-z][A-Za-z0-9_-]*$/)
   })
 })

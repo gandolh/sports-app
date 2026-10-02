@@ -1,19 +1,15 @@
 // Runs in the default `node` environment: `rig.ts` is pure geometry, and keeping
 // it testable with no DOM is the reason it emits numbers rather than JSX.
 //
-// ─── About the fixtures ─────────────────────────────────────────────────────
+// ─── About the rigs ─────────────────────────────────────────────────────────
 //
-// The five rigs below are transcribed from the canonical-skeleton table in
-// `corpus/briefs/todo/23-figure-rig-and-morph.md`, which was measured off the
-// existing drawings. They are **fixtures, not art**: wave 2 owns the final
-// numbers in `Push.tsx` and friends. They are here because a geometry module
-// tested only on synthetic inputs proves nothing about the geometry the app
-// actually has — `push`'s 94-unit arm chain folding 60° over a planted hand is
-// the case that sets the sample resolution, and no tidy synthetic case is as
-// harsh.
-//
-// Where a fixture departs from the brief's table it is commented, because those
-// departures are findings about the table rather than choices about the test.
+// Every assertion below runs on the five rigs the app actually ships, imported
+// from the figure files, across all 35 rungs' clocks. Wave 1 tested transcribed
+// fixtures because the figure files did not exist yet; a geometry module tested
+// on stand-ins proves nothing about the geometry the app draws — `push`'s
+// 94-unit arm chain folding over a planted hand is the case that sets the sample
+// resolution, and no tidy synthetic case is as harsh. The one synthetic rig left
+// is `BRANCH_CUT`, a probe for a code path no real pose reaches.
 import { LADDERS } from '../../../domain/ladders.ts'
 import { PATTERNS } from '@sports-app/shared/types.ts'
 import { buildTimeline } from '../motion.ts'
@@ -33,7 +29,13 @@ import {
   worstTipDrift,
 } from '../rig.ts'
 import type { RigPose } from '../rig.ts'
-import type { Joint, Rig } from '../types.ts'
+import type { Joint, Rig, RigBoneId } from '../types.ts'
+import { HINGE_RIG as HINGE } from '../Hinge.tsx'
+import { PLANK_RIG as PLANK } from '../Plank.tsx'
+import { PRONE_RIG as PRONE } from '../Prone.tsx'
+import { PUSH_RIG as PUSH } from '../Push.tsx'
+import { SQUAT_RIG as SQUAT } from '../Squat.tsx'
+import { figures } from '../index.ts'
 
 /**
  * The brief's budget: ~1 figure unit of slide on a joint that is supposed to be
@@ -76,178 +78,6 @@ function spread(count: number, seed: number): readonly number[] {
     values.push(state / 2147483648)
   }
   return values
-}
-
-// ─── The five fixtures ──────────────────────────────────────────────────────
-
-const PUSH: Rig = {
-  // Hands at y=176 and feet at y=150/158 in *both* drawn phases while the
-  // shoulder descends 44 units — the case that motivates IK at all.
-  shoulder: { start: { x: 62, y: 82 }, end: { x: 62, y: 126 } },
-  torso: { length: 71.4, angleDeg: { start: 11, end: -15 } },
-  neck: { length: 20, angleDeg: { start: -143, end: -148 } },
-  limbs: {
-    // bend -1 puts the elbow anticlockwise of the shoulder→hand line, which in
-    // this side view is *back toward the feet* — where a push-up's elbow goes.
-    // FINDING: the current END drawing has it the other way (elbow x=52 with the
-    // shoulder at x=62 and the hand at x=56, so ahead of the line), which is
-    // anatomically inverted. Read the bend sign off anatomy, not off the drawing.
-    armL: {
-      kind: 'ik',
-      root: 'shoulder',
-      upper: 47.05,
-      lower: 47.05,
-      bend: -1,
-      target: { start: { x: 58, y: 176 }, end: { x: 58, y: 176 } },
-    },
-    armR: {
-      kind: 'ik',
-      root: 'shoulder',
-      upper: 47.05,
-      lower: 47.05,
-      bend: -1,
-      target: { start: { x: 66, y: 176 }, end: { x: 66, y: 176 } },
-    },
-    // FINDING: 67.6 and 77.0, not the table's 67.2 and 76.6. The table rounds
-    // lengths to 0.1 and angles to whole degrees, and the rounding lands *short*:
-    // with a torso of 71.4 at 11° the start hip is (132.1, 95.6), which is 67.44
-    // from the planted foot at (172, 150) — so a 67.2 chain cannot reach a pose
-    // the same table says is straight, and clamps. Every straight-in-one-phase
-    // limb needs its canonical length taken from the derived chord, not from the
-    // rounded measurement.
-    legL: {
-      kind: 'ik',
-      root: 'hip',
-      upper: 33.8,
-      lower: 33.8,
-      bend: -1,
-      target: { start: { x: 172, y: 150 }, end: { x: 172, y: 150 } },
-    },
-    legR: {
-      kind: 'ik',
-      root: 'hip',
-      upper: 38.5,
-      lower: 38.5,
-      bend: -1,
-      target: { start: { x: 177, y: 158 }, end: { x: 177, y: 158 } },
-    },
-  },
-}
-
-const SQUAT: Rig = {
-  shoulder: { start: { x: 100, y: 58 }, end: { x: 100, y: 108 } },
-  // Front view, so the torso leans toward the viewer as the hips go back: 42 →
-  // 34 is projection, not a stretched spine.
-  torso: { length: 42, angleDeg: { start: 90, end: 90 }, foreshorten: { start: 1, end: 0.81 } },
-  neck: { length: 18, angleDeg: { start: -90, end: -90 } },
-  limbs: {
-    // The brief's one sanctioned foreshorten case: the arms swing at the viewer.
-    armL: {
-      kind: 'fk',
-      root: 'shoulder',
-      length: 70.7,
-      angleDeg: { start: 98, end: 180 },
-      foreshorten: { start: 1, end: 0.45 },
-    },
-    armR: {
-      kind: 'fk',
-      root: 'shoulder',
-      length: 70.7,
-      angleDeg: { start: 82, end: 0 },
-      foreshorten: { start: 1, end: 0.45 },
-    },
-    // FINDING: the legs need foreshortening too, and the brief says only the arms
-    // do. A front-view femur points away from the viewer at the bottom of a
-    // squat. Held at its full length in the picture plane with the foot planted
-    // and the hip 36 units off the floor, the knee is forced ~36 units lateral —
-    // a frog squat, and it collides with the forward-swung hands. 0.626
-    // reproduces the drawn 49.6 chain and puts the knee ~16 out, which is what
-    // the drawing has.
-    //
-    // 79.2 rather than the table's 78.6, for the same rounding reason as `push`'s
-    // legs: the standing hip is 78.92 from the planted foot.
-    legL: {
-      kind: 'ik',
-      root: 'hip',
-      upper: 39.6,
-      lower: 39.6,
-      bend: 1,
-      target: { start: { x: 88, y: 178 }, end: { x: 88, y: 178 } },
-      foreshorten: { start: 1, end: 0.626 },
-    },
-    legR: {
-      kind: 'ik',
-      root: 'hip',
-      upper: 39.6,
-      lower: 39.6,
-      bend: -1,
-      target: { start: { x: 112, y: 178 }, end: { x: 112, y: 178 } },
-      foreshorten: { start: 1, end: 0.626 },
-    },
-  },
-}
-
-const HINGE: Rig = {
-  // The shoulders are the plant here — they do not move between phases — and the
-  // hip rises 46 units, which is the whole drawing.
-  shoulder: { start: { x: 58, y: 150 }, end: { x: 58, y: 150 } },
-  torso: { length: 66, angleDeg: { start: 7, end: -35 } },
-  neck: { length: 20, angleDeg: { start: 180, end: 180 } },
-  limbs: {
-    armL: { kind: 'fk', root: 'shoulder', length: 20.4, angleDeg: { start: 101, end: 101 } },
-    armR: { kind: 'fk', root: 'shoulder', length: 24.1, angleDeg: { start: 85, end: 85 } },
-    legL: {
-      kind: 'ik',
-      root: 'hip',
-      upper: 36.88,
-      lower: 43.91,
-      bend: -1,
-      target: { start: { x: 160, y: 170 }, end: { x: 160, y: 170 } },
-    },
-    legR: {
-      kind: 'ik',
-      root: 'hip',
-      upper: 40,
-      lower: 45.65,
-      bend: -1,
-      target: { start: { x: 166, y: 176 }, end: { x: 166, y: 176 } },
-    },
-  },
-}
-
-const PRONE: Rig = {
-  shoulder: { start: { x: 58, y: 104 }, end: { x: 58, y: 104 } },
-  torso: { length: 72.25, angleDeg: { start: 5, end: 5 } },
-  neck: { length: 20.4, angleDeg: { start: -169, end: -169 } },
-  limbs: {
-    // 220, not the table's -140. Identical directions; opposite sweeps. Written
-    // as -140 the arm travels the other 211° home, down through the torso
-    // instead of up past the head. See `FkLimb`.
-    armL: { kind: 'fk', root: 'shoulder', length: 49.7, angleDeg: { start: 71, end: 220 } },
-    armR: { kind: 'fk', root: 'shoulder', length: 52.8, angleDeg: { start: 66, end: 233 } },
-    legL: { kind: 'fk', root: 'hip', length: 40.8, angleDeg: { start: 11, end: 11 } },
-    legR: { kind: 'fk', root: 'hip', length: 48.1, angleDeg: { start: 17, end: 17 } },
-  },
-}
-
-const PLANK: Rig = {
-  // FINDING: FK, though the brief's table marks all four limbs IK. Nothing in
-  // the plank drawings is on the ground line (hands y≈140, feet y≈130, ground
-  // 182) and every tip moves between phases. Worse, planting them is
-  // over-constrained: the hip rises 14 units, which puts the planted foot 62.9
-  // from the hip while the longest leg the drawings offer is 56.6 — unreachable
-  // at any canonical length taken from the table. Held straight instead, the
-  // shoulder stays put, the torso pitches, and the tips travel a few units,
-  // which is what the drawings already do.
-  shoulder: { start: { x: 62, y: 92 }, end: { x: 62, y: 92 } },
-  torso: { length: 68.1, angleDeg: { start: 3.37, end: -8.44 } },
-  neck: { length: 21.63, angleDeg: { start: -146, end: -146 } },
-  limbs: {
-    armL: { kind: 'fk', root: 'shoulder', length: 53.3, angleDeg: { start: 95, end: 96 } },
-    armR: { kind: 'fk', root: 'shoulder', length: 58, angleDeg: { start: 88, end: 90 } },
-    legL: { kind: 'fk', root: 'hip', length: 56.6, angleDeg: { start: 40, end: 42 } },
-    legR: { kind: 'fk', root: 'hip', length: 65.1, angleDeg: { start: 41, end: 43 } },
-  },
 }
 
 /**
@@ -299,13 +129,18 @@ const CASES: readonly RigCase[] = ALL_RUNGS.flatMap((rung) => {
   return [{ label: rung.id, rig, timeline: buildTimeline(rung.figureId, rung.modifier) }]
 })
 
-// The fixtures and the content have to actually meet, or every loop below runs
+// The rigs and the content have to actually meet, or every loop below runs
 // zero times and the file is the third vacuous test this area has produced.
-describe('the fixtures cover the content', () => {
+describe('the rigs cover the content', () => {
   it('there is a rig for all 35 rungs', () => {
     expect(ALL_RUNGS).toHaveLength(35)
     expect(CASES).toHaveLength(35)
     expect(new Set(CASES.map((c) => c.rig)).size).toBe(5)
+  })
+
+  it('tests the rigs the registry renders, not copies of them', () => {
+    expect(Object.keys(RIGS).sort()).toEqual(Object.keys(figures).sort())
+    for (const [id, rig] of Object.entries(RIGS)) expect(figures[id]?.rig, id).toBe(rig)
   })
 
   it('every rig declares exactly the four limbs `LIMB_IDS` iterates', () => {
@@ -457,17 +292,27 @@ describe('solveIk', () => {
 
 // ─── The invariant the whole brief exists for ───────────────────────────────
 
-function assertBoneLengths(pose: RigPose, label: string): void {
+/** The length a rig *declares* for a bone — the canonical number, read from
+ * the rig rather than from the solver's output, so the comparison below is
+ * against the source and not against itself. */
+function declaredLength(rig: Rig, id: RigBoneId): number {
+  if (id === 'neck' || id === 'torso') return rig[id].length
+  const [limbId, part] = id.split('-') as [keyof Rig['limbs'], 'upper' | 'lower' | undefined]
+  const limb = rig.limbs[limbId]
+  if (limb.kind === 'fk') return limb.length
+  return part === 'lower' ? limb.lower : limb.upper
+}
+
+function assertBoneLengths(rig: Rig, pose: RigPose, label: string): void {
   const bones = boneEntries(pose)
   expect(bones.length, label).toBeGreaterThanOrEqual(6)
   for (const [id, bone] of bones) {
     const where = `${label} ${id}`
     // Two separate claims. The drawn segment is exactly as long as the bone says
-    // it is, and the bone says something that is either its rest length or a
-    // declared projection of it — never a third number.
+    // it is, and the bone says exactly what the rig declares — absolutely, since
+    // no figure may foreshorten.
     expect(distance(bone.from, bone.to), where).toBeCloseTo(bone.length, 6)
-    expect(bone.length, where).toBeLessThanOrEqual(bone.restLength + LENGTH_EPSILON)
-    expect(bone.length, where).toBeGreaterThanOrEqual(0)
+    expect(Math.abs(bone.length - declaredLength(rig, id)), where).toBeLessThan(LENGTH_EPSILON)
   }
 }
 
@@ -478,7 +323,7 @@ describe('a bone never changes length', () => {
       const samples = sampleTimeline(rig, timeline)
       expect(samples.length, label).toBeGreaterThan(4)
       for (const sample of samples) {
-        assertBoneLengths(sample.pose, `${label}@${sample.percent.toFixed(2)}%`)
+        assertBoneLengths(rig, sample.pose, `${label}@${sample.percent.toFixed(2)}%`)
         checked += 1
       }
     }
@@ -493,7 +338,7 @@ describe('a bone never changes length', () => {
         const next = samples[index + 1]
         if (!next) break
         for (const t of [0.25, 0.5, 0.75]) {
-          assertBoneLengths(blendPoses(sample.pose, next.pose, t), `${label} blend ${t}`)
+          assertBoneLengths(rig, blendPoses(sample.pose, next.pose, t), `${label} blend ${t}`)
           checked += 1
         }
       }
@@ -504,7 +349,7 @@ describe('a bone never changes length', () => {
   it('holds at every position, not only the ones the sampler happens to pick', () => {
     for (const [id, rig] of Object.entries(RIGS)) {
       for (const position of spread(64, 7)) {
-        assertBoneLengths(resolvePose(rig, position), `${id}@${position.toFixed(4)}`)
+        assertBoneLengths(rig, resolvePose(rig, position), `${id}@${position.toFixed(4)}`)
       }
     }
   })
@@ -733,16 +578,10 @@ describe('no pose contains a non-finite number', () => {
     const broken: Rig = {
       shoulder: { start: { x: NaN, y: 0 }, end: { x: 0, y: Infinity } },
       torso: { length: NaN, angleDeg: { start: NaN, end: Infinity } },
-      neck: { length: -0, angleDeg: { start: 0, end: 0 }, foreshorten: { start: NaN, end: 9 } },
+      neck: { length: -0, angleDeg: { start: 0, end: 0 } },
       limbs: {
         armL: { kind: 'fk', root: 'shoulder', length: -50, angleDeg: { start: NaN, end: NaN } },
-        armR: {
-          kind: 'fk',
-          root: 'hip',
-          length: 0,
-          angleDeg: { start: 0, end: 0 },
-          foreshorten: { start: -3, end: 4 },
-        },
+        armR: { kind: 'fk', root: 'hip', length: 0, angleDeg: { start: 0, end: 0 } },
         legL: {
           kind: 'ik',
           root: 'hip',
@@ -825,36 +664,14 @@ describe('resolvePose', () => {
     expect(pose.limbs.legL.root).toEqual(pose.hip)
   })
 
-  it('applies a declared foreshorten and nothing else does', () => {
-    // squat's arms are the one sanctioned projection case in the brief.
-    const start = resolvePhasePose(SQUAT, 'start')
-    const end = resolvePhasePose(SQUAT, 'end')
-    expect(distance(start.shoulder, start.limbs.armL.tip)).toBeCloseTo(70.7, 6)
-    expect(distance(end.shoulder, end.limbs.armL.tip)).toBeCloseTo(70.7 * 0.45, 6)
-    // Interpolated alongside the angle, so the shortening is gradual.
-    const mid = resolvePose(SQUAT, 0.5)
-    expect(distance(mid.shoulder, mid.limbs.armL.tip)).toBeCloseTo(70.7 * 0.725, 6)
-    // prone declares none, so its arm is its full length throughout.
-    for (const position of spread(16, 11)) {
-      const pose = resolvePose(PRONE, position)
-      expect(distance(pose.shoulder, pose.limbs.armL.tip)).toBeCloseTo(49.7, 6)
+  it('no rig smuggles a foreshorten back in', () => {
+    // The field is gone from the types, so this guards the one way it could
+    // return unseen: a cast. With it, bone length would be "declared times a
+    // factor" again, and a squat drawn front-on would pass every test here.
+    for (const [id, rig] of Object.entries(RIGS)) {
+      const parts: object[] = [rig.torso, rig.neck, ...Object.values(rig.limbs)]
+      for (const part of parts) expect('foreshorten' in part, id).toBe(false)
     }
-  })
-
-  it('refuses a foreshorten above 1, because lengthening a bone is the bug', () => {
-    // Not policed by the type — it is a number — so it is policed here. A rig
-    // that declared 1.6 and was honoured would still pass the length test, since
-    // that test compares against `length × foreshorten`.
-    const stretched: Rig = {
-      ...PRONE,
-      torso: { length: 60, angleDeg: { start: 0, end: 0 }, foreshorten: { start: 1.6, end: -0.4 } },
-    }
-    const start = resolvePhasePose(stretched, 'start')
-    expect(start.torso.length).toBe(60)
-    expect(distance(start.shoulder, start.hip)).toBeCloseTo(60, 6)
-    const end = resolvePhasePose(stretched, 'end')
-    expect(end.torso.length).toBe(0)
-    expect(end.hip).toEqual(end.shoulder)
   })
 })
 
@@ -886,3 +703,47 @@ describe('no hand or foot crowds the torso', () => {
   })
 })
 
+
+// ─── The movement arrow is an annotation, not a body part ───────────────────
+
+describe('the movement arrow stays clear of the body', () => {
+  /** Closest approach of two segments, found by walking one of them. The arrow
+   * is short and the budget generous, so 64 steps is far finer than it needs. */
+  function segmentGap(a: Joint, b: Joint, c: Joint, d: Joint): number {
+    let gap = Infinity
+    for (let step = 0; step <= 64; step += 1) {
+      const t = step / 64
+      gap = Math.min(gap, distanceToSegment({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, c, d))
+    }
+    return gap
+  }
+
+  it('by a stroke and a half, at every stop and between stops, on every rung', () => {
+    // Before the rig, four of the five arrows were drawn straight through the
+    // figure — push's across the back, hinge's up the thigh, prone's inside the
+    // head, plank's on the legs — and a crossfade hid it at a glance. A body
+    // moving under a fixed arrow does not. 12 centre-to-centre is two half
+    // strokes plus a clear stroke's width of daylight.
+    let checked = 0
+    for (const { label, rig, timeline } of CASES) {
+      const definition = Object.values(figures).find((figure) => figure.rig === rig)
+      expect(definition, label).toBeDefined()
+      const { x, y1, y2 } = definition!.arrow
+      const samples = sampleTimeline(rig, timeline)
+      for (const [index, sample] of samples.entries()) {
+        const next = samples[index + 1]
+        const poses = next ? [sample.pose, blendPoses(sample.pose, next.pose, 0.5)] : [sample.pose]
+        for (const pose of poses) {
+          for (const [id, bone] of boneEntries(pose)) {
+            const gap = segmentGap({ x, y: y1 }, { x, y: y2 }, bone.from, bone.to)
+            expect(gap, `${label} ${id}`).toBeGreaterThanOrEqual(12)
+          }
+          const headGap = distanceToSegment(pose.head, { x, y: y1 }, { x, y: y2 }) - 14
+          expect(headGap, `${label} head`).toBeGreaterThanOrEqual(12)
+          checked += 1
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(1000)
+  })
+})
