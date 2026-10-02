@@ -36,7 +36,7 @@
  * byte-verbatim assertions are protecting.
  */
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { basename, dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -47,7 +47,6 @@ import {
   RETENTION,
   openSnapshotStore,
 } from '../db.mjs'
-import { USERNAME_MAX_LENGTH } from '@sports-app/shared/username.ts'
 import {
   STATE_PATH,
   checkDocument,
@@ -120,7 +119,10 @@ function authorised(extra = {}) {
  * child process's pipes can see it.
  *
  * Port `0` so the test never collides with a real deployment; the actual port is
- * read back out of the startup line the service prints.
+ * read back out of the startup line the service prints. The Ward variables point
+ * at a port nothing listens on: the service needs all three to start, and the
+ * test that uses this only sends requests that are refused before Ward is asked
+ * anything, so no Ward is needed.
  */
 async function startServiceProcess() {
   const root = mkdtempSync(join(tmpdir(), 'sports-app-proc-'))
@@ -129,7 +131,9 @@ async function startServiceProcess() {
   const child = spawn(process.execPath, [join(PROJECT_ROOT, 'server', 'state-server.mjs')], {
     env: {
       ...process.env,
-      SPORTS_APP_SYNC_SECRET: SECRET,
+      WARD_PUBLIC_ORIGIN: 'http://127.0.0.1:9',
+      WARD_API_BASE_PATH: '/ward-api',
+      WARD_APP_KEY: 'wak_test-not-a-real-key',
       SPORTS_APP_HOST: '127.0.0.1',
       SPORTS_APP_PORT: '0',
       SPORTS_APP_DB: file,
@@ -479,6 +483,47 @@ describe('there is no login route any more', () => {
   })
 })
 
+
+// ─── The real process prints only what it composes ──────────────────────────
+
+describe('the real process prints nothing about a request but its own fixed line', () => {
+  it('never puts a request line, a query, a header or a body on stdout or stderr', async () => {
+    // The migration risk this exists for: **Fastify logs every request by
+    // default**, and its logger, pino, writes to file descriptor 1 directly, so
+    // only a real child process's pipes can see it. `logger: false` is what
+    // switches it off; this is what notices if it is ever switched back on.
+    //
+    // It was written against the shared secret and stopped running at the Ward
+    // cutover, which removed its credential. Requests refused before Ward is
+    // consulted exercise the same framework path without needing one.
+    const SENTINEL = 'sentinel-7f3e-should-never-be-printed'
+    const service = await startServiceProcess()
+
+    expect((await fetch(`${service.base}/api/health`)).status).toBe(200)
+    const refused = await fetch(`${service.base}${STATE_PATH}?leak=${SENTINEL}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Leak': SENTINEL },
+      body: JSON.stringify({ username: SENTINEL }),
+    })
+    expect(refused.status).toBe(401)
+    expect(await refused.text()).not.toContain(SENTINEL)
+
+    await service.stop()
+    const printed = service.output()
+
+    // Nothing the client sent is in anything the process printed.
+    expect(printed).not.toContain(SENTINEL)
+    // No framework request log. Fastify's would name every route, health included.
+    expect(printed).not.toMatch(/incoming request|request completed|"reqId"|"req":/)
+    expect(printed).not.toMatch(/api\/health/)
+
+    // Positive controls: the process is wired to these pipes, did serve the
+    // refused request, and does log it — through its one log, as a fixed string
+    // with the query stripped.
+    expect(printed).toMatch(/listening on http/)
+    expect(printed).toContain(`401 PUT ${STATE_PATH}\n`)
+  })
+})
 
 describe('routing and method handling', () => {
   /*

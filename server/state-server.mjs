@@ -143,7 +143,6 @@
  * training history to a network. Host and port are environment variables.
  */
 import Fastify from 'fastify'
-import { createHash, timingSafeEqual } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import { TypeCompiler } from '@sinclair/typebox/compiler'
 import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from './db.mjs'
