@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@sports-app/shared": "0.1.0",
-    "fastify": "5.10.0",
+    "fastify": "5.12.5",
     "jose": "6.2.10"
   }
 }
