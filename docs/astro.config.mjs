@@ -57,7 +57,7 @@ export default defineConfig({
         {
           label: 'Reference',
           items: [
-            { label: 'The four routes', link: '/api/' },
+            { label: 'The three routes', link: '/api/' },
             { label: 'State and sync', link: '/state/' },
             { label: 'Wire contract (TypeDoc) ↗', link: '/reference/', attrs: { target: '_blank' } },
           ],

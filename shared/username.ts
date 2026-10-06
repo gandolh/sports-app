@@ -92,13 +92,13 @@ export function isValidUsername(value: unknown): value is string {
  * that migrated on the server must end up naming the same person, or one user
  * becomes two.
  *
- * It is deliberately a valid username, so migrated history is reachable through
- * the ordinary route (`GET /api/state?user=local`) with no special case anywhere
- * in the service. It is also honest about what those rows are: the single-user
- * local deployment that existed before accounts did.
+ * It is deliberately a valid username, so migrated rows need no special case
+ * anywhere in the service. It is also honest about what those rows are: the
+ * single-user local deployment that existed before accounts did.
  *
- * Reattributing them to a real name afterwards is one statement:
+ * The stream key is the caller's Ward subject, so the history is read again
+ * once it is reattributed to its owner's subject — one statement:
  *
- *   sqlite3 db/app.db "UPDATE snapshots SET username = 'alice' WHERE username = 'local'"
+ *   sqlite3 db/app.db "UPDATE snapshots SET username = '<ward subject>' WHERE username = 'local'"
  */
 export const LEGACY_USERNAME = 'local'

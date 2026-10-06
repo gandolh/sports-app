@@ -137,7 +137,7 @@ export type HealthResponse = Static<typeof HealthResponse>
  *   - `schemaVersion` — copied into an indexed column and never interpreted, so a
  *     number is the only requirement. A document from a future version must round
  *     trip.
- *   - `username` — the row key, compared against `?user=`.
+ *   - `username` — must equal the session's subject, which is the row key.
  *   - `history` — its *length* becomes the `sessions_completed` column. The
  *     service never looks inside, hence `Type.Unknown()` for the elements rather
  *     than a `SessionResult` schema.
@@ -184,8 +184,7 @@ export type SnapshotReceipt = Static<typeof SnapshotReceipt>
  *
  * The string never echoes any part of the request. A rejected username states the
  * rule rather than repeating the value, because echoing it would put
- * attacker-controlled text into a body some client will eventually render — and on
- * `/api/login` a body that failed to parse may well have had a credential in it.
+ * attacker-controlled text into a body some client will eventually render.
  */
 export const ErrorResponse = Type.Object({
   error: Type.String(),

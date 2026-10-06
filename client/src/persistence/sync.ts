@@ -6,23 +6,19 @@
  * Nothing on the session-critical path may require network
  * (corpus/wiki/architecture.md § "Offline posture"). `push` is the function that
  * runs right after a session is saved, and it is written so that *every*
- * outcome — offline, DNS failure, 500, wrong secret, a captive-portal login page
+ * outcome — offline, DNS failure, 500, no session, a captive-portal login page
  * where JSON was expected — returns a value rather than throwing. It never
  * rejects, so `void push(doc)` cannot produce an unhandled rejection, and it is
  * called *after* `store.save` has already succeeded, so a failure here costs
- * nothing but a log line. The same is true of `login`, which is why a wrong
- * secret cannot lock anybody out of their own offline history.
+ * nothing but a log line. The same is true of `checkSession`, which is why being
+ * signed out cannot lock anybody out of their own offline history.
  *
- * ── The username travels in the URL, the secret in a header ──────────────────
+ * ── The session names the stream ────────────────────────────────────────────
  *
- * `/api/state` is keyed by `?user=<username>` on **both** `GET` and `PUT`
- * (`server/state-server.mjs`), and a `PUT` whose body disagrees with `?user=` is
- * refused with a 400. This module fills both from the *same* place — the
- * document's own `username` on push, the caller's requested username on pull — so
- * that mismatch is unreachable from this client rather than merely unlikely.
- *
- * The secret goes in `x-sync-secret`, never in the URL: a URL ends up in proxy
- * logs, browser history, and referrers.
+ * `/api/state` carries no username. The service keys the stream by the Ward
+ * session's subject (`server/state-server.mjs`), and a `PUT` whose document's
+ * `username` is not that subject is refused with a 400. The browser sends the
+ * `ward_session` cookie; this module sends no credential of its own.
  *
  * ── `navigator.onLine` is not consulted. Anywhere. ───────────────────────────
  *
@@ -155,9 +151,9 @@ export type PushOutcome =
  * no background sync, no retry queue. A dropped push is picked up by the next
  * session, and the export file is the real backup either way.
  *
- * The subject is `doc.username`, for both `?user=` and the body, so the two
- * cannot disagree. Callers on the session path should write `void push(doc)` and
- * move on.
+ * The body's `username` must be the session's subject, or the service answers
+ * 400 and stores nothing. Callers on the session path should write
+ * `void push(doc)` and move on.
  */
 export async function push(doc: StateDoc, options: SyncOptions = {}): Promise<PushOutcome> {
   const log = options.log ?? warn
@@ -311,7 +307,7 @@ export async function pull(
   return { ok: true, doc: parsed.doc, text }
 }
 
-// ─── login ──────────────────────────────────────────────────────────────────
+// ─── checkSession ───────────────────────────────────────────────────────────
 
 /**
  * The result of `checkSession`.

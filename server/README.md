@@ -13,32 +13,39 @@ It is the durability half of the persistence design: browser storage keeps the a
 and offline, this keeps the history alive when the phone is lost or the browser evicts
 its storage, and it gives phone↔desktop sync as a side effect.
 
-Deliberately not a backend in the usual sense. No users table, no sessions, no ORM, no
-migration runner — one table holding whole-document JSON snapshots keyed by username,
-four routes, and a shared secret.
+Deliberately not a backend in the usual sense. No users table, no sign-in of its own, no
+ORM, no migration runner — one table holding whole-document JSON snapshots keyed by the
+caller's Ward subject, and three routes.
 
 It is the `server` workspace of a three-workspace repo (`client` · `server` ·
 `shared`). It did not move when the workspaces were introduced, so `db/` is still a
 sibling directory at the repo root and still gitignored. Run it with `npm run server`
 from the root, or `npm start` from here.
 
-## Login checks nothing, and says so
+## Who the caller is: Ward
 
-`POST /api/login` takes `{ username, password }`, **never reads the password**, and
-answers `{ username }`. Not hashed-and-compared, not stored for later, not logged. There
-is deliberately no expression in `server/state-server.mjs` that evaluates `.password` —
-there is a test asserting that about the source — because storing an unchecked password
-buys nothing and collects real passwords that people reuse elsewhere.
+`/api/state` is guarded by a Ward session. The browser's `ward_session` cookie goes to
+`ward.mjs`, which verifies the token against Ward's keys, introspects it (cached 30 s) and
+requires a `sports-app` grant. Signing in, the password and TOTP all happen in Ward; this
+service has no login route and never sees a credential.
 
-**This is not a security boundary and does not pretend to be one.** Anyone who knows a
-username can read that person's training history. That is accepted for training data on a
-personal deployment. There is no token, no session cookie, and no rate limiting — each
-one would manufacture a feeling of security the design does not provide, and a user who
-believed it would make worse decisions than one who knows the truth. The login screen
-says so in as many words.
+The session's **subject is the stream key**. Nothing on the request says whose document
+is wanted, and a `?user=` is ignored, so a caller reads and writes only their own history.
+That is a per-person boundary, which the shared secret it replaced never was: the secret
+authenticated the installation, and anyone holding it could read anyone's history by
+changing a name in a URL.
 
-The shared secret is a different thing: it protects the **deployment** — whether this
-process will talk to you at all — not the accounts inside it.
+| Situation                         | Answer |
+| --------------------------------- | ------ |
+| No session, or one Ward rejects   | `401`  |
+| A live session with no grant      | `403`  |
+| Ward cannot be reached            | `503`  |
+
+`503` rather than `401` on purpose: a `401` tells a sync client to drop its session, and
+an identity service that is briefly down is a reason to retry, not to sign out.
+
+The session is checked before anything else, so a caller without one gets a `401` and
+never a `400` that would describe the document.
 
 ## Requirements
 
@@ -118,18 +125,17 @@ different thing from the session cookie that authenticates a *person* to the ser
 
 ## Routes
 
-| Route                       | Auth | Behaviour                                                                 |
-| --------------------------- | ---- | ------------------------------------------------------------------------- |
-| `GET /api/health`           | no   | `{"status":"ok"}`. Liveness only — no database read, no information.       |
-| `POST /api/login`           | yes  | `{ username, password }` → `{ username }`. The password is never read.     |
-| `GET /api/state?user=NAME`  | yes  | That user's newest snapshot bytes, or `404` when they have none.           |
-| `PUT /api/state?user=NAME`  | yes  | Validate shallowly, store the body verbatim, prune that user to the cap.   |
+| Route             | Auth    | Behaviour                                                                 |
+| ----------------- | ------- | ------------------------------------------------------------------------- |
+| `GET /api/health` | no      | `{"status":"ok"}`. Liveness only — no database read, no information.       |
+| `GET /api/state`  | session | The caller's newest snapshot bytes, or `404` when they have none.          |
+| `PUT /api/state`  | session | Validate shallowly, store the body verbatim, prune the caller to the cap.  |
 
-Anything else is a `404`. No static files, no directory listing, no fallback handler.
-
-The secret goes in the **`x-sync-secret`** header — never in the URL, which would end
-up in proxy logs and browser history. The **username** does go in the URL, because it is
-a nameplate rather than a secret.
+Anything else is a `404`, including the old `POST /api/login`. No static files, no
+directory listing, no fallback handler. An unsupported method on `/api/state` is a `405`
+with an `Allow` header, but only for a caller with a session: without one it is the same
+`401` as every other request to `/api/state`, so the `Allow` header goes only to someone
+signed in.
 
 **Usernames** are defined once, in `shared/username.ts`, and imported by this service
 and by the client — there is no second copy here to drift from. They are 1–32
@@ -142,22 +148,24 @@ mismatch `PUT` refuses.
 
 **Validation is schema-driven, from `shared/api.ts`.** The wire shapes are TypeBox
 declarations in the shared workspace, so one declaration produces both the runtime guard
-here and the TypeScript type the client can use. Fastify's AJV reads them directly for
-`?user=` and for response serialisation; the two JSON *bodies* are checked here against the
-same declarations, because they have to stay raw strings — a parsed-and-re-serialised
-document is not the document that was sent.
+here and the TypeScript type the client can use. Fastify's AJV reads them for response
+serialisation; the `PUT` body is checked here against the same declaration, because it has
+to stay a raw string — a parsed-and-re-serialised document is not the document that was
+sent.
 
 `PUT` requires `Content-Type: application/json` and a body that is a JSON object with a
 numeric `schemaVersion`, a valid `username`, and an array `history` — and the document's
-`username` must equal `?user=`. Everything else about the shape is the codec's business:
+`username` must equal the session's subject. Everything else about the shape is the codec's business:
 `client/src/persistence/codec.ts` is the single source of truth, and a second, drifting
 validator here would eventually reject a document the app considers good, turning the
 safety net into a way to lose a workout. A rejected `PUT` returns `400` and leaves the
 database untouched.
 
-Comparing `?user=` against the document's own `username` is the one check that needs
-both. Without an independently stated target there is nothing to compare, and a client
-bug that sent the wrong document would silently overwrite someone else's stream.
+A document whose `username` is not the caller's subject is a `400` and stores nothing.
+It used to compare two values the client supplied, `?user=` and the document's own name,
+which caught a client bug but not a hostile caller. One side is now the session, so the
+same check refuses a write into somebody else's stream. A document written before the
+cutover, under an old username, is the ordinary way to hit it.
 
 `PUT` answers `200` with `{ id, createdAt, username, historyLength, schemaVersion,
 bytes, pruned, retained }`. `retained` is *that user's* row count, not the table's — a
@@ -211,11 +219,11 @@ can only append).
 
 Pre-existing rows are attributed to **`local`**, because the old table held one stream
 and recorded nothing about whose it was — there is no owner to recover, only one to
-choose. The migrated history is reachable straight away at `GET /api/state?user=local`,
-and the service says so once at startup. To claim it under a real name:
+choose. The service says so once at startup. The stream key is the caller's Ward subject, so to
+read that history again, reattribute it to the subject of the person it belongs to:
 
 ```sh
-sqlite3 db/app.db "UPDATE snapshots SET username = 'alice' WHERE username = 'local'"
+sqlite3 db/app.db "UPDATE snapshots SET username = '<ward subject>' WHERE username = 'local'"
 ```
 
 That leaves the *documents* saying `"schemaVersion": 2` with no `username` field inside
@@ -295,15 +303,18 @@ secret was reused somewhere else, and the Settings screen says the stored value 
 npx vitest run server
 ```
 
-Two files, both against a **real temporary SQLite file** rather than a mock:
+Two test files, both against a **real temporary SQLite file** rather than a mock. Ward is
+the one thing faked: `__tests__/fake-ward.mjs` stands in for the session check, so the
+tests decide who the caller is.
 
 - `__tests__/state-server.test.mjs` drives the service over a real HTTP socket. `GET`
-  before any `PUT` returns 404, a wrong or missing secret returns 401, `PUT` then `GET`
-  round-trips byte-identically, a malformed body is rejected with the newest row
-  unchanged, one user cannot read or overwrite another, a username outside the allowlist
-  is a 400, `/api/health` is served from a store that throws on every method, and **a
-  distinctive password sent to `/api/login` is searched for in the database files on disk
-  and in every captured log line.**
+  before any `PUT` returns 404, a missing or unrecognised session returns 401 before
+  anything is validated, Ward being down is a 503, each session gets its own stream and a
+  `?user=` naming somebody else is ignored, `PUT` then `GET` round-trips byte-identically,
+  a malformed body is rejected with the newest row unchanged, `/api/health` is served from
+  a store that throws on every method, the old login path is a 404, and **a distinctive
+  password sent there is searched for in the database files on disk and in every
+  captured log line.**
 - `__tests__/db.test.mjs` covers what HTTP cannot reach: a database built with the *old*
   single-stream DDL is migrated and its rows stay readable, re-opening it migrates nothing
   and leaves the same schema as a fresh database, a busy user cannot evict a quiet one,

@@ -41,7 +41,7 @@ them *from* the snapshots rather than replacing the snapshots with them.
 **Byte-preservation is why `GET /api/state` has no response schema.** A
 serialiser would rewrite the layout the codec produced. The client's crash-safe
 save round-trips through a byte comparison, so a "harmless" re-serialisation
-would fail it. See [the four routes](/api/#the-five-things-fastify-must-not-do).
+would fail it. See [the three routes](/api/#the-five-things-fastify-must-not-do).
 
 ## The snapshot cap is a correctness limit, not a tuning knob
 
@@ -75,9 +75,9 @@ outcome that keeps the two definitionally equal.
 Since the Ward cutover, the document key is **the session's subject**, not a
 value the caller chooses.
 
-`?user=` remains in the URL as part of the wire contract — the whole point of
-brief 22 was that moving to Fastify changed no bytes — but the server checks it
-against the session rather than trusting it. A mismatch is a `400`.
+The client no longer sends `?user=`, and the server ignores one if it is
+there. A `PUT` whose document names somebody other than the session's subject
+is a `400` and stores nothing.
 
 Before that, one shared secret authenticated the *installation* and `?user=`
 chose the target, so anyone holding it could read anyone's training history by

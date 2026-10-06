@@ -46,7 +46,7 @@ client/                    the PWA
   src/main.tsx
 
 server/                    the service. Fastify since brief 22.
-  state-server.mjs         /api/state · /api/login · /api/health, on Fastify
+  state-server.mjs         /api/state · /api/health, on Fastify, Ward-guarded
   db.mjs                   node:sqlite snapshot rows, one stream per username
 ```
 

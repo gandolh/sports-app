@@ -1234,3 +1234,21 @@ focus. It does stop dead on a body that was moving at a constant rate, and the
 static `AngleArc` overlay names the hold on its own, so the blur was a redundant
 third signal. Not yet watched live on a phone; R3 waits for that look. Full
 outcome on the brief.
+
+## [2026-10-06] docs | The state service's prose catches up with Ward
+
+Closed the todo `state-server-header-predates-ward` (captured 2026-10-02; the file is
+retired, git has it). The header of `server/state-server.mjs` was rewritten from the
+code: three routes, a "Who the caller is" section (the session subject is the stream
+key; 401, 403 and 503 and why they differ), guarantee 2 restated as the session check,
+guarantee 3 as subject-versus-document. The `SPORTS_APP_SYNC_SECRET` /
+`timingSafeEqual` Auth section, the "not a security boundary" paragraph and the empty
+"login body" section are gone.
+
+The same drift was in `server/README.md` (login section, routes table, `x-sync-secret`,
+`?user=` in validation and in the migration note, test list), the docs site's routes
+page (renamed "The three routes"), `docs/.../state.mdx` (which claimed `?user=` is still
+sent and checked; the client sends none and the server ignores one), the header of
+`client/src/persistence/sync.ts`, and comments in `shared/api.ts`, `shared/username.ts`
+and `wiki/architecture.md`. Comments and docs only; no behaviour changed. 1118 tests
+pass, lint and typecheck are clean, and the docs site builds.

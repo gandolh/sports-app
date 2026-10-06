@@ -1,11 +1,11 @@
 ---
-title: The four routes
-description: The whole wire contract — and the five things Fastify does helpfully by default that this service is not allowed to do.
+title: The three routes
+description: The whole wire contract, who the caller is, and the five things Fastify does helpfully by default that this service is not allowed to do.
 ---
 
-The state service has **four routes, one table, and Fastify underneath**.
-Anything else is a `404`. No static files, no directory listing, no fallback
-handler.
+The state service has **three routes, one table, and Fastify underneath**.
+Anything else is a `404`, including the old `POST /api/login`. No static
+files, no directory listing, no fallback handler.
 
 > A service whose only job is to hold documents has no business serving anything
 > else, and **every route that does not exist is a route that cannot be wrong.**
@@ -16,22 +16,24 @@ the service keeps serving its own bare `/api/*` paths.
 | Method | Path | What it does |
 |---|---|---|
 | `GET` | `/api/health` | Liveness. No auth, no database read, no information. |
-| `POST` | `/api/login` | `{ username, … }` → `{ username }`. |
-| `GET` | `/api/state?user=…` | That user's newest snapshot bytes, or `404`. |
-| `PUT` | `/api/state?user=…` | Validate shallowly, store verbatim, prune to the cap. |
+| `GET` | `/api/state` | The caller's newest snapshot bytes, or `404`. |
+| `PUT` | `/api/state` | Validate shallowly, store verbatim, prune to the cap. |
 
-## Login checks nothing, and that is the design
+## Who the caller is
 
-**The credential is never read.** Not hashed, not compared, not stored, not
-logged, not echoed. There is deliberately no expression anywhere in the handler
-that evaluates that field — it reads `username` and nothing else.
+`/api/state` needs a Ward session. The browser's `ward_session` cookie is
+verified against Ward's keys, introspected (cached 30 seconds) and must carry a
+`sports-app` grant. Signing in, the password and TOTP are Ward's; the service has
+no login route and never sees a credential.
 
-That is a stronger guarantee than deleting the value afterwards would be,
-because it cannot be weakened by a later edit that forgets why. Read
-[Identity](/wiki/decisions-identity/) before changing anything in `login()`;
-"authentication is a nameplate, not a boundary" is the recorded call.
+| Situation | Answer |
+|---|---|
+| No session, or one Ward rejects | `401` |
+| A live session with no grant | `403` |
+| Ward cannot be reached | `503` |
 
-The actual boundary is Ward.
+`503` and not `401`, because a sync client that sees `401` drops its session,
+and an identity service that is briefly down is a reason to retry.
 
 ## What Ward changed
 
@@ -44,14 +46,15 @@ the file header said so plainly rather than pretending otherwise.
 
 Ward's session authenticates a **person**, and the subject it returns **is** the
 document key. So `?user=` stops being a target a caller chooses and becomes a
-value the server already knows. That is the whole security change, and it is the
+value the server already knows. The client no longer sends it, and the server
+ignores one if it is there. That is the whole security change, and it is the
 largest one in the repo's history.
 
 ## The five things Fastify must not do
 
 Brief 22 replaced hand-rolled `node:http` routing with Fastify **without
 changing one byte of the REST contract** — same paths, methods, status codes,
-headers and bodies. The 73 tests in `server/__tests__/` are what make that claim
+headers and bodies. The Ward cutover changed the contract later, on purpose. The 73 tests in `server/__tests__/` are what make that claim
 checkable rather than hopeful: they were written against the wire, not the
 implementation.
 
@@ -66,13 +69,15 @@ pinned by a test.
    200** — a serialiser attached to it would rewrite the very bytes it exists to
    preserve. The client's crash-safe save round-trips through a byte comparison,
    so this is not cosmetic.
-2. **The credential check runs before any validation.** It is a route-level
+2. **The session is checked before any validation.** It is a route-level
    `onRequest` hook — the earliest point in Fastify's lifecycle, ahead of body
-   parsing and ahead of schema validation. A wrong caller therefore gets a `401`
-   and never a `400` that would leak whether a username is even well-formed, or
-   that `/api/login` exists.
-3. **A `?user=` / document-`username` mismatch is a `400`, not a `409`,** and
-   stores nothing. It is a client bug, not a concurrent edit.
+   parsing and ahead of schema validation. A caller without a session gets a
+   `401` and never a `400` that would say anything about the document. The
+   not-found handler checks too, so an unauthorised caller cannot tell a `405`
+   on `/api/state` from a `404`.
+3. **A document whose `username` is not the session's subject is a `400`, not
+   a `409`,** and stores nothing. It refuses a write into somebody else's
+   stream as well as a confused client.
 4. **Usernames are rejected, never case-folded.** Folding would make the stream
    key disagree with the document's own `username`, which is exactly what (3)
    refuses. The rule lives in `shared/username.ts` and says why.
@@ -86,8 +91,8 @@ logging off completely, so there is no logger for a request body to reach even
 in principle. The only log in the process is a callback called with fixed
 strings the caller composes.
 
-The test block is named "the password is never stored, logged, echoed, or
-compared".
+The test that pins it sends a distinctive password to the old login path and
+searches the database files and every captured log line for it.
 :::
 
 ## Validation comes from one declaration
@@ -96,13 +101,13 @@ The wire shapes are **TypeBox** declarations in `shared/api.ts`, so the same
 declaration that guards the service also types the client.
 
 A `Type.Object({...})` value *is* a JSON Schema object, so Fastify's AJV reads
-them directly with no adapter, and `Static<typeof X>` gives the TypeScript type
+the response schemas directly with no adapter, and `Static<typeof X>` gives the TypeScript type
 from the same expression. Hand-written JSON Schema plus a separately maintained
 interface would recreate exactly the duplication `shared/` exists to delete.
 
-The two JSON **bodies** are checked with `TypeCompiler` rather than by Fastify,
-because they must stay raw strings (see 1 above) and a body schema would require
-Fastify to have parsed them first. **One declaration, two entry points into it —
+The `PUT` **body** is checked with `TypeCompiler` rather than by Fastify,
+because it must stay a raw string (see 1 above) and a body schema would require
+Fastify to have parsed it first. **One declaration, two entry points into it —
 not two declarations.**
 
 The generated [wire contract reference](/reference/) is TypeDoc over that

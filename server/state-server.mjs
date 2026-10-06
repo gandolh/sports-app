@@ -1,36 +1,46 @@
 /**
- * The state service: four routes, one table, and Fastify underneath.
+ * The state service: three routes, one table, and Fastify underneath.
  *
  * ── What this is not ─────────────────────────────────────────────────────────
  *
- * Not a backend in the usual sense. There is no users table, no session cookie,
- * no ORM, no migration runner, and no route that returns anything other than the
- * one JSON document the app already produces. A username names a stream of
- * snapshots; "conflict resolution" is a comparison of two integers, done on the
- * client.
+ * Not a backend in the usual sense. There is no users table, no ORM, no
+ * migration runner, no sign-in of its own, and no route that returns anything
+ * other than the one JSON document the app already produces. A person's Ward
+ * subject names a stream of snapshots; "conflict resolution" is a comparison of
+ * two integers, done on the client.
  *
  * ── The routes ───────────────────────────────────────────────────────────────
  *
- *   GET  /api/health          liveness. No auth, no database read, no information.
- *   POST /api/login           { username, … } → { username }.
- *   GET  /api/state?user=…    that user's newest snapshot bytes, or 404.
- *   PUT  /api/state?user=…    validate shallowly, store verbatim, prune to the cap.
+ *   GET  /api/health   liveness. No auth, no database read, no information.
+ *   GET  /api/state    the caller's newest snapshot bytes, or 404.
+ *   PUT  /api/state    validate shallowly, store verbatim, prune to the cap.
  *
- * Anything else is a 404. No static files, no directory listing, no fallback
- * handler — a service whose only job is to hold documents has no business
- * serving anything else, and every route that does not exist is a route that
- * cannot be wrong.
+ * Anything else is a 404, including the old `POST /api/login`. No static files,
+ * no directory listing, no fallback handler — a service whose only job is to
+ * hold documents has no business serving anything else, and every route that
+ * does not exist is a route that cannot be wrong.
+ *
+ * ── Who the caller is: Ward ──────────────────────────────────────────────────
+ *
+ * `/api/state` is guarded by `requireSession`, which hands the browser's
+ * `ward_session` cookie to `ward.mjs`: the token is verified against Ward's
+ * keys, introspected (cached 30 s), and must carry a `sports-app` grant. The
+ * session's **subject is the stream key**. Nothing on the request names whose
+ * document is wanted — a `?user=` is ignored — so a caller can read and write
+ * only their own history. This is a per-person boundary, which the shared
+ * secret it replaced never was; `ward.mjs` says why the cutover mattered most
+ * here.
+ *
+ * No session is a 401, a session without the grant is a 403, and Ward being
+ * unreachable is a 503 — not a 401, which would send a sync client to drop its
+ * session instead of retrying. Signing in, the password and TOTP are Ward's.
  *
  * ── Fastify, and what the framework is NOT allowed to do (brief 22) ──────────
  *
- * Brief 22 replaced hand-rolled `node:http` routing with Fastify **without
- * changing one byte of the REST contract** — same paths, methods, status codes,
- * headers and bodies, so that `client/src/persistence/sync.ts` needed no edit at
- * all. The 73 tests in `__tests__/` are what makes that claim checkable rather
- * than hopeful: they were written against the wire, not the implementation.
- *
- * Five things a framework does helpfully by default and must not do here. Each of
- * the five is load-bearing and each is pinned by a test:
+ * Brief 22 replaced hand-rolled `node:http` routing with Fastify without
+ * changing the REST contract, and the tests in `__tests__/` are written against
+ * the wire, not the implementation. Five things a framework does helpfully by
+ * default and must not do here, each load-bearing and each pinned by a test:
  *
  *   1. **`GET /api/state` returns the stored bytes verbatim.** Fastify will parse
  *      and re-serialise JSON for you, which would destroy the codec's layout while
@@ -40,61 +50,35 @@
  *      `response` schema on that route's 200 — a serialiser attached to it would
  *      rewrite the very bytes it exists to preserve. The client's crash-safe save
  *      round-trips through a byte comparison, so this is not cosmetic.
- *   2. **The secret is checked before any validation.** It is a route-level
- *      `onRequest` hook, which is the earliest point in Fastify's lifecycle — ahead
- *      of body parsing and ahead of schema validation. A wrong secret therefore
- *      gets a `401` and never a `400` that would leak whether a username is even
- *      well-formed, or that `/api/login` exists.
- *   3. **A `?user=` / document-`username` mismatch is a `400`, not a `409`,** and
- *      stores nothing. It is a client bug, not a concurrent edit.
- *   4. **Usernames are rejected, never case-folded.** Folding would make the stream
- *      key disagree with the document's own `username`, which is exactly what (3)
- *      refuses. The rule lives in `shared/username.ts` and says why.
+ *   2. **The session is checked before any validation.** `requireSession` is a
+ *      route-level `onRequest` hook, the earliest point in Fastify's lifecycle —
+ *      ahead of body parsing and schema validation. A caller without a session
+ *      gets a 401 and never a 400 that would say anything about the document.
+ *      The not-found handler checks too, so an unauthorised caller cannot tell a
+ *      405 on `/api/state` from a 404.
+ *   3. **A document whose `username` is not the session's subject is a `400`,
+ *      not a `409`,** and stores nothing. It refuses a write into somebody
+ *      else's stream as well as a confused client.
+ *   4. **Usernames are rejected, never case-folded.** Folding would make the
+ *      stream key disagree with the document's own `username`, which is exactly
+ *      what (3) refuses. The rule lives in `shared/username.ts` and says why.
  *   5. **Paths match exactly.** `ignoreTrailingSlash` stays off and
  *      `exposeHeadRoutes` is switched **off** — otherwise Fastify would helpfully
- *      add `HEAD /api/state`, which today is a `405`.
+ *      add `HEAD /api/state`, which is a `405`.
  *
  * And one more, the loudest: **Fastify logs requests by default.** `logger: false`
  * turns the framework's logging off completely, so there is no logger for a request
  * body to reach even in principle. The only log in this process is the `log`
- * callback below, which is called with fixed strings the caller composes. See the
- * `__tests__` block "the password is never stored, logged, echoed, or compared".
+ * callback below, which is called with fixed strings the caller composes.
  *
  * ── Validation is schema-driven, from `shared/api.ts` ────────────────────────
  *
  * The wire shapes are TypeBox declarations in `@sports-app/shared/api.ts`, so the
  * same declaration that guards this service also types the client. Fastify's AJV
- * reads them directly for `?user=` and for response serialisation; the two JSON
- * *bodies* are checked here with `TypeCompiler`, because they must stay raw strings
- * (see 1 above) and a body schema would require Fastify to have parsed them first.
- * One declaration, two entry points into it — not two declarations.
- *
- * ── Login checks nothing, and that is the design ──────────────────────────────
- *
- * `corpus/wiki/technical-decisions.md § "Authentication is a nameplate, not a
- * boundary"`. Read that before changing anything in `login()`.
- *
- * **The credential is never read.** Not hashed, not compared, not stored, not
- * logged, not echoed. There is deliberately no expression anywhere in this file
- * that evaluates that field — the handler reads `username` and nothing else —
- * which is a stronger guarantee than deleting it afterwards would be, because it
- * cannot be undone by a later edit that "just needs it for a moment". Storing an
- * unchecked credential buys nothing and collects real ones that people reuse
- * elsewhere. A request without that field is therefore accepted: there is nothing
- * to check, so there is nothing to be missing.
- *
- * **This is not a security boundary and does not pretend to be one.** Anyone who
- * knows a username can read that person's training history through
- * `GET /api/state?user=…`. That is accepted for training data on a personal
- * deployment. There is no token, no session, no cookie, no rate limit — not
- * because they were forgotten, but because each one would manufacture a feeling
- * of security that the design does not provide, and a user who believed it would
- * make worse decisions than one who knows the truth. The login screen says so in
- * as many words.
- *
- * The shared secret below is a different thing entirely: it protects the
- * *deployment* — whether this process will talk to you at all — not the accounts
- * inside it. It does not make one user's history private from another.
+ * reads them for response serialisation; the `PUT` body is checked here with
+ * `TypeCompiler`, because it must stay a raw string (see 1 above) and a body
+ * schema would require Fastify to have parsed it first. One declaration, two
+ * entry points into it — not two declarations.
  *
  * ── Why validation here is deliberately shallow ──────────────────────────────
  *
@@ -110,32 +94,20 @@
  * reject a document from a future `schemaVersion` this build has never heard of,
  * which the service is supposed to store blindly. The three fields it does check
  * are exactly the three the service itself needs: `schemaVersion` for the indexed
- * column, `username` because it is the row key, and `history` because its length
- * is what the `sessions_completed` column holds now that the v3 document no longer
- * carries a `sessionsCompleted` field.
+ * column, `username` because it must match the stream key, and `history` because
+ * its length is what the `sessions_completed` column holds now that the v3
+ * document no longer carries a `sessionsCompleted` field.
  *
  * A 400 leaves the database completely untouched. The newest snapshot after a
  * rejected `PUT` is byte-for-byte the newest snapshot from before it.
  *
- * ── The username travels in the query string, on both /api/state routes ───────
+ * ── Configuration ────────────────────────────────────────────────────────────
  *
- * `?user=alice`. On `GET` it is the only way to say whose document is wanted. On
- * `PUT` it is redundant with the document's own `username` — and that is the
- * point: the two are compared and a mismatch is a 400. Without an independently
- * stated target there is nothing to compare, and a client bug that puts the
- * wrong name in a document would silently overwrite someone else's stream.
- *
- * A username in a URL is fine; a secret in one is not, which is why the secret
- * stays in a header. A URL ends up in proxy logs and browser history, and a
- * username is not a secret in this design — it is a nameplate.
- *
- * ── Auth ─────────────────────────────────────────────────────────────────────
- *
- * One shared secret in a header, from the `SPORTS_APP_SYNC_SECRET` environment
- * variable, compared with `crypto.timingSafeEqual`. The service refuses to start
- * without one — a default or empty secret would be worse than no auth at all,
- * because it would look like auth. **No secret is committed anywhere in this
- * repository.**
+ * `WARD_PUBLIC_ORIGIN`, `WARD_API_BASE_PATH` and `WARD_APP_KEY` are required,
+ * with no defaults: the service refuses to start without all three, because a
+ * service that cannot tell its callers apart looks authenticated and is not. The
+ * app key authenticates this service to Ward and never reaches a browser. **No
+ * key is committed anywhere in this repository.**
  *
  * ── Binding ──────────────────────────────────────────────────────────────────
  *
@@ -186,14 +158,11 @@ const JSON_CONTENT_TYPE_UTF8 = `${JSON_CONTENT_TYPE}; charset=utf-8`
 // and not in `shared/api.ts`: that package has to work under a browser's
 // Content-Security-Policy, and this one is a Node process.
 //
-// These are the *same* declarations Fastify's AJV validates `?user=` against. Two
+// These are the *same* declarations Fastify's AJV serialises responses with. Two
 // entry points into one schema, because a raw-string body cannot be handed to a
 // body schema — see the file header.
 
 const checkStateDocument = TypeCompiler.Compile(StateDocumentEnvelope)
-
-// ─── Auth ───────────────────────────────────────────────────────────────────
-
 
 // ─── Small helpers ──────────────────────────────────────────────────────────
 
@@ -280,9 +249,6 @@ export function checkDocument(text) {
   }
 }
 
-// ─── The login body ─────────────────────────────────────────────────────────
-
-
 // ─── The service ────────────────────────────────────────────────────────────
 
 /**
@@ -343,8 +309,7 @@ export function createStateServer(config) {
   // The replacement returns the raw text unchanged. That is what makes
   // `GET /api/state` able to answer with the bytes it was given: the document is
   // never a JavaScript object in this process, so there is nothing to
-  // re-serialise. It also means a login body never becomes a structured value
-  // with a credential in a named field.
+  // re-serialise.
   app.removeAllContentTypeParsers()
   app.addContentTypeParser(
     JSON_CONTENT_TYPE,
@@ -384,7 +349,7 @@ export function createStateServer(config) {
    * one.
    *
    * The resolved subject is put on the request. **That subject is the document
-   * key** — see the `?user=` note in the file header for what that replaced.
+   * key** — see "Who the caller is" in the file header.
    */
   async function requireSession(request, reply) {
     try {
@@ -429,8 +394,8 @@ export function createStateServer(config) {
   // Fastify routes both "no such path" and "that path, wrong method" here, and the
   // contract answers them differently — including who is allowed to know which.
   // `/api/health` says `405` to anyone, because liveness needs no credential;
-  // `/api/state` and `/api/login` check the secret first, so an unauthorised
-  // caller cannot use a `405` to learn that a route exists.
+  // `/api/state` checks the session first, so an unauthorised caller cannot use
+  // a `405` to learn that a route exists.
   app.setNotFoundHandler(async (request, reply) => {
     const path = pathOf(request.url)
 
