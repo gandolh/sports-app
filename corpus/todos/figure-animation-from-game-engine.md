@@ -2,7 +2,9 @@
 
 Captured 2026-07-30. **R1 is done** (see below). R2 became
 [brief 23](../briefs/done/23-figure-rig-and-morph.md) after a grill and shipped
-2026-10-02; R3 is deferred with a stated reason there.
+2026-10-02. **R3 was decided 2026-10-07 by the owner: the turnaround stays linear**
+([design-system.md](../wiki/design-system.md)). R4 is not taken. Nothing is left
+open here.
 
 The question was what the game-engine monorepo has that would improve this app's
 animations. The useful answer turned out not to be a technique to copy but a
@@ -154,7 +156,7 @@ Two alternatives considered and not recommended:
   introduces per-frame JS the app currently does not have anywhere, for no advantage
   over transforms once the rig exists.
 
-**R3 — reconsider the linear turnaround. Needs a decision, do not just do it.**
+**R3 — reconsider the linear turnaround.** *Decided 2026-10-07: keep it linear.*
 The loop currently walks 0 → 1 → 0 at a constant rate, so the figure **reverses
 direction instantaneously** at the bottom, which no body does. This is the one place
 the engine's Hermite/Catmull-Rom applies — its stated purpose there is that a unit

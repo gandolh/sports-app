@@ -61,6 +61,7 @@ date anywhere in the UI. Full detail in
 | 25 | [Persistence v4](../briefs/done/25-persistence-v4.md) | **done** | 24 |
 | 26 | [Tailwind + canon tokens](../briefs/done/26-tailwind-and-canon-tokens.md) | **done** | — |
 | 27 | [The four screens](../briefs/done/27-the-four-screens.md) | **done** | 24, 25, 26 |
+| 28 | [In-between rungs at the three big steps](../briefs/todo/28-in-between-rungs.md) | **todo** (2026-10-07) | — |
 
 ## How it ran
 

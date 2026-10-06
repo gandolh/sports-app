@@ -1,6 +1,6 @@
 ---
 summary: Design tokens and the doctrine governing them — colour, type, spacing and motion. The banned patterns and accessibility floor live in design-guardrails.md.
-updated: 2026-07-30
+updated: 2026-10-07
 ---
 
 # Design system
@@ -145,7 +145,9 @@ supposed to govern, which is the failure mode a design system exists to prevent.
   [technical-decisions.md](technical-decisions.md#figures-five-poses-animated-on-a-data-driven-clock)).
   Timing is **linear**, deliberately: easing that decelerates into the turnaround makes a
   pauseless rung look like it dwells at the bottom, which is precisely the signal a
-  paused rung owns.
+  paused rung owns. Reconsidered and kept by the owner on 2026-10-07 (R3 in the
+  [figure-animation todo](../todos/figure-animation-from-game-engine.md)); rejected:
+  rounding the turn over a short window.
 
 Rule 1 still governs everything that is *interface*. Neither exception licenses a third.
 

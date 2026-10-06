@@ -1252,3 +1252,14 @@ sent and checked; the client sends none and the server ignores one), the header 
 `client/src/persistence/sync.ts`, and comments in `shared/api.ts`, `shared/username.ts`
 and `wiki/architecture.md`. Comments and docs only; no behaviour changed. 1118 tests
 pass, lint and typecheck are clean, and the docs site builds.
+
+## [2026-10-07] decide | The last open questions, answered
+
+Asked one at a time. **Question 7:** the owner chose in-between rungs at the three
+big steps (push 3→4, hinge 4→5, squat 5→6), over a gentler range or only rewording.
+Written as brief 28, which carries a v4 → v5 migration because position is stored as
+`sessionsDone`, and inserting a rung would otherwise move people back one exercise.
+**Questions 8 and 9** were already answered in code (brief 27's `<HonestNote>`;
+brief 24's `stopRule` and brief 27's `<StopRule>`); the page had not caught up.
+**R3:** the figure's turnaround stays linear; recorded in design-system.md, and the
+figure-animation todo has nothing left open.
