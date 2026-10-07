@@ -146,7 +146,7 @@ supposed to govern, which is the failure mode a design system exists to prevent.
   Timing is **linear**, deliberately: easing that decelerates into the turnaround makes a
   pauseless rung look like it dwells at the bottom, which is precisely the signal a
   paused rung owns. Reconsidered and kept by the owner on 2026-10-07 (R3 in the
-  [figure-animation todo](../todos/figure-animation-from-game-engine.md)); rejected:
+  figure-animation todo, retired the same day; see [`../log.md`](../log.md)); rejected:
   rounding the turn over a short window.
 
 Rule 1 still governs everything that is *interface*. Neither exception licenses a third.

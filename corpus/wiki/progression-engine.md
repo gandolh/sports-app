@@ -1,6 +1,6 @@
 ---
 summary: How the app decides today's prescription — the fixed 6-week-per-rung schedule, why it needs no input, and the interpolation that makes state a single integer per pattern.
-updated: 2026-07-29
+updated: 2026-10-07
 ---
 
 # Progression — the fixed schedule
@@ -68,7 +68,7 @@ Three properties fall out of this rather than needing to be implemented:
 
 ```ts
 interface StateDoc {
-  schemaVersion: 3
+  schemaVersion: 5
   cyclePosition: number                       // integer index into ROTATION
   sessionsDone: Record<Pattern, number>       // ← the whole of the mutable state
   history: readonly SessionResult[]
@@ -86,6 +86,22 @@ rotation is deterministic, `sessionsDone.push` is exactly `⌈cyclePosition / 3�
 stored anyway: if the rotation ever changes, derived counters would silently
 reinterpret every existing user's position mid-programme. One integer per pattern is
 cheap insurance against a content change rewriting history.
+
+### Inserting a rung moves people, so it needs a migration
+
+The counter is turned into a rung by **array index**. Insert a rung at index k and the
+same counter names the rung below the one it used to: everyone at or above k silently
+drops back one exercise. Brief 28 inserted three rungs (push 3a, hinge 4a, squat 5a;
+see [programme.md](programme.md#the-three-in-between-rungs)), so schema v5 carries a
+one-off step in `client/src/persistence/codec.ts`: a v4 counter at or above an
+insertion gains `sessionsPerRung` (14). Same rung, same point in it, same target.
+Counters below an insertion do not move. History needs nothing, because each record
+stores its `rungId`. The step reads frozen v4 numbers rather than `ladders.ts`, and the
+service stores documents without migrating them, so it runs exactly once.
+
+The consequence worth knowing: on a migrated document `sessionsDone` is a **position**,
+not a tally. It can sit 14 above the sessions actually trained. Retiring a rung from
+the middle would need the same treatment in reverse.
 
 ## The rotation
 

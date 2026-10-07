@@ -72,3 +72,30 @@ brief carries a **schema migration** (v4 → v5), not just content.
 - Server and client both accept v5 and reject a v4 document only through the
   migration path, as brief 25 set up.
 - `npm test` and typecheck pass.
+
+## Outcome (2026-10-07)
+
+**Done** in `b09773d`. The three rungs:
+
+| Pattern | Inserted between | New rung |
+|---|---|---|
+| push | `push-03-knees` · `push-04-full` | `push-03a-3s-down-knee-press`: lower a full push-up over three seconds, press up from the knees |
+| hinge | `hinge-04-single-leg-heel-far` · `hinge-05-sliding-leg-curl` | `hinge-04a-sliding-curl-half-range`: the two-legged slide, heels halfway out |
+| squat | `squat-05-heels-elevated` · `squat-06-split` | `squat-05a-split-hand-on-wall`: a split squat with one hand on a wall |
+
+Ids are immutable, so a new rung takes its lower neighbour's number plus a letter;
+`RUNG_ID_PATTERN` allows one. Every `startRungIndex` still names the same rung, because
+each insertion sits above its ladder's start.
+
+**Migration.** The v4 → v5 step adds 14 to a counter that sat at or above an insertion on
+the v4 ladders (push ≥ 14, hinge ≥ 42, squat ≥ 56). It reads frozen v4 numbers, not
+`ladders.ts`. The service is unchanged in code and migrates nothing, which v5 makes
+necessary: the step must run once. Tested per ladder at the edges, by a sweep over counts
+0 to 400, on `/progress`'s "today" marker, on a pull, and on the server. A mutation that
+disables the step fails 8 codec tests and both UI and sync fixtures. 1144 tests pass
+(1118 before); typecheck, lint and build are clean.
+
+**Left open:** milestones replay history on today's ladders, so a migrated document past
+an insertion lists the new rung as reached, and the named "first full push-up" lands a
+rung late. Display only. Captured as
+[todos/milestones-after-a-rung-insertion.md](../../todos/milestones-after-a-rung-insertion.md).

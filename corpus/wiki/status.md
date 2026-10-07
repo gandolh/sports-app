@@ -1,6 +1,6 @@
 ---
 summary: Dated snapshot of where every brief stands and what's next.
-updated: 2026-10-02
+updated: 2026-10-07
 ---
 
 # Status — 2026-09-06
@@ -61,7 +61,7 @@ date anywhere in the UI. Full detail in
 | 25 | [Persistence v4](../briefs/done/25-persistence-v4.md) | **done** | 24 |
 | 26 | [Tailwind + canon tokens](../briefs/done/26-tailwind-and-canon-tokens.md) | **done** | — |
 | 27 | [The four screens](../briefs/done/27-the-four-screens.md) | **done** | 24, 25, 26 |
-| 28 | [In-between rungs at the three big steps](../briefs/todo/28-in-between-rungs.md) | **todo** (2026-10-07) | — |
+| 28 | [In-between rungs at the three big steps](../briefs/done/28-in-between-rungs.md) | **done** 2026-10-07 — three rungs, schema v5 | — |
 
 ## How it ran
 
@@ -96,9 +96,11 @@ per-side side-plank dose the code splits between sides.
   currently blocks training until repaired. Consistent with `cyclePosition`, and it
   surfaces the typo rather than hiding it — but it cuts against "arrive with the answer
   already made". See [`../log.md`](../log.md).
-- **Open questions 8 and 9 were answered in the build** (`<HonestNote>` and `<StopRule>`),
-  but 9's data half is not: `stopRule` is now its own field, so nothing is left implicit.
-  Question 7 — the step between rungs — is still open and is still content, not code.
+- **Open questions 7, 8 and 9 are answered.** 8 and 9 in the build (`<HonestNote>` and
+  `<StopRule>`); 7 by brief 28 on 2026-10-07, which added three in-between rungs and
+  schema v5. 1144 tests pass. One display gap is left as a todo: milestones replay
+  history on today's ladders, so a migrated document past an insertion lists the new
+  rung as reached.
 - **The theme has not been looked at on a phone.** Contrast is enforced across all
   sixteen palettes by test, which is a different claim from "it looks right in a bright
   room at arm's length".

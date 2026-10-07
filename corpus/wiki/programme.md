@@ -1,6 +1,6 @@
 ---
-summary: What the training actually is — the three-day rotation, what each session contains, the per-rung hold caps, and the cardio protocol.
-updated: 2026-07-30
+summary: What the training actually is — the three-day rotation, what each session contains, the rep ladders rung by rung (with brief 28's three in-between rungs), the per-rung hold caps, and the cardio protocol.
+updated: 2026-10-07
 ---
 
 # The programme
@@ -89,6 +89,52 @@ without needing a per-rung step, so re-tuning any of these costs nothing.
 All three run 5 → 12. **Reps cap at 12** because past ~12–15 bodyweight reps the
 adaptation drifts from strength to endurance and there is no load to add. At the cap
 the lever switches to the next modifier — tempo, pause, range, leverage, unilateral.
+
+The `#` is the number in the rung's id, which never changes. The app's "rung 4 of 9"
+counts by position instead, so the two differ above a gap or an inserted rung. **S** is
+where every document starts; **!** is `safetyCritical`; **new** is brief 28.
+
+| # | Push | # | Squat | # | Hinge |
+|---|---|---|---|---|---|
+| 01 | Wall push-up | 01 | Assisted squat, fingertips on a wall | 01 | Glute bridge |
+| 02 | Knee push-up, knees under hips | 02 | Bodyweight squat **S** | 02 | Glute bridge, 2s hold at the top **S** |
+| 03 | Knee push-up, knees set back **S** | 03 | Squat, 3s lowering | 03 | Single-leg glute bridge |
+| 3a | Slow-lowering push-up, press up from the knees **new** | 04 | Squat, 3s lowering + 2s bottom hold | 04 | Single-leg bridge, heel far out |
+| 04 | Full push-up | 05 | Heels-elevated squat, deeper range | 4a | Sliding leg curl, halfway out **new** |
+| 05 | Full push-up, 3s lowering | 5a | Split squat, one hand on a wall **new** | 05 | Sliding leg curl, both legs |
+| 06 | Full push-up, 3s lowering + 2s bottom hold | 06 | Split squat | 06 | Sliding leg curl, 5s slide out |
+| 08 | Diamond push-up (07 retired, see below) | 07 | Assisted single-leg squat **!** | 07 | Single-leg sliding leg curl |
+| 09 | Archer push-up **!** | 08 | Pistol squat progression **!** | | |
+
+Push has no rung 7: `push-07-feet-elevated` needed a chair, and a pike push-up would
+be a different exercise. The gap is deliberate (`ladders.ts`).
+
+### The three in-between rungs
+
+*Added 2026-10-07 by brief 28, answering open question 7.* At three places the next
+rung at 5 reps was much harder than the last one at 12, so its first session was often
+its hardest while the app drew a smooth ramp. The owner is new to exercise and asked
+for the best option at each step, so each was chosen for a beginner:
+
+- **Push 3a, slow-lowering push-up.** Lowering is easier than pushing, so a beginner can
+  control a full push-up on the way down before they can press one up. This rung does
+  the full push-up's lowering over three seconds, then sets the knees down and presses
+  from there. One movement, a tempo modifier, and the knee push-up's leverage for the
+  half they cannot do yet. A standard route to a first full push-up.
+- **Hinge 4a, sliding leg curl halfway out.** Rung 4 to rung 5 asked for two new things
+  at once: the slide itself, and a long, loaded lever at its far end. The half slide
+  teaches the slide while the knees stay bent and the lever is short; rung 5 then adds
+  only range. Like the rest of this ladder, it fails by the hips dropping, so it is not
+  `safetyCritical`.
+- **Squat 5a, split squat with a hand on a wall.** Two legs to one adds load per leg and
+  a balance problem in the same step. The hand takes the balance away, so the first
+  split-squat rung trains the legs; rung 6 then only takes the hand off. Rung 7 already
+  uses a hand on a wall, so the ladder's language does not change.
+
+Each is zero equipment (towels and a wall), states its tempo, and says in its cues what
+changed from the rung before. The cues call them rung 3a, 4a and 5a, after their ids.
+Adding a rung moves every rung above it up one array index, which is why brief 28 also
+carried a state migration; see [progression-engine.md](progression-engine.md).
 
 ## The cardio day
 

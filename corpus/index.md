@@ -24,9 +24,9 @@ pages. See [CLAUDE.md](CLAUDE.md) for the conventions and the retrieval budget.
 - [wiki/design-guardrails.md](wiki/design-guardrails.md) — The rules that keep the design system honest — the banned patterns, the floor-phone accessibility floor, and the four tests that enforce both mechanically.
 - [wiki/design-system.md](wiki/design-system.md) — Design tokens and the doctrine governing them — colour, type, spacing and motion. The banned patterns and accessibility floor live in design-guardrails.md.
 - [wiki/licensing.md](wiki/licensing.md) — Why the repository is AGPL v3.0, what the exercise reference cost to import, the unresolved chain of title behind it, and the public-domain substitute that would undo both.
-- [wiki/open-questions.md](wiki/open-questions.md) — Nothing open as of 2026-10-07. Question 7 is brief 28 (in-between rungs); 8 and 9 were already answered by briefs 24 and 27.
+- [wiki/open-questions.md](wiki/open-questions.md) — Nothing open as of 2026-10-07. Questions 8 and 9 were already answered by briefs 24 and 27; 7 landed as brief 28 and is deleted.
 - [wiki/overview.md](wiki/overview.md) — What sports-app is in one paragraph, who it's for, and the constraints that shaped it.
-- [wiki/programme.md](wiki/programme.md) — What the training actually is — the three-day rotation, what each session contains, the per-rung hold caps, and the cardio protocol.
+- [wiki/programme.md](wiki/programme.md) — What the training actually is — the three-day rotation, what each session contains, the rep ladders rung by rung (with brief 28's three in-between rungs), the per-rung hold caps, and the cardio protocol.
 - [wiki/progression-engine.md](wiki/progression-engine.md) — How the app decides today's prescription — the fixed 6-week-per-rung schedule, why it needs no input, and the interpolation that makes state a single integer per pattern.
 - [wiki/reversals.md](wiki/reversals.md) — The three v3 reversals, the original reasoning each one overturned, and the cost each purchase carries — read before re-deriving a rule that was deliberately dropped.
 - [wiki/status.md](wiki/status.md) — Dated snapshot of where every brief stands and what's next.

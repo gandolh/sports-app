@@ -275,7 +275,7 @@ Fold the outcome back into question 4 either way.
   organically than a point translating linearly. Ship this, look at it, then decide.
 - **R1, the easing module and injected-time tween.** Real but unrelated — it touches
   `client/src/ui/components/CountUp.tsx`, not the figures. Still captured in
-  [todos/figure-animation-from-game-engine.md](../../todos/figure-animation-from-game-engine.md).
+  `todos/figure-animation-from-game-engine.md` (retired 2026-10-07; git has it).
 - **Colour on the figures**, a sixth pose, and any change to the four overlays.
 
 ---

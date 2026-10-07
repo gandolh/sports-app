@@ -1,6 +1,6 @@
 ---
 summary: Locked product and programme calls with the reasoning that settled them — read before proposing an alternative.
-updated: 2026-09-06
+updated: 2026-10-07
 ---
 
 # Decisions
@@ -29,11 +29,6 @@ time-invariance snapshot. A test kept alive after its rule is gone is worse than
 engine adapts off a log, every number in
 [progression-engine.md](progression-engine.md) becomes a lie.
 
-## SUPERSEDED — moved
-
-The original argument for measuring nothing — the whole of it, including why it was
-defensible rather than merely simple — now lives in [reversals.md](reversals.md).
-
 ## Progression is a fixed schedule — a rung takes ~6 weeks
 
 One law generates every number in the programme:
@@ -58,6 +53,17 @@ to endurance and there is no load to add.
 **At the top of a ladder you stay there and the target cycles** bottom→top→bottom
 indefinitely. That is the honest ceiling of floor-only training, not a failure state,
 and the account page says so. Ladders run out at roughly 9 months of daily training.
+
+## In-between rungs at the three big steps
+
+*Decided 2026-10-07 by the owner (open question 7); built as brief 28.*
+
+At push 3→4, hinge 4→5 and squat 5→6, the next rung at 5 reps was much harder than the
+last at 12. **Each step got a rung of its own**; which, and why, is in
+[programme.md](programme.md#the-three-in-between-rungs). **Rejected:** a gentler `range`
+on the rung after each step, which softens the number but keeps the jump, and only
+correcting the wording, which names the problem without fixing it. An insertion moves
+array indices, so v5 migrated stored counters once; the next insertion needs its own.
 
 ## Adherence and accepted risk — moved
 
@@ -143,11 +149,6 @@ Dates, a calendar, streaks and missed days are in scope. The cost, stated in
 after a long gap no longer looks identical to returning after one day** — the app's worst
 moment, previously answered by construction.
 
-## SUPERSEDED — moved
-
-The original argument for having no dates is in [reversals.md](reversals.md), together
-with the cost its reversal now owes a design answer.
-
 ## Standing decisions from v1, unchanged
 
 ### Zero equipment means floor and bodyweight only, in one room
@@ -194,8 +195,7 @@ iconography, "designed, not assembled". A finish level, not a feature list.
 Tailwind theme** — it is then the only mechanical guard left on the palette, and it is
 the one that caught `#6ee7a8` scoring 1.5:1 on white.
 
-Two findings from the losing directions outlived them and are now open work — see
-[open-questions.md](open-questions.md), questions 8 and 9.
+Two findings from the losing directions became questions 8 and 9, since answered.
 
 ## Licensing — moved
 

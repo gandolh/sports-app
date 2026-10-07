@@ -1263,3 +1263,31 @@ Written as brief 28, which carries a v4 → v5 migration because position is sto
 brief 24's `stopRule` and brief 27's `<StopRule>`); the page had not caught up.
 **R3:** the figure's turnaround stays linear; recorded in design-system.md, and the
 figure-animation todo has nothing left open.
+
+## [2026-10-07] done | Brief 28: three in-between rungs, and schema v5
+
+Question 7 is built. Each of the three big steps got a rung, chosen for a beginner:
+`push-03a-3s-down-knee-press` (lower a full push-up over three seconds, press up from
+the knees), `hinge-04a-sliding-curl-half-range` (the two-legged slide, heels halfway
+out) and `squat-05a-split-hand-on-wall`. Why each, and the full ladder tables, are in
+[programme.md](wiki/programme.md#the-three-in-between-rungs). Ids never change, so an
+inserted rung takes its lower neighbour's number plus a letter. The rung after each
+now names the new one in its cues. Every `startRungIndex` still names the same rung.
+
+The v4 → v5 step adds 14 to a counter that sat at or above an insertion on the v4
+ladders, so nobody changes exercise or target. It uses frozen v4 numbers, and the
+service still migrates nothing, so the step runs once. `midProgram` is now a migrated
+document (push 44). 1144 tests pass (1118 before); typecheck, lint and build clean.
+Code in `b09773d`.
+
+Found on the way and not fixed: milestones replay history on today's ladders, so a
+document that was past an insertion when it migrated lists the new rung as reached.
+Captured as `todos/milestones-after-a-rung-insertion.md`.
+
+Corpus: question 7 deleted from open-questions.md, the decision and its rejected options
+recorded in decisions.md. decisions.md was at its 200-line cap, so the two
+"SUPERSEDED — moved" pointers that repeated the link in the section above them were
+removed to make room. Closed the todo `figure-animation-from-game-engine` (captured
+2026-07-30; nothing was left open after R3 was decided; the file is retired, git has
+it). Its links in design-system.md and in brief 23 are now plain text, the only edit to
+that brief.
