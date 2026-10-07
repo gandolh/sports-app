@@ -1291,3 +1291,13 @@ removed to make room. Closed the todo `figure-animation-from-game-engine` (captu
 2026-07-30; nothing was left open after R3 was decided; the file is retired, git has
 it). Its links in design-system.md and in brief 23 are now plain text, the only edit to
 that brief.
+
+## [2026-10-07] decision | Milestones after a rung insertion: left as is
+
+The owner chose to leave the display gap that brief 28 found. Milestones replay history
+on today's ladders, so a document that was past an insertion when it migrated (push 14,
+hinge 42, squat 56 sessions) lists the new rung as reached. No real document was that far
+along, and the fix (replay by `rungId`) would shift every milestone one session later for
+everyone. Recorded in [progression-engine.md](wiki/progression-engine.md#inserting-a-rung-moves-people-so-it-needs-a-migration).
+The todo `milestones-after-a-rung-insertion` is retired (git has it); its link in brief 28
+is now plain text, the only edit to that brief.

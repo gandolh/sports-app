@@ -98,9 +98,10 @@ per-side side-plank dose the code splits between sides.
   already made". See [`../log.md`](../log.md).
 - **Open questions 7, 8 and 9 are answered.** 8 and 9 in the build (`<HonestNote>` and
   `<StopRule>`); 7 by brief 28 on 2026-10-07, which added three in-between rungs and
-  schema v5. 1144 tests pass. One display gap is left as a todo: milestones replay
-  history on today's ladders, so a migrated document past an insertion lists the new
-  rung as reached.
+  schema v5. 1144 tests pass. One display gap is left on purpose (owner, 2026-10-07):
+  milestones replay history on today's ladders, so a migrated document past an
+  insertion lists the new rung as reached. See
+  [progression-engine.md](progression-engine.md#inserting-a-rung-moves-people-so-it-needs-a-migration).
 - **The theme has not been looked at on a phone.** Contrast is enforced across all
   sixteen palettes by test, which is a different claim from "it looks right in a bright
   room at arm's length".

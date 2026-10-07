@@ -103,6 +103,15 @@ The consequence worth knowing: on a migrated document `sessionsDone` is a **posi
 not a tally. It can sit 14 above the sessions actually trained. Retiring a rung from
 the middle would need the same treatment in reverse.
 
+**A known display gap, left on purpose.** `milestonesReached`
+(`client/src/domain/milestones.ts`) replays `history` against **today's** ladders by
+running session count. On a document that was past an insertion when it migrated (push
+14, hinge 42, squat 56 sessions), the replay lists the inserted rung as reached and
+"first full push-up" a rung late. The prescription is unaffected. The fix (replay by each
+record's `rungId`) would move every milestone one session later for everyone, because a
+record names the rung trained, not the rung earned. The owner chose to leave it on
+2026-10-07: no real document was that far along.
+
 ## The rotation
 
 ```

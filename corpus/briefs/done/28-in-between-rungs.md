@@ -98,4 +98,4 @@ disables the step fails 8 codec tests and both UI and sync fixtures. 1144 tests 
 **Left open:** milestones replay history on today's ladders, so a migrated document past
 an insertion lists the new rung as reached, and the named "first full push-up" lands a
 rung late. Display only. Captured as
-[todos/milestones-after-a-rung-insertion.md](../../todos/milestones-after-a-rung-insertion.md).
+`todos/milestones-after-a-rung-insertion.md`.
