@@ -180,11 +180,11 @@ describe('the eccentric runs toward the lowered pose, which differs per pattern'
 
 // ─── Every rung, and the shape of the output ───────────────────────────────
 
-describe('all 35 rungs', () => {
+describe('all 38 rungs', () => {
   const allRungs = PATTERNS.flatMap((pattern) => LADDERS[pattern].rungs)
 
-  it('there are 35 of them (push 8, squat 8, hinge 7, core 6, pull 6)', () => {
-    expect(allRungs).toHaveLength(35)
+  it('there are 38 of them (push 9, squat 9, hinge 8, core 6, pull 6)', () => {
+    expect(allRungs).toHaveLength(38)
   })
 
   for (const rung of allRungs) {
@@ -214,10 +214,13 @@ describe('all 35 rungs', () => {
     // Every pair the content actually relies on. Each pair shares a ladder, a
     // pose and a drawing; the clock is the only thing left to separate them.
     const pairs: readonly [string, string][] = [
+      ['push-03-knees', 'push-03a-3s-down-knee-press'],
+      ['push-03a-3s-down-knee-press', 'push-04-full'],
       ['push-04-full', 'push-05-full-3s-down'],
       ['push-05-full-3s-down', 'push-06-full-3s-down-2s-bottom-hold'],
       ['squat-02-bodyweight', 'squat-03-3s-down'],
       ['squat-03-3s-down', 'squat-04-3s-down-2s-bottom-hold'],
+      ['squat-05-heels-elevated', 'squat-05a-split-hand-on-wall'],
       ['squat-05-heels-elevated', 'squat-06-split'],
       ['hinge-01-glute-bridge', 'hinge-02-glute-bridge-2s-top-hold'],
       ['hinge-05-sliding-leg-curl', 'hinge-06-sliding-curl-eccentric'],
@@ -335,7 +338,7 @@ describe('generated CSS', () => {
     const clock = buildTimeline('squat', undefined)
     const push = new Set(motionClassNames(clock, PUSH_RIG).values())
     for (const name of motionClassNames(clock, SQUAT_RIG).values()) expect(push.has(name)).toBe(false)
-    // …while the same rig on the same clock shares, so 35 rungs stay cheap.
+    // …while the same rig on the same clock shares, so 38 rungs stay cheap.
     expect([...motionClassNames(clock, PUSH_RIG).values()]).toEqual([...push])
   })
 

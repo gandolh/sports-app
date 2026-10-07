@@ -456,6 +456,21 @@ describe('pull', () => {
     if (parsed.ok) expect(parsed.doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
   })
 
+  it('pulls a v4 document and hands back v5, on the same push rung', async () => {
+    // Brief 28. A phone still on the old build pushes v4, whose counters index the
+    // ladders as they were before three rungs were inserted. The pull goes through
+    // `parse`, so the v4 → v5 step runs on the way in: 14 push sessions was
+    // `push-04-full` under v4 and is 28 on the new ladder, the same rung.
+    const v4 = serialise({ ...docWith(4), sessionsDone: { ...docWith(4).sessionsDone, push: 14 } })
+      .replace(`"schemaVersion": ${CURRENT_SCHEMA_VERSION}`, '"schemaVersion": 4')
+    const outcome = await pull(TARGET, ALICE, { fetchImpl: responder(v4), log })
+    expect(outcome.ok).toBe(true)
+    if (outcome.ok) {
+      expect(outcome.doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+      expect(outcome.doc.sessionsDone.push).toBe(28)
+    }
+  })
+
   it('maps 404 to the empty (new-device) case rather than an error', async () => {
     const outcome = await pull(TARGET, ALICE, {
       fetchImpl: responder('{"error":"no state"}', { status: 404 }),

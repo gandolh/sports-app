@@ -189,9 +189,9 @@ describe('the stop rule', () => {
 
 describe('a safetyCritical rung', () => {
   // The push ladder starts at index 2 and takes 14 sessions per rung, so 84
-  // sessions clamps to the top rung — `push-09-archer`, at index 7.
+  // sessions reaches the top rung, `push-09-archer`, at index 8.
   const AT_ARCHER = 84
-  const ARCHER = getRung('push', 7)
+  const ARCHER = getRung('push', 8)
 
   it('renders its first cue in a separate element from the remaining cues', async () => {
     seedUser(docWith({ push: AT_ARCHER }))

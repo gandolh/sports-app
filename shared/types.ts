@@ -218,14 +218,23 @@ export interface Settings {
  * could not have recorded logs" is a fact worth being able to ask about. Brief 25
  * owns the v3 → v4 migration; nothing in this file performs one.
  *
+ * **v5** (2026-10-07): no field changed. What changed is what a `sessionsDone`
+ * counter *means*. Brief 28 inserted a rung into each of the push, hinge and squat
+ * ladders, and a counter is turned into a rung by array index, so the same count
+ * names a different exercise on the new ladders. The v4 → v5 step in
+ * `client/src/persistence/codec.ts` moves each counter past an insertion forward
+ * by one rung's worth of sessions, once, so nobody changes exercise. The version
+ * bumps because that step must run exactly once per document: a v5 counter is
+ * already on the new ladders and must never be moved again.
+ *
  * It lives here rather than in the codec because the service writes it into an
  * indexed column: `schema_version` on every snapshot row. Two runtimes agreeing
  * on the current version is exactly what a shared contract is for.
  */
-export const CURRENT_SCHEMA_VERSION = 4
+export const CURRENT_SCHEMA_VERSION = 5
 
 export interface StateDoc {
-  readonly schemaVersion: 4
+  readonly schemaVersion: 5
   /** Keys the document. A password is accepted and discarded, never stored. */
   readonly username: string
   /** Integer index into ROTATION. Advances on training, never on a date. */
@@ -239,6 +248,10 @@ export interface StateDoc {
    * because if the rotation ever changes, derived counters would silently
    * reinterpret every existing user's position mid-programme. One integer per
    * pattern is cheap insurance against a content change rewriting history.
+   *
+   * Since v5 a migrated counter can sit one rung (14 sessions) above the number
+   * of sessions actually trained: it is a position on the current ladder, and
+   * the v4 → v5 step moved it so the position names the same exercise.
    */
   readonly sessionsDone: Readonly<Record<Pattern, number>>
   readonly history: readonly SessionResult[]

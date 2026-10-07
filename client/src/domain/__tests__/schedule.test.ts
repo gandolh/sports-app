@@ -33,7 +33,7 @@ const ZERO: Readonly<Record<Pattern, number>> = { push: 0, squat: 0, hinge: 0, c
 
 function docWith(sessionsDone: Partial<Record<Pattern, number>>, cyclePosition = 0): StateDoc {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     username: 'test',
     cyclePosition,
     sessionsDone: { ...ZERO, ...sessionsDone },

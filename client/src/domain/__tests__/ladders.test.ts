@@ -28,6 +28,20 @@ const allRungs: readonly [Pattern, number, Rung][] = ladders.flatMap(([p, l]) =>
 
 const NUMBER_WORD: Record<number, string> = { 2: 'two', 3: 'three', 4: 'four', 5: 'five' }
 
+/** An id whose `NN` carries a letter: a rung inserted after its neighbours shipped. */
+const LETTERED = /^[a-z]+-\d{2}[a-z]-/
+
+/**
+ * `NN` as a sortable number. `03` is 3 and `03a` sits between 3 and 4, so a
+ * lettered rung reads as the in-between rung it is. NaN when the id has no `NN`.
+ */
+function rungNumber(id: string): number {
+  const match = /^[a-z]+-(\d{2})([a-z]?)-/.exec(id)
+  if (!match) return Number.NaN
+  const letter = match[2] ? match[2].charCodeAt(0) - 96 : 0
+  return Number(match[1]) + letter / 27
+}
+
 describe('ladder shape', () => {
   it('covers every pattern exactly once', () => {
     expect(Object.keys(LADDERS).sort()).toEqual([...PATTERNS].sort())
@@ -37,12 +51,46 @@ describe('ladder shape', () => {
     // Hard-coded on purpose: a silently dropped rung would otherwise pass every
     // other test in this file. Push LOST one — `push-07-feet-elevated` needed a
     // chair and was deliberately not backfilled — while hinge gained one when the
-    // two couch-anchored nordic negatives became three sliding-curl rungs.
-    expect(LADDERS.push.rungs).toHaveLength(8)
-    expect(LADDERS.squat.rungs).toHaveLength(8)
-    expect(LADDERS.hinge.rungs).toHaveLength(7)
+    // two couch-anchored nordic negatives became three sliding-curl rungs. Brief
+    // 28 then added one rung to each of push, squat and hinge.
+    expect(LADDERS.push.rungs).toHaveLength(9)
+    expect(LADDERS.squat.rungs).toHaveLength(9)
+    expect(LADDERS.hinge.rungs).toHaveLength(8)
     expect(LADDERS.core.rungs).toHaveLength(6)
     expect(LADDERS.pull.rungs).toHaveLength(6)
+  })
+
+  it('puts each in-between rung exactly between the two rungs of its big step', () => {
+    // Brief 28. The neighbours are the point: each inserted rung exists to split
+    // one step that was too big, so it must sit between those two rungs and no
+    // others. The v4 → v5 migration in `codec.ts` also assumes these positions.
+    const inserted: readonly [Pattern, string, string, string][] = [
+      ['push', 'push-03-knees', 'push-03a-3s-down-knee-press', 'push-04-full'],
+      ['hinge', 'hinge-04-single-leg-heel-far', 'hinge-04a-sliding-curl-half-range', 'hinge-05-sliding-leg-curl'],
+      ['squat', 'squat-05-heels-elevated', 'squat-05a-split-hand-on-wall', 'squat-06-split'],
+    ]
+    for (const [pattern, below, id, above] of inserted) {
+      const ids: readonly string[] = LADDERS[pattern].rungs.map((r) => r.id)
+      const at = ids.indexOf(id)
+      expect(at, `${id} is missing`).toBeGreaterThan(0)
+      expect(ids[at - 1], `${id} sits on the wrong rung`).toBe(below)
+      expect(ids[at + 1], `${id} sits under the wrong rung`).toBe(above)
+    }
+  })
+
+  it('keeps every in-between rung a zero-equipment rep rung with a figure', () => {
+    for (const id of [
+      'push-03a-3s-down-knee-press',
+      'hinge-04a-sliding-curl-half-range',
+      'squat-05a-split-hand-on-wall',
+    ]) {
+      const rung = findRungById(id)
+      expect(rung, id).toBeDefined()
+      expect(rung!.figureId, id).toBe(id.split('-')[0])
+      expect(rung!.range, `${id} overrides the rep range`).toBeUndefined()
+      expect(rung!.safetyCritical, id).toBeFalsy()
+      expect(rung!.modifier?.elevation, `${id} needs something to stand on`).toBeUndefined()
+    }
   })
 
   it('declares each ladder under its own pattern key', () => {
@@ -367,8 +415,8 @@ describe('rung ids', () => {
     // is that the numbers are unique and ordered, so a human reading a state file
     // can still tell which rung is harder.
     for (const [pattern, ladder] of ladders) {
-      const numbers = ladder.rungs.map((r) => Number(r.id.split('-')[1]))
-      expect(numbers.every(Number.isInteger), pattern).toBe(true)
+      const numbers = ladder.rungs.map((r) => rungNumber(r.id))
+      expect(numbers.every(Number.isFinite), pattern).toBe(true)
       expect(new Set(numbers).size, `${pattern} reuses a rung number`).toBe(numbers.length)
       for (let i = 1; i < numbers.length; i++) {
         expect(numbers[i]!, `${pattern} numbers go backwards at index ${i}`).toBeGreaterThan(
@@ -380,6 +428,19 @@ describe('rung ids', () => {
     }
   })
 
+  it('sorts a lettered rung between the two numbers it was inserted between', () => {
+    // The parse the test above relies on, checked on its own so a wrong parse
+    // cannot make "strictly increasing" pass by accident.
+    expect(rungNumber('push-03-knees')).toBe(3)
+    expect(rungNumber('push-03a-3s-down-knee-press')).toBeGreaterThan(3)
+    expect(rungNumber('push-03a-3s-down-knee-press')).toBeLessThan(4)
+    expect(rungNumber('push-03b-later')).toBeGreaterThan(rungNumber('push-03a-3s-down-knee-press'))
+    expect('push-03a-3s-down-knee-press').toMatch(RUNG_ID_PATTERN)
+    expect('push-3a-short').not.toMatch(RUNG_ID_PATTERN)
+    expect('push-03ab-two-letters').not.toMatch(RUNG_ID_PATTERN)
+    expect('push-03A-capital').not.toMatch(RUNG_ID_PATTERN)
+  })
+
   it('has exactly one gap, in the push ladder, where rung 7 was retired', () => {
     // Hard-coded so the gap stays a recorded decision rather than becoming a
     // pattern someone copies. If a second ladder ever grows a gap, that is a
@@ -388,6 +449,7 @@ describe('rung ids', () => {
       'push-01-wall',
       'push-02-knees-short-lever',
       'push-03-knees',
+      'push-03a-3s-down-knee-press',
       'push-04-full',
       'push-05-full-3s-down',
       'push-06-full-3s-down-2s-bottom-hold',
@@ -396,11 +458,24 @@ describe('rung ids', () => {
     ])
     for (const [pattern, ladder] of ladders) {
       if (pattern === 'push') continue
-      const numbers = ladder.rungs.map((r) => Number(r.id.split('-')[1]))
-      expect(numbers, `${pattern} has a numbering gap`).toEqual(
-        ladder.rungs.map((_, i) => i + 1),
+      // Lettered rungs were inserted later and are listed below; the rungs that
+      // shipped in place still number 1, 2, 3 … with no hole.
+      const shipped = ladder.rungs.map((r) => r.id).filter((id) => !LETTERED.test(id))
+      expect(shipped.map(rungNumber), `${pattern} has a numbering gap`).toEqual(
+        shipped.map((_, i) => i + 1),
       )
     }
+  })
+
+  it('has exactly the three lettered rungs brief 28 inserted', () => {
+    // Same reasoning as the gap: an inserted rung is a content decision with a
+    // migration attached, never a pattern to reach for casually.
+    const lettered = allRungs.map(([, , rung]) => rung.id).filter((id) => LETTERED.test(id))
+    expect(lettered.sort()).toEqual([
+      'hinge-04a-sliding-curl-half-range',
+      'push-03a-3s-down-knee-press',
+      'squat-05a-split-hand-on-wall',
+    ])
   })
 
   it('never backfills the retired push rung with a different exercise', () => {
@@ -542,16 +617,21 @@ describe('cues', () => {
     const mustCrossReference: readonly string[] = [
       'push-02-knees-short-lever',
       'push-03-knees',
+      'push-03a-3s-down-knee-press',
+      'push-04-full',
       'push-05-full-3s-down',
       'push-06-full-3s-down-2s-bottom-hold',
       'push-08-diamond-hands',
       'squat-03-3s-down',
       'squat-04-3s-down-2s-bottom-hold',
       'squat-05-heels-elevated',
+      'squat-05a-split-hand-on-wall',
       'squat-06-split',
       'hinge-02-glute-bridge-2s-top-hold',
       'hinge-03-single-leg-bridge',
       'hinge-04-single-leg-heel-far',
+      'hinge-04a-sliding-curl-half-range',
+      'hinge-05-sliding-leg-curl',
       'hinge-06-sliding-curl-eccentric',
       'hinge-07-single-leg-slide',
       'core-05-hollow-rock',
@@ -643,9 +723,11 @@ describe('the cardio protocol', () => {
 describe('getRung', () => {
   it('returns the rung at a valid index', () => {
     expect(getRung('push', 0).id).toBe('push-01-wall')
-    expect(getRung('push', 3).id).toBe('push-04-full')
-    // Index 6, id 08: the retired rung 7 is why these differ.
-    expect(getRung('push', 6).id).toBe('push-08-diamond-hands')
+    expect(getRung('push', 3).id).toBe('push-03a-3s-down-knee-press')
+    expect(getRung('push', 4).id).toBe('push-04-full')
+    // Index 7, id 08: the inserted rung 3a and the retired rung 7 are why these
+    // differ, and they pull in opposite directions.
+    expect(getRung('push', 7).id).toBe('push-08-diamond-hands')
     expect(getRung('push', topRungIndex('push')).id).toBe('push-09-archer')
     expect(getRung('pull', topRungIndex('pull')).id).toBe('pull-06-end-range-isometric')
   })
@@ -659,9 +741,9 @@ describe('getRung', () => {
   it('throws loudly rather than returning undefined past the top', () => {
     // A hand-edited counter past the top of a ladder must fail where it is wrong,
     // not render a blank card and get logged against nothing.
-    expect(() => getRung('hinge', 7)).toThrow(/hinge has no rung at index 7/)
-    expect(() => getRung('hinge', 7)).toThrow(/valid range 0\.\.6/)
-    expect(() => getRung('hinge', 7)).toThrow(/sessionsDone/)
+    expect(() => getRung('hinge', 8)).toThrow(/hinge has no rung at index 8/)
+    expect(() => getRung('hinge', 8)).toThrow(/valid range 0\.\.7/)
+    expect(() => getRung('hinge', 8)).toThrow(/sessionsDone/)
   })
 
   it('throws on a negative or non-integer index', () => {

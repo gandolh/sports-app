@@ -81,6 +81,17 @@
  *     `prescribe()`, and the cheapest way to keep that true is for the layer that
  *     stores them to have no opinion about them either.
  *
+ * ── v5 moved counters once, and that is all it did ─────────────────────────
+ *
+ * Brief 28 inserted a rung into three ladders. No field changed, but a stored
+ * `sessionsDone` is turned into a rung by array index, so the same number now
+ * names a different exercise. The v4 → v5 step (`keepPlaceAcrossInsertedRungs`)
+ * moves each affected counter forward by one rung's worth of sessions so the
+ * person stays where they were. It is the first migration that knows anything
+ * about ladder content, and it knows it as frozen numbers rather than by
+ * importing `ladders.ts`: a migration describes the ladders as v4 documents saw
+ * them, and the live content will keep changing.
+ *
  * ── Serialisation is a feature, not a formality ─────────────────────────────
  *
  * `serialise` is hand-rolled rather than `JSON.stringify(doc, null, 2)` because
@@ -458,6 +469,92 @@ function adoptLogging(raw: JsonObject): JsonObject {
   return raw
 }
 
+/**
+ * The v4 ladders, frozen: only the facts the v4 → v5 step needs, per pattern that
+ * gained a rung. `startRungIndex` and `sessionsPerRung` are the v4 values, and
+ * `insertedAt` is the array index the new rung took, which is also the v4 index
+ * of the rung that now sits just above it.
+ *
+ * **Written out rather than read from `ladders.ts`**, for two reasons. This
+ * directory is deliberately content-free (see the header), and a migration has
+ * to describe the ladders *as they were when v4 documents were written*. If it
+ * read the live content, the next content change would silently change what
+ * this step does to a v4 document. A test in `codec.test.ts` checks these numbers
+ * against the live ladders, rung id by rung id.
+ */
+interface V4Insertion {
+  readonly startRungIndex: number
+  readonly insertedAt: number
+  readonly sessionsPerRung: number
+}
+
+const V4_TO_V5_INSERTIONS: ReadonlyMap<Pattern, V4Insertion> = new Map<Pattern, V4Insertion>([
+  // `push-03a-3s-down-knee-press`, between `push-03-knees` and `push-04-full`.
+  ['push', { startRungIndex: 2, insertedAt: 3, sessionsPerRung: 14 }],
+  // `hinge-04a-sliding-curl-half-range`, between `hinge-04-single-leg-heel-far`
+  // and `hinge-05-sliding-leg-curl`.
+  ['hinge', { startRungIndex: 1, insertedAt: 4, sessionsPerRung: 14 }],
+  // `squat-05a-split-hand-on-wall`, between `squat-05-heels-elevated` and
+  // `squat-06-split`.
+  ['squat', { startRungIndex: 1, insertedAt: 5, sessionsPerRung: 14 }],
+])
+
+/**
+ * v4 → v5: brief 28 inserted a rung into the push, hinge and squat ladders, and
+ * this step keeps every document on the exercise it was on.
+ *
+ * Position is not stored as a rung. It is `sessionsDone`, and the rung is
+ * `startRungIndex + ⌊sessionsDone / sessionsPerRung⌋` (clamped to the top), an
+ * array index. A rung inserted at index k moves every rung at k or above up by
+ * one index. Left alone, the same counter would then name the rung *below* the
+ * one the person was training, and they would silently drop back one exercise.
+ *
+ * So, per pattern: if the stored counter put the person at index k or above on
+ * the v4 ladder, it gains one rung's worth of sessions (`sessionsPerRung`). The
+ * new index is one higher, which is the same exercise, and the counter mod
+ * `sessionsPerRung` is unchanged, which is the same target. A counter below k is
+ * left alone: that person has not reached the insertion yet and meets the new
+ * rung in its turn. Past the top the clamp holds on both ladders, so the step
+ * still lands on the same top rung and the same point in its cycle.
+ *
+ * What it deliberately does not touch:
+ *
+ *   - **`history`.** Each `ExerciseRecord` stores its `rungId`, never an index,
+ *     so a record of `push-04-full` still means `push-04-full`.
+ *   - **`cyclePosition`.** It picks the rotation slot, which did not change.
+ *   - **core and pull**, which gained no rung.
+ *
+ * It edits stored counts once and adds no branch anywhere else: the schedule
+ * stays a pure function of `sessionsDone`, and a v5 counter is never moved again
+ * because only a document stamped 4 reaches this step.
+ *
+ * Defensive like the other steps: a counter that is not a non-negative integer,
+ * or a `sessionsDone` that is not an object, is passed through untouched for the
+ * validator to report.
+ */
+function keepPlaceAcrossInsertedRungs(raw: JsonObject): JsonObject {
+  const counters = raw['sessionsDone']
+  if (!isPlainObject(counters)) return raw
+
+  const moved: Record<string, unknown> = { ...counters }
+  let changed = false
+  for (const [pattern, insertion] of V4_TO_V5_INSERTIONS) {
+    const count = counters[pattern]
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) continue
+    const v4Index = insertion.startRungIndex + Math.floor(count / insertion.sessionsPerRung)
+    // The v4 top clamp is not needed here: every v4 ladder's top index was at
+    // or above its `insertedAt`, so clamping could never move an index from
+    // above k to below it.
+    if (v4Index >= insertion.insertedAt) {
+      moved[pattern] = count + insertion.sessionsPerRung
+      changed = true
+    }
+  }
+  // The same object back when nothing moved, so a document below every
+  // insertion visibly passes through untouched.
+  return changed ? { ...raw, sessionsDone: moved } : raw
+}
+
 function dropRetiredSettings(value: unknown): unknown {
   if (!isPlainObject(value)) return value
   const {
@@ -478,12 +575,14 @@ function dropRetiredSettings(value: unknown): unknown {
  * v3 arriving five after that, then v4 nine after that, each with one line to
  * register, is the payoff. v4's line registers a function that does nothing, which
  * is the cheapest possible version of the payoff and still worth having: see
- * `adoptLogging`.
+ * `adoptLogging`. v5's line is the first that changes a number the schedule reads:
+ * see `keepPlaceAcrossInsertedRungs`.
  */
 const MIGRATIONS: ReadonlyMap<number, MigrationStep> = new Map<number, MigrationStep>([
   [1, dropEffortFromExercises],
   [2, collapseAdaptiveState],
   [3, adoptLogging],
+  [4, keepPlaceAcrossInsertedRungs],
 ])
 
 /**

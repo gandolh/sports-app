@@ -14,10 +14,12 @@
  *
  * Three things get their own sections at the bottom:
  *
- *   1. **The migration chain**, v1 → v2 → v3 → v4. The v1 and v2 fixtures are built
- *      here rather than imported, because the shapes they describe no longer exist
- *      anywhere in `client/src/`. The v3 fixture is *derived* from the v4 one
- *      rather than hand-written — see `v3Doc`.
+ *   1. **The migration chain**, v1 → v2 → v3 → v4 → v5. The v1 and v2 fixtures are
+ *      built here rather than imported, because the shapes they describe no longer
+ *      exist anywhere in `client/src/`. The v3 and v4 fixtures are *derived* from
+ *      the v5 one rather than hand-written — see `v4Doc`. The v4 → v5 step is the
+ *      one that moves counters, and it gets the most tests: one per ladder that
+ *      gained a rung, plus a sweep over every counter.
  *   2. **`logged`**, v4's one optional field, and every way a hand-edit can get it
  *      wrong. The property under test is not "bad input is rejected" but "bad input
  *      is rejected *without repairing the file*": a truncated log the app then
@@ -38,6 +40,8 @@ import {
   isValidUsername,
 } from '@sports-app/shared/username.ts'
 import { midProgram } from '../../domain/__tests__/fixtures.ts'
+import { LADDERS, getRung } from '../../domain/ladders.ts'
+import { rungIndexAt, targetAt } from '../../domain/schedule.ts'
 import { emptyDoc, migrate, parse, serialise, summarise } from '../codec.ts'
 import type { JsonObject, ParseResult } from '../codec.ts'
 // The state service is still plain `.mjs` run directly by Node — it is outside
@@ -196,7 +200,7 @@ describe('serialised form', () => {
     // Five integers, in PATTERNS order, visible at a glance. This is the line a
     // person edits when the schedule has them on the wrong rung.
     expect(text).toContain(
-      '"sessionsDone": { "push": 30, "squat": 31, "hinge": 29, "core": 90, "pull": 90 },',
+      '"sessionsDone": { "push": 44, "squat": 31, "hinge": 29, "core": 90, "pull": 90 },',
     )
   })
 
@@ -278,8 +282,8 @@ describe('parse rejects malformed input', () => {
   })
 
   it('a document from a newer build, without misreading it', () => {
-    // v5 does not exist. It must be refused, never coerced down to v4 — a field
-    // v5 renamed would otherwise be read as the v4 field of the same name. The
+    // v6 does not exist. It must be refused, never coerced down to v5 — a field
+    // v6 renamed would otherwise be read as the v5 field of the same name. The
     // number is `CURRENT_SCHEMA_VERSION + 1` rather than a literal so the next
     // schema bump moves the goalposts instead of quietly retiring this test: when
     // 4 became current, the old literal 4 here stopped meaning "the future".
@@ -746,24 +750,35 @@ function v1Doc(): JsonObject {
 }
 
 /**
- * A v3 document: exactly the current shape, minus `logged`, stamped 3.
+ * `midProgram` as a v4 build wrote it: stamped 4, with push at 30 instead of 44.
  *
  * **Derived from `serialise(midProgram)` rather than hand-written**, which is the
  * opposite of the choice made for v1 and v2 above, and the reason is the same one:
  * write the fixture from whatever still exists. The v2 shape is gone from `src/`
- * so it has to be transcribed; the v3 shape is *the v4 shape without an optional
- * field*, so transcribing it would produce a second copy of a document that already
- * exists, free to drift and proving nothing when it did. `midProgram` carries no
- * `logged`, so lowering the version number is genuinely all a v3 document is.
+ * so it has to be transcribed; the v4 shape is the v5 shape, so transcribing it
+ * would produce a second copy of a document that already exists, free to drift
+ * and proving nothing when it did.
  *
- * That is not a weaker test than a hand-written fixture. It is a stronger claim:
- * it says the v3 → v4 step is the identity, and it would fail the moment the step
- * started touching anything.
+ * The one number that differs is the one v5 is about. Under v4, 30 push sessions
+ * put the document on `push-05-full-3s-down`. Brief 28 inserted `push-03a` below
+ * that rung, and the v4 → v5 step adds 14 so the document stays on `push-05`.
+ * Squat (31) and hinge (29) sit below their insertions and do not move. So this
+ * fixture must migrate to exactly `midProgram`, and the tests say so.
+ */
+function v4Doc(): JsonObject {
+  const raw = JSON.parse(serialise(midProgram)) as Record<string, unknown>
+  raw['schemaVersion'] = 4
+  raw['sessionsDone'] = { ...(raw['sessionsDone'] as Record<string, number>), push: 30 }
+  return raw
+}
+
+/**
+ * A v3 document: the v4 fixture minus `logged`, stamped 3. `midProgram` carries no
+ * `logged`, so lowering the version number is genuinely all a v3 document is, and
+ * the v3 → v4 step being the identity is what the tests below rely on.
  */
 function v3Doc(): JsonObject {
-  const raw = JSON.parse(serialise(midProgram)) as Record<string, unknown>
-  raw['schemaVersion'] = 3
-  return raw
+  return { ...v4Doc(), schemaVersion: 3 }
 }
 
 /** Sessions in which `pattern` appears — the definition of `sessionsDone`. */
@@ -817,7 +832,11 @@ describe('migrate', () => {
     // — without an entry in the map the loop refuses version 3 outright. The step
     // being the identity is what says v4 is purely additive: it hands back the very
     // same object, so there is no clone to have quietly rewritten anything.
-    const raw = v3Doc()
+    //
+    // Push is set below its insertion so the v4 → v5 step has nothing to move and
+    // also hands the object straight back. Otherwise the same-object check would
+    // be about the v5 step rather than the v3 one.
+    const raw = { ...v3Doc(), sessionsDone: { push: 13, squat: 31, hinge: 29, core: 90, pull: 90 } }
     const result = migrate(raw, 3)
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.value).toBe(raw)
@@ -848,7 +867,7 @@ describe('migrate', () => {
   })
 })
 
-describe('a v2 document migrates to v4', () => {
+describe('a v2 document migrates to v5', () => {
   const doc = expectAccepted(JSON.stringify(v2Doc(), null, 2), 'dana')
 
   it('reconstructs every counter from the history, not from the rung indices', () => {
@@ -937,7 +956,7 @@ describe('a v2 document migrates to v4', () => {
     expect(doc.cyclePosition).toBe(4)
   })
 
-  it('re-serialises as clean v4 that loads again', () => {
+  it('re-serialises as clean v5 that loads again', () => {
     const text = serialise(doc)
     expect(text).toContain(`"schemaVersion": ${CURRENT_SCHEMA_VERSION}`)
     expect(expectAccepted(text)).toEqual(doc)
@@ -967,14 +986,14 @@ describe('a v2 document migrates to v4', () => {
   })
 })
 
-describe('a v1 document migrates all the way to v4 in one call', () => {
-  it('composes all three steps rather than needing a v1→v4 shortcut', () => {
-    const v4 = expectAccepted(JSON.stringify(v1Doc(), null, 2), 'dana')
+describe('a v1 document migrates all the way to v5 in one call', () => {
+  it('composes all four steps rather than needing a v1→v5 shortcut', () => {
+    const v5 = expectAccepted(JSON.stringify(v1Doc(), null, 2), 'dana')
     // Identical to the v2 document's outcome: the effort ratings the first step
     // strips are the only difference between the two inputs.
-    expect(v4).toEqual(expectAccepted(JSON.stringify(v2Doc(), null, 2), 'dana'))
-    expect(serialise(v4)).not.toContain('effort')
-    expect(v4.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(v5).toEqual(expectAccepted(JSON.stringify(v2Doc(), null, 2), 'dana'))
+    expect(serialise(v5)).not.toContain('effort')
+    expect(v5.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
   })
 
   it('runs one step at a time, so each step only knows its own version', () => {
@@ -990,7 +1009,7 @@ describe('a v1 document migrates all the way to v4 in one call', () => {
   })
 })
 
-describe('a v3 document migrates to v4', () => {
+describe('a v3 document migrates to v5', () => {
   it('is accepted and re-stamped rather than refused', () => {
     // The whole of the migration, and the only reason it exists: before brief 25
     // this exact input produced "no migration from version 3 to 4".
@@ -1000,8 +1019,9 @@ describe('a v3 document migrates to v4', () => {
 
   it('changes nothing else at all', () => {
     // Equal to `midProgram` itself, which is the strongest available statement
-    // that the step is the identity: `midProgram` *is* the v4 document, and the
-    // fixture differs from it only in the version number.
+    // that the v3 step is the identity: the fixture differs from `midProgram` only
+    // in its version and in the push counter, and the v4 → v5 step moves that
+    // counter from 30 to 44 exactly as it does for a v4 document.
     expect(expectAccepted(JSON.stringify(v3Doc(), null, 2))).toEqual(midProgram)
   })
 
@@ -1039,7 +1059,7 @@ describe('a v3 document migrates to v4', () => {
   })
 })
 
-describe('every schema this build has ever written reaches v4 and settles there', () => {
+describe('every schema this build has ever written reaches v5 and settles there', () => {
   // One table rather than three near-identical tests, because the property is the
   // same for all three and stating it once makes the *absence* of a version
   // obvious if one is ever added to the chain without being added here.
@@ -1047,6 +1067,7 @@ describe('every schema this build has ever written reaches v4 and settles there'
     [1, v1Doc],
     [2, v2Doc],
     [3, v3Doc],
+    [4, v4Doc],
   ]
 
   for (const [version, build] of fixtures) {
@@ -1064,10 +1085,171 @@ describe('every schema this build has ever written reaches v4 and settles there'
       expect(expectAccepted(twice)).toEqual(doc)
 
       // And migrating the already-migrated text is a no-op rather than a second
-      // pass through the chain — it is v4 now, so there is no step left to run.
-      expect(parse(once).ok).toBe(true)
+      // pass through the chain: it is v5 now, so there is no step left to run,
+      // and no counter moves twice.
+      expect(expectAccepted(once).sessionsDone).toEqual(doc.sessionsDone)
     })
   }
+})
+
+// ─── v4 → v5: the in-between rungs ──────────────────────────────────────────
+
+/**
+ * Brief 28's three inserted rungs. The v4 ladder for a pattern is today's ladder
+ * without its inserted rung: rung ids never change, so that is exactly the list
+ * a v4 build indexed into.
+ */
+const INSERTED: Readonly<Partial<Record<Pattern, string>>> = {
+  push: 'push-03a-3s-down-knee-press',
+  hinge: 'hinge-04a-sliding-curl-half-range',
+  squat: 'squat-05a-split-hand-on-wall',
+}
+
+/** The rung a v4 build put `sessionsDone` on: v4 indexing over the v4 ladder. */
+function v4RungIdAt(pattern: Pattern, sessionsDone: number): string {
+  const ladder = LADDERS[pattern]
+  const ids = ladder.rungs.map((r) => r.id).filter((id) => id !== INSERTED[pattern])
+  const climbed = Math.floor(sessionsDone / ladder.sessionsPerRung)
+  return ids[Math.min(ladder.startRungIndex + climbed, ids.length - 1)]!
+}
+
+/** The rung this build puts `sessionsDone` on. */
+function rungIdAt(pattern: Pattern, sessionsDone: number): string {
+  return getRung(pattern, rungIndexAt(pattern, sessionsDone)).id
+}
+
+/** A fresh document stamped 4, with `counts` as its counters, as text. */
+function v4Text(counts: Partial<Record<Pattern, unknown>>): string {
+  const raw = JSON.parse(serialise(emptyDoc('alice'))) as Record<string, unknown>
+  raw['schemaVersion'] = 4
+  raw['sessionsDone'] = { ...(raw['sessionsDone'] as Record<string, unknown>), ...counts }
+  return JSON.stringify(raw, null, 2)
+}
+
+describe('a v4 document migrates to v5 and stays on the same exercise', () => {
+  // Brief 28's acceptance table. For each ladder that gained a rung: the first
+  // count on the rung just past the insertion, and the last count on the rung
+  // just before it. The rung ids are written out, so a wrong v4 model in the
+  // helpers above cannot make these pass on its own.
+  const edges: readonly {
+    readonly pattern: Pattern
+    readonly before: number
+    readonly beforeRung: string
+    readonly past: number
+    readonly pastRung: string
+  }[] = [
+    { pattern: 'push', before: 13, beforeRung: 'push-03-knees', past: 14, pastRung: 'push-04-full' },
+    {
+      pattern: 'hinge',
+      before: 41,
+      beforeRung: 'hinge-04-single-leg-heel-far',
+      past: 42,
+      pastRung: 'hinge-05-sliding-leg-curl',
+    },
+    {
+      pattern: 'squat',
+      before: 55,
+      beforeRung: 'squat-05-heels-elevated',
+      past: 56,
+      pastRung: 'squat-06-split',
+    },
+  ]
+
+  for (const { pattern, before, beforeRung, past, pastRung } of edges) {
+    describe(pattern, () => {
+      it(`just past the insertion (${past}), it loads as v5 still on ${pastRung}`, () => {
+        expect(v4RungIdAt(pattern, past)).toBe(pastRung)
+        const doc = expectAccepted(v4Text({ [pattern]: past }))
+        expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+        expect(doc.sessionsDone[pattern]).toBe(past + 14)
+        expect(rungIdAt(pattern, doc.sessionsDone[pattern])).toBe(pastRung)
+        // Same number as well as the same exercise: the first session of a rung
+        // prescribes its floor.
+        expect(targetAt(pattern, doc.sessionsDone[pattern])).toBe(5)
+        // Without the migration the same count would have dropped back one rung,
+        // onto the new one. That is the bug this step exists to prevent.
+        expect(rungIdAt(pattern, past)).toBe(INSERTED[pattern])
+      })
+
+      it(`just before it (${before}), it loads unchanged and still on ${beforeRung}`, () => {
+        expect(v4RungIdAt(pattern, before)).toBe(beforeRung)
+        const doc = expectAccepted(v4Text({ [pattern]: before }))
+        expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+        expect(doc.sessionsDone[pattern]).toBe(before)
+        expect(rungIdAt(pattern, before)).toBe(beforeRung)
+        expect(targetAt(pattern, before)).toBe(12)
+        // The next session meets the new rung in its turn.
+        expect(rungIdAt(pattern, before + 1)).toBe(INSERTED[pattern])
+      })
+    })
+  }
+
+  it('keeps every count on the same rung at the same point in it, on every ladder', () => {
+    // The sweep behind the table, from a fresh document to far past the top of
+    // every ladder. A count either stays put or moves by exactly one rung's worth
+    // of sessions, so the rung is the same and so is the position inside it.
+    // `targetAt` reads nothing else, so the target is the same too.
+    for (const pattern of PATTERNS) {
+      const per = LADDERS[pattern].sessionsPerRung
+      for (let count = 0; count <= 400; count += 1) {
+        const migrated = expectAccepted(v4Text({ [pattern]: count })).sessionsDone[pattern]
+        const label = `${pattern} at ${count}`
+        expect(rungIdAt(pattern, migrated), label).toBe(v4RungIdAt(pattern, count))
+        expect([0, per], label).toContain(migrated - count)
+        expect(migrated % per, label).toBe(count % per)
+      }
+    }
+  })
+
+  it('moves each ladder on its own counter, and never core or pull', () => {
+    const doc = expectAccepted(v4Text({ push: 14, squat: 55, hinge: 42, core: 300, pull: 7 }))
+    expect(doc.sessionsDone).toEqual({ push: 28, squat: 55, hinge: 56, core: 300, pull: 7 })
+  })
+
+  it('leaves history alone, because each record stores its rung id', () => {
+    const doc = expectAccepted(JSON.stringify(v4Doc(), null, 2))
+    expect(doc.history).toEqual(midProgram.history)
+    expect(doc.sessionsDone).toEqual(midProgram.sessionsDone)
+    // The last push record says `push-05`, and so does the moved counter.
+    expect(doc.history[0]?.exercises[0]?.rungId).toBe('push-05-full-3s-down')
+    expect(rungIdAt('push', doc.sessionsDone.push)).toBe('push-05-full-3s-down')
+  })
+
+  it('never moves a v5 counter', () => {
+    // Only a document stamped 4 reaches the step. On the v5 ladders a push count
+    // of 14 is the in-between rung, and it must stay there.
+    const text = serialise({
+      ...emptyDoc('alice'),
+      sessionsDone: { push: 14, squat: 56, hinge: 42, core: 0, pull: 0 },
+    })
+    const doc = expectAccepted(text)
+    expect(doc.sessionsDone).toEqual({ push: 14, squat: 56, hinge: 42, core: 0, pull: 0 })
+    expect(rungIdAt('push', 14)).toBe('push-03a-3s-down-knee-press')
+    expect(serialise(doc)).toBe(text)
+  })
+
+  it('does not mutate the document it was handed', () => {
+    const raw = JSON.parse(v4Text({ push: 14 })) as Record<string, unknown>
+    const result = migrate(raw, 4)
+    expect((raw['sessionsDone'] as Record<string, number>)['push']).toBe(14)
+    if (result.ok) expect((result.value['sessionsDone'] as Record<string, number>)['push']).toBe(28)
+  })
+
+  it('leaves a malformed counter to the validator rather than moving it', () => {
+    for (const bad of [-14, 14.5, '14', null, true]) {
+      const raw = JSON.parse(v4Text({ push: bad })) as JsonObject
+      const result = migrate(raw, 4)
+      expect(result.ok, JSON.stringify(bad)).toBe(true)
+      if (result.ok) {
+        expect((result.value['sessionsDone'] as Record<string, unknown>)['push']).toBe(bad)
+      }
+      expectRejected(JSON.stringify(raw), 'sessionsDone.push')
+    }
+    for (const sessionsDone of [undefined, null, 42, 'x', [14]]) {
+      const result = migrate({ schemaVersion: 4, sessionsDone }, 4)
+      expect(result.ok, JSON.stringify(sessionsDone)).toBe(true)
+    }
+  })
 })
 
 // ─── logged: v4's one optional field ────────────────────────────────────────

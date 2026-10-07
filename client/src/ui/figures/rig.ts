@@ -74,7 +74,7 @@ const RAD_TO_DEG = 180 / Math.PI
 /**
  * Canonical iteration order for limbs. Exported because CSS output has to be
  * deterministic — two identical rigs must produce byte-identical stylesheets, or
- * every rung gets its own `@keyframes` block and the sharing that makes 35 rungs
+ * every rung gets its own `@keyframes` block and the sharing that makes 38 rungs
  * cheap disappears. `Object.keys` would very nearly do, and would break the day
  * someone reorders a literal.
  */

@@ -4,7 +4,7 @@
 // ─── About the rigs ─────────────────────────────────────────────────────────
 //
 // Every assertion below runs on the five rigs the app actually ships, imported
-// from the figure files, across all 35 rungs' clocks. Wave 1 tested transcribed
+// from the figure files, across all 38 rungs' clocks. Wave 1 tested transcribed
 // fixtures because the figure files did not exist yet; a geometry module tested
 // on stand-ins proves nothing about the geometry the app draws — `push`'s
 // 94-unit arm chain folding over a planted hand is the case that sets the sample
@@ -132,9 +132,9 @@ const CASES: readonly RigCase[] = ALL_RUNGS.flatMap((rung) => {
 // The rigs and the content have to actually meet, or every loop below runs
 // zero times and the file is the third vacuous test this area has produced.
 describe('the rigs cover the content', () => {
-  it('there is a rig for all 35 rungs', () => {
-    expect(ALL_RUNGS).toHaveLength(35)
-    expect(CASES).toHaveLength(35)
+  it('there is a rig for all 38 rungs', () => {
+    expect(ALL_RUNGS).toHaveLength(38)
+    expect(CASES).toHaveLength(38)
     expect(new Set(CASES.map((c) => c.rig)).size).toBe(5)
   })
 

@@ -33,12 +33,17 @@
  *
  * Nothing in this file compares `schema_version` to anything. It is written from
  * whatever the document said and read back out; there is no allowlist of accepted
- * versions, no `CHECK` constraint, and no migration. That is why schema v4 shipped
- * without touching a line here, exactly as v3 did: **the client owns migration**
- * (`client/src/persistence/codec.ts`), and the service's job is to store every
- * version faithfully enough that a client can migrate it later — including a
- * version newer than anything this build has heard of. Adding a version check here
- * would turn a service that cannot lose a workout into one that can.
+ * versions, no `CHECK` constraint, and no migration. That is why schemas v4 and v5
+ * shipped without touching a line of code here, exactly as v3 did: **the client
+ * owns migration** (`client/src/persistence/codec.ts`), and the service's job is to
+ * store every version faithfully enough that a client can migrate it later —
+ * including a version newer than anything this build has heard of. Adding a version
+ * check here would turn a service that cannot lose a workout into one that can.
+ *
+ * v5 makes the "no migration" half load-bearing rather than merely tidy. Its step
+ * moves `sessionsDone` counters forward by one rung, and it must run exactly once
+ * per document. A v4 document stored here stays a v4 document, counters and all, so
+ * the client that pulls it is the one place the step runs.
  *
  * ── And `logged` is opaque ───────────────────────────────────────────────────
  *

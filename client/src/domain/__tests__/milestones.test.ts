@@ -17,7 +17,7 @@ const ZERO: Readonly<Record<Pattern, number>> = { push: 0, squat: 0, hinge: 0, c
 
 function docWith(history: readonly SessionResult[], sessionsDone: Partial<Record<Pattern, number>> = {}): StateDoc {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     username: 'test',
     cyclePosition: 0,
     sessionsDone: { ...ZERO, ...sessionsDone },
@@ -58,10 +58,15 @@ describe('milestonesReached replays history rather than trusting doc.sessionsDon
   const milestones = milestonesReached(doc)
 
   it('attributes the push rung advance to session 27, not to a count derived from sessionsDone', () => {
-    const found = milestones.find((m) => m.pattern === 'push' && m.label.includes('full push-up'))
+    // Push's 14th session climbs from `push-03-knees` into brief 28's in-between
+    // rung, which is an ordinary advance. The named "first full push-up" is one
+    // rung later, and has its own test below.
+    const found = milestones.find((m) => m.pattern === 'push' && m.label.startsWith('Advanced to'))
     expect(found).toBeDefined()
     expect(found?.sessionNumber).toBe(27)
-    expect(found?.kind).toBe('named')
+    expect(found?.kind).toBe('rung')
+    expect(found?.label).toContain(getRung('push', 3).name)
+    expect(milestones.some((m) => m.label.includes('full push-up'))).toBe(false)
   })
 
   it('attributes the squat rung advance to session 28, independently of push', () => {
@@ -99,6 +104,26 @@ describe('milestonesReached replays history rather than trusting doc.sessionsDon
   })
 })
 
+describe('the first full push-up comes one rung after the in-between rung', () => {
+  // Brief 28 put `push-03a` between the knee push-up and the full push-up, so
+  // the named milestone moved from push's 14th session to its 28th. Its meaning
+  // did not move: it still fires on arriving at `push-04-full`.
+  const history = Array.from({ length: 28 }, () => sessionFor('push'))
+  const milestones = milestonesReached(docWith(history))
+
+  it('names it on the 28th push session, as a named milestone', () => {
+    const found = milestones.find((m) => m.label.includes('full push-up'))
+    expect(found?.sessionNumber).toBe(28)
+    expect(found?.kind).toBe('named')
+    expect(getRung('push', rungIndexAt('push', 28)).id).toBe('push-04-full')
+  })
+
+  it('passes through the in-between rung first, on the 14th', () => {
+    const found = milestones.find((m) => m.sessionNumber === 14)
+    expect(found?.label).toBe(`Advanced to ${getRung('push', 3).name}.`)
+  })
+})
+
 // ─── Empty document ─────────────────────────────────────────────────────────
 
 describe('an empty document', () => {
@@ -131,7 +156,7 @@ describe('an empty document', () => {
 
 describe('reaching the top of a ladder', () => {
   // 90 push sessions is enough to climb from the startRungIndex all the way to
-  // topRungIndex (reached at push count 70) and sit there for 20 more sessions
+  // topRungIndex (reached at push count 84) and sit there for 6 more sessions
   // while the target cycles — the exact scenario the "no special case" note in
   // schedule.ts describes.
   const history = Array.from({ length: 90 }, () => sessionFor('push'))

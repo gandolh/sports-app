@@ -25,9 +25,18 @@
  * **`NN` therefore records the position a rung SHIPPED at, not its current array
  * index**, and the two diverge the moment a rung in the middle is retired. The
  * push ladder is the live case: rung 7 is gone, so `push-08-diamond-hands` sits at
- * index 6. Renumbering it would rename an id, which is the one thing that is never
+ * index 7. Renumbering it would rename an id, which is the one thing that is never
  * allowed. The tests assert `NN` is unique and strictly increasing within a
  * ladder, not that it equals `index + 1`.
+ *
+ * **A rung inserted between two shipped rungs takes the lower one's `NN` plus a
+ * letter.** Brief 28 put one rung into each of the three big steps, and there is
+ * no free number between `03` and `04`. So the new push rung is `push-03a-…`: it
+ * sorts after rung 3 and before rung 4, no shipped id moves, and the cue text can
+ * call it "rung 3a". Inserting a rung shifts the array index of every rung above
+ * it, and position is stored as a session count, so an insertion also needs a
+ * state-document migration (`codec.ts`, v4 → v5). Without one, everyone above the
+ * insertion would silently drop back one exercise.
  *
  * ── FLOOR ONLY. TOWELS AND THE FLOOR ────────────────────────────────────────
  *
@@ -124,10 +133,11 @@ const SEC_10_30: Range = { min: 10, max: 30 }
 const SEC_30_90: Range = { min: 30, max: 90 }
 
 /**
- * `<pattern>-<NN>-<slug>`. Exported so the tests and any future validator check
- * the same rule rather than two drifting copies of it.
+ * `<pattern>-<NN>-<slug>`, where `NN` may carry one lowercase letter for a rung
+ * inserted after it shipped (`push-03a-…`). Exported so the tests and any future
+ * validator check the same rule rather than two drifting copies of it.
  */
-export const RUNG_ID_PATTERN = /^(?:push|squat|hinge|core|pull)-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*$/
+export const RUNG_ID_PATTERN = /^(?:push|squat|hinge|core|pull)-\d{2}[a-z]?-[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 /**
  * What the UI must show alongside any ladder with `kind: 'postural'`. There is no
@@ -187,13 +197,30 @@ const PUSH_RUNGS: readonly Rung[] = [
       'Stop the set when your hips sag toward the floor, your back arches, or your chest stops reaching a fist off the floor. Do not finish a set on half-reps.',
   },
   {
+    // Inserted by brief 28 between rung 3 and rung 4, the biggest step on this
+    // ladder: twelve knee push-ups did not make five full ones possible. Lowering
+    // is the half of a push-up you can control first, so this rung does the full
+    // push-up's lowering on your toes and keeps the press on your knees.
+    id: 'push-03a-3s-down-knee-press',
+    name: 'Slow-lowering push-up, press up from your knees',
+    figureId: 'push',
+    modifier: { eccentricSeconds: 3 },
+    cues: [
+      'Start at the top of a full push-up: hands on the floor under your shoulders, legs straight, feet hip-width. Squeeze your glutes so you are one straight line from heels to head.',
+      'Lower your whole body slowly, counting three full seconds on the way down, until your chest is a fist off the floor. Then put your knees down, press up to straight arms, and lift your knees to start the next rep.',
+      'Rung 3 lowered you from your knees. Here you lower from your toes, like a full push-up. Lowering is easier than pushing, so you can do this half first. The press up stays on your knees at normal speed, about one second. There is no pause at the bottom.',
+    ],
+    stopRule:
+      'Stop the set when you can no longer stretch the lowering to three seconds, or when your hips sag before your knees touch down.',
+  },
+  {
     id: 'push-04-full',
     name: 'Full push-up',
     figureId: 'push',
     cues: [
       'Hands on the floor under your shoulders, legs straight and feet hip-width, glutes and quads switched on so you are one line from heel to head.',
       'Lower until your chest is a fist deep off the floor, then press to straight elbows, keeping your elbows tracking back at about 45° rather than flared out to the sides.',
-      'Steady tempo, roughly one second down and one second up, with no pause at the bottom. The only change from rung 3 is that your knees are off the floor.',
+      'Steady tempo, roughly one second down and one second up, with no pause at the bottom. Rung 3a let you put your knees down to press. Now your knees stay off the floor for the whole rep.',
     ],
     stopRule:
       'Stop the set when your hips sag, your head pokes forward ahead of your hands, or your chest stops reaching a fist off the floor.',
@@ -337,6 +364,23 @@ const SQUAT_RUNGS: readonly Rung[] = [
       'Stop the set when your lower back rounds at the bottom, when your knees ache instead of your thighs working, or when you can no longer reach the deeper position.',
   },
   {
+    // Inserted by brief 28 between rung 5 and rung 6. Two legs at twelve reps to
+    // one leg at five was the biggest step on this ladder, and most of what made
+    // it big was balance. A hand on the wall takes the balance away and leaves the
+    // leg work, the same help rung 7 already allows.
+    id: 'squat-05a-split-hand-on-wall',
+    name: 'Split squat, one hand on a wall',
+    figureId: 'squat',
+    modifier: { unilateral: true },
+    cues: [
+      'Stand side-on to a wall and rest one hand flat on it at shoulder height. Step one foot a long stride forward with the back heel lifted, feet in line with your hips.',
+      'Lower straight down until your back knee is an inch off the floor and your front thigh is parallel, then drive up through the front foot. Keep your torso upright. The hand steadies you. It does not push you up.',
+      'Back to a steady tempo: one second down, one second up, no hold at the bottom. Do not carry rung 5\'s three-second count or two-second hold over. The split stance is the new work. Do all reps on one leg, then switch. The target is reps per leg.',
+    ],
+    stopRule:
+      'Stop the set when you start pushing on the wall to stand up, when your front knee drifts inside your foot, or when your torso tips forward to help.',
+  },
+  {
     id: 'squat-06-split',
     name: 'Split squat',
     figureId: 'squat',
@@ -344,7 +388,7 @@ const SQUAT_RUNGS: readonly Rung[] = [
     cues: [
       'Step one foot a long stride forward with the back heel lifted, feet in line with your hips. Fingertips on a wall for balance if you need them.',
       'Lower straight down until your back knee is an inch off the floor and your front thigh is parallel, then drive up through the front foot. Torso stays upright — you are going down, not lunging forward.',
-      'Back to a steady tempo: one second down, one second up, no bottom hold. The split stance is this rung\'s difficulty, so do not carry rung 5\'s three-second count or two-second hold over. Do all reps on one leg, then switch — the target is reps per leg.',
+      'Same split squat and steady tempo as rung 5a: one second down, one second up, no bottom hold. The change is that your hand leaves the wall, so your legs balance you as well as lift you. Do all reps on one leg, then switch. The target is reps per leg.',
     ],
     stopRule:
       'Stop the set when your front knee drifts inside your foot, your torso pitches forward to help, or you are catching your balance on the wall every rep.',
@@ -444,6 +488,22 @@ const HINGE_RUNGS: readonly Rung[] = [
       'Stop the set when your hips tilt, when the planted heel slides further away from you, or when your hamstring cramps rather than working hard.',
   },
   {
+    // Inserted by brief 28 between rung 4 and rung 5. A planted single-leg bridge
+    // at twelve reps did not prepare anyone for a full sliding curl at five: the
+    // slide is a new skill and its far end is a long, loaded lever. This rung
+    // teaches the slide over the short half of the range first.
+    id: 'hinge-04a-sliding-curl-half-range',
+    name: 'Sliding leg curl, halfway out',
+    figureId: 'hinge',
+    cues: [
+      'Lie on your back on a smooth floor with a folded towel under each heel, knees bent about 90°, feet hip-width. Lift your hips into a bridge, one straight line from knee to shoulder, and keep them up for the whole set.',
+      'Slide both heels away only about halfway to straight legs, then pull them back in under your knees. Your hips stay up the whole time. Stopping halfway keeps the lever short while your hamstrings learn the slide.',
+      'Steady tempo: about two seconds out and two seconds back, no pause at either end. Rung 4 kept one heel planted far out. Now both heels slide on towels, but only halfway. Rung 5 takes them all the way out.',
+    ],
+    stopRule:
+      'Stop the set when your hips sink while the heels travel, when you cannot pull the heels back in without your hips dropping, or when a hamstring cramps.',
+  },
+  {
     // Replaces `hinge-05-nordic-negative`. Floor and a towel, no anchor.
     id: 'hinge-05-sliding-leg-curl',
     name: 'Bilateral sliding leg curl',
@@ -451,7 +511,7 @@ const HINGE_RUNGS: readonly Rung[] = [
     cues: [
       'Lie on your back on a smooth floor with a folded towel under each heel, knees bent about 90°, feet hip-width. Lift your hips into a bridge — one straight line from knee to shoulder — and keep them up for every rep of the set.',
       'Keeping your hips up, slide both heels slowly away until your legs are nearly straight, then pull them back in under your knees. Your hips must not drop while the heels travel; holding that height is the exercise.',
-      'Steady tempo: about two seconds sliding out, two seconds pulling back in, with no pause at either end. Both legs work together on this rung.',
+      'Steady tempo: about two seconds sliding out, two seconds pulling back in, with no pause at either end. Both legs work together on this rung. Rung 4a stopped halfway. Now the heels travel all the way out.',
     ],
     stopRule:
       'Stop the set when your hips sink as the heels slide out, when your lower back arches to keep the height, or when your hamstrings cramp. A cramp is a stop, not something to push through.',
@@ -688,13 +748,14 @@ const PULL_RUNGS: readonly Rung[] = [
  */
 const START_RUNGS: Readonly<Record<Pattern, number>> = {
   /**
-   * `push-03-knees` (index 2 of 8). Failing a knee push-up lowers you onto the
+   * `push-03-knees` (index 2 of 9). Failing a knee push-up lowers you onto the
    * floor from a hand's depth with your knees already down — there is nowhere to
-   * fall to. A wall push-up and a short-lever knee push-up sit below it.
+   * fall to. A wall push-up and a short-lever knee push-up sit below it. Brief
+   * 28's insertion sits above it, so this index still names the same rung.
    */
   push: 2,
   /**
-   * `squat-02-bodyweight` (index 1 of 8). A bodyweight squat that fails ends with
+   * `squat-02-bodyweight` (index 1 of 9). A bodyweight squat that fails ends with
    * you standing up short of parallel or sitting down; both are benign. Rung 0
    * (fingertips on a wall) is the fallback, and rungs 2–4 add a 3s eccentric and a
    * bottom hold, where failure means being stuck in the hole rather than short of
@@ -702,7 +763,7 @@ const START_RUNGS: Readonly<Record<Pattern, number>> = {
    */
   squat: 1,
   /**
-   * `hinge-02-glute-bridge-2s-top-hold` (index 1 of 7). Deliberately the last
+   * `hinge-02-glute-bridge-2s-top-hold` (index 1 of 8). Deliberately the last
    * **bilateral, supine** rung: failure is "your hips settle back to the floor",
    * from four inches up, with both feet planted. Index 2 onward is unilateral or a
    * sliding curl, both of which fail by the hips dropping — which is why this

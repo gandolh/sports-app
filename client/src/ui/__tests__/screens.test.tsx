@@ -14,8 +14,10 @@
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StateDoc } from '@sports-app/shared/types.ts'
-import { POSTURAL_NOTICE } from '../../domain/ladders.ts'
+import { CURRENT_SCHEMA_VERSION } from '@sports-app/shared/types.ts'
+import { LADDERS, POSTURAL_NOTICE, getRung } from '../../domain/ladders.ts'
 import { prescribe, recordSession, toSessionResult } from '../../domain/schedule.ts'
+import { serialise } from '../../persistence/codec.ts'
 import { SESSION_KEY } from '../../persistence/session.ts'
 import { STORAGE_KEYS, emptyDoc } from '../../persistence/store.ts'
 import { ACCENTS } from '../components/theme.ts'
@@ -405,6 +407,59 @@ describe('/progress', () => {
     await renderApp('/progress')
     expect(document.body.textContent).toContain('Nothing yet')
     expect(document.querySelectorAll('[data-testid="milestone"]')).toHaveLength(0)
+  })
+
+  /**
+   * Brief 28. The chart plots `sessionsDone.push` along the whole ladder, so a
+   * document stored as v4 must reach the chart through the v4 → v5 step. These
+   * seed the stored text directly, stamped 4, the way an un-updated phone left it.
+   */
+  function seedV4(push: number): void {
+    const fresh = emptyDoc(USERNAME)
+    const text = serialise({ ...fresh, sessionsDone: { ...fresh.sessionsDone, push } }).replace(
+      `"schemaVersion": ${CURRENT_SCHEMA_VERSION}`,
+      '"schemaVersion": 4',
+    )
+    expect(text).toContain('"schemaVersion": 4')
+    localStorage.setItem(SESSION_KEY, USERNAME)
+    localStorage.setItem(STORAGE_KEYS.live(USERNAME), text)
+  }
+
+  /** The chart, its "today" dot, and where the dot sits as a share of the domain. */
+  function todayMarker(): { readonly label: string; readonly left: string } {
+    const chart = screen.getByRole('img', { name: /push rep target/i })
+    const dot = chart.querySelector('span')
+    expect(dot).toBeTruthy()
+    return { label: chart.getAttribute('aria-label') ?? '', left: dot?.style.left ?? '' }
+  }
+
+  // Nine push rungs of 14 sessions each: the whole climb is the chart's domain.
+  const DOMAIN = LADDERS.push.rungs.length * LADDERS.push.sessionsPerRung
+
+  it('puts "today" where a migrated v4 document now sits, on the same rung', async () => {
+    // 14 push sessions was `push-04-full` under v4, rung 4 of 8, on its first
+    // session. The migration makes it 28: the same rung, now rung 5 of 9, at the
+    // same target. Unmigrated, the dot would sit at 14 on the in-between rung.
+    seedV4(14)
+    await renderApp('/progress')
+
+    expect(DOMAIN).toBe(126)
+    expect(getRung('push', 4).id).toBe('push-04-full')
+    const { label, left } = todayMarker()
+    expect(label).toContain('Currently rung 5 of 9, targeting 5 reps.')
+    expect(screen.getByText('rung 5 of 9')).toBeTruthy()
+    expect(left).toBe(`${(28 / DOMAIN) * 100}%`)
+  })
+
+  it('leaves "today" alone for a v4 document below the insertion', async () => {
+    // 13 is the last session of `push-03-knees`, under v4 and v5 alike.
+    seedV4(13)
+    await renderApp('/progress')
+
+    expect(getRung('push', 2).id).toBe('push-03-knees')
+    const { label, left } = todayMarker()
+    expect(label).toContain('Currently rung 3 of 9, targeting 12 reps.')
+    expect(left).toBe(`${(13 / DOMAIN) * 100}%`)
   })
 })
 

@@ -29,7 +29,7 @@
  *     foreshortening: every figure is a side view, every limb in the picture
  *     plane.
  *   - **A figure draws a rung's *pose*, not its identity.** Five rigs cover
- *     35 rungs because every rung within a ladder is the same movement plus a
+ *     38 rungs because every rung within a ladder is the same movement plus a
  *     modifier (see `corpus/wiki/decisions.md`). What actually differs
  *     between adjacent rungs — tempo, pause location, elevation, unilateral
  *     load — is the clock (`motion.ts`) and the overlays (`overlays.tsx`),

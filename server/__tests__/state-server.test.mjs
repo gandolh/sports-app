@@ -763,6 +763,24 @@ describe('PUT then GET round-trips byte-identically', () => {
     }
   })
 
+  it('accepts 4 and 5 alike, and moves no counter, because migration is the client\'s', async () => {
+    // Brief 28's v5 moves `sessionsDone` counters forward when a v4 document is
+    // read, in the client codec. The service must not do the same. A v4 document
+    // stored with push at 14 has to come back with push at 14, still stamped 4, so
+    // the client that pulls it runs the v4 → v5 step exactly once. A service that
+    // also migrated would move the counter twice and put that person a rung ahead.
+    const { base, store } = await startService()
+    for (const version of [4, 5]) {
+      const sent = docText('alice', 2, { schemaVersion: version }).replace('"push": 0', '"push": 14')
+      expect(sent, String(version)).toContain('"push": 14')
+      const response = await put(base, 'alice', sent)
+      expect(response.status, String(version)).toBe(200)
+      expect(store.latest('alice').docJson, String(version)).toBe(sent)
+      expect(store.latest('alice').schemaVersion, String(version)).toBe(version)
+      expect(await (await get(base, 'alice')).text(), String(version)).toBe(sent)
+    }
+  })
+
   it('stores a v4 document with logged sets in it and derives nothing from them', async () => {
     // `logged` is training content. It crosses the wire as opaque numbers, and the
     // only column derived from `history` is its *length* — a fact about the

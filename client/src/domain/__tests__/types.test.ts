@@ -142,9 +142,9 @@ describe('the v2 contract is gone, not deprecated', () => {
     }
   })
 
-  it('is at schema version 4', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(4)
-    expect(midProgram.schemaVersion).toBe(4)
+  it('is at schema version 5', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(5)
+    expect(midProgram.schemaVersion).toBe(5)
   })
 })
 

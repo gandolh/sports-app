@@ -106,7 +106,7 @@ const STYLES = `
 /**
  * Renders a rung's figure by its `figureId`, moving the rig between its `start`
  * and `end` poses **on a clock derived from `Rung.modifier`** (`figures/motion.ts`).
- * That derivation is the whole point: five drawings cover 35 rungs, and what
+ * That derivation is the whole point: five drawings cover 38 rungs, and what
  * separates two rungs sharing a pose is when the figure moves and when it stops.
  * A 3-second lowering takes three (scaled) seconds; a 2-second bottom hold
  * visibly stops at the bottom. Nothing here is per-rung — this component reads

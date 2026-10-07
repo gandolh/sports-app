@@ -21,7 +21,7 @@ const HAIR_SPIKE_ANGLE_DEG = -35
 const FLARE_HALF_WIDTH = 7
 
 /** Coordinates and angles to three decimals: well under anything visible at any
- * size, and short enough that 35 rungs of attributes stay readable. */
+ * size, and short enough that 38 rungs of attributes stay readable. */
 function fmt(value: number): string {
   return String(Math.round(value * 1000) / 1000)
 }

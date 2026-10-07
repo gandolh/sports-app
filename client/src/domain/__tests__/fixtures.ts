@@ -20,22 +20,29 @@ import type { StateDoc } from '@sports-app/shared/types.ts'
  * A document part-way through the programme, chosen so that every pattern is
  * distinguishable from the others:
  *
- *   push   30  →  rung 2 + 2 = 4 (`push-05-full-3s-down`), 2 sessions into it
+ *   push   44  →  rung 2 + 3 = 5 (`push-05-full-3s-down`), 2 sessions into it
  *   squat  31  →  rung 1 + 2 = 3 (`squat-04-...`), 3 sessions in
  *   hinge  29  →  rung 1 + 2 = 3 (`hinge-04-single-leg-heel-far`), 1 session in
  *   core   90  →  rung 1 + 2 = 3 (`core-04-hollow-hold`), 6 sessions in
  *   pull   90  →  rung 1 + 2 = 3 (`pull-04-reverse-snow-angel`), 6 sessions in
  *
- * The rotating patterns sit near but not equal to each other (a real document has
- * them within one of each other, because the rotation trains them in turn), while
- * core and pull are three times further along because the daily block is trained
- * every session. `cyclePosition` 90 is a Push slot: 90 mod 3 = 0.
+ * The rotating patterns sit near each other, while core and pull are three times
+ * further along because the daily block is trained every session. `cyclePosition`
+ * 90 is a Push slot: 90 mod 3 = 0.
+ *
+ * **Push is 44, not 30, because this is a document the v4 → v5 migration has
+ * touched.** It was 30 under schema v4, which put it on `push-05` when the push
+ * ladder had no rung 3a. Brief 28 inserted `push-03a` below it, and the migration
+ * added one rung's worth of sessions (14) so the same document stays on the same
+ * exercise. The codec tests build their v3 and v4 fixtures from this one with
+ * push set back to 30, and assert they migrate to exactly this. Hinge (29) and
+ * squat (31) sit below their insertions, so the migration left them alone.
  */
 export const midProgram: StateDoc = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   username: 'test',
   cyclePosition: 90,
-  sessionsDone: { push: 30, squat: 31, hinge: 29, core: 90, pull: 90 },
+  sessionsDone: { push: 44, squat: 31, hinge: 29, core: 90, pull: 90 },
   history: [
     {
       completedAt: '2026-05-01T07:12:00.000Z',

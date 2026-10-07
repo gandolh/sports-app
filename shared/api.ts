@@ -41,9 +41,11 @@
  *
  * That is not a hypothetical any more. v4 arrived and **nothing in this file or in
  * `server/` changed**, which is the design working: the service never held a list
- * of versions it accepts, so there was no list to add 4 to. Migration is the
- * client's, in `client/src/persistence/codec.ts`, and the service's contribution is
- * to store every version faithfully enough that the client can migrate it later.
+ * of versions it accepts, so there was no list to add 4 to. v5 arrived the same
+ * way. Migration is the client's, in `client/src/persistence/codec.ts`, and the
+ * service's contribution is to store every version faithfully enough that the
+ * client can migrate it later. Since v5 that includes not migrating: the v4 → v5
+ * step moves stored counters and must run once, on the client, never here too.
  *
  * **No schema for `ExerciseRecord.logged` either**, and that one is a rule rather
  * than an omission. `history` is `Type.Array(Type.Unknown())`; logged values cross
