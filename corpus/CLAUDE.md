@@ -100,3 +100,8 @@ explicit revisit plus a `log.md` entry.
   `wiki/`.
 - **Verify before quoting.** A wiki page naming a path, function, or commit may
   have drifted. Check it exists before acting on it.
+
+## brief-board
+
+Brief progress goes on brief-board. Run `brief-board guide` before you
+start or resume a brief, and follow it.
