@@ -62,6 +62,8 @@ date anywhere in the UI. Full detail in
 | 26 | [Tailwind + canon tokens](../briefs/done/26-tailwind-and-canon-tokens.md) | **done** | — |
 | 27 | [The four screens](../briefs/done/27-the-four-screens.md) | **done** | 24, 25, 26 |
 | 28 | [In-between rungs at the three big steps](../briefs/done/28-in-between-rungs.md) | **done** 2026-10-07 — three rungs, schema v5 | — |
+| 29 | [Sign-in loops on a fresh browser](../briefs/todo/29-sign-in-loops-on-a-fresh-browser.md) | **todo** — unconfirmed; reproduce first | — |
+| 30 | [Account "Total work ever" note is out of date](../briefs/todo/30-account-total-work-copy-is-outdated.md) | **todo** | — |
 
 ## How it ran
 

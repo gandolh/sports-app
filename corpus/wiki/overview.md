@@ -1,6 +1,6 @@
 ---
 summary: What sports-app is in one paragraph, who it's for, and the constraints that shaped it.
-updated: 2026-07-29
+updated: 2026-10-09
 ---
 
 # Overview
@@ -10,11 +10,13 @@ PWA. You open it, it already knows what today's session is, you pick how hard a 
 you're having, and you work through the exercises one page at a time tapping Next.
 It takes about twelve minutes. It never asks you anything else.
 
-**The app measures nothing.** There is no counter, no completion signal, and no
-adaptation — the prescription grows on a fixed schedule at roughly one ladder rung
-every six weeks, and pressing Next means only that you're ready for the next thing.
-That is the governing design decision and it is what makes everything else small; see
-[decisions.md](decisions.md).
+**The prescription never adapts to what you log.** Since 2026-09-04 the app records
+what you did (optional logged sets), shows dates, a streak and a calendar, and compares
+against last time. None of that reaches the schedule: it grows at roughly one ladder
+rung every six weeks, as a pure function of sessions completed, and a logged value may
+never feed it. That is the governing invariant and it is what keeps everything else
+small; see [decisions.md](decisions.md) and [reversals.md](reversals.md), which holds
+the "measures nothing" decision this replaced.
 
 [`../../SPEC.md`](../../SPEC.md) is the v1 design document and is **partly superseded**
 — it describes the adaptive engine this app no longer has. Where it disagrees with
@@ -23,8 +25,8 @@ this wiki, the wiki wins until SPEC.md is revised.
 ## Who it's for
 
 A returning beginner, training at home on the floor in one room with no equipment at
-all. v2 added weak multi-user support (a username, a password nobody checks) so a
-second person can train on the same deployment — but the product is still shaped by
+all. the app supports more than one person, each signed in through Ward, with one
+state document per person on the service — but the product is still shaped by
 one person's constraints, not by a market.
 
 ## The constraints that shaped everything
@@ -36,10 +38,11 @@ one person's constraints, not by a market.
   killed the logging-app design and produced the one-exercise-per-page player.
 - **Decision fatigue is the real enemy.** Workouts fail because "I don't know what to
   do today," so the app must arrive with the answer already made.
-- **A missed day must not feel like failure.** This is why there is no date anywhere
-  in the app and the rotation advances on training, not on the calendar.
-- **Trust over measurement.** Any feature that needs to know what you actually did
-  cannot exist here. That is a constraint, and it removed about half the codebase.
+- **A missed day must not feel like failure.** The rotation advances on training, not
+  on the calendar, so a skipped day advances nothing. Dates are displayed since
+  2026-09-04 but never schedule anything.
+- **Logs report; they do not steer.** What you log may be shown and compared. It may
+  never change the prescription.
 
 ## The cast
 
@@ -57,5 +60,5 @@ one person's constraints, not by a market.
 SPEC.md      the v1 design — partly superseded by the v2 grill
 corpus/      this wiki + the brief lifecycle
 src/         the app
-server/      the zero-dependency SQLite state service
+server/      the Fastify + SQLite state service
 ```

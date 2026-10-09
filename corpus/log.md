@@ -1301,3 +1301,21 @@ along, and the fix (replay by `rungId`) would shift every milestone one session 
 everyone. Recorded in [progression-engine.md](wiki/progression-engine.md#inserting-a-rung-moves-people-so-it-needs-a-migration).
 The todo `milestones-after-a-rung-insertion` is retired (git has it); its link in brief 28
 is now plain text, the only edit to that brief.
+
+## [2026-10-09] capture | briefs 29 and 30 filed; overview and product pages refreshed
+
+Two bugs found during the README refresh are now briefs, not fixed. **29**: every route
+guard needs `sports-app.session.v3`, nothing writes it after Ward's sign-in
+(`setCurrentUsername` has no caller, the service has no `/api/me`), so sign-in loops;
+found by reading code and not yet reproduced. **30**: the account screen's "Total work
+ever" note still says the app never learns what you did, which stopped being true on
+2026-09-04; the totals themselves still sum the prescription.
+
+Pages brought up to date against the code: `wiki/overview.md` and the docs site's
+`index.mdx` and Starlight description (no longer "measures nothing", dates are
+displayed, identity is Ward, the service has three routes), `PRODUCT.md` (`/plan` not
+`/week`, the screen list, the dates bullet, the stale test count dropped), and
+`docs/diagrams/architecture.json` ("three routes", diagram rebuilt with archify).
+Left alone and still stale: `wiki/status.md` and `wiki/adherence.md` still say "measures
+nothing" / "no dates", and `wiki/architecture.md` still lists `/week`; the Login bullet
+in `PRODUCT.md` still describes the pre-Ward login.
