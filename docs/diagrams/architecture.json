@@ -103,7 +103,7 @@
       "id": "service",
       "type": "backend",
       "label": "server/",
-      "sublabel": "Fastify, four routes",
+      "sublabel": "Fastify, three routes",
       "tag": "logger: false",
       "pos": [
         880,

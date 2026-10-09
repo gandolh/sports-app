@@ -1,6 +1,6 @@
 ---
 title: sports-app
-description: A zero-equipment calisthenics trainer, installed as an offline-first PWA. It measures nothing, and that is the governing design decision.
+description: A zero-equipment calisthenics trainer, installed as an offline-first PWA. Its schedule never adapts to what you log, and that is the governing design decision.
 tableOfContents: false
 ---
 
@@ -18,22 +18,24 @@ anything else.
   <dt>Made of</dt>
   <dd>Three workspaces — <code>client/</code>, <code>server/</code>, <code>shared/</code></dd>
   <dt>The service is</dt>
-  <dd>Four routes, one table, Fastify underneath</dd>
+  <dd>Three routes, one table, Fastify underneath</dd>
   <dt>Identity</dt>
   <dd>Ward — the session's subject <em>is</em> the document key</dd>
-  <dt>Measures</dt>
-  <dd>Nothing</dd>
+  <dt>Adapts to your log</dt>
+  <dd>Never</dd>
 </dl>
 
-## The app measures nothing
+## The schedule never adapts to what you log
 
-There is no counter, no completion signal, and no adaptation. The prescription
-grows on a **fixed schedule** — roughly one ladder rung every six weeks — and
-pressing Next means only that you are ready for the next thing.
+Since 2026-09-04 the app records what you did, shows dates, a streak and a
+calendar, and compares against last time. None of it reaches the prescription.
+It grows on a **fixed schedule** — roughly one ladder rung every six weeks — as a
+pure function of sessions completed.
 
 That is the governing design decision, and it is what makes everything else
-small. An app that measured would need a model of you, a way to be wrong about
-you, and a way to tell you it had changed its mind. This one needs a calendar.
+small. A schedule that adapted would need a model of you, a way to be wrong about
+you, and a way to tell you it had changed its mind. This one needs a count of
+sessions.
 
 :::note[`SPEC.md` is partly superseded]
 The v1 design document describes the adaptive engine this app no longer has.
@@ -46,10 +48,10 @@ Where it disagrees with the corpus, **the corpus wins** until SPEC.md is revised
   Its consequence is stated openly rather than hidden: the app cannot train
   pulling *strength*, only scapular retraction and upper-back endurance.
 - **Sweaty hands, phone on the floor.** Mid-workout every tap is expensive. This
-  is why the numerals are oversized and why nothing on any screen reads the
-  clock.
-- **One user, then two.** v2 added weak multi-user support so a second person can
-  train on the same deployment. The product is still shaped by one person's
+  is why the numerals are oversized. The pure core in `client/src/domain/` still
+  never reads the clock.
+- **One user, then two.** More than one person can train on the same deployment,
+  each signed in through Ward. The product is still shaped by one person's
   constraints, not by a market.
 
 <Diagram
@@ -68,4 +70,4 @@ Where it disagrees with the corpus, **the corpus wins** until SPEC.md is revised
 | Understand offline and sync | [State and sync](/state/) |
 | Know what the training actually is | [The programme](/wiki/programme/) · [Training science](/wiki/training-science/) |
 | Touch anything visual | [Design system](/wiki/design-system/) · [Guardrails](/wiki/design-guardrails/) |
-| Know why login checks nothing | [Identity](/wiki/decisions-identity/) |
+| Know why identity works the way it does | [Identity](/wiki/decisions-identity/) |

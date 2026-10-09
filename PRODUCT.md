@@ -43,8 +43,9 @@ that substitute for load when load cannot be added.
 
 ## Operating Context
 
-- **Four screens.** `/` today's session → the player → done. `/week` the next seven
-  *sessions*. `/account` milestones and total work. `/login`.
+- **Screens.** `/` today's session → the player → done. `/plan` the next seven
+  *sessions*. `/progress` and `/library`. `/account` milestones and total work. `/login`
+  hands off to Ward.
 - **Three-day rotation**, advanced by training and never by the calendar: Push ·
   Legs · Cardio, with a core-and-posture block every day. `Legs → Cardio → Push`
   order is locked by the concurrent-training literature.
@@ -61,10 +62,10 @@ that substitute for load when load cannot be added.
 - **Zero equipment, floor and bodyweight only, one room.** Reaffirmed three times
   against specific no-purchase alternatives. Standing consequence the app must state
   rather than hide: lats, elbow flexors and grip receive no meaningful stimulus.
-- **No dates anywhere in the UI.** No streak, no heatmap, no "3 days ago", no calendar,
-  no % of a weekly goal, no trophy. Returning after two weeks must look identical to
-  returning after one day. `completedAt` is stored; nothing in the UI may read it.
-  Enforced by a `noDatesInUi` test and a byte-identical time-invariance snapshot.
+- **Dates are displayed, and never schedule anything.** Since 2026-09-04 the UI shows a
+  streak, a calendar and "last time". The rotation still advances on training, not the
+  calendar, and `client/src/domain/**` still cannot read the clock; dates enter through
+  `client/src/persistence/` and are passed in.
 - **Pure core, imperative shell**, enforced by eslint rather than convention:
   `client/src/domain/**` cannot touch a browser global, `new Date()`, `Date.now()`, or
   `Math.random()`. `shared/` is the wire contract and holds no behaviour.
@@ -76,7 +77,7 @@ that substitute for load when load cannot be added.
   10→30s, side plank 30→90s *total* split between sides. Reps cap at 12.
 - Login is **not a security boundary**; anyone who knows a username can read that
   person's training history. Accepted, and no feature may treat it otherwise.
-- **~634 tests** currently green across domain, persistence, server and UI.
+- **Tests** across domain, persistence, server and UI are green; run `npm test` for the count.
 
 ### Reversed 2026-09-04, recorded in the corpus
 

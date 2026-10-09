@@ -35,7 +35,7 @@ export default defineConfig({
     starlight({
       title: 'sports-app',
       description:
-        'A zero-equipment calisthenics trainer, installed as an offline-first PWA. It measures nothing, and that is the governing design decision.',
+        'A zero-equipment calisthenics trainer, installed as an offline-first PWA. Its schedule never adapts to what you log, and that is the governing design decision.',
       tagline: 'An instrument, not a coach.',
       customCss: ['./src/styles/theme.css'],
       // One theme, and it is light — design-system.md doctrine 4. The toggle is
