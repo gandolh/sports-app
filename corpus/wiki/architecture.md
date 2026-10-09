@@ -41,7 +41,7 @@ client/                    the PWA
   src/session/             the imperative shell around a live workout
     useSession.ts  timer.ts  wakeLock.ts
   src/ui/
-    routes/                TanStack Router: / · /week · /account · /login
+    routes/                TanStack Router: / · /plan · /progress · /library · /account · /login
     components/  figures/  ExerciseFigure.tsx
   src/main.tsx
 
@@ -81,8 +81,9 @@ points back the other way. Specifically:
 - `persistence/` knows the shape of `StateDoc` but nothing about React.
 - `session/` is the only place `wakeLock` and any timer is touched, each behind a
   capability check with a no-op fallback.
-- **`ui/` may not read a timestamp from history.** No dates anywhere is a product
-  invariant with a mechanical test, not a styling preference.
+- **`domain/` may not read the clock or a timestamp from history.** Dates are displayed
+  since 2026-09-04, but they enter through `persistence/` and never reach `prescribe()`;
+  eslint enforces it.
 
 ## Data flow through one session
 

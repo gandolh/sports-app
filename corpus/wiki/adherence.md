@@ -11,10 +11,11 @@ they are not softer or more provisional — but they share one subject: the app'
 a real person rather than an ideal one.
 
 Every one of them follows from
-[the governing decision](decisions.md#the-governing-decision--the-app-measures-nothing).
-Because the app measures nothing, it cannot detect a bad day, a skipped day, a rung the
-user cannot perform, or a block being quietly dropped. It has to decide in advance what
-it assumes about each, and then never ask.
+[the governing decision](decisions.md#reversed-2026-09-04--the-governing-decision-and-what-replaced-it).
+Because the prescription never adapts to what is logged, it cannot react to a bad day, a
+skipped day, a rung the user cannot perform, or a block being quietly dropped. It has to
+decide in advance what it assumes about each, and then never ask. (Written when the app
+measured nothing; logging has since arrived but may not steer the schedule.)
 
 **Three of the four were settled by the user on 2026-07-30**, closing open questions 1, 2,
 3 and 5. See [`../log.md`](../log.md) for the exchange.
@@ -67,8 +68,8 @@ rung before the split squat, the user answered: *"It's ok if it gets difficult"*
 *"If it's dangerous, the player can skip it by pressing next."*
 
 So the brake is **Next**, not the prose. That is a stronger mitigation than the one
-originally recorded, and it costs nothing to exercise: the app measures nothing, so
-skipping an exercise has no consequence anywhere — no debt, no flag, no effect on
+originally recorded, and it costs nothing to exercise: the schedule ignores what
+is logged, so skipping an exercise has no consequence anywhere — no debt, no flag, no effect on
 tomorrow. **No feature may ever make skipping expensive**, because that is what this
 mitigation rests on. In particular, nothing may count skips, warn about them, or show
 them on `/account`.
@@ -87,18 +88,20 @@ skip, i will go to the next session in the queue."*
 This is the answer to the sharpest thing brief 15's implementer found: **"a rung takes
 six weeks" silently assumes daily training.** 14 sessions is 2.3/week × 6, so at three
 sessions a week a push rung takes ~14 weeks and the whole ladder runs to about two years.
-The app has no dates and cannot notice.
+The schedule is clock-free and cannot notice.
 
 The user's answer is that **there is nothing to notice.** "Six weeks" is not a promise the
 app makes; it is the arithmetic that produced the step size, and the step size is what
 actually ships. The queue is the contract: skip a day, open the app, get the next session.
-That is exactly what [no dates anywhere](#no-dates-anywhere-in-the-app) already
-guarantees, so no code changes.
+That is exactly what the clock-free schedule already guarantees (dates have been
+displayed since [2026-09-04](decisions.md#reversed-2026-09-04--no-dates-anywhere-in-the-app),
+but never schedule anything), so no code changes.
 
 **What this forbids:** any feature that would need to know the gap between sessions —
 "you've been away a while", a re-entry deload, a pace estimate, a projected finish date.
-All of them require reading `completedAt` from the UI layer, which is already banned. This
-decision is why that ban is a product rule and not just a tidiness rule.
+All of them would feed the gap between sessions into the schedule, and
+`client/src/domain/` may not read the clock. The UI may now show dates, but this
+decision is why they must never drive the prescription.
 
 `SESSIONS_PER_RUNG_ROTATING` (14) and `SESSIONS_PER_RUNG_DAILY` (42) stay as they are, and
 remain re-tunable without invalidating stored state.

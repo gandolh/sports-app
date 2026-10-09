@@ -9,8 +9,8 @@ web
 ## Users
 
 A returning beginner training at home, on the floor, in one room, with **zero
-equipment and no intention of buying any**. One primary user; weak multi-user exists
-(a username keys a state document, a password is accepted and discarded) so a second
+equipment and no intention of buying any**. One primary user; multi-user exists
+(each person signs in through Ward and has their own state document) so a second
 person can train on the same personal deployment. The product is shaped by one
 person's constraints, not by a market.
 
@@ -75,8 +75,9 @@ that substitute for load when load cannot be added.
   misrepresentation.
 - **Per-rung evidence caps**, not one range per ladder: front plank 20→60s, tuck L-sit
   10→30s, side plank 30→90s *total* split between sides. Reps cap at 12.
-- Login is **not a security boundary**; anyone who knows a username can read that
-  person's training history. Accepted, and no feature may treat it otherwise.
+- **Identity is Ward's.** Sign-in happens in Ward, and the state service keys each
+  document on the session's subject, so one person cannot read another's history by
+  guessing a name. The client's cached username is a convenience, not a credential.
 - **Tests** across domain, persistence, server and UI are green; run `npm test` for the count.
 
 ### Reversed 2026-09-04, recorded in the corpus

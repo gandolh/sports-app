@@ -1,6 +1,6 @@
 ---
 summary: Dated snapshot of where every brief stands and what's next.
-updated: 2026-10-07
+updated: 2026-10-09
 ---
 
 # Status — 2026-09-06
@@ -21,13 +21,14 @@ alongside the rig; see [`../log.md`](../log.md).
 
 ## What changed, in one paragraph
 
-The app measures nothing: no counter, no completion signal, no adaptation. Progression
+The prescription never adapts to what is logged (the app has recorded sets and shown
+dates since 2026-09-04; see [reversals.md](reversals.md)). Progression
 is one law — a rung takes ~6 weeks, and the step is the span divided by the sessions in
 it — which reproduces all three step sizes the user specified independently. State
 collapses to one integer per pattern, so rung and target are interpolated rather than
 stored, and top-of-ladder cycling falls out for free. The rotation is Push · Legs ·
-Cardio with a core-and-posture block every day. Four screens, weak multi-user auth, no
-date anywhere in the UI. Full detail in
+Cardio with a core-and-posture block every day. Screens: `/`, `/plan`, `/progress`,
+`/library`, `/account`; sign-in is Ward's. Dates are displayed but never schedule anything. Full detail in
 [progression-engine.md](progression-engine.md) and [programme.md](programme.md).
 
 ## Briefs
