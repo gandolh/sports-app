@@ -15,7 +15,7 @@ The theme follows the system setting; these use dark (`agent-browser set media d
 
 Every screen needs a username, and signing in loops at the time of writing (see [getting-started.md](../getting-started.md#signing-in-loops)). So the captures use a fresh browser profile, a made-up user called `demo`, and a history generated with the app's own pure functions. No state service is needed.
 
-1. Save this as `seed-doc.ts` anywhere outside the repo, then run `node /path/to/seed-doc.ts > demo-doc.json` from the repo root. It writes 27 sessions over the last seven weeks, most of them logged, so the next session is a Push day.
+1. Save this as `seed-doc.ts` anywhere outside the repo, then run `node /path/to/seed-doc.ts > /tmp/demo-doc.json` from the repo root (keep the output out of the repo). It writes 27 sessions over the last seven weeks, most of them logged, so the next session is a Push day.
 
    ```ts
    const root = `file://${process.cwd()}`
@@ -45,7 +45,7 @@ Every screen needs a username, and signing in loops at the time of writing (see 
    process.stdout.write(serialise(doc))
    ```
 
-2. Start `npm run dev`, open <http://localhost:5173/sports-app/icons/icon-192.png> (same origin, no redirect), and in the console set `localStorage['sports-app.session.v3'] = 'demo'` and `localStorage['sports-app.state.v3.demo']` to the text of `demo-doc.json`.
+2. Start `npm run dev`, open <http://localhost:5173/sports-app/icons/icon-192.png> (same origin, no redirect), and in the console set `localStorage['sports-app.session.v3'] = 'demo'` and `localStorage['sports-app.state.v3.demo']` to the text of `/tmp/demo-doc.json`.
 3. Open <http://localhost:5173/sports-app/>.
 
 ## Capture
