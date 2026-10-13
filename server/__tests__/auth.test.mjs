@@ -404,6 +404,36 @@ describe('streams keyed by a Ward subject, from before accounts existed', () => 
     const result = await seedAccount({ username: 'alice', password: PASSWORD, store })
     expect(result.orphans).toEqual([])
   })
+
+  it('are not re-linked after the person unlinks Ward, and the next boot does not throw', async () => {
+    const { store, accounts } = await startService()
+    store.insert({ username: SUBJECT, docJson: docText(SUBJECT, 2), historyLength: 2, schemaVersion: 5 })
+    expect(await linkWardStreams(store, accounts)).toEqual([SUBJECT])
+
+    // Unlinking needs a local password, as in settings.
+    const identities = createWardIdentities({ accounts })
+    await accounts.setPassword(SUBJECT, PASSWORD)
+    await identities.unlink(SUBJECT)
+    expect(await identities.findUserBySubject(SUBJECT)).toBeUndefined()
+    expect(await accounts.findUserById(SUBJECT)).toBeDefined()
+
+    // The reboot: the user row stays, the link is gone, and nothing is re-linked.
+    await expect(linkWardStreams(store, accounts)).resolves.toEqual([])
+    expect(await identities.findUserBySubject(SUBJECT)).toBeUndefined()
+    expect((await accounts.findUserById(SUBJECT))?.username).toBe(SUBJECT)
+  })
+
+  it('leave the seed working after an unlink', async () => {
+    const { store, accounts } = await startService()
+    store.insert({ username: SUBJECT, docJson: docText(SUBJECT, 2), historyLength: 2, schemaVersion: 5 })
+    await linkWardStreams(store, accounts)
+    await accounts.setPassword(SUBJECT, PASSWORD)
+    await createWardIdentities({ accounts }).unlink(SUBJECT)
+
+    const result = await seedAccount({ username: 'alice', password: PASSWORD, store, accounts })
+    expect(result).toMatchObject({ created: true, orphans: [] })
+    expect(await createWardIdentities({ accounts }).findUserBySubject(SUBJECT)).toBeUndefined()
+  })
 })
 
 // ─── Ward ───────────────────────────────────────────────────────────────────

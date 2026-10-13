@@ -163,7 +163,10 @@ const WARD_SUBJECT = /^[0-9a-f]{32}$/
  * that subject, and the next Ward sign-in finds it. No row is rewritten and no name
  * is matched: the key is the subject, which is the one thing the app knew.
  *
- * Idempotent (`findUserBySubject` first), one transaction per user, and it needs no
+ * Idempotent (`findUserBySubject` first), and a key that already has a user, by id
+ * or by username, is skipped even with no link, so a person who unlinked Ward is
+ * never re-linked and a boot never trips on `UserIdTakenError`. One transaction per
+ * user, and it needs no
  * Ward client — linking a subject does not call Ward. The honest cost: that
  * person's name is the hex string until it is renamed by hand, because the library
  * has no rename and a snapshot stream cannot be moved without rewriting the
@@ -182,6 +185,11 @@ export async function linkWardStreams(store, accounts) {
   for (const key of store.usernames()) {
     if (!WARD_SUBJECT.test(key)) continue
     if ((await identities.findUserBySubject(key)) !== undefined) continue
+    // A user already owns this key, id or name, but has no Ward link: a migrated
+    // user who unlinked Ward. Re-linking them is not ours to do (createLinkedUser
+    // would throw, and the service would never start). Same rule as atrium.
+    if ((await accounts.findUserById(key)) !== undefined) continue
+    if ((await accounts.findUserByUsername(key)) !== undefined) continue
     await identities.createLinkedUser({
       subject: key,
       id: key,

@@ -252,8 +252,8 @@ export function SyncSettings({
           <p className={FIELD_DESCRIPTION}>
             Something like{' '}
             <span className="font-mono text-tx2">http://192.168.1.20:8787</span>. Leave it empty
-            to use this app&rsquo;s own origin, which is what a co-hosted service and the dev proxy
-            both want.
+            to use this app&rsquo;s own origin, under the same path you sign in through, which is
+            what a co-hosted service and the dev proxy both want.
           </p>
           {errors.baseUrl === undefined ? null : (
             <Field.Error className={FIELD_ERROR} match>

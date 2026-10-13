@@ -44,6 +44,7 @@ import {
   saveAndPush,
   stateEndpoint,
 } from '../sync.ts'
+import { API_PREFIX } from '../auth.ts'
 
 /*
  * `secret` is still in `SyncSettings` because it is still in the document
@@ -194,6 +195,20 @@ describe('stateEndpoint', () => {
   it('names no user — the service reads the session', () => {
     expect(stateEndpoint('http://host:8787')).toBe('http://host:8787/api/state')
     expect(stateEndpoint('')).toBe('/api/state')
+  })
+
+  it('puts an empty address under the API prefix sign-in uses, and only then', () => {
+    // Same-origin in the deploy: the cookie's Path and the proxy route are both the prefix.
+    expect(stateEndpoint('', '/sports-app-api')).toBe('/sports-app-api/api/state')
+    expect(stateEndpoint('  / ', '/sports-app-api')).toBe('/sports-app-api/api/state')
+    // No prefix (dev proxy, co-hosted): unchanged.
+    expect(stateEndpoint('', '')).toBe('/api/state')
+    // An explicit address is used as typed, prefix or not.
+    expect(stateEndpoint('http://host:8787', '/sports-app-api')).toBe('http://host:8787/api/state')
+  })
+
+  it('defaults to the prefix baked into the build, the one the auth client uses', () => {
+    expect(stateEndpoint('')).toBe(`${API_PREFIX}/api/state`)
   })
 
   it('cannot be made to address another stream, whatever the username contains', () => {

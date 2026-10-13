@@ -67,6 +67,7 @@
  * hand-repairable.
  */
 import type { StateDoc, SyncSettings } from '@sports-app/shared/types.ts'
+import { API_PREFIX } from './auth.ts'
 import { parse, serialise } from './codec.ts'
 import type { SaveResult, StoreOptions } from './store.ts'
 import { isReadOnly, save } from './store.ts'
@@ -95,6 +96,7 @@ export interface SyncOptions {
 /**
  * `settings.sync.baseUrl` may legitimately be empty — that is the same-origin
  * case, which is how the Vite dev proxy and a co-hosted service both work.
+ * (`stateEndpoint` adds the API prefix in that case; this function does not.)
  * Trailing slashes are stripped so `http://host:8787/` and `http://host:8787`
  * behave identically.
  */
@@ -114,8 +116,14 @@ export function endpoint(baseUrl: string, path: string): string {
  * The parameter is not sent at all rather than sent and ignored. Sending it
  * would suggest it still selected something.
  */
-export function stateEndpoint(baseUrl: string): string {
-  return endpoint(baseUrl, STATE_PATH)
+export function stateEndpoint(baseUrl: string, apiPrefix: string = API_PREFIX): string {
+  // An empty address means "this app's own origin", and the service on that origin
+  // is mounted at the same prefix sign-in uses (`AUTH_BASE_PATH`): in the deploy
+  // `/api/state` is outside the session cookie's Path and has no route, so it would
+  // fail without a word. An explicit address names the service itself, which has
+  // its own routes, so it is used as typed.
+  const own = endpoint(baseUrl, '') === ''
+  return endpoint(baseUrl, own ? `${apiPrefix}${STATE_PATH}` : STATE_PATH)
 }
 
 // ─── push ───────────────────────────────────────────────────────────────────
