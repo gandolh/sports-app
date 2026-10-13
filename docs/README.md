@@ -7,7 +7,7 @@ Start with the [main README](../README.md). This folder holds the docs site's wo
 | [getting-started.md](getting-started.md) | Full local setup: Ward, env vars, the dev server, the state service, tests, and the sign-in workaround |
 | [images/](images/shots.md) | The GIF and screenshots in the README, and how each was made |
 
-The rest of this folder is the docs site, a Starlight workspace deployed at <https://gandolh.ro/sports-app/docs/>:
+The rest of this folder is the docs site, a Starlight workspace deployed at `/sports-app/docs/`:
 
 | Path | What it is |
 |---|---|
@@ -18,6 +18,6 @@ The rest of this folder is the docs site, a Starlight workspace deployed at <htt
 
 Going deeper:
 
-- Site pages worth starting with: [the programme](https://gandolh.ro/sports-app/docs/wiki/programme/), [the progression engine](https://gandolh.ro/sports-app/docs/wiki/progression-engine/), [the API routes](https://gandolh.ro/sports-app/docs/api/), [state and sync](https://gandolh.ro/sports-app/docs/state/)
+- Site pages worth starting with: [the programme](../corpus/wiki/programme.md), [the progression engine](../corpus/wiki/progression-engine.md), [the API routes](src/content/docs/api.mdx), [state and sync](src/content/docs/state.mdx)
 - The state service: [server/README.md](../server/README.md)
 - Project wiki: [corpus/](../corpus/index.md), with decisions, status and the briefs that built the app

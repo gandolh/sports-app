@@ -111,7 +111,7 @@ per-side side-plank dose the code splits between sides.
 
 ## The deploy, in one paragraph
 
-Static PWA → `/var/www/sports-app`, served at `https://gandolh.ro/sports-app/`. Fastify
+Static PWA → `/var/www/sports-app`, served at `/sports-app/`. Fastify
 state service → pm2 `sports-app-api` on `127.0.0.1:8794`, proxied at `/sports-app-api`
 (**not** its default 8787 — farm-valley holds that port). The sqlite file lives at
 `/srv/sports-app-api/data/app.db`, outside the rsync tree, protected by an anchored

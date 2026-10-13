@@ -6,7 +6,7 @@ A zero-equipment calisthenics trainer for a returning beginner who trains at hom
   <img src="docs/images/workout.gif" width="300" alt="A workout on a phone. The Push day screen lists a knee push-up, a front plank and a prone T raise. Tapping Start workout opens the knee push-up page with an animated figure and a target of 10 reps; the set is logged and Next set fills the first set dots. The front plank page follows, and its countdown ring runs down from 46 seconds.">
 </p>
 
-**Status:** Personal project, live at <https://gandolh.ro/sports-app/>. Every screen works once the app knows your username, but signing in does not finish yet. After Ward's sign-in page the app never stores who signed in, so a fresh browser lands on sign-in again. The workaround is in [docs/getting-started.md](docs/getting-started.md#signing-in-loops).
+**Status:** Personal project, live at `/sports-app/`. Every screen works once the app knows your username, but signing in does not finish yet. After Ward's sign-in page the app never stores who signed in, so a fresh browser lands on sign-in again. The workaround is in [docs/getting-started.md](docs/getting-started.md#signing-in-loops).
 
 ## What it does
 
@@ -40,7 +40,7 @@ flowchart LR
   server --> db[("SQLite<br/>snapshots per user")]
 ```
 
-More on the [docs site](https://gandolh.ro/sports-app/docs/): [architecture](https://gandolh.ro/sports-app/docs/wiki/architecture/), [the progression engine](https://gandolh.ro/sports-app/docs/wiki/progression-engine/) and [state and sync](https://gandolh.ro/sports-app/docs/state/).
+More on the docs site: [architecture](corpus/wiki/architecture.md), [the progression engine](corpus/wiki/progression-engine.md) and [state and sync](docs/src/content/docs/state.mdx).
 
 ## Run it locally
 
@@ -69,7 +69,7 @@ The state service, env vars, tests and the sign-in workaround: [docs/getting-sta
 ## Docs
 
 - [docs/](docs/README.md): setup and the images used here
-- Docs site: <https://gandolh.ro/sports-app/docs/>, built from `docs/`
+- Docs site: `/sports-app/docs/`, built from `docs/`
 - Project wiki: [corpus/](corpus/index.md), with the programme, the training science behind it, and every decision
 - [PRODUCT.md](PRODUCT.md) for who it is for; [SPEC.md](SPEC.md) is the v1 design and partly out of date
 

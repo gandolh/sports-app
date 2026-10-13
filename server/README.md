@@ -86,7 +86,7 @@ file, so passing them inline still works:
 ```sh
 # Against another Ward: issue the app key in its console, on the sports-app page,
 # "Service keys". It is shown ONCE and cannot be read back.
-WARD_PUBLIC_ORIGIN=https://gandolh.ro \
+WARD_PUBLIC_ORIGIN=https://example.com \
 WARD_API_BASE_PATH=/ward-api \
 WARD_APP_KEY=wak_... \
   npm run server
