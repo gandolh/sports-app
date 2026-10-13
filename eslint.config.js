@@ -41,6 +41,9 @@ export default tseslint.config(
       '**/dev-dist/',
       '**/coverage/',
       '**/node_modules/',
+      // Vendored, built copies of the shared auth library: generated, never edited
+      // here, and a few hundred KB of bundled third-party code.
+      '**/vendor/',
       'docs/.astro/',
       'docs/public/reference/',
       'docs/public/diagrams/',

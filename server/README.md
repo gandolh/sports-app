@@ -13,39 +13,59 @@ It is the durability half of the persistence design: browser storage keeps the a
 and offline, this keeps the history alive when the phone is lost or the browser evicts
 its storage, and it gives phone↔desktop sync as a side effect.
 
-Deliberately not a backend in the usual sense. No users table, no sign-in of its own, no
-ORM, no migration runner — one table holding whole-document JSON snapshots keyed by the
-caller's Ward subject, and three routes.
+Deliberately not a backend in the usual sense. No ORM, no migration runner of its own —
+one table holding whole-document JSON snapshots keyed by the signed-in account's username,
+the sign-in routes of the vendored auth library, and two routes of its own. Accounts live
+in `auth_*` tables of the same SQLite file, owned by the library (`vendor/ward/`).
 
 It is the `server` workspace of a three-workspace repo (`client` · `server` ·
 `shared`). It did not move when the workspaces were introduced, so `db/` is still a
 sibling directory at the repo root and still gitignored. Run it with `npm run server`
 from the root, or `npm start` from here.
 
-## Who the caller is: Ward
+## Who the caller is: an account on this service
 
-`/api/state` is guarded by a Ward session. The browser's `ward_session` cookie goes to
-`ward.mjs`, which verifies the token against Ward's keys, introspects it (cached 30 s) and
-requires a `sports-app` grant. Signing in, the password and TOTP all happen in Ward; this
-service has no login route and never sees a credential.
+The app owns its accounts. `wardAuth`, the vendored library's Fastify plugin, is registered
+first and guards **every** route except `GET /api/health` and its own sign-in routes. A
+request needs a live session in the `sports_app_session` cookie, which the library sets
+after a password sign-in or after "Sign in with Ward". Local sign-in never calls Ward, so
+the service keeps working while Ward is down.
 
-The session's **subject is the stream key**. Nothing on the request says whose document
-is wanted, and a `?user=` is ignored, so a caller reads and writes only their own history.
-That is a per-person boundary, which the shared secret it replaced never was: the secret
-authenticated the installation, and anyone holding it could read anyone's history by
-changing a name in a URL.
+The signed-in user's **username is the stream key**. Nothing on the request says whose
+document is wanted, and a `?user=` is ignored, so a caller reads and writes only their own
+history. A person who signs in with Ward and was suffixed because their Ward name was taken
+(`alice-2`) gets that stream: it follows the local account, never the Ward name.
 
-| Situation                         | Answer |
-| --------------------------------- | ------ |
-| No session, or one Ward rejects   | `401`  |
-| A live session with no grant      | `403`  |
-| Ward cannot be reached            | `503`  |
+| Situation                                              | Answer                                      |
+| ------------------------------------------------------ | ------------------------------------------- |
+| No session, or an expired one                          | `401 {"error":"unauthorized"}`              |
+| A Ward-originated session while Ward cannot answer     | `401`, `reason: "ward_unavailable"`         |
+| A Ward session Ward has ended (sign-out, revoke)       | `401`, `reason: "ward_session_ended"`       |
+| A username the document schema cannot hold             | `401`, `reason: "unsupported_username"`     |
+| A browser `POST` from another origin                   | `403 {"error":"cross_site"}`                |
 
-`503` rather than `401` on purpose: a `401` tells a sync client to drop its session, and
-an identity service that is briefly down is a reason to retry, not to sign out.
+A Ward-originated session is checked against Ward at most every 30 seconds, so a revoke at
+Ward ends it within 30 seconds; a local session is never checked. The session is checked
+before anything else, so a caller without one gets a `401` and never a `400` that would
+describe the document — and the same `401` for a path that does not exist.
 
-The session is checked before anything else, so a caller without one gets a `401` and
-never a `400` that would describe the document.
+`ward.mjs` is the configuration and the app's own rules; the library does the rest. Its
+README is the contract: `../shared-library/README.md` in Ward's repo, vendored at
+`vendor/ward/README.md` with the version.
+
+**Creating accounts.** There is no register route. `npm run seed` creates one (it asks for
+a username and a password, or reads `SPORTS_APP_SEED_USERNAME` and
+`SPORTS_APP_SEED_PASSWORD`; never put them in a file). It never resets an existing
+account's password or role, so it is safe to run on every deploy. A first Ward sign-in also
+creates an account, if Ward holds a grant for that person. A person who already has an
+account links Ward from `/account`; nothing is ever matched by username.
+
+**Existing history.** Snapshots are keyed by username. A stream keyed by a Ward subject (32
+hex, which is what the key was before accounts) gets a linked account of the same name at
+startup, so that person's next Ward sign-in finds it; their displayed name stays the hex
+string until renamed by hand. A stream keyed by a name is read again as soon as an account
+with that exact username exists (`npm run seed`). At startup the service names any such
+stream that has no account yet.
 
 ## Requirements
 
@@ -77,61 +97,62 @@ cp .env.example .env   # at the repo root, once
 npm run server
 ```
 
-`npm run server` loads the repo-root `.env` (Node's `--env-file-if-exists`), so the
-three Ward variables live there. Locally they point at Ward's container in
-`../wzd_auth/infrastructure/local`, whose `seed.mjs` registers sports-app, grants your
-account and writes `WARD_APP_KEY` into `.env`. Anything set in the shell wins over the
-file, so passing them inline still works:
+`npm run server` loads the repo-root `.env` (Node's `--env-file-if-exists`). Anything set
+in the shell wins over the file. Locally the `WARD_OIDC_*` values point at Ward's
+container in `../wzd_auth/infrastructure/local`, whose `seed.mjs` registers sports-app as
+an OpenID Connect client and writes them into `.env`. Without `WARD_OIDC_ISSUER` the service
+runs with local accounts only, and the sign-in page has no Ward button.
 
-```sh
-# Against another Ward: issue the app key in its console, on the sports-app page,
-# "Service keys". It is shown ONCE and cannot be read back.
-WARD_PUBLIC_ORIGIN=https://example.com \
-WARD_API_BASE_PATH=/ward-api \
-WARD_APP_KEY=wak_... \
-  npm run server
-```
-
-The service refuses to start without all three. There is no default and no fallback: a
-service that cannot tell its callers apart looks authenticated and is not.
-
-`WARD_API_BASE_PATH` is undefaulted for a specific reason — an empty value resolves
-Ward's JWKS to `<origin>/.well-known/jwks.json`, a path nothing serves, so every token
-would be rejected with a clean log on the deploy that shipped the mistake.
+**Two prefixes, and why.** Fastify sees `/api/...` everywhere. What the *browser* puts in
+front of it differs: nothing in development (the dev server proxies `/api`), and
+`SPORTS_APP_API_PREFIX` in the deploy, where a reverse proxy strips it. The session
+cookie's `Path` is `<prefix>/api` and Ward's redirect URI is
+`<prefix>/api/auth/ward/callback`; **both come from configuration and change together**, per
+environment. The library refuses to start if the redirect URI's path does not sit under the
+cookie's path, so a mismatch is a failed boot, not a silent sign-in that does nothing. The
+client build reads the same variable (`vite.config.ts`).
 
 In development, `npm run dev` serves the app at `http://localhost:5173/sports-app/` and
-proxies `/api` to `http://127.0.0.1:8787`, so the app and the service share an origin and
-there is no CORS to configure. It proxies `/ward` and `/ward-api` to `WARD_PUBLIC_ORIGIN`
-too, which is what lets the app's own sign-in go through Ward and come back. Leave
-**Service address** empty in Settings and it will use the proxy. If you change
-`SPORTS_APP_PORT`, change the proxy target in `vite.config.ts` to match.
+proxies `/api` to `http://127.0.0.1:8787`, so the app and the service share an origin, there
+is no CORS to configure, and Ward's callback needs no proxy rule of its own. There is no
+`/ward` proxy: the browser goes to Ward's own origin. Leave **Service address** empty in
+Settings and it will use the proxy. If you change `SPORTS_APP_PORT`, change the proxy target
+in `vite.config.ts` to match.
 
 ## Environment variables
 
-| Variable                     | Default            | Notes                                                              |
-| ---------------------------- | ------------------ | ------------------------------------------------------------------ |
-| `WARD_PUBLIC_ORIGIN`         | *(none)*           | **Required.** Ward's origin, and the exact `iss` on every access token. |
-| `WARD_API_BASE_PATH`         | *(none)*           | **Required.** `/ward-api`. Undefaulted on purpose — see above.      |
-| `WARD_APP_KEY`               | *(none)*           | **Required.** This service's own key. A secret. Never commit it.    |
-| `SPORTS_APP_HOST`            | `127.0.0.1`        | Loopback by default so running it cannot expose your history.       |
-| `SPORTS_APP_PORT`            | `8787`             |                                                                    |
-| `SPORTS_APP_DB`              | `<repo>/db/app.db` | Created on startup, with its parent directory.                      |
-| `SPORTS_APP_MAX_BODY_BYTES`  | `4194304` (4 MiB)  | Request body cap.                                                   |
-| `SPORTS_APP_QUIET`           | unset              | `1` silences the request log.                                       |
+| Variable                              | Default            | Notes                                                                 |
+| ------------------------------------- | ------------------ | --------------------------------------------------------------------- |
+| `SPORTS_APP_PUBLIC_ORIGIN`            | from the redirect URI | The browser's address for the app, no path. Required unless `WARD_OIDC_REDIRECT_URI` is set. Decides `Secure` cookies and the cross-site check. |
+| `SPORTS_APP_API_PREFIX`               | *(empty)*          | What the browser puts in front of `/api`: empty in development, `/sports-app-api` in the deploy. Also read by the client build. |
+| `SPORTS_APP_BASE`                     | `/sports-app/`     | Where the client is served from; the sign-in and settings pages the callback lands on. |
+| `WARD_OIDC_ISSUER`                    | *(unset)*          | Ward's issuer, ending in `/oidc`. Unset means local accounts only.    |
+| `WARD_OIDC_CLIENT_ID`                 | *(none)*           | Required when the issuer is set. The app's slug at Ward.              |
+| `WARD_OIDC_CLIENT_KEY`                | *(none)*           | Required when the issuer is set. The app's private key. **A secret.** |
+| `WARD_OIDC_REDIRECT_URI`              | *(none)*           | Required when the issuer is set. `<prefix>/api/auth/ward/callback` as the browser reaches it. |
+| `WARD_OIDC_POST_LOGOUT_REDIRECT_URI`  | *(unset)*          | Where Ward returns after "log out of Ward too".                       |
+| `SPORTS_APP_HOST`                     | `127.0.0.1`        | Loopback by default so running it cannot expose your history.         |
+| `SPORTS_APP_PORT`                     | `8787`             |                                                                       |
+| `SPORTS_APP_DB`                       | `<repo>/db/app.db` | Created on startup, with its parent directory.                        |
+| `SPORTS_APP_MAX_BODY_BYTES`           | `4194304` (4 MiB)  | Request body cap.                                                     |
+| `SPORTS_APP_QUIET`                    | unset              | `1` silences the request log.                                         |
 
-The app key appears in **no committed file**. It is passed in the environment and never
-reaches the browser: it authenticates the *service* to Ward, and is a completely
-different thing from the session cookie that authenticates a *person* to the service.
+The client key appears in **no committed file**. It never reaches the browser: it
+authenticates the *service* to Ward, and is a different thing from the session cookie that
+authenticates a *person* to the service. The old `WARD_PUBLIC_ORIGIN`, `WARD_API_BASE_PATH`
+and `WARD_APP_KEY` are not read.
 
 ## Routes
 
-| Route             | Auth    | Behaviour                                                                 |
-| ----------------- | ------- | ------------------------------------------------------------------------- |
-| `GET /api/health` | no      | `{"status":"ok"}`. Liveness only — no database read, no information.       |
-| `GET /api/state`  | session | The caller's newest snapshot bytes, or `404` when they have none.          |
-| `PUT /api/state`  | session | Validate shallowly, store the body verbatim, prune the caller to the cap.  |
+| Route                  | Auth    | Behaviour                                                                 |
+| ---------------------- | ------- | ------------------------------------------------------------------------- |
+| `GET /api/health`      | no      | `{"status":"ok"}`. Liveness only — no database read, no information.       |
+| `GET /api/state`       | session | The caller's newest snapshot bytes, or `404` when they have none.          |
+| `PUT /api/state`       | session | Validate shallowly, store the body verbatim, prune the caller to the cap.  |
+| `GET /api/auth/session`| public  | Who the cookie belongs to (`user: null` when nobody), and whether Ward is on. What the client asks to learn who it is. |
+| `POST /api/auth/login`, `logout`, `password`, `ward/*` | mixed | The library's routes; see `vendor/ward/README.md`. There is no `register`. |
 
-Anything else is a `404`, including the old `POST /api/login`. No static files, no
+Anything else is a `404` for a signed-in caller (and a `401` for anyone else). No static files, no
 directory listing, no fallback handler. An unsupported method on `/api/state` is a `405`
 with an `Allow` header, but only for a caller with a session: without one it is the same
 `401` as every other request to `/api/state`, so the `Allow` header goes only to someone
@@ -155,17 +176,17 @@ sent.
 
 `PUT` requires `Content-Type: application/json` and a body that is a JSON object with a
 numeric `schemaVersion`, a valid `username`, and an array `history` — and the document's
-`username` must equal the session's subject. Everything else about the shape is the codec's business:
+`username` must equal the session's username. Everything else about the shape is the codec's business:
 `client/src/persistence/codec.ts` is the single source of truth, and a second, drifting
 validator here would eventually reject a document the app considers good, turning the
 safety net into a way to lose a workout. A rejected `PUT` returns `400` and leaves the
 database untouched.
 
-A document whose `username` is not the caller's subject is a `400` and stores nothing.
+A document whose `username` is not the caller's username is a `400` and stores nothing.
 It used to compare two values the client supplied, `?user=` and the document's own name,
 which caught a client bug but not a hostile caller. One side is now the session, so the
 same check refuses a write into somebody else's stream. A document written before the
-cutover, under an old username, is the ordinary way to hit it.
+accounts, under a name that is not this account's, is the ordinary way to hit it.
 
 `PUT` answers `200` with `{ id, createdAt, username, historyLength, schemaVersion,
 bytes, pruned, retained }`. `retained` is *that user's* row count, not the table's — a
@@ -219,11 +240,12 @@ can only append).
 
 Pre-existing rows are attributed to **`local`**, because the old table held one stream
 and recorded nothing about whose it was — there is no owner to recover, only one to
-choose. The service says so once at startup. The stream key is the caller's Ward subject, so to
-read that history again, reattribute it to the subject of the person it belongs to:
+choose. The service says so once at startup. The stream key is the caller's username, so to
+read that history again, reattribute it to the username of the account it belongs to
+(create the account first with `npm run seed`):
 
 ```sh
-sqlite3 db/app.db "UPDATE snapshots SET username = '<ward subject>' WHERE username = 'local'"
+sqlite3 db/app.db "UPDATE snapshots SET username = '<username>' WHERE username = 'local'"
 ```
 
 That leaves the *documents* saying `"schemaVersion": 2` with no `username` field inside
@@ -303,18 +325,25 @@ secret was reused somewhere else, and the Settings screen says the stored value 
 npx vitest run server
 ```
 
-Two test files, both against a **real temporary SQLite file** rather than a mock. Ward is
-the one thing faked: `__tests__/fake-ward.mjs` stands in for the session check, so the
-tests decide who the caller is.
+Three test files, all against a **real temporary SQLite file** rather than a mock. Ward is
+the one thing faked, and only in `auth.test.mjs`: a `fetch` handed to `createWardClient`
+answers discovery and the 30-second session check. The other files sign in through real
+sessions minted by the library (`__tests__/auth-fixture.mjs`), so the guard is never stubbed.
 
 - `__tests__/state-server.test.mjs` drives the service over a real HTTP socket. `GET`
   before any `PUT` returns 404, a missing or unrecognised session returns 401 before
-  anything is validated, Ward being down is a 503, each session gets its own stream and a
+  anything is validated, each session gets its own stream and a
   `?user=` naming somebody else is ignored, `PUT` then `GET` round-trips byte-identically,
   a malformed body is rejected with the newest row unchanged, `/api/health` is served from
   a store that throws on every method, the old login path is a 404, and **a distinctive
   password sent there is searched for in the database files on disk and in every
   captured log line.**
+- `__tests__/auth.test.mjs` covers getting a session and what the app does with it: local
+  sign-in over HTTP, the guard on every route, `GET /api/auth/session` (the call that ended
+  the sign-in loop), the stream following the *local* username, the Ward routes being wired
+  (the start URL, the cookie path and redirect URI moving together), a Ward session failing
+  closed with `ward_unavailable` while a local one keeps working, the configuration, and the
+  seed.
 - `__tests__/db.test.mjs` covers what HTTP cannot reach: a database built with the *old*
   single-stream DDL is migrated and its rows stay readable, re-opening it migrates nothing
   and leaves the same schema as a fresh database, a busy user cannot evict a quiet one,

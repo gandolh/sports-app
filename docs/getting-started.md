@@ -25,12 +25,11 @@ cp .env.example .env
 
 | Variable | Used by | Purpose | Where the value comes from |
 |---|---|---|---|
-| `WARD_PUBLIC_ORIGIN` | dev server, state service | Ward's origin; the dev server proxies `/ward` and `/ward-api` to it | `http://localhost:8792` for the local Ward |
-| `WARD_API_BASE_PATH` | state service | Where Ward's API lives under that origin | `/ward-api` |
-| `WARD_APP_KEY` | state service | The service's own key for asking Ward about a session. A secret | Ward's local `seed.mjs` writes it into `.env`; for another Ward, its console's "Service keys" page |
+| `WARD_OIDC_ISSUER`, `WARD_OIDC_CLIENT_ID`, `WARD_OIDC_CLIENT_KEY`, `WARD_OIDC_REDIRECT_URI`, `WARD_OIDC_POST_LOGOUT_REDIRECT_URI` | state service | "Sign in with Ward", optional. The client key is a secret | Ward's local `seed.mjs` registers the app and writes all five into `.env`. Leave them out and the app has local accounts only |
+| `SPORTS_APP_API_PREFIX` | state service, build | What the browser puts in front of `/api`: empty here, `/sports-app-api` in the deploy | Leave empty locally |
 | `SPORTS_APP_BASE` | dev server, build | The sub-path the app is served from | `/sports-app/`, the same path as the deploy |
 
-The state service has more variables (port, host, database file, body limit). They are listed in [server/README.md](../server/README.md#environment-variables).
+Create an account to sign in with: `npm run seed` asks for a username and a password. The state service has more variables (port, host, database file, body limit). They are listed in [server/README.md](../server/README.md#environment-variables).
 
 ## 3. Run
 

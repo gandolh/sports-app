@@ -2,7 +2,6 @@
 // `test` block below. Importing it from 'vite' typechecks everything except the
 // test config, which then silently does nothing.
 import { defineConfig } from 'vitest/config'
-import type { ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -31,37 +30,31 @@ const baseSegment = (process.env.SPORTS_APP_BASE ?? '').replace(/^\/+|\/+$/g, ''
 const base = baseSegment === '' ? '/' : `/${baseSegment}/`
 
 /**
- * Dev only: `/ward` + `/ward-api` on this dev server's origin, the way Caddy puts
- * them on the deployed one, pointed at WARD_PUBLIC_ORIGIN — the Ward the state
- * service trusts, locally the container in wzd_auth/infrastructure/local. One
- * origin is what lets Ward's cookie, its redirect back into the app and signing
- * out work as they do in the deploy.
+ * What the **browser** puts in front of `/api` to reach the state service, with a
+ * leading slash and no trailing one, or `''` for none.
  *
- * Ward refuses /refresh and /logout unless the request's Origin is its own. A
- * request from a page on this dev server would be same-origin in the deploy, so
- * its Origin is rewritten to say so. Anything else keeps its Origin and its
- * Sec-Fetch-Site, and Ward still refuses it.
+ * Empty in development, where this dev server proxies `/api` itself. `/sports-app-api`
+ * in the deploy, where the reverse proxy strips it. The sign-in page needs it
+ * before any document exists, so unlike the sync address (typed per browser, in
+ * Settings) it has to be a build-time constant. It is the same variable the service
+ * reads (`SPORTS_APP_API_PREFIX`), so the deploy sets one value for both, and the
+ * session cookie's `Path` and the browser's request path cannot disagree.
  */
-function wardProxy(): Record<string, ProxyOptions> {
-  if (!process.env.WARD_PUBLIC_ORIGIN) return {}
-  const ward = new URL(process.env.WARD_PUBLIC_ORIGIN).origin
-  return {
-    '^/ward(-api)?(/|$)': {
-      target: ward,
-      configure: (server) => {
-        server.on('proxyReq', (proxyReq, req) => {
-          const origin = req.headers.origin
-          if (origin && URL.canParse(origin) && new URL(origin).host === req.headers.host) {
-            proxyReq.setHeader('origin', ward)
-          }
-        })
-      },
-    },
+const apiPrefix = (() => {
+  const value = (process.env.SPORTS_APP_API_PREFIX ?? '').trim()
+  if (value === '') return ''
+  if (!/^\/[A-Za-z0-9._~/-]*[A-Za-z0-9._~-]$/.test(value)) {
+    throw new Error(
+      `SPORTS_APP_API_PREFIX must be empty or a path like /sports-app-api (a leading slash, no trailing one), got "${value}"`,
+    )
   }
-}
+  return value
+})()
 
 export default defineConfig({
   base,
+  // Read by `src/persistence/auth.ts`, the one place that names it.
+  define: { __SPORTS_APP_API_PREFIX__: JSON.stringify(apiPrefix) },
   plugins: [
     react(),
     // Tailwind v4, as a Vite plugin rather than through PostCSS. The difference
@@ -129,11 +122,16 @@ export default defineConfig({
   // SPORTS_APP_PORT, override this too. Splitting the repo into workspaces changed
   // nothing here — the proxy target is a port on the loopback interface, not a
   // path, so the service being a sibling package rather than a sibling directory
-  // is invisible to it. Ward's pages ride along on the same origin (`wardProxy`).
+  // is invisible to it.
+  //
+  // The sign-in routes (`/api/auth/...`) ride this same proxy, and so does Ward's
+  // callback: it is registered under the API prefix precisely so that no new proxy
+  // rule is needed here or in the deploy. `changeOrigin` stays off so the browser's
+  // `Origin` reaches the service unchanged, which is what its cross-site check reads.
+  // There is no `/ward` proxy any more: the browser goes to Ward's own origin.
   server: {
     proxy: {
       '/api': { target: 'http://127.0.0.1:8787', changeOrigin: false },
-      ...wardProxy(),
     },
   },
   test: {

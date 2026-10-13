@@ -15,10 +15,10 @@
  *
  * ── The session names the stream ────────────────────────────────────────────
  *
- * `/api/state` carries no username. The service keys the stream by the Ward
- * session's subject (`server/state-server.mjs`), and a `PUT` whose document's
- * `username` is not that subject is refused with a 400. The browser sends the
- * `ward_session` cookie; this module sends no credential of its own.
+ * `/api/state` carries no username. The service keys the stream by the signed-in
+ * account's username (`server/state-server.mjs`), and a `PUT` whose document's
+ * `username` is not that one is refused with a 400. The browser sends the
+ * `sports_app_session` cookie; this module sends no credential of its own.
  *
  * ── `navigator.onLine` is not consulted. Anywhere. ───────────────────────────
  *
@@ -75,14 +75,6 @@ import { isReadOnly, save } from './store.ts'
 
 export const STATE_PATH = '/api/state'
 export const HEALTH_PATH = '/api/health'
-
-/**
- * Ward's login page, for the one thing this client can do about a 401.
- *
- * A path, never an absolute URL: Ward validates `next` against the estate's own
- * path roots and refuses anything absolute.
- */
-export const WARD_LOGIN_PATH = '/ward/login'
 
 /**
  * Long enough for a slow phone on a slow connection, short enough that a
@@ -151,7 +143,7 @@ export type PushOutcome =
  * no background sync, no retry queue. A dropped push is picked up by the next
  * session, and the export file is the real backup either way.
  *
- * The body's `username` must be the session's subject, or the service answers
+ * The body's `username` must be the session's username, or the service answers
  * 400 and stores nothing. Callers on the session path should write
  * `void push(doc)` and move on.
  */
@@ -217,7 +209,7 @@ export async function push(doc: StateDoc, options: SyncOptions = {}): Promise<Pu
 export type PullFailure =
   /** This user has no snapshot on the service. The new-device case. */
   | 'empty'
-  /** Wrong or missing secret. */
+  /** No live session, or an account the service does not allow. */
   | 'unauthorized'
   | 'network'
   /** Answered, but the body is not a document this build understands. */
@@ -268,7 +260,7 @@ export async function pull(
     return {
       ok: false,
       reason: 'unauthorized',
-      error: 'The sync service rejected the secret. Check the secret in Settings.',
+      error: 'You are not signed in to the sync service. Sign in again to sync.',
     }
   }
   if (!response.ok) {
@@ -334,8 +326,8 @@ export type SessionCheckOutcome =
  * posted a username and a password to `/api/login`, which checked neither — it
  * validated the shape of the name, discarded the password unread, and echoed
  * the name back (corpus/wiki/technical-decisions.md, "Authentication is a
- * nameplate"). Signing in is Ward's now, at one page for the estate, so there is
- * nothing here to post.
+ * nameplate"). Signing in is the app's own sign-in page now (`ui/routes/login.tsx`,
+ * with an optional Ward button), so there is nothing here to post.
  *
  * What is left is worth keeping: telling somebody their **service address** is
  * wrong, or that they are not signed in, at the moment they are most likely to
@@ -378,13 +370,6 @@ export async function checkSession(
   if (response.status === 404 || response.ok) return { ok: true }
 
   return { ok: false, reason: 'rejected', error: describeStatus(response.status) }
-}
-
-/** Ward's login page, returning to wherever the person is now. */
-export function wardLoginUrl(): string {
-  const next =
-    typeof window === 'undefined' ? '/' : window.location.pathname + window.location.search
-  return `${WARD_LOGIN_PATH}?next=${encodeURIComponent(next)}`
 }
 
 // ─── Comparison and the conflict prompt ─────────────────────────────────────
@@ -553,7 +538,7 @@ interface SendInit {
  * `_target` is unused and kept in the signature deliberately.
  *
  * It carried the shared secret, which was the only per-target value a request
- * needed; the credential is now Ward's cookie, which the browser attaches
+ * needed; the credential is now the session cookie, which the browser attaches
  * without being asked. Every call site already has the target and reads
  * naturally passing it, and a future per-target concern — a header, a timeout
  * override — belongs here rather than being threaded back in.
@@ -578,7 +563,7 @@ async function send(
     /*
      * `include`, where this used to be `omit`.
      *
-     * The credential is Ward's `ward_session` cookie, and the service is a
+     * The credential is the `sports_app_session` cookie, and the service is a
      * different origin whenever `baseUrl` is set — which is the ordinary
      * deployment. Without this the cookie is dropped and every request 401s,
      * while a same-origin build works perfectly: the worst kind of split to
@@ -607,18 +592,18 @@ function timeoutSignal(timeoutMs: number): AbortSignal | null {
 
 function describeStatus(status: number): string {
   if (status === 401) {
-    return 'You are not signed in. Sign in again to sync.'
+    // No live session. That includes a session that began with Ward while Ward
+    // cannot answer (`reason: ward_unavailable`), which signing in with a password
+    // fixes — the sign-in page says so; this line only needs to point there.
+    return 'You are not signed in, or your session has ended. Sign in again to sync.'
   }
   if (status === 403) {
-    // A live session with no `sports-app` grant. Signing in again cannot fix
-    // it, so the message must not suggest it.
-    return 'This account does not have access to sync. Ask the administrator to grant it.'
+    // The service understood the request and refused it: a role check, or a
+    // browser that said the request came from another origin.
+    return 'The service refused this request (403).'
   }
   if (status === 503) {
-    // Ward is unreachable. The distinction from 401 is the whole reason the
-    // service answers 503: this is worth retrying, and signing out is not the
-    // remedy.
-    return 'The sign-in service is temporarily unavailable. Sync will retry.'
+    return 'The service is temporarily unavailable. Sync will retry.'
   }
   if (status === 413) {
     return `The sync service refused the document as too large (${status}).`

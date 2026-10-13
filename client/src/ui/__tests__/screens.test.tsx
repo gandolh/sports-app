@@ -211,14 +211,10 @@ describe('/ — Today', () => {
 
 describe('/login', () => {
   /*
-   * This block asserted a screen that no longer exists. It had a username
-   * field, a password field that was never read, and two sentences admitting
-   * that anyone who knew a username could open that person's training history.
-   *
-   * The honesty was the right response to the old design. Ward authenticates a
-   * person now and the service keys each document on their subject, so there is
-   * no name for a stranger to guess and nothing true left for that copy to say.
-   * `/login` is a hand-off to Ward.
+   * The page is this app's own sign-in: a username, a password, and a Ward
+   * button the server turns on. `signin.test.tsx` covers what it does; this block
+   * is about where a browser with nobody logged in lands, and that the page is not
+   * one of the four destinations.
    */
 
   it('is where a browser with nobody logged in ends up', async () => {
@@ -231,35 +227,14 @@ describe('/login', () => {
     expect(screen.queryByRole('navigation', { name: 'Sections' })).toBeNull()
   })
 
-  /**
-   * The screen takes no credential, and cannot.
-   *
-   * Asserted as an absence rather than left implicit: a password field here
-   * would be the exact dishonesty the old copy was written to avoid — a box
-   * that looks like a sign-in, on a page that has no way to check one.
-   */
-  it('offers no username or password field — the credential is Ward\'s', async () => {
+  it('has no register link: an account comes from the seed or from Ward', async () => {
     await renderApp('/login')
-    expect(screen.queryByLabelText('Username')).toBeNull()
-    expect(screen.queryByLabelText('Password')).toBeNull()
-    expect(document.body.textContent).not.toContain('The password is not checked.')
-  })
-
-  it('hands off to Ward, carrying where to come back to', async () => {
-    await renderApp('/login')
-    const link = screen.getByRole('link', { name: 'Continue' })
-    const href = link.getAttribute('href') ?? ''
-
-    expect(href.startsWith('/ward/login?next=')).toBe(true)
-    // A path, never an absolute URL: Ward validates `next` against the estate's
-    // own path roots and refuses anything absolute.
-    expect(decodeURIComponent(href.split('next=')[1] ?? '').startsWith('/')).toBe(true)
-    expect(href).not.toContain('http')
+    expect(screen.queryByText(/register|create an account|sign up/i)).toBeNull()
   })
 
   /**
-   * Signing in needs the network now, because it needs Ward — and that is not
-   * the regression it looks like. The property that mattered was that the
+   * Signing in needs the service now, because the service holds the accounts — and
+   * that is not the regression it looks like. The property that mattered was that the
    * **app** opens offline for somebody already signed in, which it still does:
    * `session.ts` reads the cached name synchronously and nothing on the
    * session-critical path awaits anything.
@@ -583,11 +558,13 @@ describe('/account', () => {
   it('logging out forgets the username and keeps every document where it was', async () => {
     seedUser(trained(2))
     const stored = localStorage.getItem(STORAGE_KEYS.live(USERNAME))
-    const { router } = await renderApp('/account')
+    const { router, auth } = await renderApp('/account', { signedInAs: { username: USERNAME } })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Log out' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Log out' }))
 
     await waitFor(() => expect(currentUrl(router)).toBe('/login'))
+    // The service ended the session first, and only then was the name forgotten.
+    expect(auth.calls).toContain('POST /logout')
     expect(localStorage.getItem(SESSION_KEY)).toBeNull()
     expect(localStorage.getItem(STORAGE_KEYS.live(USERNAME))).toBe(stored)
   })

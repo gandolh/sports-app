@@ -13,17 +13,25 @@
  * ── What is stored, and what is not ─────────────────────────────────────────
  *
  * One key, holding one username in plain text. Not a token, not a session id,
- * not a password — and since the Ward cutover that is a much stronger statement
- * than it used to be. The real credential is Ward's `ward_session` cookie,
- * which this module never sees and must never copy: an httpOnly cookie in
- * `localStorage` would be a credential an XSS could read, which is the entire
- * thing httpOnly exists to prevent.
+ * not a password. The real credential is the service's session cookie
+ * (`sports_app_session`, HttpOnly), which this module never sees and must never
+ * copy: an httpOnly cookie in `localStorage` would be a credential an XSS could
+ * read, which is the entire thing httpOnly exists to prevent.
  *
- * So what remains here is a **cache of the signed-in name**, not an identity.
- * The service decides whose document a request touches, from the session — this
+ * So what is here is a **cache of the signed-in name**, not an identity. The
+ * service decides whose document a request touches, from the session — this
  * value cannot change that, and a stale or edited one costs a wrong name in the
  * header until the next sync corrects it. That is also why the app still opens
  * offline: nothing here is verified, because nothing here is trusted.
+ *
+ * **Who writes it.** The sign-in page, and only after the service has said who the
+ * session is (`GET /api/auth/session`): after a password sign-in, after the
+ * redirect back from Ward, and on a visit with a cookie that is still live. That
+ * last write is what fixes the old sign-in loop, where nothing wrote the key after
+ * Ward's redirect and every route guard sent the browser back to sign in. **Who
+ * clears it:** an explicit log out, and nothing else. A session call that fails
+ * or says "signed out" must not clear it — the cache is what keeps the app
+ * usable with no network, and an unreachable service is not a sign-out.
  *
  * It is deliberately *not* in the state document. A document is exported, synced
  * and hand-edited; "which account this browser is showing" is a property of the
@@ -49,7 +57,7 @@ export type SetUsernameResult =
  * Who this browser is acting as, or `null` when nobody is logged in.
  *
  * A stored value that is not a valid username reads as `null` and is left in
- * place: the only consequence is a trip through Ward's sign-in, which costs
+ * place: the only consequence is a trip through the sign-in page, which costs
  * nothing and creates nothing, so there is no repair worth attempting and no
  * warning worth showing. (Contrast `store.load`, which is loud about an
  * unreadable *document* — that one is irreplaceable.)

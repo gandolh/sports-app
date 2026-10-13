@@ -8,6 +8,7 @@ import { progressRoute } from './routes/progress.tsx'
 import { accountRoute } from './routes/account.tsx'
 import { libraryRoute } from './routes/library.tsx'
 import { loginRoute } from './routes/login.tsx'
+import { configureSessionAuth } from '../persistence/auth.ts'
 
 /**
  * Router and query wiring, and nothing else. Every screen owns its own layout —
@@ -28,6 +29,11 @@ import { loginRoute } from './routes/login.tsx'
  * is tested, rather than by poking at component state. And a query client per test
  * is what stops one test's cached document from leaking into the next.
  */
+
+// Before the router exists: the vendored sign-in client reads (and removes) the
+// outcome of a Ward round trip from the address bar as it is configured, and the
+// router must not have read that address first. See `persistence/auth.ts`.
+configureSessionAuth()
 
 const routeTree = rootRoute.addChildren([
   indexRoute,

@@ -269,6 +269,8 @@ function addUsernameColumn(db) {
 /**
  * @typedef {object} SnapshotStore
  * @property {string} file            the database path actually opened
+ * @property {import('node:sqlite').DatabaseSync} db  the open handle, handed to the
+ *   vendored auth library so its `auth_*` tables live in this same file
  * @property {number} retention       per username, not in total
  * @property {boolean} migrated       true when this open added the username column
  * @property {(username: string) => Snapshot | null} latest
@@ -352,6 +354,10 @@ export function openSnapshotStore(options = {}) {
 
   return {
     file,
+    // The one handle, shared. The auth library runs its own migrations on it and
+    // keeps to its `auth_*` tables, so accounts and snapshots are one file, one
+    // backup, and `snapshots.username` is the same string `auth_users.username` holds.
+    db,
     retention,
     migrated,
 

@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link, createRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { Link, createRoute, redirect } from '@tanstack/react-router'
 import { LADDERS, getRung, topRungIndex } from '../../domain/ladders.ts'
 import { rangeAt, rungIndexAt } from '../../domain/schedule.ts'
 import { milestonesReached, totalWork } from '../../domain/milestones.ts'
 import { PATTERNS } from '@sports-app/shared/types.ts'
 import type { Pattern, StateDoc } from '@sports-app/shared/types.ts'
-import { clearCurrentUsername } from '../../persistence/session.ts'
 import { rootRoute } from './__root.tsx'
 import { useDocument, useStartFresh } from '../document.ts'
 import { AlertBanner } from '../components/AlertBanner.tsx'
 import { QuietButton, SecondaryButton } from '../components/Buttons.tsx'
+import { SignInSettings } from '../components/SignInSettings.tsx'
 import { SyncSettings } from '../components/SyncSettings.tsx'
 import { TabBar } from '../components/TabBar.tsx'
 import { Eyebrow, SectionHeading, Shell, ShellBody, ShellRail, ShellTitle } from '../components/Shell.tsx'
@@ -43,11 +43,13 @@ import { PATTERN_LABEL, formatHoldTime, groupDigits } from '../components/format
  * they do; the two lists are allowed to look different because they answer
  * different questions.
  *
- * ── It also carries the two things nothing else can ─────────────────────────
+ * ── It also carries the things nothing else can ─────────────────────────
  *
  * The sync settings, because deleting the old settings screen left
  * `client/src/persistence/sync.ts` with no way in at all — see
- * `../components/SyncSettings.tsx`. And the way out of the read-only latch: a
+ * `../components/SyncSettings.tsx`. The sign-in settings — the Ward link, the local
+ * password and logging out — because the service has accounts now and this is the
+ * page a person is already on (`../components/SignInSettings.tsx`). And the way out of the read-only latch: a
  * user whose stored document cannot be read is told so on every screen, but this
  * is the only one that offers the export and then the replacement, in that order.
  */
@@ -64,13 +66,7 @@ export const accountRoute = createRoute({
 
 function AccountRoute() {
   const { username } = accountRoute.useRouteContext()
-  const navigate = useNavigate()
   const { data: snapshot } = useDocument(username)
-
-  function logOut(): void {
-    clearCurrentUsername()
-    void navigate({ to: '/login' })
-  }
 
   return (
     <Shell>
@@ -111,14 +107,7 @@ function AccountRoute() {
 
         <Appearance />
 
-        <SectionHeading>Session</SectionHeading>
-        <p className="text-body text-tx2">
-          Logging out forgets which account this browser is showing. Every training history stays
-          exactly where it is.
-        </p>
-        <div className="mt-[var(--sp-2)]">
-          <SecondaryButton onClick={logOut}>Log out</SecondaryButton>
-        </div>
+        <SignInSettings />
       </ShellBody>
       <TabBar active="you" />
     </Shell>

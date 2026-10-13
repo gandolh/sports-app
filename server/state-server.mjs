@@ -3,37 +3,41 @@
  *
  * ── What this is not ─────────────────────────────────────────────────────────
  *
- * Not a backend in the usual sense. There is no users table, no ORM, no
- * migration runner, no sign-in of its own, and no route that returns anything
- * other than the one JSON document the app already produces. A person's Ward
- * subject names a stream of snapshots; "conflict resolution" is a comparison of
- * two integers, done on the client.
+ * Not a backend in the usual sense. There is no ORM, no migration runner of its
+ * own, and no route that returns anything other than the one JSON document the app
+ * already produces. A person's username names a stream of snapshots; "conflict
+ * resolution" is a comparison of two integers, done on the client. The one thing
+ * it does hold beyond that is accounts, and those are the vendored library's
+ * (`vendor/ward/`), kept in `auth_*` tables of the same database file.
  *
  * ── The routes ───────────────────────────────────────────────────────────────
  *
- *   GET  /api/health   liveness. No auth, no database read, no information.
- *   GET  /api/state    the caller's newest snapshot bytes, or 404.
- *   PUT  /api/state    validate shallowly, store verbatim, prune to the cap.
+ *   GET  /api/health      liveness. No auth, no database read, no information.
+ *   GET  /api/state       the caller's newest snapshot bytes, or 404.
+ *   PUT  /api/state       validate shallowly, store verbatim, prune to the cap.
+ *   ...  /api/auth/...    the library's: login, logout, session, password, and
+ *                         "Sign in with Ward" (see `vendor/ward/README.md`).
  *
- * Anything else is a 404, including the old `POST /api/login`. No static files,
- * no directory listing, no fallback handler — a service whose only job is to
- * hold documents has no business serving anything else, and every route that
- * does not exist is a route that cannot be wrong.
+ * Anything else is a 404. No static files, no directory listing, no fallback
+ * handler — a service whose only job is to hold documents has no business
+ * serving anything else, and every route that does not exist is a route that
+ * cannot be wrong.
  *
- * ── Who the caller is: Ward ──────────────────────────────────────────────────
+ * ── Who the caller is: the signed-in account ─────────────────────────────────
  *
- * `/api/state` is guarded by `requireSession`, which hands the browser's
- * `ward_session` cookie to `ward.mjs`: the token is verified against Ward's
- * keys, introspected (cached 30 s), and must carry a `sports-app` grant. The
- * session's **subject is the stream key**. Nothing on the request names whose
- * document is wanted — a `?user=` is ignored — so a caller can read and write
- * only their own history. This is a per-person boundary, which the shared
- * secret it replaced never was; `ward.mjs` says why the cutover mattered most
- * here.
+ * The app owns its accounts. `wardAuth` (the vendored library's Fastify plugin)
+ * is registered first and guards **every** route but the allowlist: a request
+ * needs a live session in the `sports_app_session` cookie, which the library
+ * set after a local sign-in or after "Sign in with Ward". The signed-in user's
+ * **username is the stream key**. Nothing on the request names whose document
+ * is wanted — a `?user=` is ignored — so a caller can read and write only their
+ * own history.
  *
- * No session is a 401, a session without the grant is a 403, and Ward being
- * unreachable is a 503 — not a 401, which would send a sync client to drop its
- * session instead of retrying. Signing in, the password and TOTP are Ward's.
+ * No session is a `401` with no hint at what exists. A session that began with
+ * Ward is checked against Ward at most every 30 seconds, and while Ward cannot
+ * answer it is a `401` whose `reason` is `ward_unavailable`; a local session is
+ * never checked and keeps working. See `ward.mjs` for the prefixes and for the
+ * one rule that is this app's own (a username has to fit the document schema).
  *
  * ── Fastify, and what the framework is NOT allowed to do (brief 22) ──────────
  *
@@ -44,19 +48,21 @@
  *
  *   1. **`GET /api/state` returns the stored bytes verbatim.** Fastify will parse
  *      and re-serialise JSON for you, which would destroy the codec's layout while
- *      still being "valid JSON". So the JSON body parser is replaced with one that
- *      hands the handler the **raw string** (`parseAs: 'string'`, no `JSON.parse`),
+ *      still being "valid JSON". So, **inside the state routes' own scope**, the JSON body parser is replaced
+ *      with one that hands the handler the **raw string** (`parseAs: 'string'`, no `JSON.parse`),
  *      the stored document goes out as a `Buffer`, and there is deliberately no
  *      `response` schema on that route's 200 — a serialiser attached to it would
  *      rewrite the very bytes it exists to preserve. The client's crash-safe save
- *      round-trips through a byte comparison, so this is not cosmetic.
- *   2. **The session is checked before any validation.** `requireSession` is a
- *      route-level `onRequest` hook, the earliest point in Fastify's lifecycle —
+ *      round-trips through a byte comparison, so this is not cosmetic. The scope
+ *      matters: the library's `/api/auth/*` routes need Fastify's ordinary parsed
+ *      JSON, so the raw parser must not be instance-wide.
+ *   2. **The session is checked before any validation.** The library's guard is
+ *      an app-wide `onRequest` hook, the earliest point in Fastify's lifecycle —
  *      ahead of body parsing and schema validation. A caller without a session
- *      gets a 401 and never a 400 that would say anything about the document.
- *      The not-found handler checks too, so an unauthorised caller cannot tell a
- *      405 on `/api/state` from a 404.
- *   3. **A document whose `username` is not the session's subject is a `400`,
+ *      gets a 401 and never a 400 that would say anything about the document, and
+ *      the same 401 for a path that does not exist, so an unauthorised caller
+ *      cannot tell a 405 on `/api/state` from a 404.
+ *   3. **A document whose `username` is not the session's username is a `400`,
  *      not a `409`,** and stores nothing. It refuses a write into somebody
  *      else's stream as well as a confused client.
  *   4. **Usernames are rejected, never case-folded.** Folding would make the
@@ -103,11 +109,12 @@
  *
  * ── Configuration ────────────────────────────────────────────────────────────
  *
- * `WARD_PUBLIC_ORIGIN`, `WARD_API_BASE_PATH` and `WARD_APP_KEY` are required,
- * with no defaults: the service refuses to start without all three, because a
- * service that cannot tell its callers apart looks authenticated and is not. The
- * app key authenticates this service to Ward and never reaches a browser. **No
- * key is committed anywhere in this repository.**
+ * Accounts need an origin and a prefix, and "Sign in with Ward" needs the five
+ * `WARD_OIDC_*` values; `ward.mjs` reads them, says what each is, and explains why
+ * the cookie's `Path` and Ward's redirect URI both come from configuration rather
+ * than from a literal. With no `WARD_OIDC_ISSUER` the service runs with local
+ * accounts only and the sign-in page offers no Ward button. **No key is committed
+ * anywhere in this repository.**
  *
  * ── Binding ──────────────────────────────────────────────────────────────────
  *
@@ -118,7 +125,16 @@ import Fastify from 'fastify'
 import { pathToFileURL } from 'node:url'
 import { TypeCompiler } from '@sinclair/typebox/compiler'
 import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from './db.mjs'
-import { createWardClient, WardUnavailableError } from './ward.mjs'
+import {
+  ROUTE_PREFIX,
+  openAccounts,
+  linkWardStreams,
+  openWardClient,
+  orphanStreamNames,
+  readAuthConfig,
+  requireSupportedUsername,
+} from './ward.mjs'
+import { wardAuth } from './vendor/ward/ward-auth.js'
 // The wire contract, from the one place it is declared. `shared/` may not import
 // `node:` anything, so nothing in here can drag a Node-only module into the client
 // bundle or a browser-only one into this process. Node ≥22.18 strips the types at
@@ -269,23 +285,24 @@ export function checkDocument(text) {
 /**
  * @param {{
  *   store: import('./db.mjs').SnapshotStore,
- *   ward: { authenticate: (cookieHeader: string | undefined) => Promise<{subject: string, username: string}> },
+ *   accounts: import('./vendor/ward/ward-auth.js').Accounts,
+ *   auth: ReturnType<typeof readAuthConfig>,
+ *   wardClient?: import('./vendor/ward/ward-auth.js').WardClient | undefined,
  *   maxBodyBytes?: number,
  *   log?: (message: string) => void,
  * }} config
  * @returns {StateService}
  */
 export function createStateServer(config) {
-  const { store } = config
-  const ward = config.ward
+  const { store, accounts, auth, wardClient } = config
   const maxBodyBytes = config.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES
   const log = config.log ?? (() => {})
 
-  if (ward === undefined || typeof ward.authenticate !== 'function') {
+  if (accounts === undefined || auth === undefined) {
     // Refusing here rather than defaulting is the point, and it is the same
     // point the shared secret used to make: a service with no way to identify
     // its callers looks authenticated and is not.
-    throw new Error('createStateServer requires a Ward client')
+    throw new Error('createStateServer requires accounts and an auth config')
   }
 
   const app = Fastify({
@@ -299,25 +316,6 @@ export function createStateServer(config) {
     exposeHeadRoutes: false,
     bodyLimit: maxBodyBytes,
   })
-
-  // ── The body arrives as a string, and is never parsed for us ──────────────
-  //
-  // `removeAllContentTypeParsers` drops Fastify's `application/json` *and* its
-  // `text/plain` parser, so this service accepts exactly one media type and
-  // everything else is a 415 — which is what it did before.
-  //
-  // The replacement returns the raw text unchanged. That is what makes
-  // `GET /api/state` able to answer with the bytes it was given: the document is
-  // never a JavaScript object in this process, so there is nothing to
-  // re-serialise.
-  app.removeAllContentTypeParsers()
-  app.addContentTypeParser(
-    JSON_CONTENT_TYPE,
-    { parseAs: 'string', bodyLimit: maxBodyBytes },
-    (_request, body, done) => {
-      done(null, body)
-    },
-  )
 
   // ── Headers every response carries ────────────────────────────────────────
   //
@@ -339,44 +337,38 @@ export function createStateServer(config) {
     done(null, payload)
   })
 
-  /**
-   * The session gate, as the earliest hook Fastify has.
-   *
-   * Route-level rather than global, which keeps two orderings right at once: an
-   * unauthorised caller on a real route is refused *before* any validation
-   * runs, and a caller on a path that does not exist gets `404` without a
-   * session being consulted at all — the same answer whether or not they hold
-   * one.
-   *
-   * The resolved subject is put on the request. **That subject is the document
-   * key** — see "Who the caller is" in the file header.
-   */
-  async function requireSession(request, reply) {
-    try {
-      const session = await ward.authenticate(request.headers.cookie)
-      request.ward = session
-      return
-    } catch (error) {
-      /*
-       * 503, not 401, when Ward cannot be reached. The distinction is the whole
-       * reason `WardUnavailableError` exists: telling a client it is signed out
-       * when the identity service is down sends somebody to a login page that
-       * cannot work either, and — worse — a sync client would treat it as a
-       * reason to drop its session rather than to retry.
-       */
-      if (error instanceof WardUnavailableError) {
-        log(`503 ${request.method} ${pathOf(request.url)}: ward unavailable`)
-        return reply.code(503).send({ error: 'identity service unavailable' })
-      }
-
-      // 401 for no session, 403 for a live session with no `sports-app` grant.
-      // The client can act on the first and not the second, which is why they
-      // are not folded together.
-      const status = error.statusCode === 403 ? 403 : 401
-      log(`${status} ${request.method} ${pathOf(request.url)}`)
-      return reply.code(status).send({ error: status === 403 ? 'forbidden' : 'unauthorized' })
-    }
-  }
+  // ── Accounts, and the guard ───────────────────────────────────────────────
+  //
+  // **First, before every route and every other plugin.** The guard is an
+  // `onRequest` hook on this instance, and Fastify copies hooks into a child
+  // context when the child is created, so anything registered earlier would be
+  // unguarded. The state routes below live in a child scope for that reason too
+  // — see "the body arrives as a string" there.
+  //
+  // `routePrefix` and `cookiePath` are two views of one address: Fastify sees
+  // `/api/auth/...` everywhere, and the browser sees it behind whatever the
+  // deploy's proxy strips. `ward.mjs` explains where each comes from.
+  app.register(wardAuth, {
+    accounts,
+    cookieName: auth.cookieName,
+    cookiePath: auth.cookiePath,
+    publicOrigin: auth.publicOrigin,
+    routePrefix: ROUTE_PREFIX,
+    // The one route with no session: liveness needs no credential. `GET` covers
+    // `HEAD`, which the route also answers.
+    publicRoutes: [`GET ${HEALTH_PATH}`],
+    validateSession: requireSupportedUsername,
+    ...(wardClient === undefined
+      ? {}
+      : {
+          ward: {
+            client: wardClient,
+            loginPath: auth.loginPath,
+            settingsPath: auth.settingsPath,
+            afterSignInPath: auth.afterSignInPath,
+          },
+        }),
+  })
 
   function methodNotAllowed(reply, allow) {
     return reply
@@ -392,30 +384,19 @@ export function createStateServer(config) {
   // ── 404, and the 405 that has to be told apart from it ────────────────────
   //
   // Fastify routes both "no such path" and "that path, wrong method" here, and the
-  // contract answers them differently — including who is allowed to know which.
-  // `/api/health` says `405` to anyone, because liveness needs no credential;
-  // `/api/state` checks the session first, so an unauthorised caller cannot use
-  // a `405` to learn that a route exists.
+  // contract answers them differently. `/api/health` says `405` to anyone,
+  // because liveness needs no credential. Everything else reaches this handler
+  // **through the guard**: a caller without a session was already answered `401`,
+  // for a real path and an invented one alike, so nobody unauthorised can use a
+  // `405` to learn that a route exists. Only a signed-in caller gets to tell the
+  // two apart.
   app.setNotFoundHandler(async (request, reply) => {
     const path = pathOf(request.url)
 
     if (path === HEALTH_PATH) return methodNotAllowed(reply, 'GET, HEAD')
 
     if (path !== STATE_PATH) {
-      // Deliberately identical for "route does not exist" and "route exists but
-      // you are not allowed to know". No listing, no hints.
       return reply.code(404).send({ error: 'not found' })
-    }
-
-    try {
-      await ward.authenticate(request.headers.cookie)
-    } catch {
-      // Deliberately collapsed to 401 here, unlike `requireSession`: this is the
-      // not-found handler, and the point of checking at all is that an
-      // unauthorised caller cannot use a `405` to learn a route exists. Telling
-      // them *why* they were refused would leak the same thing more slowly.
-      log(`401 ${request.method} ${path}`)
-      return reply.code(401).send({ error: 'unauthorized' })
     }
 
     return methodNotAllowed(reply, 'GET, PUT')
@@ -443,7 +424,7 @@ export function createStateServer(config) {
      * There is no schema-validated input left.
      *
      * `?user=` was the only one, and it is gone: the stream key is the session's
-     * subject now, so there is nothing on the query string for AJV to reject.
+     * username, so there is nothing on the query string for AJV to reject.
      * The JSON body is checked by `checkDocument`, which answers in the
      * contract's own wording. This branch is therefore unreachable, and it is
      * removed rather than left as dead code that would quietly start firing if
@@ -464,7 +445,7 @@ export function createStateServer(config) {
 
   // ── GET /api/health ───────────────────────────────────────────────────────
   //
-  // Before auth, on purpose: the whole point is to answer "is the process up"
+  // On the guard's allowlist, on purpose: the whole point is to answer "is the process up"
   // without needing a credential. It touches neither the database nor anything
   // about any document — no row is read, no username is revealed, and the response
   // schema pins the body to one fixed field, so it cannot become an existence
@@ -476,138 +457,148 @@ export function createStateServer(config) {
     handler: () => ({ status: 'ok' }),
   })
 
-  /*
-   * `POST /api/login` is gone.
-   *
-   * It never authenticated anybody — it validated a username and echoed it back,
-   * so a login screen had something to fail against. Signing in is Ward's now,
-   * at one page for the estate, and the username this service uses comes from
-   * the session rather than from a client claiming one.
-   */
-
-  // ── GET /api/state ────────────────────────────────────────────────────────
+  // ── The state routes, in a scope of their own ─────────────────────────────
   //
-  // No `response` schema on the 200. Attaching one would hand the reply to
-  // fast-json-stringify, which is exactly the re-serialisation this route exists
-  // not to do.
-  app.route({
-    method: 'GET',
-    url: STATE_PATH,
-    onRequest: requireSession,
-    handler: (request, reply) => {
-      /*
-       * The stream key is the SESSION's subject, not a query parameter.
-       *
-       * This is the security change the Ward cutover is worth here. `?user=`
-       * used to be the only way to say whose document was wanted, and the
-       * shared secret authenticated the installation rather than a person — so
-       * anyone holding it could read anyone's training history by changing a
-       * name in a URL. The file header said so plainly and accepted it for a
-       * single-user deployment on loopback.
-       *
-       * Now there is nothing to choose: a caller reads their own stream because
-       * it is the only one they can name.
-       */
-      const username = request.ward.subject
+  // **The body arrives as a string, and is never parsed for us.**
+  //
+  // `removeAllContentTypeParsers` drops Fastify's `application/json` *and* its
+  // `text/plain` parser, so these routes accept exactly one media type and
+  // everything else is a 415 — which is what they always did.
+  //
+  // The replacement returns the raw text unchanged. That is what makes
+  // `GET /api/state` able to answer with the bytes it was given: the document is
+  // never a JavaScript object in this process, so there is nothing to
+  // re-serialise.
+  //
+  // Parsers are encapsulated per scope, and that is why this is a child scope
+  // rather than the instance: the auth routes registered above need Fastify's
+  // ordinary JSON parsing and would answer `invalid_request` to a raw string.
+  // The scope is created after the guard was registered, so it inherits it.
+  app.register(async (scope) => {
+    scope.removeAllContentTypeParsers()
+    scope.addContentTypeParser(
+      JSON_CONTENT_TYPE,
+      { parseAs: 'string', bodyLimit: maxBodyBytes },
+      (_request, body, done) => {
+        done(null, body)
+      },
+    )
 
-      const snapshot = store.latest(username)
-      if (snapshot === null) {
-        // 404 rather than an empty document: "nothing has ever been stored for
-        // this user" is exactly the new-device case the client needs to
-        // distinguish from "the remote holds a document with zero sessions".
-        return reply.code(404).send({ error: 'no state has been stored yet for this user' })
-      }
-
-      // `Buffer.from(text, 'utf8')` plus Fastify's own `Content-Length` is what
-      // makes the round trip byte-identical: no re-encoding, no pretty-printing,
-      // no chunked-transfer surprises.
-      //
-      // The snapshot headers are advisory only. The client compares session counts
-      // read from inside the document, never a header, so a proxy that strips them
-      // changes nothing. Deliberately no `X-Snapshot-User`: the username is in the
-      // document, and a header would be a second place for it to disagree.
-      return reply
-        .code(200)
-        .header('Content-Type', JSON_CONTENT_TYPE_UTF8)
-        .header('X-Snapshot-Id', String(snapshot.id))
-        .header('X-Snapshot-Created-At', snapshot.createdAt)
-        .send(Buffer.from(snapshot.docJson, 'utf8'))
-    },
-  })
-
-  // ── PUT /api/state ────────────────────────────────────────────────────────
-  app.route({
-    method: 'PUT',
-    url: STATE_PATH,
-    onRequest: requireSession,
-    schema: { response: { 200: SnapshotReceipt } },
-    handler: (request, reply) => {
-      // The session's subject, for the reason `GET` gives above.
-      const username = request.ward.subject
-
-      const text = request.body
-      if (text === undefined) return unsupportedMediaType(reply)
-
-      const checked = checkDocument(text)
-      if (!checked.ok) {
-        log(`400 PUT ${STATE_PATH}: ${checked.error}`)
-        // Nothing has been written. The newest snapshot is untouched.
-        return reply.code(400).send({ error: checked.error })
-      }
-
-      if (checked.username !== username) {
+    // ── GET /api/state ────────────────────────────────────────────────────────
+    //
+    // No `response` schema on the 200. Attaching one would hand the reply to
+    // fast-json-stringify, which is exactly the re-serialisation this route exists
+    // not to do.
+    scope.route({
+      method: 'GET',
+      url: STATE_PATH,
+        handler: (request, reply) => {
         /*
-         * The document names somebody other than the caller.
+         * The stream key is the SESSION's username, not a query parameter.
          *
-         * This check survives the cutover and is *more* useful than before, not
-         * less. It used to compare two client-supplied values — `?user=` and
-         * the document's own name — which caught a client bug but could not
-         * catch a malicious caller, since they controlled both. Now one side is
-         * the session's subject, so this refuses a caller trying to write into
-         * somebody else's stream as well as a client that got confused.
+         * `?user=` used to be the only way to say whose document was wanted, and
+         * a shared secret authenticated the installation rather than a person —
+         * so anyone holding it could read anyone's training history by changing a
+         * name in a URL. Now there is nothing to choose: a caller reads their own
+         * stream because it is the only one they can name.
          *
-         * 400 and not 409: nothing is in conflict. One of the two names is
-         * simply wrong, and folding them together is precisely what
-         * `shared/username.ts` refuses to do.
-         *
-         * In practice a client should put the subject in the document; the
-         * ordinary cause of this in the field will be a document written before
-         * the cutover, under the old username.
+         * The username is the **local account's**. A person who signs in with Ward
+         * and was suffixed because their Ward name was taken is `alice-2` here, and
+         * that is the stream they get; it never follows the Ward name.
          */
-        const error =
-          `username mismatch: the session is ${username} but the document says ` +
-          `${checked.username}. Nothing was stored.`
-        log(`400 PUT ${STATE_PATH}: ${error}`)
-        return reply.code(400).send({ error })
-      }
+        const username = request.auth.user.username
 
-      // `text`, not a re-serialisation of a parsed object — there is no parsed
-      // object. See the "Bytes in, same bytes out" note in db.mjs.
-      const written = store.insert({
-        username,
-        docJson: text,
-        historyLength: checked.historyLength,
-        schemaVersion: checked.schemaVersion,
-      })
+        const snapshot = store.latest(username)
+        if (snapshot === null) {
+          // 404 rather than an empty document: "nothing has ever been stored for
+          // this user" is exactly the new-device case the client needs to
+          // distinguish from "the remote holds a document with zero sessions".
+          return reply.code(404).send({ error: 'no state has been stored yet for this user' })
+        }
 
-      log(
-        `stored snapshot ${written.id} for ${username} (${checked.historyLength} sessions, ` +
-          `${text.length} bytes, pruned ${written.pruned})`,
-      )
+        // `Buffer.from(text, 'utf8')` plus Fastify's own `Content-Length` is what
+        // makes the round trip byte-identical: no re-encoding, no pretty-printing,
+        // no chunked-transfer surprises.
+        //
+        // The snapshot headers are advisory only. The client compares session counts
+        // read from inside the document, never a header, so a proxy that strips them
+        // changes nothing. Deliberately no `X-Snapshot-User`: the username is in the
+        // document, and a header would be a second place for it to disagree.
+        return reply
+          .code(200)
+          .header('Content-Type', JSON_CONTENT_TYPE_UTF8)
+          .header('X-Snapshot-Id', String(snapshot.id))
+          .header('X-Snapshot-Created-At', snapshot.createdAt)
+          .send(Buffer.from(snapshot.docJson, 'utf8'))
+      },
+    })
 
-      return reply.code(200).send({
-        id: written.id,
-        createdAt: written.createdAt,
-        username,
-        historyLength: checked.historyLength,
-        schemaVersion: checked.schemaVersion,
-        bytes: text.length,
-        pruned: written.pruned,
-        // This user's rows, not the table's. A count of everybody's would tell
-        // each user how much other people train.
-        retained: store.count(username),
-      })
-    },
+    // ── PUT /api/state ────────────────────────────────────────────────────────
+    scope.route({
+      method: 'PUT',
+      url: STATE_PATH,
+        schema: { response: { 200: SnapshotReceipt } },
+      handler: (request, reply) => {
+        // The session's username, for the reason `GET` gives above.
+        const username = request.auth.user.username
+
+        const text = request.body
+        if (text === undefined) return unsupportedMediaType(reply)
+
+        const checked = checkDocument(text)
+        if (!checked.ok) {
+          log(`400 PUT ${STATE_PATH}: ${checked.error}`)
+          // Nothing has been written. The newest snapshot is untouched.
+          return reply.code(400).send({ error: checked.error })
+        }
+
+        if (checked.username !== username) {
+          /*
+           * The document names somebody other than the caller.
+           *
+           * One side of this comparison is the session, so it refuses a caller
+           * trying to write into somebody else's stream as well as a client that
+           * got confused.
+           *
+           * 400 and not 409: nothing is in conflict. One of the two names is
+           * simply wrong, and folding them together is precisely what
+           * `shared/username.ts` refuses to do.
+           */
+          const error =
+            `username mismatch: the session is ${username} but the document says ` +
+            `${checked.username}. Nothing was stored.`
+          log(`400 PUT ${STATE_PATH}: ${error}`)
+          return reply.code(400).send({ error })
+        }
+
+        // `text`, not a re-serialisation of a parsed object — there is no parsed
+        // object. See the "Bytes in, same bytes out" note in db.mjs.
+        const written = store.insert({
+          username,
+          docJson: text,
+          historyLength: checked.historyLength,
+          schemaVersion: checked.schemaVersion,
+        })
+
+        log(
+          `stored snapshot ${written.id} for ${username} (${checked.historyLength} sessions, ` +
+            `${text.length} bytes, pruned ${written.pruned})`,
+        )
+
+        return reply.code(200).send({
+          id: written.id,
+          createdAt: written.createdAt,
+          username,
+          historyLength: checked.historyLength,
+          schemaVersion: checked.schemaVersion,
+          bytes: text.length,
+          pruned: written.pruned,
+          // This user's rows, not the table's. A count of everybody's would tell
+          // each user how much other people train.
+          retained: store.count(username),
+        })
+      },
+    })
   })
 
   return {
@@ -647,9 +638,6 @@ export function readConfig(env) {
   const maxBodyBytes = rawMax === undefined || rawMax === '' ? DEFAULT_MAX_BODY_BYTES : Number(rawMax)
 
   return {
-    wardPublicOrigin: env.WARD_PUBLIC_ORIGIN ?? '',
-    wardApiBasePath: env.WARD_API_BASE_PATH ?? '',
-    wardAppKey: env.WARD_APP_KEY ?? '',
     host: env.SPORTS_APP_HOST ?? DEFAULT_HOST,
     port,
     dbFile: env.SPORTS_APP_DB ?? DEFAULT_DB_FILE,
@@ -664,49 +652,60 @@ export function readConfig(env) {
  * @param {Record<string, string | undefined>} env
  * @param {{error: (m: string) => void, log: (m: string) => void}} out
  */
-export function main(env, out = console) {
+export async function main(env, out = console) {
   const config = readConfig(env)
 
-  /*
-   * All three Ward variables are required, and none is defaulted.
-   *
-   * The old refusal here was about a blank shared secret looking like auth and
-   * not being it. The same argument applies, one layer up: without these there
-   * is no way to identify a caller at all, and `WARD_API_BASE_PATH` in
-   * particular must never default to empty — that resolves Ward's JWKS to
-   * `<origin>/.well-known/jwks.json`, a path nothing serves, so every token
-   * would be rejected with a clean log on the deploy that shipped it.
-   */
-  const missing = ['WARD_PUBLIC_ORIGIN', 'WARD_API_BASE_PATH', 'WARD_APP_KEY'].filter(
-    (name) => (env[name] ?? '') === '',
-  )
-  if (missing.length > 0) {
-    out.error(
-      `${missing.join(', ')} not set, so there would be no way to tell callers apart.\n\n` +
-        'This service uses Ward, the estate\'s identity service. Issue an app key in\n' +
-        "Ward's console (the sports-app page, \"Service keys\") — it is shown once — then:\n\n" +
-        '  WARD_PUBLIC_ORIGIN=https://gandolh.ro \\\n' +
-        '  WARD_API_BASE_PATH=/ward-api \\\n' +
-        '  WARD_APP_KEY=wak_… \\\n' +
-        '    npm run server\n\n' +
-        'See server/README.md. Never commit the key.',
-    )
-    return null
-  }
   if (!Number.isInteger(config.port) || config.port < 0 || config.port > 65535) {
     out.error(`SPORTS_APP_PORT must be a port number, got ${String(config.port)}`)
     return null
   }
 
+  /*
+   * The origin and the prefix are required to be knowable, and the Ward values
+   * are all-or-nothing. A missing origin would mint cookies that are not marked
+   * Secure or not sent back; a half-set Ward configuration is always a deploy
+   * mistake, and `readAuthConfig` names what is missing.
+   */
+  let auth
+  try {
+    auth = readAuthConfig(env)
+  } catch (error) {
+    out.error(`${messageOf(error)}\n\nSee server/README.md, "Configuration".`)
+    return null
+  }
+
   const store = openSnapshotStore({ file: config.dbFile })
   const log = config.quiet ? () => {} : (message) => out.log(`[state] ${message}`)
+
+  const accounts = openAccounts(store.db)
+  let wardClient
+  try {
+    // Validates the values and imports the key now, so a bad key fails here.
+    // It does not contact Ward: discovery is lazy, and the service starts while
+    // Ward is down.
+    wardClient = await openWardClient(auth)
+  } catch (error) {
+    store.close()
+    out.error(`Ward sign-in is misconfigured: ${messageOf(error)}`)
+    return null
+  }
+
+  // Before anything listens: a Ward sign-in must find the account that owns an
+  // existing stream the moment it can arrive.
+  let linkedStreams
+  try {
+    linkedStreams = await linkWardStreams(store, accounts)
+  } catch (error) {
+    store.close()
+    out.error(`Could not link existing Ward streams to accounts: ${messageOf(error)}`)
+    return null
+  }
+
   const server = createStateServer({
     store,
-    ward: createWardClient({
-      publicOrigin: config.wardPublicOrigin,
-      apiBasePath: config.wardApiBasePath,
-      appKey: config.wardAppKey,
-    }),
+    accounts,
+    auth,
+    wardClient,
     maxBodyBytes: config.maxBodyBytes,
     log,
   })
@@ -714,9 +713,27 @@ export function main(env, out = console) {
   server.listen(config.port, config.host, () => {
     const address = server.address()
     const shown = typeof address === 'object' && address !== null ? address.port : config.port
-    // The secret is never logged, here or anywhere else.
     log(`listening on http://${config.host}:${shown}`)
     log(`database ${store.file} (keeping the newest ${RETENTION} snapshots per user)`)
+    log(
+      `sessions: cookie ${auth.cookieName} on Path=${auth.cookiePath}; ` +
+        (wardClient === undefined ? 'Sign in with Ward is off' : 'Sign in with Ward is on'),
+    )
+    if (linkedStreams.length > 0) {
+      log(
+        `linked ${linkedStreams.length} stream(s) keyed by a Ward subject to accounts of the same ` +
+          'name, so their next Ward sign-in finds their history',
+      )
+    }
+    // The secret is never logged, here or anywhere else.
+    void orphanStreamNames(store, accounts).then((orphans) => {
+      if (orphans.length === 0) return
+      log(
+        `${orphans.length} snapshot stream(s) have no account yet: ${orphans.slice(0, 10).join(', ')}` +
+          `${orphans.length > 10 ? ', …' : ''}. Create one with the same username (npm run seed) ` +
+          'and its history is read again.',
+      )
+    })
     if (store.migrated) {
       // Worth one line at startup, once: somebody upgrading a real deployment
       // needs to know where their existing history went and how to rename it.
@@ -739,12 +756,15 @@ export function main(env, out = console) {
   process.once('SIGINT', shutdown)
   process.once('SIGTERM', shutdown)
 
-  return { server, store }
+  return { server, store, accounts }
 }
 
 const invokedDirectly =
   process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url
 
 if (invokedDirectly) {
-  main(process.env)
+  main(process.env).catch((cause) => {
+    console.error(messageOf(cause))
+    process.exitCode = 1
+  })
 }

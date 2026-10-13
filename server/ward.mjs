@@ -1,287 +1,251 @@
-import { createRemoteJWKSet, jwtVerify } from 'jose'
+import { isValidUsername, USERNAME_RULE } from '@sports-app/shared/username.ts'
+import {
+  createAccounts,
+  createSqliteStore,
+  createWardClient,
+  createWardIdentities,
+  wardClientOptionsFromEnv,
+} from './vendor/ward/ward-auth.js'
 
 /**
- * Ward, the estate's identity service, as the state service consumes it.
+ * Accounts and "Sign in with Ward", as this service wires them.
  *
- * ── Why this file exists, and why it is hand-written ─────────────────────────
+ * ── What this file used to be ────────────────────────────────────────────────
  *
- * Ward ships a tested client package, and this app deliberately does not depend
- * on it: the estate's apps are separate checkouts that `npm ci` independently,
- * so no build resolves a workspace package from another repo. The contract every
- * app implements is `wzd_auth/corpus/wiki/integrating.md`, and
- * `wzd_auth/client/src/` is the tested reference these ~150 lines were adapted
- * from. **Change the contract there before changing behaviour here.**
+ * ~290 lines of hand-written Ward client: a JWKS-verified access token, an
+ * introspection call with an app key, a 30-second cache, fail-closed. All of it
+ * is the vendored library's job now (`vendor/ward/`, version in its README), and
+ * the library does it from the other side: the app owns its accounts and its
+ * sessions, and Ward is a second way in that this service reaches through
+ * OpenID Connect. Local sign-in never calls Ward, so the service works while
+ * Ward is down. This file is what is left: the configuration, and the two
+ * decisions that are this app's own.
  *
- * ── What this replaced, and why it is a real upgrade ─────────────────────────
+ * ── The two prefixes, and why there are two ──────────────────────────────────
  *
- * The service used to hold ONE shared secret in a header — the same string for
- * every caller, with `?user=` naming whose document was wanted. That secret
- * authenticated the *installation*, never a person: anyone holding it could read
- * or write anyone's training history by changing a query parameter, and the file
- * header said so plainly rather than pretending otherwise.
+ * Fastify sees `/api/...` in every environment. What differs is what the
+ * **browser** sees in front of it: nothing in development (Vite proxies `/api`
+ * and strips nothing), `/sports-app-api` behind the deploy's reverse proxy,
+ * which strips that and forwards `/api/...`. The session cookie's `Path` and
+ * Ward's redirect URI both have to be the browser's view, so both come from
+ * configuration and **never** from a literal:
  *
- * Ward's session authenticates a **person**. The subject it returns is the
- * document key, so `?user=` stops being a target a caller chooses and becomes a
- * value the server already knows. That is the whole security change, and it is
- * why the cutover is worth more here than in any other app in the estate: this
- * one had no per-user boundary at all.
+ *   - `ROUTE_PREFIX` — Fastify's own, `/api/auth`, constant.
+ *   - `SPORTS_APP_API_PREFIX` — what the browser puts in front of `/api`:
+ *     empty by default, `/sports-app-api` in the deploy. The cookie's `Path` is
+ *     `${prefix}/api`.
+ *   - `WARD_OIDC_REDIRECT_URI` — registered at Ward and set per environment. The
+ *     library refuses to start unless its path ends in `/api/auth/ward/callback`
+ *     and sits under the cookie's `Path`, so the two cannot drift apart unnoticed.
  *
- * ── The five things this must get right ──────────────────────────────────────
+ * ── Usernames are this app's rule, not the library's ─────────────────────────
  *
- * Each is implemented below with a comment naming it: pin the algorithm, send
- * the base path, send the app key, cache the answer 30 seconds, and fail closed.
+ * The snapshot stream is keyed by the signed-in user's username, and
+ * `shared/username.ts` says what a username may be: lowercase, at most 32
+ * characters. The library accepts far more (Ward's own limit), and has no hook
+ * to reshape a name it creates on a first Ward sign-in. So a person whose Ward
+ * name is `Alice` gets a local user the document schema cannot hold. That
+ * session is refused with `unsupported_username`, which the login page words,
+ * rather than being signed in to an app whose every save would be a 400.
  */
 
-/** The `alg` every Ward access token is signed with. Pinned, never derived. */
-const ACCESS_TOKEN_ALG = 'EdDSA'
+/** The session cookie. Unique in the estate, because every app shares one origin. */
+export const SESSION_COOKIE_NAME = 'sports_app_session'
 
-/** The `aud` Ward puts on every access token — one estate-wide value. */
-const ACCESS_TOKEN_AUDIENCE = 'ward-estate'
+/** Where the library's routes live, as Fastify sees them. */
+export const ROUTE_PREFIX = '/api/auth'
 
-/** Clock-skew allowance, seconds. Tight: this runs on the same box as Ward. */
-const CLOCK_TOLERANCE_SECONDS = 5
+/** What a new user created by this service holds. The app has no roles of its own. */
+export const DEFAULT_ROLE = 'user'
+
+/** The sub-path the client is served from, matching `SPORTS_APP_BASE` in the client build. */
+const DEFAULT_BASE = '/sports-app/'
 
 /**
- * The introspection cache window: 30 seconds.
- *
- * This is exactly how long a revoked session stays usable here, and it is the
- * number the estate's whole revocation design rests on. Do not raise it to save
- * a round trip — the round trip is the feature.
+ * The reason a session is refused for a name the document schema cannot hold.
+ * The login page words it; nothing here does.
  */
-const INTROSPECTION_CACHE_TTL_MS = 30_000
+export const UNSUPPORTED_USERNAME = 'unsupported_username'
 
-/** Ward's app-key header. The value is a server-side secret. */
-const APP_KEY_HEADER = 'x-ward-app-key'
+/**
+ * `''` or a leading-slash path with no trailing slash. A typo here would put the
+ * cookie on a path the browser never visits, which fails as "sign-in does
+ * nothing" — so it is refused at boot instead.
+ *
+ * @param {string | undefined} value
+ */
+function normaliseApiPrefix(value) {
+  const prefix = (value ?? '').trim()
+  if (prefix === '') return ''
+  if (!/^\/[A-Za-z0-9._~/-]*[A-Za-z0-9._~-]$/.test(prefix)) {
+    throw new Error(
+      `SPORTS_APP_API_PREFIX must be empty or a path like /sports-app-api (a leading slash, no trailing one), got "${prefix}"`,
+    )
+  }
+  return prefix
+}
 
-/** Ward's access cookie. Nothing outside this file should know the name. */
-const ACCESS_COOKIE = 'ward_session'
+/** `/sports-app/` with a leading and trailing slash, the way the client build reads it. */
+function normaliseBase(value) {
+  const segment = (value ?? '').replace(/^\/+|\/+$/g, '')
+  return segment === '' ? '/' : `/${segment}/`
+}
 
-/** This app's slug in Ward, and the key into a grant map. */
-export const SPORTS_APP_SLUG = 'sports-app'
+/**
+ * Everything the auth wiring needs from the environment.
+ *
+ * Throws, naming what is missing, rather than returning a half-configured value:
+ * a service that cannot say what origin it is served from would mint cookies
+ * that are either not `Secure` or not sent back.
+ *
+ * @param {Record<string, string | undefined>} env
+ */
+export function readAuthConfig(env) {
+  const wardOptions = wardClientOptionsFromEnv(env)
 
-/** The token is absent, malformed, expired, forged, or its session is dead. */
-export class WardAuthenticationError extends Error {
-  constructor(message, options) {
-    super(message, options)
-    this.name = 'WardAuthenticationError'
-    this.statusCode = 401
+  // The redirect URI is, by definition, an address on the app's public origin, so
+  // it names it when nothing else does. An explicit value wins.
+  const explicit = (env.SPORTS_APP_PUBLIC_ORIGIN ?? '').trim()
+  let publicOrigin = explicit
+  if (publicOrigin === '' && wardOptions !== undefined) {
+    publicOrigin = new URL(wardOptions.redirectUri).origin
+  }
+  if (publicOrigin === '') {
+    throw new Error(
+      'SPORTS_APP_PUBLIC_ORIGIN is not set, so the service cannot tell whether cookies may be marked Secure.\n' +
+        'Set it to the address the browser uses for the app, without a path, e.g. https://example.com\n' +
+        '(http://localhost:5173 in development).',
+    )
+  }
+  publicOrigin = new URL(publicOrigin).origin
+
+  const apiPrefix = normaliseApiPrefix(env.SPORTS_APP_API_PREFIX)
+  const base = normaliseBase(env.SPORTS_APP_BASE ?? DEFAULT_BASE)
+
+  return {
+    publicOrigin,
+    apiPrefix,
+    cookiePath: `${apiPrefix}/api`,
+    cookieName: SESSION_COOKIE_NAME,
+    // Browser paths on the app's own origin, built from the same base the client
+    // build uses, so the callback lands on pages that exist.
+    loginPath: `${base}login`,
+    settingsPath: `${base}account`,
+    afterSignInPath: `${base}login`,
+    wardOptions,
   }
 }
 
 /**
- * Ward could not answer, so this service does not know — and must not guess.
+ * Open the accounts on the snapshot store's own handle.
  *
- * Every caller fails the request closed. Ward being unreachable already means
- * nobody can sign in; it must not *also* mean revocation quietly stops working
- * because something treated "I don't know" as "yes".
+ * `createSqliteStore` applies the library's migrations to the same database
+ * file, in its own `auth_*` tables. It can run before or after anything else
+ * here, because the two never touch each other's tables.
+ *
+ * @param {import('node:sqlite').DatabaseSync} db
  */
-export class WardUnavailableError extends Error {
-  constructor(message, options) {
-    super(message, options)
-    this.name = 'WardUnavailableError'
-    this.statusCode = 503
+export function openAccounts(db) {
+  return createAccounts({ store: createSqliteStore(db) })
+}
+
+/** A Ward subject: 128 random bits, hex. What the stream key was between 2026-09-06 and accounts. */
+const WARD_SUBJECT = /^[0-9a-f]{32}$/
+
+/**
+ * Give every stream keyed by a Ward subject an account that Ward can find.
+ *
+ * From 2026-09-06 until accounts existed, the stream key was the session's Ward
+ * **subject**, so a person who synced then has a stream named `3f9a…` (32 hex).
+ * After the move their first "Sign in with Ward" would create a local `alice` with
+ * an empty stream, and their history would sit under a name nobody can type. So for
+ * each such key this creates a local user whose username *is* the key, linked to
+ * that subject, and the next Ward sign-in finds it. No row is rewritten and no name
+ * is matched: the key is the subject, which is the one thing the app knew.
+ *
+ * Idempotent (`findUserBySubject` first), one transaction per user, and it needs no
+ * Ward client — linking a subject does not call Ward. The honest cost: that
+ * person's name is the hex string until it is renamed by hand, because the library
+ * has no rename and a snapshot stream cannot be moved without rewriting the
+ * documents inside it.
+ *
+ * Streams that are not a subject (`local`, a name typed before Ward) are left to
+ * `orphanStreamNames` and the seed.
+ *
+ * @param {import('./db.mjs').SnapshotStore} store
+ * @param {import('./vendor/ward/ward-auth.js').Accounts} accounts
+ * @returns {Promise<string[]>} the subjects linked by this call
+ */
+export async function linkWardStreams(store, accounts) {
+  const identities = createWardIdentities({ accounts })
+  const linked = []
+  for (const key of store.usernames()) {
+    if (!WARD_SUBJECT.test(key)) continue
+    if ((await identities.findUserBySubject(key)) !== undefined) continue
+    await identities.createLinkedUser({
+      subject: key,
+      id: key,
+      username: key,
+      role: DEFAULT_ROLE,
+    })
+    linked.push(key)
   }
+  return linked
 }
 
 /**
- * Ward rejected THIS SERVICE's key with a 401.
+ * Name the snapshot streams that no account owns.
  *
- * A subclass of `WardUnavailableError`, so the fail-closed handling that already
- * catches that class is right here too — this adds information without needing a
- * new branch anywhere. What it adds is diagnosability: every other failure is
- * transient and about Ward, and this one is permanent and about this
- * deployment's `WARD_APP_KEY`.
+ * This is the data-migration seam, and it only reports. Snapshots are keyed by
+ * username, and a stream written before the Ward cutover is keyed by whatever
+ * name its owner typed then. It is read again the moment an account with that
+ * exact username exists (`npm run seed`, then "Link Ward" in settings). A stream
+ * whose key matches no account is not lost, only unreachable until then, so the
+ * list is worth a line at startup rather than a warning.
+ *
+ * @param {import('./db.mjs').SnapshotStore} store
+ * @param {import('./vendor/ward/ward-auth.js').Accounts} accounts
+ * @returns {Promise<string[]>}
  */
-export class WardConfigurationError extends WardUnavailableError {
-  constructor(message) {
-    super(message)
-    this.name = 'WardConfigurationError'
+export async function orphanStreamNames(store, accounts) {
+  const orphans = []
+  for (const username of store.usernames()) {
+    if ((await accounts.findUserByUsername(username)) === undefined) orphans.push(username)
   }
-}
-
-/** Read one cookie out of a raw `Cookie` header. */
-function readCookie(header, name) {
-  if (header === undefined) return undefined
-  const flat = Array.isArray(header) ? header.join('; ') : header
-  for (const pair of flat.split(';')) {
-    const eq = pair.indexOf('=')
-    if (eq === -1) continue
-    if (pair.slice(0, eq).trim() !== name) continue
-    const value = pair.slice(eq + 1).trim()
-    // A cleared cookie a client presented anyway is absent, not an empty token.
-    return value.length > 0 ? value : undefined
-  }
-  return undefined
+  return orphans
 }
 
 /**
- * Build the client. One per process: it owns both caches.
+ * The Ward client, or `undefined` when `WARD_OIDC_ISSUER` is not set and the
+ * service runs with local accounts only.
  *
- * `fetchImpl` and `now` exist so the tests can drive this without a network or
- * a clock, which is the same seam the reference implementation uses.
+ * `createWardClient` checks the values and imports the key now, so a bad key
+ * fails at startup. It does **not** contact Ward: discovery is lazy, so the
+ * service starts while Ward is down.
+ *
+ * @param {ReturnType<typeof readAuthConfig>} config
+ * @param {{ fetch?: typeof fetch }} [overrides]
  */
-export function createWardClient({
-  publicOrigin,
-  apiBasePath,
-  appKey,
-  fetch: fetchImpl = fetch,
-  now = Date.now,
-  cacheTtlMs = INTROSPECTION_CACHE_TTL_MS,
-  timeoutMs = 5_000,
-}) {
-  const base = apiBasePath.replace(/\/+$/, '')
-  const jwksEndpoint = new URL(`${base}/.well-known/jwks.json`, publicOrigin)
-  const introspectEndpoint = new URL(`${base}/introspect`, publicOrigin)
-
-  const keyStore = createRemoteJWKSet(jwksEndpoint, {
-    timeoutDuration: 5_000,
-    // A public-key document that changes maybe once a quarter. Completely
-    // separate from the 30-second cache below, which is about liveness —
-    // conflating the two is the mistake worth not making.
-    cacheMaxAge: 10 * 60_000,
-    // Stops a burst of tokens signed by an unknown key becoming a stampede
-    // against Ward's JWKS endpoint.
-    cooldownDuration: 30_000,
-  })
-
-  /** Keyed per TOKEN, never per subject. */
-  const cache = new Map()
-  const inflight = new Map()
-
-  async function verify(token) {
-    try {
-      const { payload } = await jwtVerify(token, keyStore, {
-        // Pinned as a literal, never read from the token's own header. Without
-        // this, `jose` accepts whatever the resolved key supports — the
-        // alg-confusion class: `alg: "none"`, and `alg: "HS256"` with the
-        // *public* key's bytes handed over as the HMAC secret.
-        algorithms: [ACCESS_TOKEN_ALG],
-        issuer: publicOrigin,
-        audience: ACCESS_TOKEN_AUDIENCE,
-        clockTolerance: CLOCK_TOLERANCE_SECONDS,
-        requiredClaims: ['sub', 'jti', 'sid', 'iat', 'exp', 'iss', 'aud'],
-        typ: 'JWT',
-      })
-      return payload
-    } catch (cause) {
-      throw new WardAuthenticationError('access token is not valid', { cause })
-    }
-  }
-
-  async function callWard(token) {
-    let response
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
-    try {
-      try {
-        response = await fetchImpl(introspectEndpoint, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            // This service's own credential, distinct from the person's token
-            // in the body. Ward checks it first and refuses before doing work.
-            [APP_KEY_HEADER]: appKey,
-          },
-          body: JSON.stringify({ accessToken: token }),
-          signal: controller.signal,
-        })
-      } catch (cause) {
-        throw new WardUnavailableError('introspection request failed', { cause })
-      }
-    } finally {
-      clearTimeout(timer)
-    }
-
-    if (response.status === 401) {
-      throw new WardConfigurationError(
-        "Ward rejected this service's app key (401). Check WARD_APP_KEY: it is absent, " +
-          "wrong, or has been revoked in Ward's console.",
-      )
-    }
-
-    // Ward's contract is "always 200". Anything else — a 500 included — means
-    // Ward is broken, never that the session is dead.
-    if (response.status !== 200) {
-      throw new WardUnavailableError(`introspect returned unexpected status ${response.status}`)
-    }
-
-    let body
-    try {
-      body = await response.json()
-    } catch (cause) {
-      throw new WardUnavailableError('introspect response was not valid JSON', { cause })
-    }
-
-    if (typeof body !== 'object' || body === null || typeof body.active !== 'boolean') {
-      throw new WardUnavailableError('introspect response did not match Ward\'s contract')
-    }
-    if (!body.active) return { active: false }
-    if (typeof body.subject !== 'string' || typeof body.username !== 'string') {
-      throw new WardUnavailableError('introspect was active but missing subject/username')
-    }
-
-    return {
-      active: true,
-      subject: body.subject,
-      username: body.username,
-      grants: body.grants ?? {},
-    }
-  }
-
-  function introspect(token) {
-    const cached = cache.get(token)
-    if (cached && cached.expiresAt > now()) return Promise.resolve(cached.result)
-
-    // Collapse concurrent callers onto one request: a sync fires GET and PUT
-    // back to back, and a cold token must not become two calls to Ward.
-    const existing = inflight.get(token)
-    if (existing) return existing
-
-    const pending = callWard(token)
-      .then((result) => {
-        cache.set(token, { result, expiresAt: now() + cacheTtlMs })
-        return result
-      })
-      .finally(() => inflight.delete(token))
-
-    inflight.set(token, pending)
-    return pending
-  }
-
-  /**
-   * Resolve a raw `Cookie` header to a live session holding a `sports-app`
-   * grant, or throw.
-   *
-   * **The grant check is not optional.** prm's registration is open to the
-   * public, so a live Ward session held by a complete stranger is an ordinary
-   * thing to receive here; authenticating without checking the grant would let
-   * that stranger read and write training history. A Ward account confers
-   * nothing on its own — the grant is the estate's actual security boundary.
-   */
-  async function authenticate(cookieHeader) {
-    const token = readCookie(cookieHeader, ACCESS_COOKIE)
-    if (token === undefined) throw new WardAuthenticationError('no access token presented')
-
-    // Local, no-network authentication first: a forged or expired token is
-    // rejected before Ward is asked anything.
-    await verify(token)
-
-    // Liveness and authority. `WardUnavailableError` propagates unchanged —
-    // that is the fail-closed path and must not be swallowed into "signed out".
-    const session = await introspect(token)
-    if (!session.active) throw new WardAuthenticationError('session is not active')
-
-    const roles = session.grants[SPORTS_APP_SLUG] ?? []
-    if (roles.length === 0) {
-      const error = new WardAuthenticationError('no sports-app grant')
-      // A live session that may not use this app. Distinct from 401 because
-      // signing in again cannot fix it — only a grant can.
-      error.statusCode = 403
-      throw error
-    }
-
-    return session
-  }
-
-  return { verify, introspect, authenticate }
+export async function openWardClient(config, overrides = {}) {
+  if (config.wardOptions === undefined) return undefined
+  return createWardClient({ ...config.wardOptions, ...overrides })
 }
+
+/**
+ * The app's own session check, after the library's Ward one.
+ *
+ * It does no I/O and answers for every session, local or Ward: whichever way a
+ * person got in, their username is a stream key, so it has to be one the
+ * document schema accepts. Refused without ending the session, so the answer
+ * stays visible (`reason` on `GET /api/auth/session`) instead of looping the
+ * person through a sign-in that succeeds and is then silently discarded.
+ *
+ * @type {import('./vendor/ward/ward-auth.js').SessionValidator}
+ */
+export function requireSupportedUsername(resolved) {
+  if (isValidUsername(resolved.user.username)) return { ok: true }
+  return { ok: false, reason: UNSUPPORTED_USERNAME }
+}
+
+/** For the seed script, which has to say the same thing before it creates anyone. */
+export { USERNAME_RULE }

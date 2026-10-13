@@ -1,47 +1,47 @@
-import { useEffect } from 'react'
-import { createRoute } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
+import { Field } from '@base-ui/react/field'
+import { createRoute, useNavigate } from '@tanstack/react-router'
 import { rootRoute } from './__root.tsx'
-import { wardLoginUrl } from '../../persistence/sync.ts'
-import { Shell, ShellBody, ShellTitle } from '../components/Shell.tsx'
+import { useLogin, useSession, useWardSignIn } from '../../../vendor/ward/ward-auth-react.js'
+import { setCurrentUsername } from '../../persistence/session.ts'
+import { AlertBanner } from '../components/AlertBanner.tsx'
+import { PrimaryButton, SecondaryButton } from '../components/Buttons.tsx'
+import { describeAuthIssue } from '../components/authMessages.ts'
+import { FIELD_INPUT, FIELD_LABEL } from '../components/fields.ts'
+import { Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from '../components/Shell.tsx'
 
 /**
- * `/login` — a hand-off, not a screen.
+ * `/login` — this app's own sign-in, and the one place a session is noticed.
  *
- * ── What this used to be, and why none of it survives ────────────────────────
+ * ── What it is ───────────────────────────────────────────────────────────────
  *
- * It was a username field and a password field that was never read, above two
- * plain sentences admitting that anyone who knew a username could read that
- * person's training history. The honesty was the right response to the design;
- * the design has changed. Ward authenticates a person, the service keys each
- * document on that person's subject, and there is no longer a name for a
- * stranger to guess their way in with.
+ * A username and a password for an account on this service, and a second way in:
+ * "Sign in with Ward", shown only when the server says it is configured. There is
+ * no register page. An account comes from the seed script (`npm run seed`) or from
+ * a first Ward sign-in, and a person who already has one links Ward from their own
+ * settings, never by matching a name.
  *
- * So this route takes no input. It cannot: the credential is Ward's cookie, set
- * on Ward's own page, and a password field here would be the exact dishonesty
- * the old copy was written to avoid — a box that looks like a sign-in and
- * cannot be one.
+ * ── It is also what ends the sign-in loop ────────────────────────────────────
  *
- * ── It redirects rather than rendering a button ──────────────────────────────
+ * Every other route guards on `currentUsername()`, a synchronous read of one
+ * `localStorage` key. Nothing used to write that key after Ward's sign-in, so a
+ * browser holding a perfectly good session cookie was sent back here forever. The
+ * service answers the question the client was missing — `GET /api/auth/session` —
+ * and this page is where the answer is written down: whenever the session is
+ * signed in, the username it names becomes the cached one and the browser goes on
+ * to the app. That covers a local sign-in, the redirect back from Ward (the service
+ * lands it here, `afterSignInPath`), and a visit with a cookie that is still live.
  *
- * Arriving here always means "you are not signed in", so waiting for a click
- * would add a step to every single occurrence. The visible content is what
- * renders during the navigation, plus a link for the case where the automatic
- * one does not happen — a blocked assign, a browser that swallowed it. Without
- * it somebody is left looking at a sentence with nothing to click.
+ * It does **not** clear the cache when the session call fails or says signed out.
+ * The cache is what lets the app open offline, and an unreachable service is not a
+ * sign-out. The cache is cleared only on an explicit log out (`/account`).
  *
- * ── The route stays, rather than being deleted ───────────────────────────────
+ * ── It needs the service, and nothing else does ─────────────────────────────
  *
- * `plan.tsx` and `account.tsx` both `redirect({ to: '/login' })` when there is
- * no username, and those guards are correct as they stand. Keeping the path and
- * changing what it does means one edit here instead of one at every guard, and
- * an old bookmark still lands somewhere useful.
- *
- * ── It no longer works offline, and that is not a regression ─────────────────
- *
- * Signing in needs the network now, because it needs Ward. The **app** still
- * opens offline with an established session, which is the property that
- * mattered: `session.ts` reads a cached username synchronously, and nothing on
- * the session-critical path awaits anything.
+ * Signing in is a request to the service, so it cannot work offline. That is not a
+ * regression of the offline-first rule: the **app** opens offline for anybody whose
+ * username is cached, which is every route but this one.
  */
 
 export const loginRoute = createRoute({
@@ -51,28 +51,108 @@ export const loginRoute = createRoute({
 })
 
 function LoginRoute() {
-  const href = wardLoginUrl()
+  const session = useSession()
+  const { login, pending, error: loginError, reset: resetLogin } = useLogin()
+  const ward = useWardSignIn()
+  const navigate = useNavigate()
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [rememberError, setRememberError] = useState<string | null>(null)
+
+  const signedInAs = session.status === 'signed_in' ? session.user.username : null
 
   useEffect(() => {
-    window.location.assign(href)
-  }, [href])
+    if (signedInAs === null) return
+    // The write the sign-in loop was missing.
+    const remembered = setCurrentUsername(signedInAs)
+    if (remembered.ok) {
+      void navigate({ to: '/', replace: true })
+      return
+    }
+    // Browser storage is unavailable. Going on would send the person straight back
+    // here, so say why instead of looping. Set from a callback rather than in the
+    // effect body, which would render twice for one fact.
+    const timer = setTimeout(() => setRememberError(remembered.error), 0)
+    return () => clearTimeout(timer)
+  }, [signedInAs, navigate])
+
+  function submit(event: FormEvent): void {
+    event.preventDefault()
+    ward.reset()
+    void login(username.trim(), password)
+  }
+
+  const wardEnabled =
+    (session.status === 'signed_in' || session.status === 'signed_out') && session.ward.enabled
+
+  // One banner at a time, the most specific first: a Ward round trip that came
+  // back with a code, then why the last session ended, then a failed password.
+  const notice =
+    ward.error !== null
+      ? describeAuthIssue(ward.error)
+      : loginError !== null
+        ? describeAuthIssue(loginError)
+        : session.status === 'signed_out' && session.reason !== undefined
+          ? describeAuthIssue({ code: session.reason })
+          : null
 
   return (
     <Shell>
+      <ShellRail>Calisthenics</ShellRail>
       <ShellTitle
-        title="Signing in"
-        subtitle="This app uses the estate's single sign-in."
+        title="Sign in"
+        subtitle="Your account on this service. Training itself works offline once you are in."
       />
       <ShellBody>
-        <p className="text-body text-tx2">
-          Taking you to sign in. You will come back here afterwards.
-        </p>
-        <p className="mt-[var(--sp-3)]">
-          <a className="text-body font-semibold underline" href={href}>
-            Continue
-          </a>
-        </p>
+        {rememberError === null ? null : <AlertBanner label="Not remembered" text={rememberError} />}
+        {notice === null ? null : <AlertBanner label="Not signed in" text={notice} />}
+
+        <form id="login-form" onSubmit={submit} noValidate className="mt-[var(--sp-3)]">
+          <div className="flex flex-col gap-[var(--sp-3)]">
+            <Field.Root>
+              <Field.Label className={FIELD_LABEL}>Username</Field.Label>
+              <Field.Control
+                className={FIELD_INPUT}
+                value={username}
+                onChange={(event) => {
+                  setUsername(event.target.value)
+                  resetLogin()
+                }}
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+            </Field.Root>
+            <Field.Root>
+              <Field.Label className={FIELD_LABEL}>Password</Field.Label>
+              <Field.Control
+                className={FIELD_INPUT}
+                type="password"
+                value={password}
+                onChange={(event) => {
+                  setPassword(event.target.value)
+                  resetLogin()
+                }}
+                autoComplete="current-password"
+              />
+            </Field.Root>
+          </div>
+        </form>
       </ShellBody>
+      <ShellFooter
+        above={
+          wardEnabled ? (
+            <SecondaryButton type="button" onClick={() => void ward.signIn()}>
+              Sign in with Ward
+            </SecondaryButton>
+          ) : undefined
+        }
+      >
+        <PrimaryButton type="submit" form="login-form" disabled={pending}>
+          {pending ? 'Signing in…' : 'Sign in'}
+        </PrimaryButton>
+      </ShellFooter>
     </Shell>
   )
 }

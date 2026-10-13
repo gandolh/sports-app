@@ -1319,3 +1319,31 @@ displayed, identity is Ward, the service has three routes), `PRODUCT.md` (`/plan
 Left alone and still stale: `wiki/status.md` and `wiki/adherence.md` still say "measures
 nothing" / "no dates", and `wiki/architecture.md` still lists `/week`; the Login bullet
 in `PRODUCT.md` still describes the pre-Ward login.
+
+## [2026-10-13] build | brief 25: local accounts and "Sign in with Ward"
+
+The state service has its own accounts now, on the vendored `ward-auth` 0.2.0
+(`server/vendor/ward/` for the plain `.mjs` service, `client/vendor/ward/` for the React
+hooks). `server/ward.mjs` is replaced: the hand-written JWKS and introspection client is
+gone with `jose`, and what is left is configuration (the browser-side API prefix, the
+public origin, the five `WARD_OIDC_*` values) and one app rule, that a username must fit
+`shared/username.ts`. `state-server.mjs` registers `wardAuth` first and puts the two state
+routes in a child scope so the raw-string JSON parser does not reach the library's routes;
+the stream key is `request.auth.user.username`. `db.mjs` hands over its `DatabaseSync`.
+New: `GET /api/auth/session` (the call the client was missing), `server/seed-users.mjs`
+(`npm run seed`), a real login page (username, password, an optional Ward button, no
+register link), and a sign-in section on `/account` (link and unlink Ward, set or change
+the password, log out, log out of Ward too). The dev server's `/ward` proxy is gone.
+Decision: [decisions-identity.md](wiki/decisions-identity.md#accounts-are-the-apps-own-and-ward-is-a-linked-second-way-in).
+
+Brief 29's sign-in loop is fixed by the same change (the login page writes the cached
+username whenever `/api/auth/session` says signed in) and is covered by a test; the brief
+file is the controller's to move. Data: snapshots stay keyed by username. Streams keyed by
+a Ward subject (what the key was from 2026-09-06 to now) get a linked local account of the
+same name at boot (`linkWardStreams`), so no history is orphaned; the person's displayed
+name is the hex string until renamed by hand. Streams keyed by a name (`local`, pre-Ward)
+are read again once `npm run seed` creates an account with that exact name, and the service
+names them at startup. Found: the library cannot reshape the first username of a Ward user,
+so a Ward name outside this app's rule (`Alice`) is refused with `unsupported_username`
+instead of being signed in. Left alone: the architecture diagram still says "verify +
+introspect", and `wiki/status.md` still lists brief 29 as todo.

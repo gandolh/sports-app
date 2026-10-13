@@ -53,11 +53,13 @@ import {
   createStateServer,
   readConfig,
 } from '../state-server.mjs'
-import { createFakeWard, sessionFor, WardUnavailableError } from './fake-ward.mjs'
+import { createTestAuth } from './auth-fixture.mjs'
 
 /** The default signed-in identity for tests that only need one person. */
 const SUBJECT = 'alice'
-const SESSION_COOKIE = sessionFor(SUBJECT)
+
+/** The auth fixture and cookie of the service the current test started. */
+let current
 
 // ─── Harness ────────────────────────────────────────────────────────────────
 
@@ -81,10 +83,11 @@ async function startService(options = {}) {
 
   /** Every log line the service emitted, for the "nothing leaked" assertions. */
   const logs = []
-  const ward = options.ward ?? createFakeWard()
+  const testAuth = createTestAuth(store)
   const server = createStateServer({
     store,
-    ward,
+    accounts: testAuth.accounts,
+    auth: testAuth.auth,
     log: (message) => logs.push(message),
     ...(options.maxBodyBytes ? { maxBodyBytes: options.maxBodyBytes } : {}),
   })
@@ -99,12 +102,14 @@ async function startService(options = {}) {
     rmSync(root, { recursive: true, force: true })
   })
 
-  return { root, file, dbDir: dirname(file), store, base, logs, ward }
+  current = { testAuth, cookie: await testAuth.cookieFor(SUBJECT) }
+
+  return { root, file, dbDir: dirname(file), store, base, logs, testAuth }
 }
 
-/** Headers for a signed-in request. */
+/** Headers for a signed-in request, as the default user. */
 function authorised(extra = {}) {
-  return { cookie: SESSION_COOKIE, ...extra }
+  return { cookie: current.cookie, ...extra }
 }
 
 /**
@@ -119,10 +124,9 @@ function authorised(extra = {}) {
  * child process's pipes can see it.
  *
  * Port `0` so the test never collides with a real deployment; the actual port is
- * read back out of the startup line the service prints. The Ward variables point
- * at a port nothing listens on: the service needs all three to start, and the
- * test that uses this only sends requests that are refused before Ward is asked
- * anything, so no Ward is needed.
+ * read back out of the startup line the service prints. No Ward variables are set,
+ * so the service runs with local accounts only: the test that uses this only
+ * sends requests that are refused at the guard, so no Ward is needed.
  */
 async function startServiceProcess() {
   const root = mkdtempSync(join(tmpdir(), 'sports-app-proc-'))
@@ -131,9 +135,7 @@ async function startServiceProcess() {
   const child = spawn(process.execPath, [join(PROJECT_ROOT, 'server', 'state-server.mjs')], {
     env: {
       ...process.env,
-      WARD_PUBLIC_ORIGIN: 'http://127.0.0.1:9',
-      WARD_API_BASE_PATH: '/ward-api',
-      WARD_APP_KEY: 'wak_test-not-a-real-key',
+      SPORTS_APP_PUBLIC_ORIGIN: 'http://127.0.0.1:5173',
       SPORTS_APP_HOST: '127.0.0.1',
       SPORTS_APP_PORT: '0',
       SPORTS_APP_DB: file,
@@ -205,7 +207,7 @@ async function put(base, username, text, headers = {}) {
   return fetch(stateUrl(base), {
     method: 'PUT',
     headers: {
-      cookie: sessionFor(username ?? SUBJECT),
+      cookie: await current.testAuth.cookieFor(username ?? SUBJECT),
       'Content-Type': 'application/json',
       ...headers,
     },
@@ -214,7 +216,9 @@ async function put(base, username, text, headers = {}) {
 }
 
 async function get(base, username) {
-  return fetch(stateUrl(base), { headers: { cookie: sessionFor(username ?? SUBJECT) } })
+  return fetch(stateUrl(base), {
+    headers: { cookie: await current.testAuth.cookieFor(username ?? SUBJECT) },
+  })
 }
 
 /**
@@ -289,9 +293,9 @@ describe('the session identifies a PERSON, which the shared secret never did', (
    * caller, with `?user=` naming whose document was wanted. Anyone holding it
    * could read or write anyone's training history by editing a query
    * parameter, and the service said so in its own header rather than
-   * pretending otherwise. Ward's session authenticates a person, and the
-   * subject it returns is the stream key — so there is no target left to
-   * choose.
+   * pretending otherwise. A session authenticates a person, and the username
+   * of the account it belongs to is the stream key — so there is no target left
+   * to choose.
    */
 
   it('rejects a request with no session at all', async () => {
@@ -304,7 +308,7 @@ describe('the session identifies a PERSON, which the shared secret never did', (
   it('rejects a session it does not recognise', async () => {
     const { base } = await startService()
     const res = await fetch(`${base}${STATE_PATH}`, {
-      headers: { cookie: 'ward_session=not-a-real-session' },
+      headers: { cookie: 'sports_app_session=not-a-real-session' },
     })
     expect(res.status).toBe(401)
   })
@@ -360,30 +364,16 @@ describe('the session identifies a PERSON, which the shared secret never did', (
     await put(base, 'bob', docText('bob', 3))
 
     const res = await fetch(`${base}${STATE_PATH}?user=bob`, {
-      headers: { cookie: sessionFor('alice') },
+      headers: { cookie: await current.testAuth.cookieFor('alice') },
     })
     // Alice has stored nothing, so she gets her own 404 — not Bob's document.
     // The parameter that used to be the entire authorisation model is inert.
     expect(res.status).toBe(404)
   })
 
-  /**
-   * Ward being unreachable must not read as "signed out". A sync client that
-   * saw 401 would drop its session; 503 tells it to retry.
-   */
-  it('answers 503, not 401, when Ward cannot be reached', async () => {
-    const ward = createFakeWard()
-    ward.breakWith(new WardUnavailableError('ward is down'))
-    const { base } = await startService({ ward })
-
-    const res = await fetch(`${base}${STATE_PATH}`, { headers: authorised() })
-    expect(res.status).toBe(503)
-    expect(await res.json()).toEqual({ error: 'identity service unavailable' })
-  })
-
-  it('refuses to construct without a Ward client', () => {
+  it('refuses to construct without accounts', () => {
     expect(() => createStateServer({ store: openSnapshotStore({ file: ':memory:' }) })).toThrow(
-      /requires a Ward client/,
+      /requires accounts/,
     )
   })
 })
@@ -434,9 +424,13 @@ describe('GET /api/health', () => {
     expect(body.status).toBe('ok')
   })
 
-  it('rejects a write to it with 405', async () => {
+  it('rejects a write to it with 405 for a signed-in caller, and 401 for anyone else', async () => {
     const { base } = await startService()
-    const response = await fetch(`${base}/api/health`, { method: 'POST' })
+    // Only `GET` is on the guard's allowlist, so any other method is guarded like
+    // every other route: an anonymous caller learns nothing about it.
+    expect((await fetch(`${base}/api/health`, { method: 'POST' })).status).toBe(401)
+
+    const response = await fetch(`${base}/api/health`, { method: 'POST', headers: authorised() })
     expect(response.status).toBe(405)
     expect(response.headers.get('allow')).toBe('GET, HEAD')
   })
@@ -448,7 +442,8 @@ describe('there is no login route any more', () => {
   /*
    * `POST /api/login` never authenticated anybody: it validated a username and
    * echoed it back so a login screen had something to fail against. Signing in
-   * is Ward's now, so the route is gone rather than reimplemented — and with it
+   * is `/api/auth/login` now (`auth.test.mjs`), so the old route is gone rather
+   * than reimplemented — and with it
    * the whole "the password is never stored, logged, echoed, or compared"
    * block, which asserted a property of a body this service no longer receives.
    *
@@ -493,9 +488,8 @@ describe('the real process prints nothing about a request but its own fixed line
     // only a real child process's pipes can see it. `logger: false` is what
     // switches it off; this is what notices if it is ever switched back on.
     //
-    // It was written against the shared secret and stopped running at the Ward
-    // cutover, which removed its credential. Requests refused before Ward is
-    // consulted exercise the same framework path without needing one.
+    // Requests refused at the guard exercise the same framework path without
+    // needing a session.
     const SENTINEL = 'sentinel-7f3e-should-never-be-printed'
     const service = await startServiceProcess()
 
@@ -521,7 +515,7 @@ describe('the real process prints nothing about a request but its own fixed line
     // refused request, and does log it — through its one log, as a fixed string
     // with the query stripped.
     expect(printed).toMatch(/listening on http/)
-    expect(printed).toContain(`401 PUT ${STATE_PATH}\n`)
+    expect(printed).toMatch(/sessions: cookie sports_app_session on Path=\/api; Sign in with Ward is off/)
   })
 })
 
@@ -538,6 +532,7 @@ describe('routing and method handling', () => {
    *
    * What survives here is the part that was never about usernames: which paths
    * exist, and what an unauthorised caller may learn from a 404 versus a 405.
+   * (Nothing, now: the guard answers 401 for every path, real or not.)
    */
 
   it('still refuses any path that is not one of the two routes', async () => {
@@ -577,11 +572,19 @@ describe('routing and method handling', () => {
     const { base } = await startService()
     const real = await fetch(stateUrl(base), { method: 'DELETE' })
     const fake = await fetch(`${base}/api/definitely-not-a-route`, { method: 'DELETE' })
+    // The guard answers both, so the two are told apart only by holding a session.
     expect(real.status).toBe(401)
-    expect(fake.status).toBe(404)
-    // The real route says 401 rather than 405, so the two are told apart only
-    // by holding a session.
+    expect(fake.status).toBe(401)
     expect(real.headers.get('allow')).toBeNull()
+    expect(fake.headers.get('allow')).toBeNull()
+
+    // And a signed-in caller still can tell them apart.
+    const signedIn = authorised()
+    expect((await fetch(stateUrl(base), { method: 'DELETE', headers: signedIn })).status).toBe(405)
+    expect(
+      (await fetch(`${base}/api/definitely-not-a-route`, { method: 'DELETE', headers: signedIn }))
+        .status,
+    ).toBe(404)
   })
 })
 
@@ -1015,39 +1018,18 @@ describe('readConfig', () => {
     expect(readConfig({}).dbFile).toBe(DEFAULT_DB_FILE)
   })
 
-  /**
-   * None of the three Ward variables may default.
-   *
-   * `WARD_API_BASE_PATH` is the one worth a test rather than a comment: an
-   * empty value resolves the JWKS to `<origin>/.well-known/jwks.json`, a path
-   * nothing serves, so every token would be rejected with a clean log on the
-   * deploy that shipped it. `main` refuses to start on any of the three.
-   */
-  it('has no default for any Ward variable', () => {
-    const config = readConfig({})
-    expect(config.wardPublicOrigin).toBe('')
-    expect(config.wardApiBasePath).toBe('')
-    expect(config.wardAppKey).toBe('')
-  })
-
   it('reads host, port, database path and body cap from the environment', () => {
     const config = readConfig({
       SPORTS_APP_HOST: '0.0.0.0',
       SPORTS_APP_PORT: '9000',
       SPORTS_APP_DB: '/tmp/elsewhere.db',
       SPORTS_APP_MAX_BODY_BYTES: '1234',
-      WARD_PUBLIC_ORIGIN: 'https://gandolh.ro',
-      WARD_API_BASE_PATH: '/ward-api',
-      WARD_APP_KEY: 'wak_from-the-environment',
     })
     expect(config).toMatchObject({
       host: '0.0.0.0',
       port: 9000,
       dbFile: '/tmp/elsewhere.db',
       maxBodyBytes: 1234,
-      wardPublicOrigin: 'https://gandolh.ro',
-      wardApiBasePath: '/ward-api',
-      wardAppKey: 'wak_from-the-environment',
     })
   })
 })

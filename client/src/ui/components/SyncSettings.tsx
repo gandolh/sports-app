@@ -6,6 +6,7 @@ import type { SyncStatus } from '../../persistence/sync.ts'
 import { useBackupNow, useSaveSync, useSyncCheck } from '../document.ts'
 import { AlertBanner } from './AlertBanner.tsx'
 import { QuietButton, SecondaryButton } from './Buttons.tsx'
+import { FIELD_DESCRIPTION, FIELD_ERROR, FIELD_INPUT, FIELD_LABEL } from './fields.ts'
 import { Eyebrow, SectionHeading } from './Shell.tsx'
 
 /**
@@ -65,13 +66,6 @@ interface SyncValues {
   readonly baseUrl: string
   readonly secret: string
 }
-
-const FIELD_LABEL = 'block text-meta font-semibold text-tx2'
-const FIELD_INPUT =
-  'mt-[var(--sp-1)] block min-h-[var(--tap-row)] w-full rounded border border-line2 ' +
-  'bg-s1 px-[var(--sp-3)] text-body text-tx'
-const FIELD_DESCRIPTION = 'mt-[var(--sp-1)] text-meta text-tx3'
-const FIELD_ERROR = 'mt-[var(--sp-1)] text-meta font-semibold text-dang'
 
 /**
  * Empty is valid and means same-origin — that is how the Vite dev proxy and a
@@ -272,7 +266,7 @@ export function SyncSettings({
           The secret field is gone.
           
           The service no longer accepts one: it authenticates the person from
-          Ward's session cookie, which the browser holds and this app never
+          their session cookie, which the browser holds and this app never
           sees. Leaving the field would invite somebody to type a credential
           into a box that is read by nothing.
           
@@ -282,9 +276,9 @@ export function SyncSettings({
         */}
         {!hasSecret ? null : (
           <p className={FIELD_DESCRIPTION}>
-            This device still has an old sync secret saved from before sign-in moved to the
-            estate&rsquo;s single sign-in. It is no longer sent anywhere and no longer does
-            anything; it will be dropped from the saved document by a later update.
+            This device still has an old sync secret saved from before the service had accounts.
+            It is no longer sent anywhere and no longer does anything; it will be dropped from
+            the saved document by a later update.
           </p>
         )}
       </div>

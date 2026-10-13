@@ -73,7 +73,7 @@ explicit revisit plus a `log.md` entry.
 - **The prescription is a pure function of sessions completed.** Deterministic,
   clock-free, no LLM planning, no autoregulation in code. One interpolation, no
   branches.
-- **Offline-first.** No session-critical path may require network — including `/login`.
+- **Offline-first.** No session-critical path may require network. Opening the app needs none for anybody whose username is cached; *signing in* needs the service, which holds the accounts (see [wiki/decisions-identity.md](wiki/decisions-identity.md)).
 - **State is one human-readable, hand-editable JSON document per user.** Not an opaque
   DB, and it holds nothing derived.
 

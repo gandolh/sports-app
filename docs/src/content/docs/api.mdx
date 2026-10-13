@@ -21,19 +21,23 @@ the service keeps serving its own bare `/api/*` paths.
 
 ## Who the caller is
 
-`/api/state` needs a Ward session. The browser's `ward_session` cookie is
-verified against Ward's keys, introspected (cached 30 seconds) and must carry a
-`sports-app` grant. Signing in, the password and TOTP are Ward's; the service has
-no login route and never sees a credential.
+`/api/state` needs a session. The service has its own accounts, and every route
+but `GET /api/health` and the sign-in routes under `/api/auth/` is guarded by the
+`sports_app_session` cookie. A person gets one by signing in with a password, or
+with Ward, an optional second way in that the service reaches through OpenID
+Connect. Local sign-in never calls Ward, so the service works while Ward is
+down. The signed-in account's **username is the stream key**.
 
 | Situation | Answer |
 |---|---|
-| No session, or one Ward rejects | `401` |
-| A live session with no grant | `403` |
-| Ward cannot be reached | `503` |
+| No session, or an expired one | `401` |
+| A session that began with Ward, while Ward cannot answer | `401`, `reason: "ward_unavailable"` |
+| A session that began with Ward, which Ward has ended | `401`, `reason: "ward_session_ended"` |
 
-`503` and not `401`, because a sync client that sees `401` drops its session,
-and an identity service that is briefly down is a reason to retry.
+A Ward-originated session is checked against Ward at most every 30 seconds, so a
+revoke at Ward ends it within 30 seconds. `GET /api/auth/session` says who the
+cookie belongs to, which is how the app learns who it is after Ward sends the
+browser back.
 
 ## What Ward changed
 

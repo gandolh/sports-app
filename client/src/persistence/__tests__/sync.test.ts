@@ -551,25 +551,25 @@ describe('checkSession', () => {
   })
 
   /**
-   * A live session with no `sports-app` grant. Distinct from 401 in the message
-   * even though both are `unauthorized` to the caller: signing in again cannot
+   * A 403 is the service understanding the request and refusing it — a role check,
+   * or a browser whose request came from another origin. Signing in again cannot
    * fix it, so the copy must not tell somebody to try.
    */
-  it('reports a missing grant differently from a missing session', async () => {
+  it('reports a refusal differently from a missing session', async () => {
     const outcome = await checkSession(TARGET, {
       fetchImpl: responder('{"error":"forbidden"}', { status: 403 }),
       log,
     })
     expect(outcome).toMatchObject({ ok: false, reason: 'unauthorized' })
     if (!outcome.ok) {
-      expect(outcome.error).toMatch(/does not have access/)
+      expect(outcome.error).toMatch(/refused this request/)
       expect(outcome.error).not.toMatch(/Sign in again/)
     }
   })
 
-  it('says an unreachable Ward is worth retrying, rather than saying you are signed out', async () => {
+  it('says a service that cannot answer is worth retrying, rather than saying you are signed out', async () => {
     const outcome = await checkSession(TARGET, {
-      fetchImpl: responder('{"error":"identity service unavailable"}', { status: 503 }),
+      fetchImpl: responder('{"error":"unavailable"}', { status: 503 }),
       log,
     })
     expect(outcome).toMatchObject({ ok: false, reason: 'rejected' })
