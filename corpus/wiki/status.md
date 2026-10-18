@@ -65,6 +65,7 @@ Cardio with a core-and-posture block every day. Screens: `/`, `/plan`, `/progres
 | 28 | [In-between rungs at the three big steps](../briefs/done/28-in-between-rungs.md) | **done** 2026-10-07 — three rungs, schema v5 | — |
 | 29 | [Sign-in loops on a fresh browser](../briefs/todo/29-sign-in-loops-on-a-fresh-browser.md) | **todo** — unconfirmed; reproduce first | — |
 | 30 | [Account "Total work ever" note is out of date](../briefs/todo/30-account-total-work-copy-is-outdated.md) | **todo** | — |
+| 31 | [Docs site from Starlight to Docusaurus](../briefs/todo/31-docs-site-on-docusaurus.md) | **todo** | — |
 
 ## How it ran
 

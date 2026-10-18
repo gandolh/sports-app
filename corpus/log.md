@@ -1347,3 +1347,7 @@ names them at startup. Found: the library cannot reshape the first username of a
 so a Ward name outside this app's rule (`Alice`) is refused with `unsupported_username`
 instead of being signed in. Left alone: the architecture diagram still says "verify +
 introspect", and `wiki/status.md` still lists brief 29 as todo.
+
+## [2026-10-18] todo | Brief 31 filed: the docs site moves from Starlight to Docusaurus
+
+The owner's call (2026-10-18), one brief in every repo with a docs site. [31](briefs/todo/31-docs-site-on-docusaurus.md) keeps the URLs and the light-only look, and teaches `eslint.config.js` the new layout. Building the corpus found three links into `wzd_auth` that Starlight turned into 404s, and one anchor into a decision replaced on 2026-09-04. The deploy waits on vps-deploy brief 11.
