@@ -4,10 +4,10 @@ import { easeOutCubic, tween } from '../easing.ts'
 
 /**
  * **The entire celebration budget of this app**: one count-up of the sessions
- * number on the finish screen. No confetti, no badge, no personal-record toast —
- * the app measures nothing, so it has nothing to award, and a trophy over a
- * prescription the user may or may not have completed would be a lie with an
- * animation on it.
+ * number on the finish screen. No confetti, no badge, no personal-record toast.
+ * Logging is optional and the schedule never reads it (corpus/wiki/reversals.md),
+ * so the app has nothing it could fairly award, and a trophy over a prescription
+ * the user may or may not have completed would be a lie with an animation on it.
  *
  * It is chrome motion confirming a state change, which is the only thing chrome
  * motion is for, so `prefers-reduced-motion` collapses it to the final value

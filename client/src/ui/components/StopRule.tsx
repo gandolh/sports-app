@@ -12,8 +12,8 @@ import { StopIcon } from './icons.tsx'
  * instructions.
  *
  * It is the one line that tells you when to END a set, in an app whose entire
- * premise is that the engine measures nothing and the user autoregulates
- * (corpus/wiki/reversals.md). It is the only brake there is. Position was
+ * premise is that the engine never adapts to effort and the user autoregulates.
+ * Logged sets are optional and never reach the schedule (corpus/wiki/reversals.md). It is the only brake there is. Position was
  * deciding its weight, so brief 24 made it a required field of `Rung` — required,
  * not optional, because optional means the thirty-sixth rung ships without one —
  * and this component is what that field is for.

@@ -323,8 +323,8 @@ function dropEffortFromExercises(raw: JsonObject): JsonObject {
  *     source of truth for a number the schedule computes.
  *
  *   - **`actualValue` is discarded and each `sets` array collapses to its
- *     length.** The app never learns what happened, so there is nothing per set
- *     to keep. The length is *measured* rather than assumed to be 3: a v2
+ *     length.** v3 recorded nothing per set (the optional `logged` arrived with
+ *     v4), so there was nothing per set to keep. The length is *measured* rather than assumed to be 3: a v2
  *     document written before the daily block existed has two-set entries, and a
  *     hand-edited one may have anything.
  *

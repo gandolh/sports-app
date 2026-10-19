@@ -512,6 +512,9 @@ describe('/account', () => {
     expect(screen.getByText('sessions completed')).toBeTruthy()
     expect(screen.getByText('Total work ever')).toBeTruthy()
     expect(screen.getByText('Time held')).toBeTruthy()
+    // The note says the totals are the schedule's and that logged sets are elsewhere,
+    // not that the app cannot know what you did, which stopped being true with v4.
+    expect(screen.getByText(/Sets you log are not counted here/)).toBeTruthy()
     // The pull row is labelled as posture, never as a pull total.
     expect(screen.getByText('Posture (pull)')).toBeTruthy()
   })

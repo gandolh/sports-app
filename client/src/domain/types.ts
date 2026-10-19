@@ -26,7 +26,8 @@
  *     `sessionsDone`, which means there is no cached number that can drift from
  *     the thing it caches — the bug class that produced the v2 fixture defect is
  *     now inexpressible.
- *   - `SetResult.actualValue` is gone. The app never learns what happened.
+ *   - `SetResult.actualValue` is gone. v3 recorded nothing about what happened;
+ *     v4 brought back an optional `logged` that the schedule never reads.
  *   - `Effort` is gone, and stays gone: asking after the work is asking at the
  *     worst possible moment.
  *   - `CycleDay` / `CYCLE` / `cycleDayAt` are gone, replaced by the three-slot
@@ -91,8 +92,9 @@ export interface Rung {
    * **Required, not optional**, for the same reason `Ladder.kind` is required: a
    * rung shipped without a stop rule is a safety gap, and optional means the
    * thirty-sixth rung will ship without one. In an app whose premise is that the
-   * user autoregulates and the engine measures nothing about effort
-   * (corpus/wiki/reversals.md), this line is the only brake there is.
+   * user autoregulates and the engine never adapts to effort (logged sets are
+   * optional and never reach `prescribe()`, corpus/wiki/reversals.md), this line
+   * is the only brake there is.
    *
    * It is a field of its own rather than the last entry in `cues` because
    * position was deciding its weight: as `cues[3]` it rendered as item four of

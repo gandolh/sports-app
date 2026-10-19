@@ -31,11 +31,13 @@ import { PATTERN_LABEL, formatHoldTime, groupDigits } from '../components/format
  *
  * The prescription is a pure function of session count, so plotting it against
  * session number draws a straight line containing no information. Nothing here is
- * a visualisation of progress because there is no measured progress to visualise:
- * every number on this page is work **prescribed**, summed from history, not work
- * verified. The app measures nothing (corpus/wiki/decisions.md), and the totals say
- * so in a sentence rather than pretending. `/progress` plots the schedule's own
- * shape instead, which is a different claim — see that screen's header.
+ * a visualisation of progress: every number on this page is work **prescribed**,
+ * summed from history, not work verified. Since 2026-09-04 a person may log what
+ * they did (`ExerciseRecord.logged`, corpus/wiki/reversals.md), but logging is
+ * optional and `totalWork` ignores it, so the totals still say in a sentence that
+ * they are the schedule's sum, and that logged sets show in the player instead.
+ * `/progress` plots the schedule's own shape, which is a different claim — see
+ * that screen's header.
  *
  * Milestones are the one thing a fixed schedule can honestly celebrate, and they
  * key off session **number**, never a date. `/progress` lists the same
@@ -141,8 +143,9 @@ function AccountBody({ doc }: { readonly doc: StateDoc }) {
         ))}
       </TotalsCard>
       <p className="mt-[var(--sp-2)] text-meta text-tx2">
-        This is work the schedule asked for, added up. The app never learns what you actually did,
-        so it cannot claim more than that — and it is still the largest true number here.
+        This is work the schedule asked for, added up. Sets you log are not counted here, so a
+        session you didn&rsquo;t log adds the same as one you did. The player shows what you logged
+        the next time you do that exercise.
       </p>
 
       {ceilings.length === 0 ? null : (

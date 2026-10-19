@@ -27,8 +27,9 @@ import { rungSummary, targetLabel, unitWord } from './format.ts'
  * ── Next is never gated. Not once, not for a moment. ────────────────────────
  *
  * There is no `disabled` anywhere below, and there is no state in which one
- * could be added without contradicting the design: **the app measures nothing
- * about effort and trusts the user** (corpus/wiki/reversals.md). Next is live
+ * could be added without contradicting the design: **the app does not judge
+ * effort and trusts the user**. It records sets only when the user logs them, and
+ * nothing logged ever changes the schedule (corpus/wiki/reversals.md). Next is live
  * before the countdown is started, while it runs, and after it is abandoned. On
  * a rep exercise there is no clock at all. A control that waited for a timer
  * would be the app deciding whether the work happened, which is precisely the

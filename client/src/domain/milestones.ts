@@ -176,9 +176,10 @@ export function milestonesReached(doc: StateDoc): readonly Milestone[] {
  * split into reps or hold-seconds by the ladder's unit (`LADDERS[pattern].unit`
  * — fixed per pattern, so there is no per-rung lookup to get wrong).
  *
- * This is work PRESCRIBED, not work verified — the app measures nothing
- * (corpus/wiki/decisions.md), so every number here is the sum of what the
- * schedule asked for, not what actually happened. Still the most motivating
+ * This is work PRESCRIBED, not work verified. Logged sets (`ExerciseRecord.logged`,
+ * optional since 2026-09-04, corpus/wiki/reversals.md) are deliberately not read
+ * here, so every number is the sum of what the schedule asked for, and a session
+ * nobody logged counts the same as one somebody did. Still the most motivating
  * figure available, and not a lie, but the distinction belongs in the code
  * rather than only in someone's head.
  *
