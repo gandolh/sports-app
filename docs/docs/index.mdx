@@ -1,10 +1,11 @@
 ---
 title: sports-app
 description: A zero-equipment calisthenics trainer, installed as an offline-first PWA. Its schedule never adapts to what you log, and that is the governing design decision.
-tableOfContents: false
+slug: /
+hide_table_of_contents: true
 ---
 
-import Diagram from '../../components/Diagram.astro'
+import Diagram from '@site/src/components/Diagram'
 
 **sports-app** is a zero-equipment calisthenics trainer, installed as an
 offline-first PWA. You open it, it already knows what today's session is, you
@@ -20,7 +21,7 @@ anything else.
   <dt>The service is</dt>
   <dd>Three routes, one table, Fastify underneath</dd>
   <dt>Identity</dt>
-  <dd>Ward — the session's subject <em>is</em> the document key</dd>
+  <dd>Accounts on the service, Ward as a second way in — the username <em>is</em> the document key</dd>
   <dt>Adapts to your log</dt>
   <dd>Never</dd>
 </dl>
@@ -51,12 +52,12 @@ Where it disagrees with the corpus, **the corpus wins** until SPEC.md is revised
   is why the numerals are oversized. The pure core in `client/src/domain/` still
   never reads the clock.
 - **One user, then two.** More than one person can train on the same deployment,
-  each signed in through Ward. The product is still shaped by one person's
-  constraints, not by a market.
+  each with an account on the service, or signed in through Ward. The product is
+  still shaped by one person's constraints, not by a market.
 
 <Diagram
   name="architecture"
-  title="sports-app — the client, the state service, and what Ward changed"
+  title="sports-app — the client, the state service, and sign-in"
   caption="Read the dashed line first: the client is fully usable with the service unreachable, and sync is a convenience rather than a dependency"
   height={800}
 />

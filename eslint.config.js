@@ -28,13 +28,14 @@ export default tseslint.config(
   // `**/` prefixes rather than bare `dist/`: build output now lives inside a
   // workspace (`client/dist`, `client/dev-dist`) rather than at the root.
   //
-  // The `docs/` entries are all GENERATED, and all of them are third-party
-  // output rather than anything this repo wrote: Astro's type cache, TypeDoc's
-  // bundled viewer scripts, and archify's self-contained diagram artifacts.
-  // Linting them added 387 errors to a 6-error baseline and told us nothing —
-  // they are build products that happen to be committed or cached, not source.
-  // `docs/`'s own hand-written files (astro.config.mjs, scripts/) are NOT
-  // ignored and do lint.
+  // The `docs/` entries are all GENERATED: Docusaurus's cache, the corpus pages
+  // sync-corpus.mjs renders, TypeDoc's bundled viewer scripts, and archify's
+  // self-contained diagram artifacts. Linting the third-party ones added 387
+  // errors to a 6-error baseline and told us nothing — they are build products
+  // that happen to be committed or cached, not source. `docs/`'s own
+  // hand-written files (docusaurus.config.ts, sidebars.ts, src/, scripts/) are
+  // NOT ignored and do lint: the TypeScript ones under the shared TypeScript
+  // rules below, the scripts in the build-scripts block.
   {
     ignores: [
       '**/dist/',
@@ -44,9 +45,11 @@ export default tseslint.config(
       // Vendored, built copies of the shared auth library: generated, never edited
       // here, and a few hundred KB of bundled third-party code.
       '**/vendor/',
-      'docs/.astro/',
-      'docs/public/reference/',
-      'docs/public/diagrams/',
+      'docs/.docusaurus/',
+      'docs/dist/',
+      'docs/docs/wiki/',
+      'docs/static/reference/',
+      'docs/static/diagrams/',
     ],
   },
 
@@ -268,11 +271,12 @@ export default tseslint.config(
   // ---------------------------------------------------------------------------
   //
   // `docs/` joins this block rather than getting one of its own: its two build
-  // scripts and its Astro config are exactly the same shape — one-shot generators
-  // that read an env var, write files and log. `astro.config.mjs` is included by
-  // name because it reads `process.env.DOCS_BASE` and nothing else.
+  // scripts are exactly the same shape — one-shot generators that read an env
+  // var, write files and log. Its config (`docusaurus.config.ts`, `sidebars.ts`)
+  // and components (`src/**/*.tsx`) are TypeScript, so the shared TypeScript
+  // rules lint them and `npm run typecheck -w @sports-app/docs-site` checks them.
   {
-    files: ['scripts/**/*.mjs', 'docs/scripts/**/*.mjs', 'docs/astro.config.mjs'],
+    files: ['scripts/**/*.mjs', 'docs/scripts/**/*.mjs'],
     languageOptions: {
       globals: { process: 'readonly', console: 'readonly' },
     },

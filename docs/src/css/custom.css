@@ -10,14 +10,16 @@
  * three of them are the ones design-guardrails.md calls template tells:
  *
  *   1. **`box-shadow: none` globally.** Not "used sparingly". Shadow-on-white is
- *      the single most recognisable template look, and Starlight uses it by
- *      default on cards, the search box and the mobile menu. All of it is off
- *      below.
+ *      the single most recognisable template look, and Infima uses it by
+ *      default on cards, the navbar, the search box and the mobile menu. All of
+ *      it is off below.
  *   2. **No gradients anywhere.**
  *   3. **One theme, and it is light.** No `prefers-color-scheme` block, no dark
  *      variant. The reason given is worth keeping: two themes would double the
- *      palette and halve the attention on each half. The toggle is removed, not
- *      disabled — see src/components/ThemeSelect.astro.
+ *      palette and halve the attention on each half. There is no toggle:
+ *      `colorMode.disableSwitch` in docusaurus.config.ts hard-codes light, and
+ *      the token block below also covers [data-theme='dark'], so a crafted
+ *      `?docusaurus-data-theme=dark` cannot repaint the site.
  *   4. **`--accent` is for one thing at a time.** In the app that list is
  *      exhaustive (primary button, countdown ring, filled rail, rung tick,
  *      sparkline, cue tick, focus ring). Documentation needs links to be
@@ -60,51 +62,67 @@
   --font: 'Archivo Variable', system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Starlight's palette, re-pointed. */
-  --sl-color-accent-low: var(--accent-wash);
-  --sl-color-accent: var(--accent);
-  --sl-color-accent-high: var(--accent-press);
+  color-scheme: light only;
 
-  --sl-color-white: #ffffff;
-  --sl-color-black: #14181d;
-  --sl-color-gray-1: #232a31;
-  --sl-color-gray-2: #4a535d;
-  --sl-color-gray-3: #646c75;
-  --sl-color-gray-4: #aab2b9;
-  --sl-color-gray-5: #e3e8ea;
-  --sl-color-gray-6: #eef1f3;
-  --sl-color-gray-7: #f5f7f8;
+  /* Infima's palette, re-pointed. The ramp is --accent darkened and lightened by
+     10/15/30% lightness, the steps Docusaurus's own generator uses. */
+  --ifm-color-primary: var(--accent);
+  --ifm-color-primary-dark: #0a6039;
+  --ifm-color-primary-darker: #095b36;
+  --ifm-color-primary-darkest: #084b2c;
+  --ifm-color-primary-light: #0c7645;
+  --ifm-color-primary-lighter: #0d7b48;
+  --ifm-color-primary-lightest: #0e8b52;
+  --ifm-link-hover-color: var(--accent-press);
 
-  --sl-color-text: var(--text-1);
-  --sl-color-text-accent: var(--accent);
-  --sl-color-bg: var(--bg);
-  --sl-color-bg-nav: var(--bg);
-  --sl-color-bg-sidebar: var(--bg);
-  --sl-color-bg-inline-code: var(--surface-2);
-  --sl-color-hairline: var(--hairline);
-  --sl-color-hairline-light: var(--hairline);
-  --sl-color-hairline-shade: var(--hairline);
+  --ifm-background-color: var(--bg);
+  --ifm-background-surface-color: var(--bg);
+  --ifm-navbar-background-color: var(--bg);
+  --ifm-footer-background-color: var(--surface-1);
+  --ifm-font-color-base: var(--text-1);
+  --ifm-font-color-secondary: var(--text-2);
+  --ifm-heading-color: var(--text-1);
+  --ifm-menu-color: var(--text-2);
+  --ifm-menu-color-active: var(--accent);
+  --ifm-menu-color-background-active: var(--accent-wash);
+  --ifm-menu-color-background-hover: var(--surface-1);
+  --ifm-toc-border-color: var(--hairline);
+  --ifm-hr-background-color: var(--hairline);
+  --ifm-table-border-color: var(--hairline);
+  --ifm-color-emphasis-300: var(--surface-3);
+  --ifm-code-background: var(--surface-2);
+  --ifm-code-font-size: 92%;
+  --docusaurus-highlighted-code-line-bg: var(--accent-wash);
 
-  --sl-font: var(--font);
-  --sl-font-mono: var(--font-mono);
+  --ifm-font-family-base: var(--font);
+  --ifm-heading-font-family: var(--font);
+  --ifm-font-family-monospace: var(--font-mono);
 
-  /* No red, no green-vs-red. Every aside is the warn ochre or plain surface —
-     an aside is emphasis, not a verdict. */
-  --sl-color-green: var(--accent);
-  --sl-color-green-low: var(--accent-wash);
-  --sl-color-green-high: var(--accent-press);
-  --sl-color-orange: var(--warn);
-  --sl-color-orange-low: var(--surface-2);
-  --sl-color-orange-high: var(--warn);
-  --sl-color-red: var(--warn);
-  --sl-color-red-low: var(--surface-2);
-  --sl-color-red-high: var(--warn);
-  --sl-color-blue: var(--text-2);
-  --sl-color-blue-low: var(--surface-2);
-  --sl-color-blue-high: var(--text-1);
-  --sl-color-purple: var(--accent);
-  --sl-color-purple-low: var(--accent-wash);
-  --sl-color-purple-high: var(--accent-press);
+  /* Elevation is surface tint and hairlines (rule 1), so Infima's shadows go. */
+  --ifm-global-shadow-lw: none;
+  --ifm-global-shadow-md: none;
+  --ifm-global-shadow-tl: none;
+  --ifm-navbar-shadow: none;
+
+  /* No red, no green-vs-red. Every admonition is the warn ochre or plain surface —
+     an admonition is emphasis, not a verdict. :::note is Infima's "secondary",
+     :::tip "success", :::info "info", :::caution and :::warning "warning",
+     :::danger "danger". */
+  --ifm-color-secondary-contrast-background: var(--surface-1);
+  --ifm-color-secondary-contrast-foreground: var(--text-1);
+  --ifm-color-secondary-dark: var(--hairline-2);
+  --ifm-color-info-contrast-background: var(--surface-1);
+  --ifm-color-info-contrast-foreground: var(--text-1);
+  --ifm-color-info-dark: var(--text-2);
+  --ifm-color-success-contrast-background: var(--accent-wash);
+  --ifm-color-success-contrast-foreground: var(--text-1);
+  --ifm-color-success-dark: var(--accent);
+  --ifm-color-warning-contrast-background: var(--surface-2);
+  --ifm-color-warning-contrast-foreground: var(--text-1);
+  --ifm-color-warning-dark: var(--warn);
+  --ifm-color-danger-contrast-background: var(--surface-2);
+  --ifm-color-danger-contrast-foreground: var(--text-1);
+  --ifm-color-danger-dark: var(--warn);
 }
 
 /* Rule 3 of the doctrine, enforced rather than trusted. */
@@ -122,32 +140,44 @@
   outline-offset: 2px;
 }
 
+/* Prose links only: Infima's --ifm-link-decoration would underline the sidebar,
+   the TOC and the navbar too. */
+.markdown a {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+/* "You are here". Not .menu__link--active: Infima puts that on the parent
+   category of the current page as well. */
+.menu__link[aria-current='page'] {
+  font-weight: 600;
+}
+
 /* Type: negative tracking at display sizes, because default tracking at those
    sizes is the tell that nobody set it. */
-.sl-markdown-content h1,
-.content-panel h1 {
+.markdown h1 {
   letter-spacing: -0.02em;
 }
 
-.sl-markdown-content h2 {
+.markdown h2 {
   letter-spacing: -0.015em;
 }
 
 /* Tabular numerals on every number that changes — non-optional in the app, and
    these pages are mostly tables of them. */
-.sl-markdown-content table,
-.sl-markdown-content code {
+.markdown table,
+.markdown code {
   font-variant-numeric: tabular-nums;
 }
 
 /* Elevation is surface tint and hairlines. */
-.sl-markdown-content table {
+.markdown table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9375rem;
 }
 
-.sl-markdown-content th {
+.markdown th {
   text-align: left;
   font-weight: 600;
   background: var(--surface-2);
@@ -155,21 +185,21 @@
   padding: 0.5rem 0.75rem;
 }
 
-.sl-markdown-content td {
+.markdown td {
   border-bottom: 1px solid var(--hairline);
   padding: 0.5rem 0.75rem;
   vertical-align: top;
 }
 
-.sl-markdown-content :not(pre) > code {
+.markdown :not(pre) > code {
+  font-variant-ligatures: none;
   background: var(--surface-2);
   border-radius: 4px;
   padding: 0.08em 0.32em;
   font-size: 0.875em;
 }
 
-.expressive-code .frame pre,
-.sl-markdown-content pre {
+.theme-code-block {
   border: 1px solid var(--hairline);
   border-radius: 8px;
 }

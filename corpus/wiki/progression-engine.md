@@ -7,7 +7,7 @@ updated: 2026-10-07
 
 **Rewritten 2026-07-29 (v2).** The adaptive engine is gone. Nothing measures, nothing
 adapts, and the prescription is a pure function of *how many sessions of that pattern
-you have completed*. See [decisions.md](decisions.md#the-governing-decision--the-app-measures-nothing)
+you have completed*. See [decisions.md](decisions.md#reversed-2026-09-04--the-governing-decision-and-what-replaced-it)
 for why.
 
 ## The two functions

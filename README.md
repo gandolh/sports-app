@@ -61,7 +61,7 @@ The state service, env vars, tests and the sign-in workaround: [docs/getting-sta
 | `client/` | The PWA. `src/domain/` is the schedule and the ladders, `src/ui/` the screens |
 | `server/` | The state service, with its own [README](server/README.md) |
 | `shared/` | Document types, the username rule and the API schemas |
-| `docs/` | The Starlight docs site, plus the images in this README |
+| `docs/` | The Docusaurus docs site, plus the images in this README |
 | `corpus/` | Project wiki and briefs: decisions, programme, status |
 | `infrastructure/` | Dockerfile and compose file for the state service |
 | `scripts/` | `import-library.mjs`, which rebuilds the exercise reference |
