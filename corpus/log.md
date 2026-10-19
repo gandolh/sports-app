@@ -1366,3 +1366,12 @@ login page with no session). `docs/getting-started.md` lost the loop section and
 `/ward` proxy, `api.mdx` lists the session routes, and the architecture diagram no longer
 says "verify + introspect" or names the production domain. Left open: sign-in always lands
 on `/`, because the guards drop the requested path.
+
+## [2026-10-19] build | brief 30: the total-work note no longer says the app cannot know
+
+Option 1, copy only, since the owner had not chosen. The note under "Total work ever"
+says the totals are the schedule's, that logged sets are not counted, and that the
+player shows them the next time you do that exercise. The six "measures nothing"
+comments, plus two "never learns" notes in `domain/types.ts` and `persistence/codec.ts`,
+now describe the 2026-09-04 reversal. `totalWork` still sums the prescription. Counting
+logged work (option 2) stays open for a grill with the owner.

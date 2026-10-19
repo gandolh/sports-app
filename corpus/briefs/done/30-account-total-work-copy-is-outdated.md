@@ -60,3 +60,23 @@ to match the 2026-09-04 reversal (see `corpus/wiki/reversals.md`). Comments only
 ## Out of scope
 
 The heading text, the layout, milestones, and the figures.
+
+## Outcome (2026-10-19)
+
+**Option 1, copy only** (`19828aa`). The owner had not answered, and option 2 would move
+every total on three screens. The note now reads: "This is work the schedule asked for,
+added up. Sets you log are not counted here, so a session you didn't log adds the same
+as one you did. The player shows what you logged the next time you do that exercise."
+The last sentence names the player's comparison strip, which shows the previous
+session's logged sets beside last time's target. `totalWork` and `prescribe()` are
+untouched.
+
+The six listed comments are reworded to the 2026-09-04 reversal: logging is optional and
+never reaches the schedule. Two more held "never learns" and had to change for the
+acceptance grep: the v3 history note in `client/src/domain/types.ts` (line 29) and the
+v2 → v3 migration note in `client/src/persistence/codec.ts`. Both now say v3 recorded
+nothing and v4 added an optional `logged`. Comments only.
+
+**Checks:** `grep -rn "never learns" client/src` finds nothing. A screen test asserts the
+new sentence on `/account` with the 9-session fixture, and the browser showed it with a
+27-session demo document. Typecheck, lint and 1202 tests pass.
