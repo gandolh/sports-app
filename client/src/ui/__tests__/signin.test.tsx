@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StateDoc } from '@sports-app/shared/types.ts'
 import { SESSION_KEY } from '../../persistence/session.ts'
 import { emptyDoc } from '../../persistence/store.ts'
-import { currentUrl, renderApp, resetBrowserState, seedUser } from './harness.tsx'
+import { currentUrl, installAuth, renderApp, resetBrowserState, seedUser } from './harness.tsx'
 
 const USERNAME = 'alice'
 const PASSWORD = 'correct-horse-battery'
@@ -275,6 +275,27 @@ describe('/account sign-in settings', () => {
     await screen.findByRole('button', { name: 'Log out' })
     expect(screen.queryByRole('button', { name: 'Link Ward' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Unlink Ward' })).toBeNull()
+  })
+
+  it('logs out, and a reload afterwards stays on the sign-in page', async () => {
+    seedUser(doc())
+    const fake = installAuth({ signedInAs: { username: USERNAME } })
+    const { router } = await renderApp('/account', fake)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Log out' }))
+
+    await waitFor(() => expect(currentUrl(router)).toBe('/login'))
+    expect(localStorage.getItem(SESSION_KEY)).toBeNull()
+    expect(fake.calls).toContain('POST /logout')
+
+    // The reload: a fresh router over the same browser and the same service, which
+    // now says nobody. The guard sends it to /login and /login stays put, so a log
+    // out cannot turn into a sign-in.
+    cleanup()
+    const reloaded = await renderApp('/', fake)
+    await waitFor(() => expect(currentUrl(reloaded.router)).toBe('/login'))
+    expect(await screen.findByLabelText('Username')).toBeTruthy()
+    expect(localStorage.getItem(SESSION_KEY)).toBeNull()
   })
 
   it('logs out of Ward too, clearing the cached name before the browser leaves', async () => {

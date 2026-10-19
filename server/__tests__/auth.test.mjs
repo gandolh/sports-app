@@ -458,6 +458,28 @@ describe('"Sign in with Ward" is wired', () => {
     expect(response.headers.get('set-cookie')).toContain(`${SESSION_COOKIE_NAME}_ward=`)
   })
 
+  it('sends a person Ward refuses (no grant) back to the login page with a reason, and no session', async () => {
+    const ward = fakeWard()
+    const { base, post } = await startService({ ward: true, fetch: ward.fetch })
+
+    const start = await post('/api/auth/ward/start', {})
+    const flowCookie = cookieFrom(start)
+    const state = new URL((await start.json()).url).searchParams.get('state')
+
+    // What Ward answers for an account with no sports-app grant (or one that
+    // pressed "Back to the app"): the OAuth error, on the redirect URI.
+    const callback = await fetch(
+      `${base}/api/auth/ward/callback?error=access_denied&state=${encodeURIComponent(state)}`,
+      { headers: { cookie: flowCookie }, redirect: 'manual' },
+    )
+    expect(callback.status).toBe(303)
+    const landed = new URL(callback.headers.get('location'))
+    expect(landed.pathname).toBe('/sports-app/login')
+    expect(landed.searchParams.get('ward_error')).toBe('access_denied')
+    // One page with a sentence on it, not a loop: no session was started.
+    expect(callback.headers.getSetCookie().some((c) => c.startsWith(`${SESSION_COOKIE_NAME}=`))).toBe(false)
+  })
+
   it('tells the login page the button is available, and not before', async () => {
     const withWard = await startService({ ward: true, fetch: fakeWard().fetch })
     expect((await (await fetch(`${withWard.base}/api/auth/session`)).json()).ward).toEqual({
