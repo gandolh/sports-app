@@ -144,4 +144,5 @@ key. The architecture diagram says "accounts + three routes" and "OpenID Connect
 line and `docs/images/shots.md` linked the removed section and were reworded.
 
 **Left open:** a sign-in always lands on `/`, not on the screen that was asked for. The
-guards drop the path when they redirect. Small, and it touches the five guards.
+guards drop the path when they redirect. Captured as
+`todos/sign-in-returns-to-requested-screen.md`.

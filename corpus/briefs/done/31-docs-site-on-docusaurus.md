@@ -148,4 +148,4 @@ at `/sports-app/docs/` by `python3 -m http.server`: the landing page, `/state/` 
 load, there is no theme toggle, and a search for "rung" returns results.
 
 **For the owner:** deploy after vps-deploy brief 11 switches the stack's asset check to
-`assets/`. `docs/node_modules` is gone; the install adds about 1,300 packages at the root.
+`assets/`. The lockfile went from 1,106 to 1,914 packages.

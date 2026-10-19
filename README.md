@@ -6,7 +6,7 @@ A zero-equipment calisthenics trainer for a returning beginner who trains at hom
   <img src="docs/images/workout.gif" width="300" alt="A workout on a phone. The Push day screen lists a knee push-up, a front plank and a prone T raise. Tapping Start workout opens the knee push-up page with an animated figure and a target of 10 reps; the set is logged and Next set fills the first set dots. The front plank page follows, and its countdown ring runs down from 46 seconds.">
 </p>
 
-**Status:** Personal project, live at `/sports-app/`. You sign in once with an account on the service, or with Ward as an optional second way in. After that the app opens offline. The live build gets this sign-in at its next deploy.
+**Status:** Personal project, live at `/sports-app/`. You sign in once with an account on the service, or with Ward as an optional second way in. After that the app opens offline.
 
 ## What it does
 
