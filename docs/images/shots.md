@@ -13,7 +13,7 @@ The theme follows the system setting; these use dark (`agent-browser set media d
 
 ## Demo data
 
-Every screen needs a username, and signing in loops at the time of writing (see [getting-started.md](../getting-started.md#signing-in-loops)). So the captures use a fresh browser profile, a made-up user called `demo`, and a history generated with the app's own pure functions. No state service is needed.
+Every screen needs a username. Signing in would need the state service and an account, so the captures skip it and use a fresh browser profile, a made-up user called `demo`, and a history generated with the app's own pure functions.
 
 1. Save this as `seed-doc.ts` anywhere outside the repo, then run `node /path/to/seed-doc.ts > /tmp/demo-doc.json` from the repo root (keep the output out of the repo). It writes 27 sessions over the last seven weeks, most of them logged, so the next session is a Push day.
 

@@ -106,3 +106,42 @@ Open decisions:
 
 Making sync work in the dev browser, multi-account switching, and any change to what
 the state service stores.
+
+## Outcome (2026-10-19)
+
+**Already fixed by Ward brief 25 (2026-10-13), so nothing here was built.** The code this
+brief describes is gone: `/login` no longer hands straight off to Ward, `wardLoginUrl`
+and `/ward/login` no longer exist, and the service has its own accounts. The question
+the client was missing is `GET /api/auth/session` (the vendored library's route), not a
+new `/api/me`, and `login.tsx` writes `sports-app.session.v3` whenever it says signed in.
+The open decisions were settled there: the key is the account's username, sign-out ends
+the service's session (and "Log out of Ward too" ends Ward's), and Ward being down shows
+as `ward_unavailable` on the button, never as a loop.
+
+**Checked in a browser** on a fresh agent-browser profile, against a throwaway database
+and a seeded `demo` account (dev server on 4340, service on 4341). `/sports-app/` went to
+`/login`; one sign-in landed on `/` with the key set; a reload stayed. With the key
+removed and the cookie still live (the state Ward's callback leaves), opening `/plan`
+went through `/login` once and landed on `/` with the key written back. A production
+build with the service worker reloaded `/` with the network cut. "Log out" cleared the
+key, the session call answered `user: null`, and a reload stayed on `/login`. The
+no-grant landing (`?ward_error=access_denied`) shows "Ward did not let you in here."
+
+**Not checked:** the real Ward round trip. The local Ward was unreachable all session
+(its published port reset every connection, then Docker vanished from WSL), so the Ward
+half is covered by tests only.
+
+**Tests added** (`c029196`): a plain log-out followed by a reload stays on `/login`; and
+Ward's `access_denied` on the callback lands on the login page with that reason and no
+session. The session call's signed-in and nobody answers, the guard's `401`, and
+`ward_unavailable` were already covered in `server/__tests__/auth.test.mjs`.
+
+**Docs:** `getting-started.md` lost the "Signing in loops" section and its workaround,
+says the service is needed to sign in, and no longer mentions a `/ward` proxy. `api.mdx`
+lists the session and sign-in routes and says the username, not the Ward subject, is the
+key. The architecture diagram says "accounts + three routes" and "OpenID Connect", not
+"verify + introspect", and no longer names the production domain. `README.md`'s status
+line and `docs/images/shots.md` linked the removed section and were reworded.
+
+**Left open:** a sign-in always lands on `/`, not on the screen that was asked for. The
+guards drop the path when they redirect. Small, and it touches the five guards.

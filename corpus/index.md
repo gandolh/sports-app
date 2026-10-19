@@ -19,7 +19,7 @@ pages. See [CLAUDE.md](CLAUDE.md) for the conventions and the retrieval budget.
 
 - [wiki/adherence.md](wiki/adherence.md) — What the app assumes about the person using it — bad days, skipped days, rungs that are too hard, and the daily block that is easiest to drop.
 - [wiki/architecture.md](wiki/architecture.md) — The three npm workspaces, the dependency direction across them, and the pure-core/imperative-shell boundary inside the client.
-- [wiki/decisions-identity.md](wiki/decisions-identity.md) — How this app knows who is asking — the superseded shared-secret-and-nameplate design, and the Ward session that replaced it, including why the stream key is now the session's subject rather than a query parameter.
+- [wiki/decisions-identity.md](wiki/decisions-identity.md) — How this app knows who is asking — local accounts on the state service with "Sign in with Ward" as a linked second way in (2026-10-13), the Ward-session-only design it revised, and the superseded shared-secret nameplate before that; why the stream key is the signed-in username and never a query parameter.
 - [wiki/decisions.md](wiki/decisions.md) — Locked product and programme calls with the reasoning that settled them — read before proposing an alternative.
 - [wiki/design-guardrails.md](wiki/design-guardrails.md) — The rules that keep the design system honest — the banned patterns, the floor-phone accessibility floor, and the four tests that enforce both mechanically.
 - [wiki/design-system.md](wiki/design-system.md) — Design tokens and the doctrine governing them — colour, type, spacing and motion. The banned patterns and accessibility floor live in design-guardrails.md.

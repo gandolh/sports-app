@@ -5,7 +5,7 @@ The full local setup. The [main README](../README.md) has the short version.
 ## Prerequisites
 
 - Node 22.18 or later (`engines` in `package.json`). npm warns that jsdom, which only the tests use, wants 22.22.2+ or 24.15+; the tests still pass on 24.14.1.
-- For signing in and for sync, the estate's Ward running locally on <http://localhost:8792>. It is started from `infrastructure/local` in the `wzd_auth` repo. Without it the app still serves, but `/login` has nowhere to send you.
+- Optionally, the estate's Ward running locally on <http://localhost:8792>, for the "Sign in with Ward" button. It is started from `infrastructure/local` in the `wzd_auth` repo. Without it, sign in with a local account (`npm run seed`, below); the Ward button then says Ward is unreachable.
 
 ## 1. Install
 
@@ -37,15 +37,19 @@ Create an account to sign in with: `npm run seed` asks for a username and a pass
 npm run dev
 ```
 
-Vite prints `Local: http://localhost:5173/sports-app/`. Open it. The dev server proxies `/api` to the state service on `127.0.0.1:8787` and `/ward`, `/ward-api` to `WARD_PUBLIC_ORIGIN`, so the app, the service and sign-in share one origin as they do in the deploy.
+Vite prints `Local: http://localhost:5173/sports-app/`. The dev server proxies `/api` to the state service on `127.0.0.1:8787`, so the app and the service share one origin as they do in the deploy. "Sign in with Ward" sends the browser to Ward's own origin and back to `/api/auth/ward/callback`.
 
-The state service is optional for using the app. Start it when you want sync:
+Start the state service too, in a second terminal. Signing in needs it, because the accounts live there:
 
 ```bash
 npm run server
 ```
 
-It prints `[state] listening on http://127.0.0.1:8787` and the database path, after Node's `ExperimentalWarning` about SQLite, which is expected. `GET /api/health` answers `{"status":"ok"}`; `/api/state` answers `401` without a Ward session. The database defaults to `db/app.db` (gitignored). To try things against a throwaway one:
+It prints `[state] listening on http://127.0.0.1:8787` and the database path, after Node's `ExperimentalWarning` about SQLite, which is expected. `GET /api/health` answers `{"status":"ok"}`; `/api/state` answers `401` without a session.
+
+Open the app and sign in with the account `npm run seed` made. A fresh browser goes to `/login`, signs in once, and lands on today's session. After that the browser remembers who you are, so the app opens with the service stopped or the network off. Only sync needs the service.
+
+The database defaults to `db/app.db` (gitignored). To try things against a throwaway one:
 
 ```bash
 SPORTS_APP_DB=/tmp/sports-app-scratch.db npm run server
@@ -56,7 +60,7 @@ If you move the service off port 8787 with `SPORTS_APP_PORT`, change the `/api` 
 ## 4. Test, lint, typecheck, build
 
 ```bash
-npm test             # vitest, client and server together (1144 tests on 2026-10-09)
+npm test             # vitest, client and server together (1202 tests on 2026-10-19)
 npm run typecheck
 npm run lint         # eslint, including the rules that keep client/src/domain pure
 npm run check        # all three
@@ -68,18 +72,6 @@ npm run build        # the PWA into client/dist
 The docs site is its own workspace in `docs/`; its scripts are in `docs/package.json`.
 
 ## Common problems
-
-### Signing in loops
-
-As of 2026-10-09, `/login` sends you to Ward, Ward sends you back, and the app sends you to `/login` again. Every screen needs a username in `localStorage`, and nothing in the app writes it after Ward's sign-in, because `setCurrentUsername` in `client/src/persistence/session.ts` has no caller. The deployed build has the same gap. It reads and clears that key but never writes it.
-
-Until that is fixed, set a username by hand to use the app locally. Open any file the dev server serves without a redirect, such as <http://localhost:5173/sports-app/icons/icon-192.png>, and run this in the browser console:
-
-```js
-localStorage.setItem('sports-app.session.v3', 'demo')
-```
-
-Then open <http://localhost:5173/sports-app/>. The name must be 1 to 32 characters: a lowercase letter or digit, then lowercase letters, digits, `.`, `-` or `_`. Training, the plan, progress and the account screen all work. Don't expect sync to. The service needs a Ward session, and it refuses a document whose username is not that session's subject.
 
 ### Port 8787 is taken
 

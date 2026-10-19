@@ -3,9 +3,10 @@ title: The three routes
 description: The whole wire contract, who the caller is, and the five things Fastify does helpfully by default that this service is not allowed to do.
 ---
 
-The state service has **three routes, one table, and Fastify underneath**.
-Anything else is a `404`, including the old `POST /api/login`. No static
-files, no directory listing, no fallback handler.
+The state service has **three routes, one table, and Fastify underneath**,
+plus the sign-in routes the vendored `ward-auth` library mounts under
+`/api/auth/`. Anything else is a `404`. No static files, no directory listing,
+no fallback handler.
 
 > A service whose only job is to hold documents has no business serving anything
 > else, and **every route that does not exist is a route that cannot be wrong.**
@@ -18,6 +19,8 @@ the service keeps serving its own bare `/api/*` paths.
 | `GET` | `/api/health` | Liveness. No auth, no database read, no information. |
 | `GET` | `/api/state` | The caller's newest snapshot bytes, or `404`. |
 | `PUT` | `/api/state` | Validate shallowly, store verbatim, prune to the cap. |
+| `GET` | `/api/auth/session` | Who the cookie belongs to (`user: null` for nobody), and whether Ward is on. The library's. |
+| `POST` | `/api/auth/login`, `logout`, `password`, `ward/*` | Sign in, sign out, change a password, the Ward round trip. The library's; there is no `register`. |
 
 ## Who the caller is
 
@@ -35,9 +38,14 @@ down. The signed-in account's **username is the stream key**.
 | A session that began with Ward, which Ward has ended | `401`, `reason: "ward_session_ended"` |
 
 A Ward-originated session is checked against Ward at most every 30 seconds, so a
-revoke at Ward ends it within 30 seconds. `GET /api/auth/session` says who the
-cookie belongs to, which is how the app learns who it is after Ward sends the
-browser back.
+revoke at Ward ends it within 30 seconds.
+
+`GET /api/auth/session` says who the cookie belongs to. It is how the app learns
+who it is after Ward sends the browser back: the login page asks it, writes the
+username into the browser, and goes on to the app. The browser keeps that name,
+so the app opens offline afterwards. A Ward account with no `sports-app` grant
+never gets a session. Ward refuses it, and the callback lands on the login page
+with `?ward_error=access_denied`, which the page puts into words.
 
 ## What Ward changed
 
@@ -48,9 +56,10 @@ That secret authenticated the *installation*, never a person. Anyone holding it
 could read or write anyone's training history by changing a query parameter, and
 the file header said so plainly rather than pretending otherwise.
 
-Ward's session authenticates a **person**, and the subject it returns **is** the
-document key. So `?user=` stops being a target a caller chooses and becomes a
-value the server already knows. The client no longer sends it, and the server
+A session authenticates a **person**, and its account's username **is** the
+document key. (From 2026-09-06 to 2026-10-13 the key was the Ward subject; the
+service's own accounts replaced that.) So `?user=` stops being a target a caller
+chooses and becomes a value the server already knows. The client no longer sends it, and the server
 ignores one if it is there. That is the whole security change, and it is the
 largest one in the repo's history.
 

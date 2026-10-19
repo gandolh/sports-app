@@ -1351,3 +1351,18 @@ introspect", and `wiki/status.md` still lists brief 29 as todo.
 ## [2026-10-18] todo | Brief 31 filed: the docs site moves from Starlight to Docusaurus
 
 The owner's call (2026-10-18), one brief in every repo with a docs site. [31](briefs/todo/31-docs-site-on-docusaurus.md) keeps the URLs and the light-only look, and teaches `eslint.config.js` the new layout. Building the corpus found three links into `wzd_auth` that Starlight turned into 404s, and one anchor into a decision replaced on 2026-09-04. The deploy waits on vps-deploy brief 11.
+
+## [2026-10-19] build | brief 29: the sign-in loop, verified fixed and closed
+
+Nothing to build: Ward brief 25 (2026-10-13) had already fixed the loop with
+`GET /api/auth/session` and the write in `login.tsx`, so the brief's `/api/me` would
+have duplicated a library route. Verified in a fresh browser with a local account: one
+sign-in lands on `/` with `sports-app.session.v3` set, a reload stays, a live cookie with
+no cached name is written back on one pass through `/login`, the service-worker build
+opens offline, and a log-out stays logged out after a reload. The real Ward round trip
+was not run: the local Ward's published port reset every connection, then Docker left
+WSL. Two tests added (a log-out survives a reload; Ward's `access_denied` lands on the
+login page with no session). `docs/getting-started.md` lost the loop section and the
+`/ward` proxy, `api.mdx` lists the session routes, and the architecture diagram no longer
+says "verify + introspect" or names the production domain. Left open: sign-in always lands
+on `/`, because the guards drop the requested path.

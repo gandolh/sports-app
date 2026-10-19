@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "sports-app — the client, the state service, and what Ward changed",
+    "title": "sports-app — the client, the state service, and sign-in",
     "viewBox": [
       1120,
       760
@@ -32,12 +32,12 @@
       },
       {
         "id": "identity",
-        "label": "What Ward replaced",
+        "label": "Who the caller is",
         "focus": [
           "ward",
           "service"
         ],
-        "note": "The subject is the document key, so ?user= stopped being a target a caller picks."
+        "note": "The session's username is the document key, so ?user= stopped being a target a caller picks."
       }
     ]
   },
@@ -89,7 +89,7 @@
       "id": "caddy",
       "type": "cloud",
       "label": "Caddy",
-      "sublabel": "gandolh.ro :443",
+      "sublabel": "one domain :443",
       "pos": [
         600,
         350
@@ -103,7 +103,7 @@
       "id": "service",
       "type": "backend",
       "label": "server/",
-      "sublabel": "Fastify, three routes",
+      "sublabel": "accounts + three routes",
       "tag": "logger: false",
       "pos": [
         880,
@@ -118,7 +118,7 @@
       "id": "ward",
       "type": "security",
       "label": "Ward",
-      "sublabel": "subject = document key",
+      "sublabel": "optional second way in",
       "pos": [
         880,
         130
@@ -202,7 +202,7 @@
       "id": "svc-ward",
       "from": "service",
       "to": "ward",
-      "label": "verify + introspect",
+      "label": "OpenID Connect",
       "variant": "security",
       "fromSide": "top",
       "toSide": "bottom"
@@ -241,11 +241,11 @@
     },
     {
       "dot": "amber",
-      "title": "What Ward closed",
+      "title": "What the session closed",
       "items": [
         "One shared secret used to authenticate the INSTALLATION, not a person",
         "Anyone holding it could read any history by editing ?user=",
-        "The session's subject is now the key, so the target is not caller-chosen"
+        "The session's username is now the key, so the target is not caller-chosen"
       ]
     }
   ]
