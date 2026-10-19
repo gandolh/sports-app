@@ -31,7 +31,7 @@ const sidebars: SidebarsConfig = {
         // TypeDoc's HTML in static/, not a Docusaurus route: `pathname://` makes it
         // a plain link (new tab, baseUrl still applied) instead of a router
         // navigation that would 404.
-        { type: 'link', label: 'Wire contract (TypeDoc) ↗', href: 'pathname:///reference/' },
+        { type: 'link', label: 'Wire contract (TypeDoc)', href: 'pathname:///reference/' },
       ],
     },
     {
