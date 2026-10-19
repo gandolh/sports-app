@@ -1350,7 +1350,7 @@ introspect", and `wiki/status.md` still lists brief 29 as todo.
 
 ## [2026-10-18] todo | Brief 31 filed: the docs site moves from Starlight to Docusaurus
 
-The owner's call (2026-10-18), one brief in every repo with a docs site. [31](briefs/todo/31-docs-site-on-docusaurus.md) keeps the URLs and the light-only look, and teaches `eslint.config.js` the new layout. Building the corpus found three links into `wzd_auth` that Starlight turned into 404s, and one anchor into a decision replaced on 2026-09-04. The deploy waits on vps-deploy brief 11.
+The owner's call (2026-10-18), one brief in every repo with a docs site. [31](briefs/done/31-docs-site-on-docusaurus.md) keeps the URLs and the light-only look, and teaches `eslint.config.js` the new layout. Building the corpus found three links into `wzd_auth` that Starlight turned into 404s, and one anchor into a decision replaced on 2026-09-04. The deploy waits on vps-deploy brief 11.
 
 ## [2026-10-19] build | brief 29: the sign-in loop, verified fixed and closed
 
@@ -1375,3 +1375,13 @@ player shows them the next time you do that exercise. The six "measures nothing"
 comments, plus two "never learns" notes in `domain/types.ts` and `persistence/codec.ts`,
 now describe the 2026-09-04 reversal. `totalWork` still sums the prescription. Counting
 logged work (option 2) stays open for a grill with the owner.
+
+## [2026-10-19] build | brief 31: the docs site is on Docusaurus
+
+Same URLs (the route list is the old one plus `/search/`), still light only, built with
+the `corpus-docs-site` skill's v0.31.0 files. The corpus sync now discovers pages (the
+same 16), sends the links into `wzd_auth`'s corpus to the `ward-auth` repo on GitHub, and
+the build throws on a broken link. The one stale anchor, in `progression-engine.md`, now
+points at the 2026-09-04 heading that replaced the old governing decision. `eslint`
+ignores the generated output and lints the new TypeScript files. Not deployed: the
+owner deploys after vps-deploy brief 11 flips the stack's asset check.

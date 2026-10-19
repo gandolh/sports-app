@@ -122,3 +122,30 @@ not compile. Two findings:
 
 Deploying. The owner deploys after vps-deploy brief 11 flips the `sports-app`
 docs stack.
+
+## Outcome (2026-10-19)
+
+**Done** (`926d8c0`, `8dd2936`), on Docusaurus 3.10.2 with the skill's v0.31.0 files read
+from source. The config, sidebar (the same 20 links), `Diagram.tsx`, sync and
+`build-diagrams.mjs` are the skill's, with this repo's base, GitHub URL and
+`OTHER_REPOS = { wzd_auth: … ward-auth }`. Discovery finds the same 16 pages the old list
+held, so `DENY` is empty. `theme.css` became `src/css/custom.css` (git kept the history):
+the same tokens and doctrine comments, Infima's variables pointed at them, Infima's
+shadows off, and every admonition kind mapped to the warn ochre, the accent or a plain
+surface, so nothing is red. `index.mdx` is `docs/index.mdx` with `slug: /`.
+`api.mdx`'s TypeDoc link became `pathname:///reference/`. The landing page's identity
+line and diagram title now name accounts, not "the session's subject".
+
+**Acceptance:** `npm run docs -w @sports-app/docs-site` exits 0 with
+`onBrokenLinks: 'throw'`, no broken-anchor warning and no sync warning. The route list
+equals `/tmp/sa-routes-before.txt` plus `./search/index.html`. `dist/index.html`
+references `/sports-app/docs/assets/` and nothing in `dist/` says `_astro`. The
+`decisions-identity` links into Ward's corpus go to `github.com/gandolh/ward-auth`.
+Root `npm run lint`, `npm run typecheck` (which now includes the docs workspace) and
+`npm test` (1202) pass, as does `bash corpus/lint.sh`. In a browser, with `dist/` served
+at `/sports-app/docs/` by `python3 -m http.server`: the landing page, `/state/` and
+`/api/` render in Archivo with the green accent, the diagram frame and `/reference/`
+load, there is no theme toggle, and a search for "rung" returns results.
+
+**For the owner:** deploy after vps-deploy brief 11 switches the stack's asset check to
+`assets/`. `docs/node_modules` is gone; the install adds about 1,300 packages at the root.
