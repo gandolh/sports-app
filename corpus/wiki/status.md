@@ -66,6 +66,7 @@ Cardio with a core-and-posture block every day. Screens: `/`, `/plan`, `/progres
 | 29 | [Sign-in loops on a fresh browser](../briefs/done/29-sign-in-loops-on-a-fresh-browser.md) | **done** 2026-10-19 — fixed by Ward brief 25; verified, tests and docs added | — |
 | 30 | [Account "Total work ever" note is out of date](../briefs/done/30-account-total-work-copy-is-outdated.md) | **done** 2026-10-19 — copy only; totals still the schedule's | — |
 | 31 | [Docs site from Starlight to Docusaurus](../briefs/done/31-docs-site-on-docusaurus.md) | **done** 2026-10-19 — same URLs plus /search/; not deployed | — |
+| 32 | [Sign-in returns to the screen that was asked for](../briefs/todo/32-sign-in-returns-to-the-asked-screen.md) | **todo** (2026-10-23) | — |
 
 ## How it ran
 

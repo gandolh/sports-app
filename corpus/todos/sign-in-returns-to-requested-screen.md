@@ -1,5 +1,8 @@
 # Sign-in returns to the screen that was asked for
 
+**Promoted 2026-10-23** into [brief 32](../briefs/todo/32-sign-in-returns-to-the-asked-screen.md).
+Delete this todo when 32 lands.
+
 Captured 2026-10-19, while closing brief 29.
 
 A sign-in always lands on `/`. Open `/plan` on a fresh browser and you go to `/login`,

@@ -1385,3 +1385,10 @@ the build throws on a broken link. The one stale anchor, in `progression-engine.
 points at the 2026-09-04 heading that replaced the old governing decision. `eslint`
 ignores the generated output and lints the new TypeScript files. Not deployed: the
 owner deploys after vps-deploy brief 11 flips the stack's asset check.
+
+## [2026-10-23] todo | Brief 32: sign-in returns to the screen that was asked for
+
+Promoted from the todo of 2026-10-19. The five route guards pass the asked-for path as
+`next`, `/login` checks it is a path inside the app and goes there, and the Ward button
+sends `returnTo: <base>login?next=…` so `/login` stays the one place that writes the
+cached username. [Brief 32](briefs/todo/32-sign-in-returns-to-the-asked-screen.md).
