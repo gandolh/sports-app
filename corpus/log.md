@@ -1391,4 +1391,20 @@ owner deploys after vps-deploy brief 11 flips the stack's asset check.
 Promoted from the todo of 2026-10-19. The five route guards pass the asked-for path as
 `next`, `/login` checks it is a path inside the app and goes there, and the Ward button
 sends `returnTo: <base>login?next=…` so `/login` stays the one place that writes the
-cached username. [Brief 32](briefs/todo/32-sign-in-returns-to-the-asked-screen.md).
+cached username. [Brief 32](briefs/done/32-sign-in-returns-to-the-asked-screen.md).
+
+## [2026-10-27] build | brief 32: a sign-in goes on to the screen that was asked for
+
+A signed-out visit to `/plan` now signs in to `/plan`. That closes what brief 29's entry
+left open ("sign-in always lands on `/`"). The five guards send `next` and `/login` goes
+there with `replace`. The Ward button asks for a return to `<base>login?next=…`, so
+`/login` is still the one place that writes the cached username. Found: the router
+spreads a route's validated search over the raw one, so `validateSearch` has to set an
+unsafe `next` to `undefined`; leaving it out let `//evil.example` through, and the tests
+caught it. Live under `/sports-app/` with a password and a throwaway account: the plan
+showed and Back did not return to `/login`. A `next` of `//evil.example` signed in to
+`/`. The real Ward round trip was not run: the local Ward refused connections, and its
+redirect URI is on port 5173, which another session was using. Ward's return is pinned
+by a test instead. Also: `next` is lost after a Ward failure, because the library lands
+failures on a bare `/login`. The todo the brief came from is deleted, and the brief's
+link to it became a plain path.

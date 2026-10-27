@@ -1,6 +1,6 @@
 ---
 summary: How this app knows who is asking — local accounts on the state service with "Sign in with Ward" as a linked second way in (2026-10-13), the Ward-session-only design it revised, and the superseded shared-secret nameplate before that; why the stream key is the signed-in username and never a query parameter.
-updated: 2026-10-13
+updated: 2026-10-27
 ---
 
 # Decisions — identity
@@ -65,6 +65,15 @@ synchronously; `GET /api/auth/session` is the missing "who is this cookie" call,
 sign-in page writes its answer to the cache whenever the session is signed in. The cache is
 cleared only by an explicit log out, never by a failed or signed-out session call: an
 unreachable service is not a sign-out, and the cache is what keeps the app usable offline.
+
+**A sign-in goes on to the screen that was asked for** (brief 32, 2026-10-27). A guard
+sends a signed-out visit to `/login?next=<path>`, and `/login` goes there once it has
+written the cached username. Ward's return is `<base>login?next=<path>`, **never the
+screen itself**: a Ward sign-in that skipped `/login` would skip the write, and the
+screen's guard would send it back to `/login`, which is the loop again. `next` must be a
+path inside the app (`client/src/ui/routes/next.ts`); the service checks the Ward return
+again with the library's `isLocalPath`. A Ward failure still lands on a bare
+`/login?ward_error=…`, so a retry after one loses `next`.
 
 **Offline.** Opening the app still needs no network for anybody whose name is cached.
 Signing in needs the service (it holds the accounts), so `/login` is no longer offline;

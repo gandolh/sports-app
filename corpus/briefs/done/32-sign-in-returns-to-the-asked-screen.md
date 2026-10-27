@@ -3,7 +3,7 @@
 ## Context
 
 Promoted 2026-10-23 from the todo
-[sign-in-returns-to-requested-screen](../../todos/sign-in-returns-to-requested-screen.md).
+`todos/sign-in-returns-to-requested-screen.md` (deleted 2026-10-27 when this brief landed; git has it).
 
 A sign-in always lands on `/`. Open `/plan` on a fresh browser and you go to `/login`,
 sign in, and end up on today's session instead of the plan. Two places drop the path
@@ -82,3 +82,46 @@ Keeping them through a sign-in is not needed; the path alone is enough.
 
 - Keeping the today screen's search params (`v`, `i`, `d`, `done`) through a sign-in.
 - Any change to how the session or the cached username works.
+
+## Outcome (2026-10-27)
+
+**Done** (`d3f7af8`). The five guards throw `toLogin(location)`, which redirects to
+`/login?next=<path>`, or to a bare `/login` from `/`. `/login` validates `next`, goes
+there with `replace: true` once the username is written, and gives the Ward button
+`returnTo: <base>login?next=<path>`. All of it is in `client/src/ui/routes/next.ts`.
+`next` must start with a single `/` and carry no `//`, backslash, control character,
+query or fragment, and it must not be `/login`.
+
+Found: TanStack Router spreads a route's validated search **over** the raw search, so
+a `validateSearch` that returns `{}` for a bad value leaves the raw `next` for
+`useSearch()` to read. The first test run showed it: `//evil.example` went on to
+`/evil.example`, and `https://evil.example` to `/login/https:/evil.example`. The router
+never left the origin, but it did not land on `/`. `validateLoginSearch` now always sets
+the key, to `undefined` when the value is unsafe.
+
+Checked under the base path: in `beforeLoad`, `location.pathname` has no base (the
+router's basepath rewrite takes it off first), so `next` is `/plan` and the router puts
+the base back on when it navigates.
+
+**Checks:** 11 new tests in `signin.test.tsx`: `/plan` signs in to `/plan` with one
+history entry, the other three guarded screens give their `next`, `/` gives a clean
+`/login`, the four bad values each sign in to `/`, the Ward button posts
+`returnTo: /login?next=%2Fplan` (asserted on the faked `/ward/start` body, which is what
+`signIn()` forwards), and a Ward landing on `/login?next=%2Fplan` is remembered and goes
+on to `/plan`. `npm test` passed 1214 tests, and typecheck and lint were clean. The
+client built at `/` and with `SPORTS_APP_BASE=/sports-app/`. One `npm run check` after
+the commit failed one test of 1214, and its output was not kept, so which test is
+unknown. The next 19 full runs passed, six of them with two suites at once.
+
+Live, in headless Chrome against the dev server under `/sports-app/`, with a throwaway
+database and account (since deleted) and Ward off: `/sports-app/plan` went to
+`/sports-app/login?next=%2Fplan`, a password sign-in showed the plan ("This month"), and
+Back went to the blank page the tab opened on, not `/login`. `/login?next=//evil.example`
+was rewritten to `/sports-app/login` and the sign-in landed on `/sports-app/`. In that
+page, `wardReturnTo('/plan')` gave `/sports-app/login?next=%2Fplan`.
+
+**Not checked live:** the real Ward round trip. The local Ward at `localhost:8792`
+refused connections, and its registered redirect URI is on port 5173, which another
+session's dev server was using. The stubbed `returnTo` assertion stands in for it, as
+the acceptance allows. Also open: a Ward failure lands on `/login?ward_error=…` (the
+library's error page), so a retry after a refusal loses `next` and lands on `/`.
