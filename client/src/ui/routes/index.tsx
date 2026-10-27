@@ -1,11 +1,12 @@
 import { useMemo } from 'react'
-import { Link, createRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { Link, createRoute, useNavigate } from '@tanstack/react-router'
 import { isVariant } from '@sports-app/shared/types.ts'
 import type { StateDoc, Variant } from '@sports-app/shared/types.ts'
 import { prescribe } from '../../domain/schedule.ts'
 import { totalWork } from '../../domain/milestones.ts'
 import type { PlayerPosition } from '../../session/useSession.ts'
 import { rootRoute } from './__root.tsx'
+import { toLogin } from './next.ts'
 import { useAdoptLegacy, useDocument, useRequestPersistence } from '../document.ts'
 import { AlertBanner } from '../components/AlertBanner.tsx'
 import { PrimaryButton, SecondaryButton } from '../components/Buttons.tsx'
@@ -99,8 +100,8 @@ export const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   validateSearch: validatePlayerSearch,
-  beforeLoad: ({ context }) => {
-    if (context.username === null) throw redirect({ to: '/login' })
+  beforeLoad: ({ context, location }) => {
+    if (context.username === null) throw toLogin(location)
     return { username: context.username }
   },
   component: TodayRoute,

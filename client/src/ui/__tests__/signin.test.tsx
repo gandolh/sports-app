@@ -66,6 +66,84 @@ describe('/login with a password', () => {
   })
 })
 
+// ─── Going on to the screen that was asked for ──────────────────────────────
+
+describe('a sign-in goes on to the screen that was asked for', () => {
+  async function signInWithPassword(): Promise<void> {
+    fireEvent.change(await screen.findByLabelText('Username'), { target: { value: USERNAME } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: PASSWORD } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+  }
+
+  it('a signed-out visit to /plan signs in to /plan, and Back does not return to /login', async () => {
+    const { router } = await renderApp('/plan', { accounts: { [USERNAME]: PASSWORD } })
+
+    // The guard says where the person was going.
+    expect(currentUrl(router)).toBe('/login?next=%2Fplan')
+
+    await signInWithPassword()
+
+    await waitFor(() => expect(currentUrl(router)).toBe('/plan'))
+    expect(await screen.findByText('This month')).toBeTruthy()
+    expect(localStorage.getItem(SESSION_KEY)).toBe(USERNAME)
+    // The guard's redirect and the page's navigation both replace, so the tab has
+    // one entry: there is no /login behind the plan to go Back to.
+    expect(router.history.canGoBack()).toBe(false)
+  })
+
+  it.each(['/progress', '/library', '/account'])('every guarded screen says so: %s', async (path) => {
+    const { router } = await renderApp(path)
+    expect(currentUrl(router)).toBe(`/login?next=${encodeURIComponent(path)}`)
+  })
+
+  it('a plain visit to / shows a clean /login, with no next', async () => {
+    const { router } = await renderApp('/', { accounts: { [USERNAME]: PASSWORD } })
+    expect(currentUrl(router)).toBe('/login')
+
+    await signInWithPassword()
+    await waitFor(() => expect(currentUrl(router)).toBe('/'))
+  })
+
+  it.each(['//evil.example', 'https://evil.example', '/\\evil', '/login'])(
+    'a next of %s is dropped and the sign-in lands on /',
+    async (next) => {
+      const { router } = await renderApp(`/login?next=${encodeURIComponent(next)}`, {
+        accounts: { [USERNAME]: PASSWORD },
+      })
+
+      await signInWithPassword()
+
+      await waitFor(() => expect(localStorage.getItem(SESSION_KEY)).toBe(USERNAME))
+      await waitFor(() => expect(currentUrl(router)).toBe('/'))
+    },
+  )
+
+  it('the Ward button asks to come back through /login with the same next', async () => {
+    const { router, auth } = await renderApp('/plan', { ward: { enabled: true } })
+    expect(currentUrl(router)).toBe('/login?next=%2Fplan')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Ward' }))
+
+    await waitFor(() => expect(auth.navigations).toHaveLength(1))
+    // `/login`, not `/plan`: the page that writes the cached username is the one
+    // Ward lands on. The base is `/` under test; the deploy's is `/sports-app/`.
+    expect(auth.bodies['POST /ward/start']).toEqual({ returnTo: '/login?next=%2Fplan' })
+  })
+
+  it('the redirect back from Ward is remembered on /login and goes on to next', async () => {
+    const { router } = await renderApp('/login?next=%2Fplan', {
+      signedInAs: { username: USERNAME },
+      origin: 'ward',
+      ward: { enabled: true, linked: true },
+      href: 'http://localhost/sports-app/login?next=%2Fplan',
+    })
+
+    await waitFor(() => expect(localStorage.getItem(SESSION_KEY)).toBe(USERNAME))
+    await waitFor(() => expect(currentUrl(router)).toBe('/plan'))
+    expect(await screen.findByText('This month')).toBeTruthy()
+  })
+})
+
 // ─── The loop ───────────────────────────────────────────────────────────────
 
 describe('the sign-in loop', () => {
@@ -137,6 +215,8 @@ describe('"Sign in with Ward"', () => {
 
     await waitFor(() => expect(auth.navigations).toHaveLength(1))
     expect(auth.calls).toContain('POST /ward/start')
+    // Nowhere was asked for, so no return either: the service lands it on /login.
+    expect(auth.bodies['POST /ward/start']).toEqual({})
     // The URL is the service's to choose; the page does not build one.
     expect(auth.navigations[0]).toMatch(/^https:\/\/ward\.example\//)
   })

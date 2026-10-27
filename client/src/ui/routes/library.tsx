@@ -1,6 +1,7 @@
 import { Suspense, lazy, useDeferredValue, useMemo, useState } from 'react'
-import { Link, createRoute, redirect } from '@tanstack/react-router'
+import { Link, createRoute } from '@tanstack/react-router'
 import { rootRoute } from './__root.tsx'
+import { toLogin } from './next.ts'
 import { Eyebrow, Shell, ShellBody, ShellRail, ShellTitle } from '../components/Shell.tsx'
 import { HonestNote } from '../components/HonestNote.tsx'
 
@@ -42,8 +43,8 @@ const LibraryList = lazy(async () => {
 export const libraryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/library',
-  beforeLoad: ({ context }) => {
-    if (context.username === null) throw redirect({ to: '/login' })
+  beforeLoad: ({ context, location }) => {
+    if (context.username === null) throw toLogin(location)
     return { username: context.username }
   },
   component: LibraryRoute,

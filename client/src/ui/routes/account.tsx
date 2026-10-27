@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link, createRoute, redirect } from '@tanstack/react-router'
+import { Link, createRoute } from '@tanstack/react-router'
 import { LADDERS, getRung, topRungIndex } from '../../domain/ladders.ts'
 import { rangeAt, rungIndexAt } from '../../domain/schedule.ts'
 import { milestonesReached, totalWork } from '../../domain/milestones.ts'
 import { PATTERNS } from '@sports-app/shared/types.ts'
 import type { Pattern, StateDoc } from '@sports-app/shared/types.ts'
 import { rootRoute } from './__root.tsx'
+import { toLogin } from './next.ts'
 import { useDocument, useStartFresh } from '../document.ts'
 import { AlertBanner } from '../components/AlertBanner.tsx'
 import { QuietButton, SecondaryButton } from '../components/Buttons.tsx'
@@ -59,8 +60,8 @@ import { PATTERN_LABEL, formatHoldTime, groupDigits } from '../components/format
 export const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/account',
-  beforeLoad: ({ context }) => {
-    if (context.username === null) throw redirect({ to: '/login' })
+  beforeLoad: ({ context, location }) => {
+    if (context.username === null) throw toLogin(location)
     return { username: context.username }
   },
   component: AccountRoute,

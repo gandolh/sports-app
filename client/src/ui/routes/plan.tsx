@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
-import { createRoute, redirect } from '@tanstack/react-router'
+import { createRoute } from '@tanstack/react-router'
 import type { IsoTimestamp, StateDoc } from '@sports-app/shared/types.ts'
 import { prescribe, recordSession, toSessionResult } from '../../domain/schedule.ts'
 import type { Prescription } from '../../domain/schedule.ts'
 import { rootRoute } from './__root.tsx'
+import { toLogin } from './next.ts'
 import { useDocument } from '../document.ts'
 import { AlertBanner } from '../components/AlertBanner.tsx'
 import { HonestNote, PosturalNote } from '../components/HonestNote.tsx'
@@ -226,8 +227,8 @@ function missedDayNote(missed: CalendarDay | null): string {
 export const planRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/plan',
-  beforeLoad: ({ context }) => {
-    if (context.username === null) throw redirect({ to: '/login' })
+  beforeLoad: ({ context, location }) => {
+    if (context.username === null) throw toLogin(location)
     return { username: context.username }
   },
   component: PlanRoute,

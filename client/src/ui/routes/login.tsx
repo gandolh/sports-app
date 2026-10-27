@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Field } from '@base-ui/react/field'
 import { createRoute, useNavigate } from '@tanstack/react-router'
 import { rootRoute } from './__root.tsx'
+import { validateLoginSearch, wardReturnTo } from './next.ts'
 import { useLogin, useSession, useWardSignIn } from '../../../vendor/ward/ward-auth-react.js'
 import { setCurrentUsername } from '../../persistence/session.ts'
 import { AlertBanner } from '../components/AlertBanner.tsx'
@@ -33,6 +34,15 @@ import { Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from '../compone
  * to the app. That covers a local sign-in, the redirect back from Ward (the service
  * lands it here, `afterSignInPath`), and a visit with a cookie that is still live.
  *
+ * ── It goes on to the screen that was asked for ─────────────────────────────
+ *
+ * A guard that sends somebody here says where they were going, as `?next=/plan`,
+ * and once the username is written the browser goes there instead of to `/`
+ * (`next.ts` keeps `next` only when it is a path inside the app). The Ward button
+ * asks Ward to come back to this page with the same `next`, not to the screen
+ * itself: a Ward sign-in that skipped this page would skip the write, and the guard
+ * on that screen would send it straight back here, which is the loop again.
+ *
  * It does **not** clear the cache when the session call fails or says signed out.
  * The cache is what lets the app open offline, and an unreachable service is not a
  * sign-out. The cache is cleared only on an explicit log out (`/account`).
@@ -47,6 +57,7 @@ import { Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from '../compone
 export const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
+  validateSearch: validateLoginSearch,
   component: LoginRoute,
 })
 
@@ -55,6 +66,7 @@ function LoginRoute() {
   const { login, pending, error: loginError, reset: resetLogin } = useLogin()
   const ward = useWardSignIn()
   const navigate = useNavigate()
+  const { next } = loginRoute.useSearch()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [rememberError, setRememberError] = useState<string | null>(null)
@@ -66,7 +78,8 @@ function LoginRoute() {
     // The write the sign-in loop was missing.
     const remembered = setCurrentUsername(signedInAs)
     if (remembered.ok) {
-      void navigate({ to: '/', replace: true })
+      // Replace, so Back from the screen it lands on does not return to this page.
+      void navigate({ to: next ?? '/', replace: true })
       return
     }
     // Browser storage is unavailable. Going on would send the person straight back
@@ -74,7 +87,7 @@ function LoginRoute() {
     // effect body, which would render twice for one fact.
     const timer = setTimeout(() => setRememberError(remembered.error), 0)
     return () => clearTimeout(timer)
-  }, [signedInAs, navigate])
+  }, [signedInAs, next, navigate])
 
   function submit(event: FormEvent): void {
     event.preventDefault()
@@ -143,7 +156,10 @@ function LoginRoute() {
       <ShellFooter
         above={
           wardEnabled ? (
-            <SecondaryButton type="button" onClick={() => void ward.signIn()}>
+            <SecondaryButton
+              type="button"
+              onClick={() => void ward.signIn(next === undefined ? {} : { returnTo: wardReturnTo(next) })}
+            >
               Sign in with Ward
             </SecondaryButton>
           ) : undefined
