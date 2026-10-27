@@ -1416,3 +1416,10 @@ so a retry lands on `/`. The owner chose a library fix in `../wzd_auth` and
 adoption here once it is released. Captured as
 [ward-retry-keeps-the-asked-screen](todos/ward-retry-keeps-the-asked-screen.md),
 blocked on that release.
+
+## [2026-10-27] todo | The Ward retry fix is released
+
+ward-auth 0.7.0 (`../wzd_auth` brief 42) carries the return path through a
+refused sign-in as `ward_return_to`, read through `useWardSignIn().returnTo`.
+[ward-retry-keeps-the-asked-screen](todos/ward-retry-keeps-the-asked-screen.md)
+now says how to adopt it and is ready to promote.
