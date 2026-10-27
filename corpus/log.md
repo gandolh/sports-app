@@ -1408,3 +1408,11 @@ redirect URI is on port 5173, which another session was using. Ward's return is 
 by a test instead. Also: `next` is lost after a Ward failure, because the library lands
 failures on a bare `/login`. The todo the brief came from is deleted, and the brief's
 link to it became a plain path.
+
+## [2026-10-27] todo | A Ward retry keeps the asked screen
+
+From brief 32's outcome: after a refused Ward sign-in the library drops `next`,
+so a retry lands on `/`. The owner chose a library fix in `../wzd_auth` and
+adoption here once it is released. Captured as
+[ward-retry-keeps-the-asked-screen](todos/ward-retry-keeps-the-asked-screen.md),
+blocked on that release.
