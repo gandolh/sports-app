@@ -25,4 +25,4 @@ To adopt it:
   (`client/src/ui/routes/next.ts`);
 - a test for the refused-then-retried path.
 
-Ready to promote to a brief.
+Promoted 2026-10-28 into [brief 33](../briefs/todo/33-ward-retry-keeps-the-asked-screen.md).

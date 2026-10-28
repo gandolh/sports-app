@@ -1423,3 +1423,11 @@ ward-auth 0.7.0 (`../wzd_auth` brief 42) carries the return path through a
 refused sign-in as `ward_return_to`, read through `useWardSignIn().returnTo`.
 [ward-retry-keeps-the-asked-screen](todos/ward-retry-keeps-the-asked-screen.md)
 now says how to adopt it and is ready to promote.
+
+## [2026-10-28] todo | Brief 33: a Ward retry returns to the asked screen
+
+The todo `ward-retry-keeps-the-asked-screen` became
+[brief 33](briefs/todo/33-ward-retry-keeps-the-asked-screen.md). It re-vendors
+ward-auth at 0.7.0 (both copies are at 0.3.1), passes `allowRename: false` so
+0.4.0's rename route stays off, lets 0.6.0's migration 4 run, and has `/login`
+pass the same `returnTo` again after a refused Ward sign-in. Not built.
