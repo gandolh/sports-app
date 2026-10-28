@@ -67,7 +67,7 @@ Cardio with a core-and-posture block every day. Screens: `/`, `/plan`, `/progres
 | 30 | [Account "Total work ever" note is out of date](../briefs/done/30-account-total-work-copy-is-outdated.md) | **done** 2026-10-19 — copy only; totals still the schedule's | — |
 | 31 | [Docs site from Starlight to Docusaurus](../briefs/done/31-docs-site-on-docusaurus.md) | **done** 2026-10-19 — same URLs plus /search/; not deployed | — |
 | 32 | [Sign-in returns to the screen that was asked for](../briefs/done/32-sign-in-returns-to-the-asked-screen.md) | **done** 2026-10-27 — `?next=` through `/login`, Ward too; Ward round trip not run live | — |
-| 33 | [A Ward retry returns to the asked screen](../briefs/todo/33-ward-retry-keeps-the-asked-screen.md) | **todo** (filed 2026-10-28) — adopt ward-auth 0.7.0 (from 0.3.1, `allowRename: false`) and pass `returnTo` again after a refused Ward sign-in | — |
+| 33 | [A Ward retry returns to the asked screen](../briefs/done/33-ward-retry-keeps-the-asked-screen.md) | **done** 2026-10-28 — ward-auth 0.7.0 (rename off, migration 4 checked on a copy); `/login` reads `next` back after a refused Ward sign-in; live Ward round trip is an owner check | — |
 
 ## How it ran
 

@@ -1414,20 +1414,35 @@ link to it became a plain path.
 From brief 32's outcome: after a refused Ward sign-in the library drops `next`,
 so a retry lands on `/`. The owner chose a library fix in `../wzd_auth` and
 adoption here once it is released. Captured as
-[ward-retry-keeps-the-asked-screen](todos/ward-retry-keeps-the-asked-screen.md),
+`ward-retry-keeps-the-asked-screen`,
 blocked on that release.
 
 ## [2026-10-27] todo | The Ward retry fix is released
 
 ward-auth 0.7.0 (`../wzd_auth` brief 42) carries the return path through a
 refused sign-in as `ward_return_to`, read through `useWardSignIn().returnTo`.
-[ward-retry-keeps-the-asked-screen](todos/ward-retry-keeps-the-asked-screen.md)
+`ward-retry-keeps-the-asked-screen`
 now says how to adopt it and is ready to promote.
 
 ## [2026-10-28] todo | Brief 33: a Ward retry returns to the asked screen
 
 The todo `ward-retry-keeps-the-asked-screen` became
-[brief 33](briefs/todo/33-ward-retry-keeps-the-asked-screen.md). It re-vendors
+[brief 33](briefs/done/33-ward-retry-keeps-the-asked-screen.md). It re-vendors
 ward-auth at 0.7.0 (both copies are at 0.3.1), passes `allowRename: false` so
 0.4.0's rename route stays off, lets 0.6.0's migration 4 run, and has `/login`
 pass the same `returnTo` again after a refused Ward sign-in. Not built.
+
+## [2026-10-28] build | brief 33: a Ward retry returns to the asked screen
+
+Both vendored copies of ward-auth went from 0.3.1 to 0.7.0, written by
+`../wzd_auth`'s vendor script, and that repo was left clean. 0.4.0's rename route
+stays off (`ALLOW_RENAME` in `server/ward.mjs`, passed in `state-server.mjs`, where
+`wardAuth` is actually registered), because a stream is keyed by the username. A
+0.3.1 database copy booted under 0.7.0 ran migration 4, and a password sign-in and the
+stored document worked. After a refused Ward sign-in, `/login` reads `next` back out
+of `useWardSignIn().returnTo`, so a retry with Ward or a password goes on to the asked
+screen. That closes the gap brief 32's entry left. The tests fake the service for the
+round trip and send six bad returns that are not reused. Headless Chrome under
+`/sports-app/` checked the refusal landing and a password sign-in to `/plan`. The live
+Ward round trip was not run, because the local Ward container was down, so it is an
+owner check. The todo is deleted. [Brief 33](briefs/done/33-ward-retry-keeps-the-asked-screen.md).

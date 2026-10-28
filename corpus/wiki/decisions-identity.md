@@ -1,6 +1,6 @@
 ---
 summary: How this app knows who is asking — local accounts on the state service with "Sign in with Ward" as a linked second way in (2026-10-13), the Ward-session-only design it revised, and the superseded shared-secret nameplate before that; why the stream key is the signed-in username and never a query parameter.
-updated: 2026-10-27
+updated: 2026-10-28
 ---
 
 # Decisions — identity
@@ -12,7 +12,8 @@ the storage and the wire contract is still there.
 ### Accounts are the app's own, and Ward is a linked second way in
 _2026-10-13, brief 25 (Ward's corpus), under [Ward's decision](../../../wzd_auth/corpus/wiki/decisions-oidc.md)._
 The state service has **its own accounts**, in `auth_*` tables of the same SQLite file,
-run by the vendored `ward-auth` library (`server/vendor/ward/`, version in its README).
+run by the vendored `ward-auth` library (`server/vendor/ward/` and `client/vendor/ward/`,
+version in their READMEs; 0.7.0 since 2026-10-28, brief 33).
 Local sign-in never calls Ward, so the app works while Ward is down. "Sign in with Ward"
 is an OpenID Connect code flow that the service finishes; a first Ward sign-in creates a
 local user, and a person who already has one links Ward from `/account`. Nothing is ever
@@ -33,20 +34,22 @@ taken here is `alice-2` and their stream is `alice-2`. Snapshots were always a r
   service creates a local user whose username and id are that subject, linked to it
   (`linkWardStreams`, idempotent), so the person's next Ward sign-in finds their history
   instead of creating an empty `alice`. The cost is that their displayed name is the hex
-  string until it is renamed by hand; the library has no rename, and a stream cannot move
-  without rewriting the documents inside it.
+  string until it is renamed by hand. The library's self-rename route (0.4.0) is off
+  here (`ALLOW_RENAME` in `server/ward.mjs`), because a stream cannot move without
+  rewriting the documents inside it.
 - **Keyed by a name** (`local`, or whatever was typed before Ward): only the name is known,
   never a subject. The stream is read again as soon as an account with that exact username
   exists (`npm run seed`), and Ward is linked from settings at the person's first sign-in.
   The service names these streams at startup.
 
 **A username has to fit this app's rule** (`shared/username.ts`: lowercase, at most 32),
-which is stricter than the library's, and the library has no hook to reshape a name it
-creates on a first Ward sign-in. A session whose username fails the rule is refused with
+which is stricter than the library's. The library has had a hook to reshape a name it
+creates on a first Ward sign-in since 0.5.0 (`usernameFor`), and this app does not pass
+one yet. A session whose username fails the rule is refused with
 `reason: "unsupported_username"` (`requireSupportedUsername` in `server/ward.mjs`) and the
 sign-in page says so, rather than signing the person in to an app whose every save is a
-`400`. The seed refuses such a name before writing anything. The fix, if it ever bites, is a
-library hook for the first name, not a rename in this app.
+`400`. The seed refuses such a name before writing anything. The fix, if it ever bites, is to
+pass that hook (and `usernameMaxLength: 32`), not a rename in this app.
 
 **No register page.** Accounts come from the seed script (username and password from the
 environment or a prompt, never a file) or from a first Ward sign-in. The login page offers
@@ -72,8 +75,12 @@ written the cached username. Ward's return is `<base>login?next=<path>`, **never
 screen itself**: a Ward sign-in that skipped `/login` would skip the write, and the
 screen's guard would send it back to `/login`, which is the loop again. `next` must be a
 path inside the app (`client/src/ui/routes/next.ts`); the service checks the Ward return
-again with the library's `isLocalPath`. A Ward failure still lands on a bare
-`/login?ward_error=…`, so a retry after one loses `next`.
+again with the library's `isLocalPath`. Since brief 33 (2026-10-28, ward-auth 0.7.0) a
+refused Ward sign-in comes back with the return it was started with
+(`useWardSignIn().returnTo`), and `/login` reads `next` back out of it
+(`nextFromWardReturn`), so a retry, with Ward or a password, still goes on to the screen.
+Only a return of exactly `<base>login?next=…` counts, and that `next` passes the same
+check.
 
 **Offline.** Opening the app still needs no network for anybody whose name is cached.
 Signing in needs the service (it holds the accounts), so `/login` is no longer offline;
