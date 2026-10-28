@@ -1446,3 +1446,9 @@ round trip and send six bad returns that are not reused. Headless Chrome under
 `/sports-app/` checked the refusal landing and a password sign-in to `/plan`. The live
 Ward round trip was not run, because the local Ward container was down, so it is an
 owner check. The todo is deleted. [Brief 33](briefs/done/33-ward-retry-keeps-the-asked-screen.md).
+
+## [2026-10-28] decision | ward-auth's rename and usernameFor stay off
+
+After brief 33 adopted ward-auth 0.7.0, the owner took the recommended answer on
+the two features it offers: no rename screen (`allowRename: false` stays, since
+each user's history is stored under the username) and no `usernameFor`.
