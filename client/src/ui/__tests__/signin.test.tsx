@@ -144,6 +144,89 @@ describe('a sign-in goes on to the screen that was asked for', () => {
   })
 })
 
+// ─── Trying again after a refused Ward sign-in ──────────────────────────────
+
+describe('a retry after a refused Ward sign-in goes on to the screen that was asked for', () => {
+  /**
+   * Where the service lands a refused sign-in (ward-auth 0.7.0): the login page,
+   * the code, and the return the sign-in was started with. No `next` of its own.
+   */
+  function refusedWith(returnTo: string): string {
+    return `http://localhost/login?ward_error=access_denied&ward_return_to=${encodeURIComponent(returnTo)}`
+  }
+
+  it('/plan, refused at Ward, tried again and let in: /plan shows', async () => {
+    // A signed-out visit to /plan starts a Ward sign-in.
+    const first = await renderApp('/plan', { ward: { enabled: true } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign in with Ward' }))
+    await waitFor(() => expect(first.auth.navigations).toHaveLength(1))
+    const asked = first.auth.bodies['POST /ward/start'] as { returnTo: string }
+    expect(asked).toEqual({ returnTo: '/login?next=%2Fplan' })
+
+    // Ward refuses, and the service lands on /login with the code and that return.
+    cleanup()
+    const refused = await renderApp('/login', {
+      ward: { enabled: true },
+      href: refusedWith(asked.returnTo),
+    })
+    expect(await screen.findByText(/Ward did not let you in here/)).toBeTruthy()
+
+    // Trying again asks for the same return.
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with Ward' }))
+    await waitFor(() => expect(refused.auth.navigations).toHaveLength(1))
+    expect(refused.auth.bodies['POST /ward/start']).toEqual(asked)
+
+    // Ward lets them in this time, and the service lands on that return.
+    cleanup()
+    const { router } = await renderApp(asked.returnTo, {
+      signedInAs: { username: USERNAME },
+      origin: 'ward',
+      ward: { enabled: true, linked: true },
+    })
+    await waitFor(() => expect(localStorage.getItem(SESSION_KEY)).toBe(USERNAME))
+    await waitFor(() => expect(currentUrl(router)).toBe('/plan'))
+    expect(await screen.findByText('This month')).toBeTruthy()
+  })
+
+  it('a password sign-in after the refusal goes on to the asked screen too', async () => {
+    const { router } = await renderApp('/login', {
+      accounts: { [USERNAME]: PASSWORD },
+      ward: { enabled: true },
+      href: refusedWith('/login?next=%2Fplan'),
+    })
+    expect(await screen.findByText(/Ward did not let you in here/)).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: USERNAME } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: PASSWORD } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    await waitFor(() => expect(currentUrl(router)).toBe('/plan'))
+  })
+
+  it.each([
+    // Off the origin: the library drops these before the page sees them.
+    '//evil.example',
+    'https://evil.example',
+    // On the origin, but the `next` inside fails brief 32's rules.
+    '/login?next=%2F%2Fevil.example',
+    '/login?next=https%3A%2F%2Fevil.example',
+    '/login?next=%2Flogin',
+    // On the origin, but not this app's login page, so not a return it made.
+    '/plan',
+  ])('a carried return of %s is not used again', async (returnTo) => {
+    const { auth } = await renderApp('/login', {
+      ward: { enabled: true },
+      href: refusedWith(returnTo),
+    })
+    expect(await screen.findByText(/Ward did not let you in here/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with Ward' }))
+
+    await waitFor(() => expect(auth.navigations).toHaveLength(1))
+    expect(auth.bodies['POST /ward/start']).toEqual({})
+  })
+})
+
 // ─── The loop ───────────────────────────────────────────────────────────────
 
 describe('the sign-in loop', () => {

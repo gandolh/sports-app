@@ -1,4 +1,4 @@
-// ward-auth 0.3.1 — built from https://github.com/gandolh/ward-auth (shared-library/).
+// ward-auth 0.7.0 — built from https://github.com/gandolh/ward-auth (shared-library/).
 // MIT licensed; see LICENSE beside this file. Do not edit a vendored copy: copy a newer build in.
 /**
  * The browser half, without React: a small client for the plugin's routes and
@@ -6,7 +6,8 @@
  *
  * Kept free of React so it can be tested in Node with a fake `fetch`, and so
  * the hooks stay thin enough to read at a glance. Nothing here imports the
- * server bundle: `ward-auth-react.js` must load in a browser.
+ * server bundle: `ward-auth-react.js` must load in a browser. `core/paths.ts`
+ * is framework-free, so the rule it holds is bundled in here too.
  */
 /** The user the server reports. Mirrors the server's `AuthUser`. */
 interface SessionUser {
@@ -92,13 +93,19 @@ type SessionState = {
 };
 /**
  * What the last Ward round trip came back with, read once from the page's URL
- * (`?ward_error=` or `?ward=`) when the client is created, and removed from
- * the address bar so a reload does not show it again.
+ * (`?ward_error=`, `?ward=`, `?ward_return_to=`) when the client is created,
+ * and removed from the address bar so a reload does not show it again.
  */
 interface WardResult {
     /** `linked` after a link, `reauthenticated` after a verified reauthentication. */
     result?: "linked" | "reauthenticated";
     error?: AuthError;
+    /**
+     * The `returnTo` a refused sign-in was started with (0.7.0): pass it to
+     * `startWardSignIn({ returnTo })` to try again to the same place. Only with
+     * an `error`, and only a path on this origin. `clearWardResult()` keeps it.
+     */
+    returnTo?: string;
 }
 type ActionResult = {
     ok: true;
@@ -140,6 +147,12 @@ interface AuthClient {
     login(username: string, password: string): Promise<ActionResult>;
     logout(): Promise<ActionResult>;
     changePassword(currentPassword: string, newPassword: string): Promise<ActionResult>;
+    /**
+     * Rename the signed-in user (0.4.0). On success the state already carries
+     * the new name. Errors: `invalid_username`, `username_taken`,
+     * `too_many_attempts`, `unauthorized`.
+     */
+    renameUser(username: string): Promise<ActionResult>;
     register(username: string, password: string): Promise<ActionResult>;
     /**
      * "Sign in with Ward": ask the server for Ward's URL and go there. On
@@ -165,7 +178,10 @@ interface AuthClient {
     signOutOfWard(): Promise<ActionResult>;
     /** The Ward result the page was loaded with, if any. */
     getWardResult(): WardResult;
-    /** Forget it (after the app has shown it). */
+    /**
+     * Forget the outcome (after the app has shown it). A carried `returnTo`
+     * stays: dismissing the message does not change where a retry should go.
+     */
     clearWardResult(): void;
 }
 declare function createAuthClient(options: AuthClientOptions): AuthClient;
@@ -230,6 +246,15 @@ declare function useChangePassword(options?: HookOptions): ActionState & {
     done: boolean;
 };
 /**
+ * `renameUser(username)` (0.4.0). On success every `useSession` shows the new
+ * name and no session ends. Errors: `invalid_username`, `username_taken`,
+ * `too_many_attempts`, `unauthorized`.
+ */
+declare function useRenameUser(options?: HookOptions): ActionState & {
+    renameUser: (username: string) => Promise<boolean>;
+    done: boolean;
+};
+/**
  * `register(username, password)`, for the app that enables registration.
  * Signs the new user in on success. Errors: `username_taken`,
  * `invalid_username`, `password_too_short`, `password_too_long`,
@@ -238,7 +263,10 @@ declare function useChangePassword(options?: HookOptions): ActionState & {
 declare function useRegister(options?: HookOptions): ActionState & {
     register: (username: string, password: string) => Promise<boolean>;
 };
-/** The Ward result the page was loaded with (`?ward_error=` / `?ward=`), and a way to dismiss it. */
+/**
+ * The Ward result the page was loaded with (`?ward_error=` / `?ward=`), and a
+ * way to dismiss it. `returnTo` survives `clear()`.
+ */
 declare function useWardResult(options?: HookOptions): WardResult & {
     clear: () => void;
 };
@@ -253,11 +281,16 @@ declare function useWardResult(options?: HookOptions): WardResult & {
  * a disabled account, or they pressed "Back to the app"), `invalid_callback`,
  * `ward_unavailable`, `sign_in_failed`. `reset()` dismisses it. Show the button only when
  * `useSession().ward.enabled`.
+ *
+ * `returnTo` (0.7.0) is the `returnTo` that failed attempt was started with,
+ * or `null`. `signIn({ returnTo })` with it tries again to the same place;
+ * `signIn()` without one still goes to `afterSignInPath`. `reset()` keeps it.
  */
 declare function useWardSignIn(options?: HookOptions): ActionState & {
     signIn: (signInOptions?: {
         returnTo?: string;
     }) => Promise<boolean>;
+    returnTo: string | null;
 };
 /**
  * Settings: "Link Ward". `link()` sends the browser to Ward; the settings
@@ -311,5 +344,5 @@ declare function useWardSignOut(options?: HookOptions): ActionState & {
     signOut: () => Promise<boolean>;
 };
 
-export { configureAuth, createAuthClient, getAuthClient, useChangePassword, useLogin, useLogout, useRegister, useSession, useSetLocalPassword, useWardLink, useWardResult, useWardSignIn, useWardSignOut, useWardUnlink };
+export { configureAuth, createAuthClient, getAuthClient, useChangePassword, useLogin, useLogout, useRegister, useRenameUser, useSession, useSetLocalPassword, useWardLink, useWardResult, useWardSignIn, useWardSignOut, useWardUnlink };
 export type { ActionResult, AuthClient, AuthClientOptions, AuthError, AuthErrorCode, HookOptions, SessionInfo, SessionState, SessionUser, WardResult, WardStatus };

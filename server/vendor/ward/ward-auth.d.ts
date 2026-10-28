@@ -1,4 +1,4 @@
-// ward-auth 0.3.1 — built from https://github.com/gandolh/ward-auth (shared-library/).
+// ward-auth 0.7.0 — built from https://github.com/gandolh/ward-auth (shared-library/).
 // MIT licensed; see LICENSE beside this file. Do not edit a vendored copy: copy a newer build in.
 import { FastifyRequest, preHandlerAsyncHookHandler, FastifyPluginAsync } from 'fastify';
 
@@ -44,6 +44,11 @@ interface UserRecord {
     role: string;
     createdAt: number;
     updatedAt: number;
+    /**
+     * When the app switched the user off (0.6.0), or `null` for an active user.
+     * A disabled user is refused everywhere a user gets in.
+     */
+    disabledAt: number | null;
 }
 /** A session row. The token itself is never stored, only its hash. */
 interface SessionRecord {
@@ -89,6 +94,16 @@ interface AuthStore {
     /** `null` removes the local password (brief 21 never does; it is here for symmetry). */
     setPasswordHash(userId: string, passwordHash: string | null, now: number): Awaitable<void>;
     setRole(userId: string, role: string, now: number): Awaitable<void>;
+    /**
+     * Rename a user (0.4.0). Throws `UsernameTakenError` when another user holds
+     * the folded name; the user's own name in another case is not taken.
+     */
+    setUsername(userId: string, username: string, usernameFolded: string, now: number): Awaitable<void>;
+    /**
+     * Switch a user off (`disabledAt`, epoch ms) or back on (`null`) (0.6.0).
+     * Only the column; ending the user's sessions is the core's job.
+     */
+    setDisabled(userId: string, disabledAt: number | null, now: number): Awaitable<void>;
     createSession(session: SessionRecord): Awaitable<void>;
     findSession(idHash: string): Awaitable<SessionRecord | undefined>;
     /** Push the sliding expiry out. */
@@ -190,6 +205,12 @@ interface AuthUser {
     role: string;
     /** False for a user created by a Ward sign-in who has not set a local password. */
     hasPassword: boolean;
+    /**
+     * True once the app has switched the user off (`disableUser`, 0.6.0). Such a
+     * user never has a live session, so a signed-in user always reads false;
+     * it is for the app's own screens that list users.
+     */
+    disabled: boolean;
 }
 /** A live, resolved session. */
 interface ResolvedSession {
@@ -229,9 +250,33 @@ interface Accounts {
     findUserByUsername(username: string): Promise<AuthUser | undefined>;
     setRole(userId: string, role: string): Promise<void>;
     /**
+     * Rename a user (0.4.0). The name is trimmed and checked as a new one is
+     * (`UsernamePolicyError`) and must be free once folded (`UsernameTakenError`;
+     * the user's own name in another case is free). The id stays, and so does
+     * every session: a rename is not a credential change. `undefined` when there
+     * is no such user.
+     */
+    renameUser(userId: string, username: string): Promise<AuthUser | undefined>;
+    /**
+     * Switch a user off (0.6.0): stamp the time and end every session they
+     * hold. From then on the user is refused wherever a user gets in, with the
+     * answer an unknown user gets: the password check fails, a session stops
+     * resolving, `startSession` throws, and a Ward sign-in for the linked
+     * subject is refused. Disabling a disabled user keeps the first stamp.
+     * Nothing is deleted. `undefined` when there is no such user.
+     */
+    disableUser(userId: string): Promise<AuthUser | undefined>;
+    /**
+     * Switch a user back on (0.6.0). The old password, role and Ward link work
+     * again; the sessions `disableUser` ended stay ended. A no-op for an active
+     * user. `undefined` when there is no such user.
+     */
+    enableUser(userId: string): Promise<AuthUser | undefined>;
+    /**
      * The password check. `undefined` for an unknown username, a user with no
-     * local password, or a wrong password — **one answer, one cost**: every path
-     * runs scrypt once, so timing does not reveal which accounts exist.
+     * local password, a disabled user, or a wrong password — **one answer, one
+     * cost**: every path runs scrypt once, so timing does not reveal which
+     * accounts exist or which are switched off.
      */
     verifyCredentials(username: string, password: string): Promise<AuthUser | undefined>;
     /**
@@ -248,15 +293,18 @@ interface Accounts {
      * route must establish who is asking before calling it.
      */
     setPassword(userId: string, newPassword: string, keepSessionIdHash?: string): Promise<void>;
-    /** Mint a session. The token is the cookie value and is not stored. */
+    /**
+     * Mint a session. The token is the cookie value and is not stored. Throws
+     * `UserDisabledError` for a disabled user; no caller should ask for one.
+     */
     startSession(userId: string, options?: StartSessionOptions): Promise<{
         token: string;
         session: SessionRecord;
     }>;
     /**
      * The session a cookie value names, renewing its sliding expiry when due.
-     * `undefined` when there is none, it expired, or its user is gone. An
-     * expired row is deleted on sight.
+     * `undefined` when there is none, it expired, or its user is gone or
+     * disabled. Such a row is deleted on sight.
      */
     resolveSession(token: string | undefined): Promise<ResolvedSession | undefined>;
     /** End one session by its cookie value. Unknown tokens are a no-op. */
@@ -274,6 +322,15 @@ interface AccountsOptions {
 /** Thrown for an app-supplied user id the library will not store. */
 declare class InvalidUserIdError extends Error {
     readonly code: "invalid_user_id";
+    constructor();
+}
+/**
+ * Thrown by `startSession` for a disabled user, and by a Ward sign-in for a
+ * linked subject whose user is disabled (0.6.0). The HTTP layer answers it as
+ * it answers any refusal; it never names the reason to the browser.
+ */
+declare class UserDisabledError extends Error {
+    readonly code: "user_disabled";
     constructor();
 }
 declare function toAuthUser(user: UserRecord): AuthUser;
@@ -449,10 +506,10 @@ declare function hashSessionToken(token: string): string;
  *
  * ## Per-surface budgets
  *
- * Login, registration and password change hold **independent** budgets.
- * Spending the password-change budget (which needs a session first) must never
- * lock the same address out of login, which is how the person would recover,
- * and a registration flood must not stop existing users signing in.
+ * Login, registration, password change and rename hold **independent**
+ * budgets. Spending the password-change budget (which needs a session first)
+ * must never lock the same address out of login, which is how the person would
+ * recover, and a registration flood must not stop existing users signing in.
  *
  * ## No artificial delay
  *
@@ -487,7 +544,7 @@ declare const LOCKOUT_WINDOW_SECONDS: number;
  * one. The union is closed so that borrowing is a compile error rather than a
  * quiet coupling nobody notices until the two interfere.
  */
-type LockoutSurface = "login" | "register" | "change_password";
+type LockoutSurface = "login" | "register" | "change_password" | "rename";
 /** Who is attempting what, from where. */
 interface LockoutTarget {
     surface: LockoutSurface;
@@ -1049,8 +1106,8 @@ declare function wardClientOptionsFromEnv(env?: Record<string, string | undefine
  * 2. otherwise, in link mode, the signed-in user who started the flow from
  *    their settings gets linked (the plugin does this, with `link`);
  * 3. otherwise a **new** local user is created, linked to the subject, named
- *    from `preferred_username` (suffixed if the name is taken) and holding the
- *    role the grant names.
+ *    from `preferred_username` (shaped by the app's `usernameFor`, suffixed if
+ *    the name is taken) and holding the role the grant names.
  *
  * **Never by username.** A local `alice` and a Ward `alice` are strangers
  * until alice links them herself. On a shared origin anything else is account
@@ -1059,6 +1116,10 @@ declare function wardClientOptionsFromEnv(env?: Record<string, string | undefine
  *
  * After creation the local row owns the role. Ward's grant decides whether a
  * Ward account may get in at all; what it may do inside is the app's.
+ *
+ * A linked user the app has disabled (0.6.0) is refused at rule 1, and the
+ * sign-in stops there: it never falls through to rule 3, which would hand the
+ * same Ward account a fresh user the app never switched off.
  */
 /** Thrown by `unlink` for a user with no local password: unlinking would lock them out. */
 declare class NoLocalPasswordError extends Error {
@@ -1099,8 +1160,16 @@ interface WardIdentities {
     /**
      * The user a verified Ward sign-in is: the linked one, or a new one (rule
      * 3). Never matches by username.
+     *
+     * For a new user, `roleFor` turns the grant's role into the first local
+     * role, and `usernameFor` shapes the name before it is suffixed. Both
+     * default to identity. `usernameMaxLength` caps every name tried, suffixes
+     * included (see `candidateUsernames`). A hook that throws throws here, and
+     * no user is created. Throws a `TypeError` for a `usernameMaxLength` that
+     * `isUsernameMaxLength` refuses, and `UserDisabledError` when the subject's
+     * linked user is disabled.
      */
-    userForSignIn(identity: WardIdentity, roleFor?: (wardRole: string) => string): Promise<{
+    userForSignIn(identity: WardIdentity, roleFor?: (wardRole: string) => string, usernameFor?: UsernameFor, usernameMaxLength?: number): Promise<{
         user: AuthUser;
         created: boolean;
     }>;
@@ -1138,6 +1207,17 @@ interface WardIdentitiesOptions {
     /** Epoch milliseconds. Must match the one `accounts` uses. */
     now?: () => number;
 }
+/**
+ * An app's own shape for a new Ward user's username, from Ward's
+ * `preferred_username` (`username`) and the subject. The result is the base
+ * that gets suffixed when taken.
+ */
+type UsernameFor = (claims: {
+    username: string;
+    subject: string;
+}) => string;
+/** Whether `value` can be a `usernameMaxLength`: a whole number from 10 to 256. */
+declare function isUsernameMaxLength(value: unknown): value is number;
 declare function createWardIdentities(options: WardIdentitiesOptions): WardIdentities;
 
 /** Thrown at boot for a `WARD_OIDC_CLIENT_KEY` that is not an Ed25519 private JWK. */
@@ -1186,12 +1266,16 @@ declare class InvalidClientKeyError extends Error {
  * ## Where the callback sends the browser
  *
  * - sign-in: `returnTo` (a same-origin path the start named) or
- *   `afterSignInPath`; on failure `loginPath?ward_error=<code>`;
+ *   `afterSignInPath`; on failure `loginPath?ward_error=<code>`, plus
+ *   `&ward_return_to=<returnTo>` when the start named one (0.7.0), so the
+ *   login page can try again to the same place. The path is checked with
+ *   `isLocalPath` again on the way out, and a callback without a readable flow
+ *   cookie has none to carry;
  * - link: `settingsPath?ward=linked`, or `settingsPath?ward_error=<code>`;
  * - reauthenticate: `settingsPath?ward=reauthenticated`, or the error.
  *
  * Anything unexpected after the code exchange (the store failing, an app's
- * `roleFor` throwing) is logged and lands on the same error page with
+ * `roleFor` or `usernameFor` throwing) is logged and lands on the same error page with
  * `ward_error=sign_in_failed`, never a raw `500` on a top-level navigation.
  *
  * The codes are stable and the React hooks expose them; the app writes the
@@ -1235,6 +1319,22 @@ interface WardSignInOptions {
      * row is the only truth; Ward's role is never written back.
      */
     roleFor?: (wardRole: string) => string;
+    /**
+     * The username a user created by a first Ward sign-in starts with, shaped
+     * by the app from Ward's `preferred_username` (`username`) and the subject:
+     * lower-cased, say, for an app that stores names in lower case. Identity by
+     * default. A taken result is suffixed (`-2`, `-3`, …); one that fails the
+     * library's own username policy becomes `ward-user`. A hook that throws
+     * lands the sign-in on `loginPath?ward_error=sign_in_failed`. Runs only when
+     * a user is created, never for one already linked.
+     */
+    usernameFor?: UsernameFor;
+    /**
+     * The longest username the app stores, 10 to 256 (the default). Every name
+     * a first Ward sign-in tries fits it, suffixes included: a hook that cuts
+     * to 16 needs `usernameMaxLength: 16`, or `name-2` comes out 18 long.
+     */
+    usernameMaxLength?: number;
     /** Defaults to `createWardIdentities({ accounts })`. */
     identities?: WardIdentities;
 }
@@ -1289,11 +1389,11 @@ declare const FRESH_SIGN_IN_SECONDS: number;
  * | status | `error` | when |
  * |---|---|---|
  * | 400 | `invalid_request` | the body is not the expected shape |
- * | 400 | `invalid_username`, `password_too_short`, `password_too_long` | registration or a new password fails the policy |
+ * | 400 | `invalid_username`, `password_too_short`, `password_too_long` | registration, a rename or a new password fails the policy |
  * | 401 | `unauthorized` (+ `reason` when a session check rejected it) | the guard found no live session |
  * | 401 | `invalid_credentials` | wrong username or password, or wrong current password |
  * | 403 | `cross_site` | a browser said the request came from another origin |
- * | 409 | `username_taken` | registration |
+ * | 409 | `username_taken` | registration, a rename |
  * | 429 | `too_many_attempts` (+ `retryAfterSeconds`, and `Retry-After`) | lockout |
  *
  * The session `reason`s the library itself sets: `ward_unavailable` (Ward
@@ -1376,6 +1476,12 @@ interface WardAuthOptions {
         role: string;
     };
     /**
+     * `POST <routePrefix>/username`, where a signed-in user renames themselves.
+     * On by default (0.4.0); `false` turns it off for an app that keys anything
+     * on the name rather than the id, or names its users itself.
+     */
+    allowRename?: boolean;
+    /**
      * Routes reachable with no session, as `"METHOD /pattern"` or `"/pattern"`
      * (any method), matched against the **route pattern** Fastify resolved —
      * never the raw URL, so a query string or an encoding cannot reach a handler
@@ -1427,5 +1533,5 @@ declare const wardAuth: FastifyPluginAsync<WardAuthOptions>;
  */
 declare function requireRole(...roles: string[]): preHandlerAsyncHookHandler;
 
-export { AlreadyLinkedError, DEFAULT_NOTIFY_TIMEOUT_MS, DEFAULT_WARD_TIMEOUT_MS, FRESH_SIGN_IN_SECONDS, InvalidClientKeyError, InvalidUserIdError, LOCKOUT_MAX_FAILURES, LOCKOUT_WINDOW_SECONDS, MAX_PASSWORD_LENGTH, MAX_USERNAME_LENGTH, MIN_PASSWORD_LENGTH, NoLocalPasswordError, NotLinkedError, PasswordPolicyError, SESSION_ABSOLUTE_SECONDS, SESSION_IDLE_SECONDS, SESSION_RENEW_INTERVAL_SECONDS, SESSION_STATUS_CACHE_SECONDS, SQLITE_MIGRATIONS, SchemaTooNewError, UserIdTakenError, UsernamePolicyError, UsernameTakenError, WardConfigurationError, WardSignInError, WardSubjectTakenError, WardUnavailableError, clearedCookie, createAccounts, createLockout, createSqliteStore, createWardClient, createWardIdentities, foldUsername, generateSessionToken, hashPassword, hashSessionToken, isWardAuthStore, lockoutKeyFor, migrateSqlite, normaliseUsername, parseTrustedProxies, readCookie, requireRole, secureCookiesFor, seedUsers, serializeCookie, spendDummyHash, toAuthUser, verifyPassword, wardAuth, wardClientOptionsFromEnv };
-export type { Accounts, AccountsOptions, AuthContext, AuthStore, AuthUser, Awaitable, CookieOptions, Lockout, LockoutDecision, LockoutKeyOptions, LockoutOptions, LockoutSurface, LockoutTarget, Migration, NewLinkedUserInput, NewUserInput, NewUserRecord, ResolvedSession, SeedResult, SeedUser, SessionOrigin, SessionRecord, SessionValidator, SessionVerdict, SqlValue, SqliteAuthStore, SqliteHandle, SqliteStatement, SqliteStoreOptions, StartSessionOptions, SyncStore, TrustedProxies, TrustedProxyRange, UserRecord, WardAuthOptions, WardAuthStore, WardClient, WardClientOptions, WardFlowSecrets, WardIdentities, WardIdentitiesOptions, WardIdentity, WardLinkRecord, WardNotification, WardSessionStatus, WardSignInOptions };
+export { AlreadyLinkedError, DEFAULT_NOTIFY_TIMEOUT_MS, DEFAULT_WARD_TIMEOUT_MS, FRESH_SIGN_IN_SECONDS, InvalidClientKeyError, InvalidUserIdError, LOCKOUT_MAX_FAILURES, LOCKOUT_WINDOW_SECONDS, MAX_PASSWORD_LENGTH, MAX_USERNAME_LENGTH, MIN_PASSWORD_LENGTH, NoLocalPasswordError, NotLinkedError, PasswordPolicyError, SESSION_ABSOLUTE_SECONDS, SESSION_IDLE_SECONDS, SESSION_RENEW_INTERVAL_SECONDS, SESSION_STATUS_CACHE_SECONDS, SQLITE_MIGRATIONS, SchemaTooNewError, UserDisabledError, UserIdTakenError, UsernamePolicyError, UsernameTakenError, WardConfigurationError, WardSignInError, WardSubjectTakenError, WardUnavailableError, clearedCookie, createAccounts, createLockout, createSqliteStore, createWardClient, createWardIdentities, foldUsername, generateSessionToken, hashPassword, hashSessionToken, isUsernameMaxLength, isWardAuthStore, lockoutKeyFor, migrateSqlite, normaliseUsername, parseTrustedProxies, readCookie, requireRole, secureCookiesFor, seedUsers, serializeCookie, spendDummyHash, toAuthUser, verifyPassword, wardAuth, wardClientOptionsFromEnv };
+export type { Accounts, AccountsOptions, AuthContext, AuthStore, AuthUser, Awaitable, CookieOptions, Lockout, LockoutDecision, LockoutKeyOptions, LockoutOptions, LockoutSurface, LockoutTarget, Migration, NewLinkedUserInput, NewUserInput, NewUserRecord, ResolvedSession, SeedResult, SeedUser, SessionOrigin, SessionRecord, SessionValidator, SessionVerdict, SqlValue, SqliteAuthStore, SqliteHandle, SqliteStatement, SqliteStoreOptions, StartSessionOptions, SyncStore, TrustedProxies, TrustedProxyRange, UserRecord, UsernameFor, WardAuthOptions, WardAuthStore, WardClient, WardClientOptions, WardFlowSecrets, WardIdentities, WardIdentitiesOptions, WardIdentity, WardLinkRecord, WardNotification, WardSessionStatus, WardSignInOptions };

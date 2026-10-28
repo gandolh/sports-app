@@ -42,11 +42,14 @@ import {
  *
  * The snapshot stream is keyed by the signed-in user's username, and
  * `shared/username.ts` says what a username may be: lowercase, at most 32
- * characters. The library accepts far more (Ward's own limit), and has no hook
- * to reshape a name it creates on a first Ward sign-in. So a person whose Ward
- * name is `Alice` gets a local user the document schema cannot hold. That
+ * characters. The library accepts far more (Ward's own limit). Since 0.5.0 it
+ * has a hook to reshape a name it creates on a first Ward sign-in
+ * (`usernameFor`), but this service does not pass one yet. So a person whose
+ * Ward name is `Alice` gets a local user the document schema cannot hold. That
  * session is refused with `unsupported_username`, which the login page words,
  * rather than being signed in to an app whose every save would be a 400.
+ *
+ * The same key is why renaming is off (`ALLOW_RENAME`).
  */
 
 /** The session cookie. Unique in the estate, because every app shares one origin. */
@@ -54,6 +57,17 @@ export const SESSION_COOKIE_NAME = 'sports_app_session'
 
 /** Where the library's routes live, as Fastify sees them. */
 export const ROUTE_PREFIX = '/api/auth'
+
+/**
+ * Whether a signed-in user may rename themselves (`POST /api/auth/username`).
+ *
+ * ward-auth turns that route on by default since 0.4.0. Here it stays off: the
+ * snapshot stream is keyed by the username, not the user id, so a rename would
+ * leave the person's history under the old name and open an empty stream under
+ * the new one. A rename screen would have to move the stream with the name, and
+ * offering one is the owner's choice (brief 33).
+ */
+export const ALLOW_RENAME = false
 
 /** What a new user created by this service holds. The app has no roles of its own. */
 export const DEFAULT_ROLE = 'user'
@@ -168,9 +182,9 @@ const WARD_SUBJECT = /^[0-9a-f]{32}$/
  * never re-linked and a boot never trips on `UserIdTakenError`. One transaction per
  * user, and it needs no
  * Ward client — linking a subject does not call Ward. The honest cost: that
- * person's name is the hex string until it is renamed by hand, because the library
- * has no rename and a snapshot stream cannot be moved without rewriting the
- * documents inside it.
+ * person's name is the hex string until it is renamed by hand, because renaming is
+ * off here (`ALLOW_RENAME`) and a snapshot stream cannot be moved without rewriting
+ * the documents inside it.
  *
  * Streams that are not a subject (`local`, a name typed before Ward) are left to
  * `orphanStreamNames` and the seed.

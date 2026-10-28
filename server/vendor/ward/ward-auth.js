@@ -1,4 +1,4 @@
-// ward-auth 0.3.1 — built from https://github.com/gandolh/ward-auth (shared-library/).
+// ward-auth 0.7.0 — built from https://github.com/gandolh/ward-auth (shared-library/).
 // MIT licensed; see LICENSE beside this file. Do not edit a vendored copy: copy a newer build in.
 import { randomBytes as randomBytes$1, createHash, scrypt as scrypt$1, timingSafeEqual, webcrypto, randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -358,12 +358,25 @@ class InvalidUserIdError extends Error {
         this.name = "InvalidUserIdError";
     }
 }
+/**
+ * Thrown by `startSession` for a disabled user, and by a Ward sign-in for a
+ * linked subject whose user is disabled (0.6.0). The HTTP layer answers it as
+ * it answers any refusal; it never names the reason to the browser.
+ */
+class UserDisabledError extends Error {
+    code = "user_disabled";
+    constructor() {
+        super("this user is disabled");
+        this.name = "UserDisabledError";
+    }
+}
 function toAuthUser(user) {
     return {
         id: user.id,
         username: user.username,
         role: user.role,
         hasPassword: user.passwordHash !== null,
+        disabled: user.disabledAt !== null,
     };
 }
 function createAccounts(options) {
@@ -400,8 +413,10 @@ function createAccounts(options) {
             : await verifyPassword(password, user.passwordHash);
         // `user === undefined` is repeated rather than inferred from `ok`, so a
         // future edit that makes the dummy path succeed cannot type-check its way
-        // into a sign-in.
-        if (user === undefined || !ok)
+        // into a sign-in. A disabled user is refused only here, after the hash
+        // ran: a right and a wrong password cost the same, and both answer as an
+        // unknown name does.
+        if (user === undefined || !ok || user.disabledAt !== null)
             return undefined;
         return toAuthUser(user);
     }
@@ -429,6 +444,9 @@ function createAccounts(options) {
         if ((origin === "ward") !== (wardSid !== null)) {
             throw new TypeError("startSession: wardSid is required for a Ward session and only for one");
         }
+        const user = await store.findUserById(userId);
+        if (user !== undefined && user.disabledAt !== null)
+            throw new UserDisabledError();
         const token = generateSessionToken();
         const at = now();
         const session = {
@@ -455,8 +473,10 @@ function createAccounts(options) {
             await store.deleteSession(idHash);
             return undefined;
         }
+        // A disabled user's sessions were ended by `disableUser`; one minted in a
+        // race with it is refused and removed here.
         const user = await store.findUserById(session.userId);
-        if (user === undefined) {
+        if (user === undefined || user.disabledAt !== null) {
             await store.deleteSession(idHash);
             return undefined;
         }
@@ -491,6 +511,34 @@ function createAccounts(options) {
             if (role.length === 0)
                 throw new TypeError("setRole: role must be a non-empty string");
             await store.setRole(userId, role, now());
+        },
+        async renameUser(userId, username) {
+            const name = normaliseUsername(username);
+            const user = await store.findUserById(userId);
+            if (user === undefined)
+                return undefined;
+            await store.setUsername(userId, name, foldUsername(name), now());
+            return toAuthUser({ ...user, username: name });
+        },
+        async disableUser(userId) {
+            const user = await store.findUserById(userId);
+            if (user === undefined)
+                return undefined;
+            const disabledAt = user.disabledAt ?? now();
+            if (user.disabledAt === null)
+                await store.setDisabled(userId, disabledAt, now());
+            // Every time, not only the first: a session minted in a race with an
+            // earlier call ends here too.
+            await store.deleteUserSessions(userId);
+            return toAuthUser({ ...user, disabledAt });
+        },
+        async enableUser(userId) {
+            const user = await store.findUserById(userId);
+            if (user === undefined)
+                return undefined;
+            if (user.disabledAt !== null)
+                await store.setDisabled(userId, null, now());
+            return toAuthUser({ ...user, disabledAt: null });
         },
         verifyCredentials,
         changePassword,
@@ -700,10 +748,10 @@ function secureCookiesFor(publicOrigin) {
  *
  * ## Per-surface budgets
  *
- * Login, registration and password change hold **independent** budgets.
- * Spending the password-change budget (which needs a session first) must never
- * lock the same address out of login, which is how the person would recover,
- * and a registration flood must not stop existing users signing in.
+ * Login, registration, password change and rename hold **independent**
+ * budgets. Spending the password-change budget (which needs a session first)
+ * must never lock the same address out of login, which is how the person would
+ * recover, and a registration flood must not stop existing users signing in.
  *
  * ## No artificial delay
  *
@@ -1217,6 +1265,17 @@ const SQLITE_MIGRATIONS = [
       ALTER TABLE auth_sessions ADD COLUMN reauthenticated_at INTEGER;
     `,
     },
+    {
+        version: 4,
+        name: "user_disabled_at",
+        sql: `
+      -- When the app switched this user off (0.6.0, Accounts.disableUser).
+      -- Epoch milliseconds on the app's clock; NULL for an active user, so
+      -- every existing row migrates active. A disabled user is refused
+      -- wherever a user gets in, with the answer an unknown one gets.
+      ALTER TABLE auth_users ADD COLUMN disabled_at INTEGER;
+    `,
+    },
 ];
 
 /**
@@ -1360,6 +1419,7 @@ function toUser(row) {
         role: row.role,
         createdAt: Number(row.created_at),
         updatedAt: Number(row.updated_at),
+        disabledAt: row.disabled_at === null ? null : Number(row.disabled_at),
     };
 }
 function toSession(row) {
@@ -1390,6 +1450,8 @@ function createSqliteStore(db, options = {}) {
        VALUES (?, ?, ?, ?, ?, ?, ?)`),
         setPasswordHash: db.prepare("UPDATE auth_users SET password_hash = ?, updated_at = ? WHERE id = ?"),
         setRole: db.prepare("UPDATE auth_users SET role = ?, updated_at = ? WHERE id = ?"),
+        setUsername: db.prepare("UPDATE auth_users SET username = ?, username_folded = ?, updated_at = ? WHERE id = ?"),
+        setDisabled: db.prepare("UPDATE auth_users SET disabled_at = ?, updated_at = ? WHERE id = ?"),
         insertSession: db.prepare(`INSERT INTO auth_sessions (id_hash, user_id, origin, ward_sid, created_at, renewed_at, expires_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`),
         sessionById: db.prepare("SELECT * FROM auth_sessions WHERE id_hash = ?"),
@@ -1444,6 +1506,18 @@ function createSqliteStore(db, options = {}) {
         },
         setRole(userId, role, now) {
             s.setRole.run(role, now, userId);
+        },
+        setUsername(userId, username, usernameFolded, now) {
+            inSavepoint(db, () => {
+                // Checked rather than caught, for the reason `insertUser` gives.
+                const holder = s.userByFolded.get(usernameFolded);
+                if (holder !== undefined && holder.id !== userId)
+                    throw new UsernameTakenError();
+                s.setUsername.run(username, usernameFolded, now, userId);
+            });
+        },
+        setDisabled(userId, disabledAt, now) {
+            s.setDisabled.run(disabledAt, now, userId);
         },
         createSession(session) {
             s.insertSession.run(session.idHash, session.userId, session.origin, session.wardSid, session.createdAt, session.renewedAt, session.expiresAt);
@@ -4095,8 +4169,8 @@ function isLoopback(hostname) {
  * 2. otherwise, in link mode, the signed-in user who started the flow from
  *    their settings gets linked (the plugin does this, with `link`);
  * 3. otherwise a **new** local user is created, linked to the subject, named
- *    from `preferred_username` (suffixed if the name is taken) and holding the
- *    role the grant names.
+ *    from `preferred_username` (shaped by the app's `usernameFor`, suffixed if
+ *    the name is taken) and holding the role the grant names.
  *
  * **Never by username.** A local `alice` and a Ward `alice` are strangers
  * until alice links them herself. On a shared origin anything else is account
@@ -4105,6 +4179,10 @@ function isLoopback(hostname) {
  *
  * After creation the local row owns the role. Ward's grant decides whether a
  * Ward account may get in at all; what it may do inside is the app's.
+ *
+ * A linked user the app has disabled (0.6.0) is refused at rule 1, and the
+ * sign-in stops there: it never falls through to rule 3, which would hand the
+ * same Ward account a fresh user the app never switched off.
  */
 /** Thrown by `unlink` for a user with no local password: unlinking would lock them out. */
 class NoLocalPasswordError extends Error {
@@ -4124,6 +4202,19 @@ class NotLinkedError extends Error {
 }
 /** The highest numeric suffix tried before falling back to a random one. */
 const MAX_NAME_SUFFIX = 99;
+/**
+ * The shortest `usernameMaxLength` accepted. The last-resort name is a letter,
+ * `-` and eight hex digits, so this is the least that still starts with a
+ * letter.
+ */
+const MIN_USERNAME_MAX_LENGTH = 10;
+/** Whether `value` can be a `usernameMaxLength`: a whole number from 10 to 256. */
+function isUsernameMaxLength(value) {
+    return (typeof value === "number" &&
+        Number.isInteger(value) &&
+        value >= MIN_USERNAME_MAX_LENGTH &&
+        value <= MAX_USERNAME_LENGTH);
+}
 function createWardIdentities(options) {
     const { accounts } = options;
     const now = options.now ?? (() => Date.now());
@@ -4159,12 +4250,24 @@ function createWardIdentities(options) {
         }, input.subject);
         return toAuthUser(created);
     }
-    async function userForSignIn(identity, roleFor = (role) => role) {
+    async function userForSignIn(identity, roleFor = (role) => role, usernameFor, usernameMaxLength = MAX_USERNAME_LENGTH) {
+        if (!isUsernameMaxLength(usernameMaxLength)) {
+            throw new TypeError(`userForSignIn: usernameMaxLength must be a whole number from ${MIN_USERNAME_MAX_LENGTH} to ${MAX_USERNAME_LENGTH}`);
+        }
         const linked = await findUserBySubject(identity.subject);
-        if (linked !== undefined)
+        if (linked !== undefined) {
+            if (linked.disabled)
+                throw new UserDisabledError();
             return { user: linked, created: false };
+        }
         const role = roleFor(identity.role);
-        for (const username of candidateUsernames(identity.username)) {
+        const preferred = usernameFor === undefined
+            ? identity.username
+            : usernameFor({ username: identity.username, subject: identity.subject });
+        if (typeof preferred !== "string") {
+            throw new TypeError("userForSignIn: usernameFor must return a string");
+        }
+        for (const username of candidateUsernames(preferred, usernameMaxLength)) {
             try {
                 const user = await createLinkedUser({ subject: identity.subject, username, role });
                 return { user, created: true };
@@ -4175,6 +4278,8 @@ function createWardIdentities(options) {
                 if (error instanceof WardSubjectTakenError) {
                     // Two first sign-ins for one subject raced; the other one won.
                     const winner = await findUserBySubject(identity.subject);
+                    if (winner?.disabled === true)
+                        throw new UserDisabledError();
                     if (winner !== undefined)
                         return { user: winner, created: false };
                 }
@@ -4221,16 +4326,28 @@ function createWardIdentities(options) {
 /** The name a Ward user gets when `preferred_username` cannot be used. */
 const FALLBACK_USERNAME = "ward-user";
 /**
- * Names to try for a new Ward user: `preferred_username` as Ward has it, then
- * `name-2`, `name-3`, …, then a random suffix, then `ward-user-<random>`. A
- * name that fails the local policy (Ward's rules are not this library's)
- * falls back to `ward-user`. Every name yielded passes the policy, so a
- * strange `preferred_username` can cost a person their preferred name, never
- * their sign-in.
+ * Names to try for a new Ward user: `preferred_username` as Ward has it (or
+ * as the app's `usernameFor` shaped it), then `name-2`, `name-3`, …, then a
+ * random suffix, then `ward-user-<random>`. A name that fails the local policy
+ * (Ward's rules are not this library's) falls back to `ward-user`. Every name
+ * yielded passes the policy, so a strange `preferred_username` can cost a
+ * person their preferred name, never their sign-in.
+ *
+ * ## `maxLength`, and why the hook is not run again on each candidate
+ *
+ * Every name yielded is at most `maxLength` UTF-16 units: the base is cut to
+ * it, and a suffix takes its room from the base, so an app that stores 16
+ * characters gets `alice.smith-wi-2`, not `alice.smith-with-2`. The
+ * alternative, running `usernameFor` again on each suffixed name, fails for
+ * the hook most apps write: one that cuts to a length cuts the suffix off
+ * again, every `-2` folds back into the taken base, and the person ends up as
+ * `ward-user-…`. A hook can't tell the base from the suffix; the library can.
+ * The suffixes are `-`, digits and lowercase hex, which survive a hook that
+ * lowercases, so they keep that shape too.
  */
-function* candidateUsernames(preferred) {
+function* candidateUsernames(preferred, maxLength) {
     const seen = new Set();
-    for (const name of rawCandidates(preferred)) {
+    for (const name of rawCandidates(preferred, maxLength)) {
         const valid = validUsername(name);
         if (valid === undefined || seen.has(valid))
             continue;
@@ -4238,17 +4355,18 @@ function* candidateUsernames(preferred) {
         yield valid;
     }
 }
-function* rawCandidates(preferred) {
-    const base = validUsername(preferred) ?? FALLBACK_USERNAME;
+function* rawCandidates(preferred, maxLength) {
+    const valid = validUsername(preferred);
+    const base = valid === undefined ? FALLBACK_USERNAME : withSuffix(valid, "", maxLength);
     yield base;
     for (let n = 2; n <= MAX_NAME_SUFFIX; n += 1)
-        yield withSuffix(base, `-${n}`);
+        yield withSuffix(base, `-${n}`, maxLength);
     for (let attempt = 0; attempt < 5; attempt += 1) {
-        yield withSuffix(base, `-${generateUserId().slice(0, 8)}`);
+        yield withSuffix(base, `-${generateUserId().slice(0, 8)}`, maxLength);
     }
     // Whatever the base was, these always fit the policy.
     for (let attempt = 0; attempt < 5; attempt += 1) {
-        yield `${FALLBACK_USERNAME}-${generateUserId().slice(0, 8)}`;
+        yield withSuffix(FALLBACK_USERNAME, `-${generateUserId().slice(0, 8)}`, maxLength);
     }
 }
 function validUsername(name) {
@@ -4262,13 +4380,13 @@ function validUsername(name) {
     }
 }
 /**
- * `base` cut to leave room for `suffix` within `MAX_USERNAME_LENGTH` UTF-16
- * units, then the suffix. Cut by code point, never through a surrogate pair,
- * and with any trailing space dropped (a cut can land just after one, and
- * `name -2` is not the name with a suffix).
+ * `base` cut to leave room for `suffix` within `maxLength` UTF-16 units, then
+ * the suffix. Cut by code point, never through a surrogate pair, and with any
+ * trailing space dropped (a cut can land just after one, and `name -2` is not
+ * the name with a suffix).
  */
-function withSuffix(base, suffix) {
-    const room = MAX_USERNAME_LENGTH - suffix.length;
+function withSuffix(base, suffix, maxLength) {
+    const room = maxLength - suffix.length;
     let kept = "";
     for (const codePoint of base) {
         if (kept.length + codePoint.length > room)
@@ -4315,6 +4433,15 @@ function passwordChangeBody(body) {
         return undefined;
     return { currentPassword, newPassword };
 }
+/** A rename's body. The name's rules are the policy's, answered with its code. */
+function usernameBody(body) {
+    if (typeof body !== "object" || body === null)
+        return undefined;
+    const { username } = body;
+    if (typeof username !== "string")
+        return undefined;
+    return { username };
+}
 /**
  * Whether the request is same-origin enough to act on the session cookie.
  *
@@ -4355,6 +4482,28 @@ function tooManyAttempts(reply, retryAfterSeconds) {
 }
 
 /**
+ * The one rule for a path the library sends a browser to: the configured
+ * pages, `returnTo`, and since 0.7.0 the `ward_return_to` a refused sign-in
+ * carries back. Framework-free, so the browser bundle checks a path from the
+ * address bar with the same rule the server checked it with.
+ */
+/**
+ * A path on the app's own origin: starts with one `/`, no `//` or `/\`
+ * (which browsers read as another host), no control characters, short.
+ * What `returnTo` and the configured pages must be — never an open redirect.
+ */
+function isLocalPath(value) {
+    return (value.length > 0 &&
+        value.length <= 512 &&
+        value.startsWith("/") &&
+        !value.startsWith("//") &&
+        !value.startsWith("/\\") &&
+        !value.includes("\\") &&
+        // eslint-disable-next-line no-control-regex
+        !/[\u0000-\u001f\u007f]/.test(value));
+}
+
+/**
  * A user with no local password may set one this long after a verified Ward
  * reauthentication (`POST /ward/reauthenticate`). A plain Ward sign-in does
  * not count.
@@ -4386,6 +4535,12 @@ function validateWardOptions(ward, cookiePath, routePrefix) {
         if (!isLocalPath(ward[name])) {
             throw new TypeError(`wardAuth: ward.${name} must be a path on the app's origin, like "/myapp/login"`);
         }
+    }
+    if (ward.usernameFor !== undefined && typeof ward.usernameFor !== "function") {
+        throw new TypeError("wardAuth: ward.usernameFor must be a function");
+    }
+    if (ward.usernameMaxLength !== undefined && !isUsernameMaxLength(ward.usernameMaxLength)) {
+        throw new TypeError(`wardAuth: ward.usernameMaxLength must be a whole number from ${MIN_USERNAME_MAX_LENGTH} to ${MAX_USERNAME_LENGTH}`);
     }
     const callback = new URL(ward.client.redirectUri).pathname;
     const expectedTail = `${routePrefix}/ward/callback`;
@@ -4526,6 +4681,20 @@ function registerWardRoutes(routes, context) {
         }
         throw error;
     }
+    /**
+     * Where a failed round trip lands: a sign-in on the login page, carrying
+     * the start's `returnTo` as `ward_return_to`; a link or reauthentication on
+     * settings.
+     */
+    function landFailure(reply, flow, code) {
+        if (flow.mode !== "sign_in")
+            return land(reply, ward.settingsPath, { ward_error: code });
+        const query = { ward_error: code };
+        if (flow.returnTo !== undefined && isLocalPath(flow.returnTo)) {
+            query["ward_return_to"] = flow.returnTo;
+        }
+        return land(reply, ward.loginPath, query);
+    }
     /** A `303` to an app page, on the app's own origin. */
     function land(reply, path, query) {
         const target = new URL(path, publicOrigin);
@@ -4600,7 +4769,6 @@ function registerWardRoutes(routes, context) {
         const flow = readFlow(request);
         if (flow === undefined)
             return land(reply, ward.loginPath, { ward_error: "invalid_callback" });
-        const errorPage = flow.mode === "sign_in" ? ward.loginPath : ward.settingsPath;
         const rawUrl = request.raw.url ?? "";
         const search = rawUrl.includes("?") ? rawUrl.slice(rawUrl.indexOf("?")) : "";
         let identity;
@@ -4614,7 +4782,7 @@ function registerWardRoutes(routes, context) {
             else if (failure.code === "ward_unavailable" || failure.code === "ward_error") {
                 request.log.warn({ err: failure }, failure.message);
             }
-            return land(reply, errorPage, { ward_error: failure.code });
+            return landFailure(reply, flow, failure.code);
         }
         try {
             return await finishCallback(request, reply, flow, identity);
@@ -4623,13 +4791,24 @@ function registerWardRoutes(routes, context) {
             // A top-level navigation: a raw 500 JSON page helps nobody. Log it and
             // send the person back where they can try again.
             request.log.error({ err: error }, "Ward callback failed after the code exchange");
-            return land(reply, errorPage, { ward_error: "sign_in_failed" });
+            return landFailure(reply, flow, "sign_in_failed");
         }
     });
     /** The callback after a verified code exchange: act on the flow's mode. */
     async function finishCallback(request, reply, flow, identity) {
         if (flow.mode === "sign_in") {
-            const { user } = await identities.userForSignIn(identity, ward.roleFor);
+            let user;
+            try {
+                ({ user } = await identities.userForSignIn(identity, ward.roleFor, ward.usernameFor, ward.usernameMaxLength));
+            }
+            catch (error) {
+                // The app disabled the linked user (0.6.0). The answer Ward gives when
+                // it refuses a sign-in itself, so a switched-off user and one with no
+                // grant look the same, and no error is logged for a deliberate no.
+                if (error instanceof UserDisabledError)
+                    return landFailure(reply, flow, "access_denied");
+                throw error;
+            }
             // Signing in on top of an old session replaces it, as a password sign-in does.
             const previous = readCookie(request.headers.cookie, context.cookieName);
             if (previous !== undefined)
@@ -4795,21 +4974,6 @@ function setPasswordBody(body) {
     if (currentPassword.length === 0 || currentPassword.length > MAX_PASSWORD_LENGTH)
         return undefined;
     return { newPassword, currentPassword };
-}
-/**
- * A path on the app's own origin: starts with one `/`, no `//` or `/\`
- * (which browsers read as another host), no control characters, short.
- * What `returnTo` and the configured pages must be — never an open redirect.
- */
-function isLocalPath(value) {
-    return (value.length > 0 &&
-        value.length <= 512 &&
-        value.startsWith("/") &&
-        !value.startsWith("//") &&
-        !value.startsWith("/\\") &&
-        !value.includes("\\") &&
-        // eslint-disable-next-line no-control-regex
-        !/[\u0000-\u001f\u007f]/.test(value));
 }
 
 const wardAuthPlugin = async (app, options) => {
@@ -5052,6 +5216,46 @@ const wardAuthPlugin = async (app, options) => {
             lockout.clearFailures(target);
             return reply.code(204).send();
         });
+        if (options.allowRename !== false) {
+            /**
+             * Rename oneself. Guarded, so `request.auth` is set. The id and every
+             * session stay. A taken name is the one answer that says something
+             * about other accounts, so each `409` counts against the address's
+             * rename budget; a policy failure or a success does not.
+             */
+            routes.post("/username", async (request, reply) => {
+                if (!sameOrigin(request, publicOrigin))
+                    return crossSite(reply);
+                const auth = request.auth;
+                if (auth === null)
+                    return reply.code(401).send({ error: "unauthorized" });
+                const address = lockoutKey(request);
+                const gate = lockout.check({ surface: "rename", address });
+                if (!gate.allowed)
+                    return tooManyAttempts(reply, gate.retryAfterSeconds ?? 1);
+                const body = usernameBody(request.body);
+                if (body === undefined)
+                    return reply.code(400).send({ error: "invalid_request" });
+                let user;
+                try {
+                    user = await accounts.renameUser(auth.user.id, body.username);
+                }
+                catch (error) {
+                    if (error instanceof UsernamePolicyError) {
+                        return reply.code(400).send({ error: error.code });
+                    }
+                    if (error instanceof UsernameTakenError) {
+                        lockout.recordFailure({ surface: "rename", address });
+                        return reply.code(409).send({ error: "username_taken" });
+                    }
+                    throw error;
+                }
+                // The guard found the user a moment ago; gone now means signed out.
+                if (user === undefined)
+                    return reply.code(401).send({ error: "unauthorized" });
+                return reply.code(200).send(await sessionBody(user, auth.session));
+            });
+        }
         if (options.registration !== undefined) {
             const { role } = options.registration;
             /**
@@ -5181,4 +5385,4 @@ function normalisePublicRoute(entry) {
     return `${match[1] ?? "*"} ${match[2]}`;
 }
 
-export { AlreadyLinkedError, DEFAULT_NOTIFY_TIMEOUT_MS, DEFAULT_WARD_TIMEOUT_MS, FRESH_SIGN_IN_SECONDS, InvalidClientKeyError, InvalidUserIdError, LOCKOUT_MAX_FAILURES, LOCKOUT_WINDOW_SECONDS, MAX_PASSWORD_LENGTH, MAX_USERNAME_LENGTH, MIN_PASSWORD_LENGTH, NoLocalPasswordError, NotLinkedError, PasswordPolicyError, SESSION_ABSOLUTE_SECONDS, SESSION_IDLE_SECONDS, SESSION_RENEW_INTERVAL_SECONDS, SESSION_STATUS_CACHE_SECONDS, SQLITE_MIGRATIONS, SchemaTooNewError, UserIdTakenError, UsernamePolicyError, UsernameTakenError, WardConfigurationError, WardSignInError, WardSubjectTakenError, WardUnavailableError, clearedCookie, createAccounts, createLockout, createSqliteStore, createWardClient, createWardIdentities, foldUsername, generateSessionToken, hashPassword, hashSessionToken, isWardAuthStore, lockoutKeyFor, migrateSqlite, normaliseUsername, parseTrustedProxies, readCookie, requireRole, secureCookiesFor, seedUsers, serializeCookie, spendDummyHash, toAuthUser, verifyPassword, wardAuth, wardClientOptionsFromEnv };
+export { AlreadyLinkedError, DEFAULT_NOTIFY_TIMEOUT_MS, DEFAULT_WARD_TIMEOUT_MS, FRESH_SIGN_IN_SECONDS, InvalidClientKeyError, InvalidUserIdError, LOCKOUT_MAX_FAILURES, LOCKOUT_WINDOW_SECONDS, MAX_PASSWORD_LENGTH, MAX_USERNAME_LENGTH, MIN_PASSWORD_LENGTH, NoLocalPasswordError, NotLinkedError, PasswordPolicyError, SESSION_ABSOLUTE_SECONDS, SESSION_IDLE_SECONDS, SESSION_RENEW_INTERVAL_SECONDS, SESSION_STATUS_CACHE_SECONDS, SQLITE_MIGRATIONS, SchemaTooNewError, UserDisabledError, UserIdTakenError, UsernamePolicyError, UsernameTakenError, WardConfigurationError, WardSignInError, WardSubjectTakenError, WardUnavailableError, clearedCookie, createAccounts, createLockout, createSqliteStore, createWardClient, createWardIdentities, foldUsername, generateSessionToken, hashPassword, hashSessionToken, isUsernameMaxLength, isWardAuthStore, lockoutKeyFor, migrateSqlite, normaliseUsername, parseTrustedProxies, readCookie, requireRole, secureCookiesFor, seedUsers, serializeCookie, spendDummyHash, toAuthUser, verifyPassword, wardAuth, wardClientOptionsFromEnv };

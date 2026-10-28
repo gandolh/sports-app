@@ -126,6 +126,7 @@ import { pathToFileURL } from 'node:url'
 import { TypeCompiler } from '@sinclair/typebox/compiler'
 import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from './db.mjs'
 import {
+  ALLOW_RENAME,
   ROUTE_PREFIX,
   openAccounts,
   linkWardStreams,
@@ -354,6 +355,8 @@ export function createStateServer(config) {
     cookiePath: auth.cookiePath,
     publicOrigin: auth.publicOrigin,
     routePrefix: ROUTE_PREFIX,
+    // No `POST /api/auth/username`: a stream is keyed by the username (ward.mjs).
+    allowRename: ALLOW_RENAME,
     // The one route with no session: liveness needs no credential. `GET` covers
     // `HEAD`, which the route also answers.
     publicRoutes: [`GET ${HEALTH_PATH}`],

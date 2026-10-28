@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { Field } from '@base-ui/react/field'
 import { createRoute, useNavigate } from '@tanstack/react-router'
 import { rootRoute } from './__root.tsx'
-import { validateLoginSearch, wardReturnTo } from './next.ts'
+import { nextFromWardReturn, validateLoginSearch, wardReturnTo } from './next.ts'
 import { useLogin, useSession, useWardSignIn } from '../../../vendor/ward/ward-auth-react.js'
 import { setCurrentUsername } from '../../persistence/session.ts'
 import { AlertBanner } from '../components/AlertBanner.tsx'
@@ -43,6 +43,11 @@ import { Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from '../compone
  * itself: a Ward sign-in that skipped this page would skip the write, and the guard
  * on that screen would send it straight back here, which is the loop again.
  *
+ * A Ward sign-in that is refused comes back here without `next`, carrying the
+ * return it was started with instead (`useWardSignIn().returnTo`, ward-auth
+ * 0.7.0). The page reads `next` back out of it, so trying again, with Ward or with
+ * a password, still goes on to the screen that was asked for (brief 33).
+ *
  * It does **not** clear the cache when the session call fails or says signed out.
  * The cache is what lets the app open offline, and an unreachable service is not a
  * sign-out. The cache is cleared only on an explicit log out (`/account`).
@@ -66,7 +71,8 @@ function LoginRoute() {
   const { login, pending, error: loginError, reset: resetLogin } = useLogin()
   const ward = useWardSignIn()
   const navigate = useNavigate()
-  const { next } = loginRoute.useSearch()
+  // The address bar's `next`, or the one a refused Ward sign-in hands back.
+  const next = loginRoute.useSearch().next ?? nextFromWardReturn(ward.returnTo)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [rememberError, setRememberError] = useState<string | null>(null)

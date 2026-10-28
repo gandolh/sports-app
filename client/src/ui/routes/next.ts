@@ -11,7 +11,8 @@
  * from. Under a base path the router has already taken the base off
  * `location.pathname` by the time a guard reads it, and puts it back on when it
  * navigates, so nothing here knows the base. Only the Ward return, which is a path
- * on the origin, adds it (`wardReturnTo`).
+ * on the origin, adds it (`wardReturnTo`), and takes it off again when a refused
+ * sign-in hands it back (`nextFromWardReturn`).
  */
 import { redirect } from '@tanstack/react-router'
 
@@ -75,4 +76,22 @@ export function validateLoginSearch(raw: Record<string, unknown>): LoginSearch {
  */
 export function wardReturnTo(next: string): string {
   return `${import.meta.env.BASE_URL}login?next=${encodeURIComponent(next)}`
+}
+
+/**
+ * The `next` a refused Ward sign-in was started with, read back out of the
+ * return it carried: the reverse of `wardReturnTo`, or `undefined`.
+ *
+ * After a refusal the service lands on `<base>login?ward_error=…&ward_return_to=…`
+ * with no `next` of its own, and the library takes both params out of the
+ * address bar, handing the return over as `useWardSignIn().returnTo`. That return
+ * is a path the library has checked with `isLocalPath`, but nothing more, so it
+ * counts only when it is exactly this app's login page with a `next`, and that
+ * `next` passes `appPath` like any other. Anything else is dropped and a retry
+ * goes to `/`, as before brief 33.
+ */
+export function nextFromWardReturn(returnTo: string | null): string | undefined {
+  const page = `${import.meta.env.BASE_URL}login?`
+  if (returnTo === null || !returnTo.startsWith(page)) return undefined
+  return appPath(new URLSearchParams(returnTo.slice(page.length)).get('next')) ?? undefined
 }

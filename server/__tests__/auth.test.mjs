@@ -207,6 +207,20 @@ describe('local sign-in, with Ward not configured at all', () => {
     expect(await accounts.findUserByUsername('mallory')).toBeUndefined()
   })
 
+  it('has no rename route: a stream is keyed by the username', async () => {
+    const { store, post, accounts } = await startService()
+    await seedAccount({ username: 'alice', password: PASSWORD, store })
+    const cookie = cookieFrom(
+      await post('/api/auth/login', { username: 'alice', password: PASSWORD }),
+    )
+
+    // ward-auth 0.4.0 turns `POST <prefix>/username` on by default; this app turns it off.
+    const response = await post('/api/auth/username', { username: 'bob' }, { cookie })
+    expect(response.status).toBe(404)
+    expect(await accounts.findUserByUsername('alice')).toBeDefined()
+    expect(await accounts.findUserByUsername('bob')).toBeUndefined()
+  })
+
   it('signs out: the cookie stops working and the stream is guarded again', async () => {
     const { base, store, post } = await startService()
     await seedAccount({ username: 'alice', password: PASSWORD, store })
