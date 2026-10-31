@@ -1452,3 +1452,9 @@ owner check. The todo is deleted. [Brief 33](briefs/done/33-ward-retry-keeps-the
 After brief 33 adopted ward-auth 0.7.0, the owner took the recommended answer on
 the two features it offers: no rename screen (`allowRename: false` stays, since
 each user's history is stored under the username) and no `usernameFor`.
+
+## [2026-10-31] maintenance | README's run steps match local accounts; `.env.example` boots as copied
+
+A README refresh pass with the readme-docs standard. The README's run section still said signing in and sync need Ward, and its diagram had the service check every session with Ward, the shared-cookie contract retired on 2026-10-13. It now starts the state service beside the app, makes an account with `npm run seed`, and draws Ward as the optional "Sign in with Ward". The link to the state page pointed at the old Starlight path; it points at `docs/docs/state.mdx` now.
+
+Found while running it: a straight `cp .env.example .env` set `WARD_OIDC_ISSUER` with an empty client key, and the service refused to start; with those lines commented out it then refused for want of `SPORTS_APP_PUBLIC_ORIGIN`, which the example left commented because it was derived from the Ward redirect URI. The example now sets the origin to `http://localhost:5173` and comments out the five Ward lines; Ward's `seed.mjs` still supplies them. `docs/getting-started.md` says so. Checked: `npm install`, `npm run server` (`listening on http://127.0.0.1:8787`, `/api/health` ok through the dev proxy), `npm run dev` on `/sports-app/`, and `npm run seed` against a scratch database. The images show the workout screens, which have not changed since 2026-10-09, and were kept.

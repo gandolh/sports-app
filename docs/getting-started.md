@@ -21,7 +21,7 @@ One install covers all four workspaces: `client`, `server`, `shared` and `docs`.
 cp .env.example .env
 ```
 
-`npm run dev` and `npm run server` both read the repo-root `.env`. A variable already set in the shell wins over the file. `.env` is gitignored.
+The copy runs with local accounts as it is: `SPORTS_APP_PUBLIC_ORIGIN` is set to `http://localhost:5173` and the `WARD_OIDC_*` lines are commented out, because with the issuer set and no client key the service refuses to start. `npm run dev` and `npm run server` both read the repo-root `.env`. A variable already set in the shell wins over the file. `.env` is gitignored.
 
 | Variable | Used by | Purpose | Where the value comes from |
 |---|---|---|---|

@@ -36,23 +36,25 @@ flowchart LR
   phone["Phone<br/>installed PWA"] --> client["client/<br/>React + Vite"]
   client -->|"save first"| local[("localStorage<br/>one JSON document per user")]
   client -.->|"sync when online"| server["server/<br/>Fastify + node:sqlite"]
-  server -->|"check the session"| ward["Ward<br/>estate sign-in"]
+  server -.->|"Sign in with Ward, optional"| ward["Ward<br/>estate sign-in"]
   server --> db[("SQLite<br/>snapshots per user")]
 ```
 
-More on the docs site: [architecture](corpus/wiki/architecture.md), [the progression engine](corpus/wiki/progression-engine.md) and [state and sync](docs/src/content/docs/state.mdx).
+More on the docs site: [architecture](corpus/wiki/architecture.md), [the progression engine](corpus/wiki/progression-engine.md) and [state and sync](docs/docs/state.mdx).
 
 ## Run it locally
 
-Requires Node 22.18 or later. Signing in and sync also need the estate's Ward, run locally from `../wzd_auth/infrastructure/local`.
+Requires Node 22.18 or later. Accounts live in the state service, so start it beside the app. Ward is optional, for the "Sign in with Ward" button.
 
 ```bash
 npm install
 cp .env.example .env
-npm run dev        # http://localhost:5173/sports-app/
+npm run seed       # asks for a username and a password
+npm run server     # the state service on 127.0.0.1:8787
+npm run dev        # in a second terminal: http://localhost:5173/sports-app/
 ```
 
-The state service, env vars, tests and the sign-in workaround: [docs/getting-started.md](docs/getting-started.md).
+Env vars, tests and a local Ward: [docs/getting-started.md](docs/getting-started.md).
 
 ## Project layout
 
