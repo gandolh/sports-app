@@ -33,9 +33,7 @@ const BRANCH = 'main'
 // that leaves the repo for a directory not listed here is reduced to its text,
 // with a warning: the site cannot serve it, and a guessed URL would 404.
 const OTHER_REPOS = {
-  // decisions-identity.md links into Ward's corpus. The checkout is `wzd_auth`;
-  // the repo on GitHub is `ward-auth`.
-  wzd_auth: 'https://github.com/gandolh/ward-auth',
+  // 'sibling-dir': 'https://github.com/OWNER/sibling-repo',
 }
 // Corpus pages deliberately NOT published (working notes, scratch, history
 // snapshots), by slug. A deny list rather than an allow list: a new page is

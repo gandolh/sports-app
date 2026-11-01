@@ -10,7 +10,7 @@ Ward cutover made this more than one section's worth. Everything else about the 
 the storage and the wire contract is still there.
 
 ### Accounts are the app's own, and Ward is a linked second way in
-_2026-10-13, brief 25 (Ward's corpus), under [Ward's decision](../../../wzd_auth/corpus/wiki/decisions-oidc.md)._
+_2026-10-13, brief 25 (Ward's corpus), under Ward's decision (`wzd_auth/corpus/wiki/decisions-oidc.md`)._
 The state service has **its own accounts**, in `auth_*` tables of the same SQLite file,
 run by the vendored `ward-auth` library (`server/vendor/ward/` and `client/vendor/ward/`,
 version in their READMEs; 0.7.0 since 2026-10-28, brief 33).
@@ -110,7 +110,7 @@ wrong-length input.
 
 ### Identity is Ward's, and the subject is the stream key — REVISED 2026-10-13, see above
 _2026-09-06._ The service authenticates a **person** from
-[Ward's](../../../wzd_auth/corpus/wiki/overview.md) `ward_session` cookie: the signature
+Ward's (`wzd_auth/corpus/wiki/overview.md`) `ward_session` cookie: the signature
 is verified locally against Ward's JWKS with the algorithm **pinned as a literal**, then
 introspected for liveness with a 30-second cache. `SPORTS_APP_SYNC_SECRET`,
 `POST /api/login` and the `x-sync-secret` header are gone.

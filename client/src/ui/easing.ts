@@ -8,7 +8,7 @@
  * module exists for the one place JS legitimately drives a *value* rather than a
  * style: the count-up on the finish screen.
  *
- * Ported in shape from `~/projects/game-engine`'s `engine/core/src/animation/
+ * Ported in shape from `game-engine`'s `engine/core/src/animation/
  * easing.ts`, which is where the idea came from, with two deliberate differences:
  *
  *   - **Only curves that correspond to a shipped token.** The engine carries six

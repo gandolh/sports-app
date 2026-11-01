@@ -675,7 +675,7 @@ cannot be "fixed" later. 614 → 634 tests.
 
 ### The deploy
 
-Built at `~/projects/vps-deploy/projects/sports-app/` (`deploy.ts`, `.env.example`,
+Built at `vps-deploy/projects/sports-app` (`deploy.ts`, `.env.example`,
 `.env`, `README.md`), plus the Caddy routes and a one-line `hasServer` registration in
 `vps-deploy/src/projects.ts`. Modelled on public-resource-map, the closest existing shape
 (SPA + Fastify + sqlite + pm2).
@@ -749,7 +749,7 @@ left alone — those are about viewing distance, not aim.
 
 ### 2026-07-30, later still — brief 23 written: the figures get a rig
 
-Researched the animation system against `~/projects/game-engine`, then grilled the
+Researched the animation system against `game-engine`, then grilled the
 result into [briefs/done/23-figure-rig-and-morph.md](briefs/done/23-figure-rig-and-morph.md).
 Nothing implemented.
 
@@ -1412,14 +1412,14 @@ link to it became a plain path.
 ## [2026-10-27] todo | A Ward retry keeps the asked screen
 
 From brief 32's outcome: after a refused Ward sign-in the library drops `next`,
-so a retry lands on `/`. The owner chose a library fix in `../wzd_auth` and
+so a retry lands on `/`. The owner chose a library fix in `wzd_auth` and
 adoption here once it is released. Captured as
 `ward-retry-keeps-the-asked-screen`,
 blocked on that release.
 
 ## [2026-10-27] todo | The Ward retry fix is released
 
-ward-auth 0.7.0 (`../wzd_auth` brief 42) carries the return path through a
+ward-auth 0.7.0 (`wzd_auth` brief 42) carries the return path through a
 refused sign-in as `ward_return_to`, read through `useWardSignIn().returnTo`.
 `ward-retry-keeps-the-asked-screen`
 now says how to adopt it and is ready to promote.
@@ -1435,7 +1435,7 @@ pass the same `returnTo` again after a refused Ward sign-in. Not built.
 ## [2026-10-28] build | brief 33: a Ward retry returns to the asked screen
 
 Both vendored copies of ward-auth went from 0.3.1 to 0.7.0, written by
-`../wzd_auth`'s vendor script, and that repo was left clean. 0.4.0's rename route
+`wzd_auth`'s vendor script, and that repo was left clean. 0.4.0's rename route
 stays off (`ALLOW_RENAME` in `server/ward.mjs`, passed in `state-server.mjs`, where
 `wardAuth` is actually registered), because a stream is keyed by the username. A
 0.3.1 database copy booted under 0.7.0 ran migration 4, and a password sign-in and the

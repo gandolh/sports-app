@@ -143,7 +143,7 @@ Browser storage is **not** durable: iOS evicts IndexedDB under pressure and one 
 site data" wipes everything. Losing history means losing ladder position entirely.
 
 ### Authentication — see decisions-identity.md
-Identity moved to [Ward](../../../wzd_auth/corpus/wiki/overview.md) on 2026-09-06,
+Identity moved to Ward (`wzd_auth/corpus/wiki/overview.md`) on 2026-09-06,
 superseding the "authentication is a nameplate" call that lived here. Both the old
 decision and its replacement are in
 [decisions-identity.md](decisions-identity.md) — it outgrew a section on this page.

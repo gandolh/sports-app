@@ -8,7 +8,7 @@ Starlight to Docusaurus. `docs/` (`@sports-app/docs-site`, served at
 
 The recipe is written and verified. The `corpus-docs-site` skill
 (personal-skills v0.31.0, source in
-`~/projects/my-personal-skills/skills/corpus-docs-site/`) now scaffolds
+`my-personal-skills/skills/corpus-docs-site`) now scaffolds
 Docusaurus 3.10, and `references/migrating-from-starlight.md` beside it holds
 the file, config and content maps plus ten gotchas, each hit during a real
 port. **Read that guide first.** The files this brief tells you to copy are in
@@ -64,7 +64,7 @@ not compile. Two findings:
    `build-diagrams.mjs` at it.
 5. **Sync.** Use the skill's `sync-corpus.mjs`, with `GITHUB_REPO` set to this
    repo's GitHub URL and
-   `OTHER_REPOS = { wzd_auth: 'https://github.com/gandolh/ward-auth' }`.
+   `OTHER_REPOS = { wzd_auth: 'https://github.com/<owner>/ward-auth' }`.
    Discovery renders every wiki page. Check the set against the old list and
    the sidebar. TypeDoc's `"out"` becomes `"static/reference"`.
 6. **Theme.** Port `theme.css` to `src/css/custom.css` with the guide's token
@@ -106,7 +106,7 @@ not compile. Two findings:
   `./search/index.html`.
 - `grep -c '/sports-app/docs/assets/' docs/dist/index.html` is non-zero, and
   `grep -rl '_astro' docs/dist` finds nothing.
-- `decisions-identity`'s Ward links point at `github.com/gandolh/ward-auth`.
+- `decisions-identity`'s Ward links point at `github.com/<owner>/ward-auth`.
 - `npm run lint`, `npm run typecheck` and `npm test` pass at the root, and
   `npm run typecheck -w @sports-app/docs-site` passes.
 - Browser check, with `docs/dist` served at `/sports-app/docs/` by a plain
@@ -140,7 +140,7 @@ line and diagram title now name accounts, not "the session's subject".
 `onBrokenLinks: 'throw'`, no broken-anchor warning and no sync warning. The route list
 equals `/tmp/sa-routes-before.txt` plus `./search/index.html`. `dist/index.html`
 references `/sports-app/docs/assets/` and nothing in `dist/` says `_astro`. The
-`decisions-identity` links into Ward's corpus go to `github.com/gandolh/ward-auth`.
+`decisions-identity` links into Ward's corpus go to `github.com/<owner>/ward-auth`.
 Root `npm run lint`, `npm run typecheck` (which now includes the docs workspace) and
 `npm test` (1202) pass, as does `bash corpus/lint.sh`. In a browser, with `dist/` served
 at `/sports-app/docs/` by `python3 -m http.server`: the landing page, `/state/` and

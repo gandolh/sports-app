@@ -99,7 +99,7 @@ npm run server
 
 `npm run server` loads the repo-root `.env` (Node's `--env-file-if-exists`). Anything set
 in the shell wins over the file. Locally the `WARD_OIDC_*` values point at Ward's
-container in `../wzd_auth/infrastructure/local`, whose `seed.mjs` registers sports-app as
+container in `wzd_auth/infrastructure/local`, whose `seed.mjs` registers sports-app as
 an OpenID Connect client and writes them into `.env`. Without `WARD_OIDC_ISSUER` the service
 runs with local accounts only, and the sign-in page has no Ward button.
 

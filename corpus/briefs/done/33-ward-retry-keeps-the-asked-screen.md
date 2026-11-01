@@ -12,14 +12,14 @@ When a Ward sign-in is refused, the library on 0.3.1 sends the browser to
 `/login?ward_error=…` without the `next`, so trying again lands on `/`.
 
 The owner chose on 2026-10-27 to fix it in the library, then adopt it here. It
-shipped as ward-auth **0.7.0** (`../wzd_auth` brief 42): a refused sign-in lands
+shipped as ward-auth **0.7.0** (`wzd_auth` brief 42): a refused sign-in lands
 on `<loginPath>?ward_error=<code>&ward_return_to=<returnTo>`, the path checked
 with `isLocalPath` on both sides, and the client hands it to the app as
 `useWardSignIn().returnTo`. `signIn()` does not reuse it by itself.
 
 Both vendored copies are at **0.3.1** (`client/vendor/ward/`,
 `server/vendor/ward/`). Going to 0.7.0 crosses the upgrade notes of 0.4.0 to
-0.7.0 in `../wzd_auth/shared-library/CHANGELOG.md`; read each one. Two that
+0.7.0 in `wzd_auth/shared-library/CHANGELOG.md`; read each one. Two that
 matter here:
 
 - **0.4.0 turns a rename route on** as soon as you upgrade. This brief adds no
@@ -32,7 +32,7 @@ matter here:
 ## Files you OWN
 
 - `client/vendor/ward/` and `server/vendor/ward/`, regenerated with
-  `npm run vendor -- <path>/vendor/ward` from `../wzd_auth` (never edited by
+  `npm run vendor -- <path>/vendor/ward` from `wzd_auth` (never edited by
   hand)
 - `server/ward.mjs` (`allowRename: false`, and anything else an upgrade note
   requires)
@@ -44,7 +44,7 @@ matter here:
 
 ## Files you must NOT touch
 
-- `../wzd_auth`: read it and run its `vendor` script, change nothing there.
+- `wzd_auth`: read it and run its `vendor` script, change nothing there.
 - `client/src/persistence/session.ts`: the cached-username contract is unchanged.
 
 ## What to do
@@ -78,7 +78,7 @@ matter here:
 ## Outcome (2026-10-28)
 
 **Done** (`9f6cd4d`). Both vendored copies are ward-auth 0.7.0, written by
-`npm run vendor` in `../wzd_auth` and byte-identical to each other. `../wzd_auth`
+`npm run vendor` in `wzd_auth` and byte-identical to each other. `wzd_auth`
 was left clean. The upgrade notes, in order:
 
 - **0.4.0:** the rename route stays off. `wardAuth` is registered in
