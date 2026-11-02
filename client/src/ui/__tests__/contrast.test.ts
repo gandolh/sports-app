@@ -11,12 +11,12 @@
 // It earned its keep twice. The 2026-07-30 dark→white switch could not be an
 // inversion — `#6ee7a8` is 1.5:1 on white — so every pair was re-derived at once,
 // which is precisely the change where one token quietly lands under the floor.
-// Then brief 26 multiplied the problem by sixteen: **two themes × eight accents**,
+// Then the token system multiplied the problem by sixteen: **two themes × eight accents**,
 // each accent carrying its own ink. A palette that size is not reviewable by eye,
 // and one shared `--on-accent` across eight fills is the exact mistake this now
 // catches — a near-black that reads at 10:1 on lime is under 2:1 on violet.
 //
-// ── What changed structurally in brief 26 ───────────────────────────────────
+// ── What changed structurally in the token system ───────────────────────────────────
 //
 // The old version flattened every `--name: value` in the file into one map and
 // measured that. With one `:root` block that was honest. With twenty-seven blocks

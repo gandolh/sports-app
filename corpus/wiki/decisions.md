@@ -1,6 +1,6 @@
 ---
 summary: Locked product and programme calls with the reasoning that settled them — read before proposing an alternative.
-updated: 2026-10-07
+updated: 2026-11-02
 ---
 
 # Decisions
@@ -56,7 +56,7 @@ and the account page says so. Ladders run out at roughly 9 months of daily train
 
 ## In-between rungs at the three big steps
 
-*Decided 2026-10-07 by the owner (open question 7); built as brief 28.*
+*Decided 2026-10-07 by the owner (open question 7); built the same day.*
 
 At push 3→4, hinge 4→5 and squat 5→6, the next rung at 5 reps was much harder than the
 last at 12. **Each step got a rung of its own**; which, and why, is in
@@ -131,7 +131,7 @@ that is not a rendering problem, it is the design being honest.
 
 ## Multi-user, with passwords that are never checked
 
-*Chosen 2026-07-29, reversing "single user, no auth".*
+*Chosen 2026-07-29, reversing "single user, no auth"; superseded 2026-10-13 ([decisions-identity.md](decisions-identity.md)).*
 
 A username keys its own state document, so two people can train on one deployment. A
 password field exists and its value is **accepted and immediately discarded** — never

@@ -39,9 +39,9 @@
  * never checked and keeps working. See `ward.mjs` for the prefixes and for the
  * one rule that is this app's own (a username has to fit the document schema).
  *
- * ── Fastify, and what the framework is NOT allowed to do (brief 22) ──────────
+ * ── Fastify, and what the framework is NOT allowed to do ──────────
  *
- * Brief 22 replaced hand-rolled `node:http` routing with Fastify without
+ * The Fastify move replaced hand-rolled `node:http` routing with Fastify without
  * changing the REST contract, and the tests in `__tests__/` are written against
  * the wire, not the implementation. Five things a framework does helpfully by
  * default and must not do here, each load-bearing and each pinned by a test:

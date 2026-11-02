@@ -22,7 +22,7 @@
  *
  * ── `navigator.onLine` is not consulted. Anywhere. ───────────────────────────
  *
- * Brief 01 observed it reporting `true` while the network was demonstrably
+ * The scaffold observed it reporting `true` while the network was demonstrably
  * offline — which is exactly the documented behaviour: `false` is reliable,
  * `true` only means "there is a network interface", not "the internet is
  * reachable". Gating on it would have skipped a push that would have worked. So

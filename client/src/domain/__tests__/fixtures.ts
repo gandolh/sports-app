@@ -32,7 +32,7 @@ import type { StateDoc } from '@sports-app/shared/types.ts'
  *
  * **Push is 44, not 30, because this is a document the v4 → v5 migration has
  * touched.** It was 30 under schema v4, which put it on `push-05` when the push
- * ladder had no rung 3a. Brief 28 inserted `push-03a` below it, and the migration
+ * ladder had no rung 3a. The in-between rungs inserted `push-03a` below it, and the migration
  * added one rung's worth of sessions (14) so the same document stays on the same
  * exercise. The codec tests build their v3 and v4 fixtures from this one with
  * push set back to 30, and assert they migrate to exactly this. Hinge (29) and

@@ -5,7 +5,7 @@
  * ── Still not a progress bar, even now that they are bars ───────────────────
  *
  * They are drawn as short capsules rather than circles, in the category
- * standard's shape language, and that is the only thing about them brief 27
+ * standard's shape language, and that is the only thing about them the 2026-09-04 rebuild
  * changed. What they mean did not: a filled dot means **"I tapped Next once"**,
  * which is the only thing the app knows for certain. It does not mean a set was
  * completed to standard, and it does not mean anything was logged — logging is

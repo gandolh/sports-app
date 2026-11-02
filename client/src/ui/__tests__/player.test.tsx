@@ -135,7 +135,7 @@ describe('the stop rule', () => {
     const cues = screen.getByTestId('cue-list')
 
     // Its own box, outside the list. Tucking it into the top of the list "so it
-    // reads together" is the single easiest way to undo brief 24, and it would
+    // reads together" is the single easiest way to undo schema v4, and it would
     // pass a text-only assertion.
     expect(cues.contains(stop)).toBe(false)
     expect(stop.contains(cues)).toBe(false)
@@ -148,7 +148,7 @@ describe('the stop rule', () => {
     // The push ladder starts at rung index 2 and nothing has been trained.
     const rung = getRung('push', 2)
     expect(screen.getByTestId('stop-rule').textContent).toContain(rung.stopRule)
-    // And it is no longer the last cue, which is where it lived before brief 24.
+    // And it is no longer the last cue, which is where it lived before schema v4.
     expect(screen.getByTestId('cue-list').textContent).not.toContain(rung.stopRule)
   })
 

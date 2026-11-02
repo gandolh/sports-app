@@ -46,7 +46,7 @@ import { Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from '../compone
  * A Ward sign-in that is refused comes back here without `next`, carrying the
  * return it was started with instead (`useWardSignIn().returnTo`, ward-auth
  * 0.7.0). The page reads `next` back out of it, so trying again, with Ward or with
- * a password, still goes on to the screen that was asked for (brief 33).
+ * a password, still goes on to the screen that was asked for.
  *
  * It does **not** clear the cache when the session call fails or says signed out.
  * The cache is what lets the app open offline, and an unreachable service is not a

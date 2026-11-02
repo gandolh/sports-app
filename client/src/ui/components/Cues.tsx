@@ -21,7 +21,7 @@ import { ShieldIcon } from './icons.tsx'
  * ── What is NOT in this list any more ───────────────────────────────────────
  *
  * The stop rule. It used to be `cues[3]` and it now has its own field on `Rung`
- * (brief 24) and its own component above this one (`StopRule.tsx`). If it ever
+ * (schema v4) and its own component above this one (`StopRule.tsx`). If it ever
  * reappears at the bottom of this list, the brake has gone back below the fold.
  *
  * ── `safetyCritical` ────────────────────────────────────────────────────────

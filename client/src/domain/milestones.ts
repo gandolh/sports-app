@@ -1,7 +1,7 @@
 /**
  * Milestones reached and total work ever — the two account-page stats that
  * need no stored data beyond what `schedule.ts` and `ladders.ts` already derive
- * (brief 20, corpus/briefs/todo/20-milestones-and-total-work.md). Charts are
+ * (corpus/briefs/todo/20-milestones-and-total-work.md). Charts are
  * out: the prescription is a pure function of session count, so plotting it
  * against session number is a straight line with no information in it.
  *

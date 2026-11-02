@@ -1,6 +1,6 @@
 ---
 summary: What the app assumes about the person using it — bad days, skipped days, rungs that are too hard, and the daily block that is easiest to drop.
-updated: 2026-07-30
+updated: 2026-11-02
 ---
 
 # Adherence and accepted risk
@@ -53,7 +53,7 @@ push-up and pistol progression at ~8 — regardless of whether the user can perf
 and with no mechanism to step back.
 
 **The nordic negative is no longer on that list** — it was the sharpest item when the
-decision was taken, and brief 15 removes it because the couch anchor violates the
+decision was taken, and the v2 domain (2026-07-29) removed it because the couch anchor violates the
 floor-only constraint. The hinge ladder now has no injurious rung at all.
 
 Four mitigations were offered (cut the rungs, a one-time unlock, a manual rung control,
@@ -85,7 +85,7 @@ justification.
 continuity. I will try to do it daily, but there might be some days when i skip. After i
 skip, i will go to the next session in the queue."*
 
-This is the answer to the sharpest thing brief 15's implementer found: **"a rung takes
+This is the answer to the sharpest thing the v2 domain's build found: **"a rung takes
 six weeks" silently assumes daily training.** 14 sessions is 2.3/week × 6, so at three
 sessions a week a push rung takes ~14 weeks and the whole ladder runs to about two years.
 The schedule is clock-free and cannot notice.

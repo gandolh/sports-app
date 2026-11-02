@@ -12,8 +12,8 @@ and tracks the work.
 2. Needing more than three is a signal that a page straddles topics and must
    split — not a licence to read more.
 3. Never read `briefs/` or `todos/` wholesale. [wiki/status.md](wiki/status.md)
-   holds every brief's state in one line. Open a brief only when you are about to
-   execute it.
+   holds a dated line per area and what is open. Open a brief only when you are
+   about to execute it.
 4. Prefer the `summary:` line over opening the page.
 
 ## Layout
@@ -80,6 +80,12 @@ explicit revisit plus a `log.md` entry.
 ## Conventions
 
 - Brief numbers are **stable for the life of the file** — never renumber on move.
+  Briefs run in number order; `wiki/status.md` doesn't list them.
+- Numbering restarted at 01 on 2026-11-02. The thirty-three briefs before that
+  were folded into the wiki and deleted; the last commit holding them is
+  `038f6ff` ([log.md](log.md), "Briefs reset").
+- Code comments don't cite brief numbers ("brief 22", "(brief 28)"), this repo's
+  or Ward's. Say what the code does and why; the history belongs in `log.md`.
 - Briefs in `done/` and `superseded/` are **immutable**.
 - Every wiki page carries `summary:` + `updated:` frontmatter.
 - Standard relative markdown links, not `[[wikilinks]]`.

@@ -1,10 +1,11 @@
 /**
- * The domain contract, **v3** (2026-07-29). Briefs 16–20 all code against this
- * file, so a wrong field here costs five briefs later.
+ * The domain contract, **v3** (2026-07-29). Persistence, the figures, the
+ * shell and milestones all code against this file, so a wrong field here
+ * costs five pieces of work later.
  *
  * ── What is here and what is in `shared/` ────────────────────────────────────
  *
- * *Split out 2026-07-29 (brief 21).* The document shape and the scalars that
+ * *Split out 2026-07-29.* The document shape and the scalars that
  * travel inside it moved to `@sports-app/shared/types.ts`, because the service
  * validates the document it stores and both ends must agree on it. What stayed
  * here is the **programme**: the ladders, the rotation, and the types that
@@ -78,7 +79,7 @@ export interface Rung {
   /**
    * Short imperative cues covering setup, the movement standard, and where the
    * modifier applies. The fourth — the failure signal that says stop the set —
-   * moved out to `stopRule` below in brief 24, so these are one shorter than they
+   * moved out to `stopRule` below in schema v4, so these are one shorter than they
    * were and now describe only how to *do* the rung.
    *
    * Load-bearing: a figure cannot distinguish rung 3 from rung 4 when they share
@@ -125,7 +126,7 @@ export interface Rung {
    * short set banks no debt. The cues still impose one UI contract:
    *
    * **On a `safetyCritical` rung, `cues[0]` renders FIRST and visually
-   * separated** — as the safety check it is, not as item one of four. Brief 19
+   * separated** — as the safety check it is, not as item one of four. The four-screen shell
    * implements that; this flag is how it knows which rungs.
    */
   readonly safetyCritical?: boolean

@@ -1,6 +1,6 @@
 ---
 summary: How this app knows who is asking — local accounts on the state service with "Sign in with Ward" as a linked second way in (2026-10-13), the Ward-session-only design it revised, and the superseded shared-secret nameplate before that; why the stream key is the signed-in username and never a query parameter.
-updated: 2026-10-28
+updated: 2026-11-02
 ---
 
 # Decisions — identity
@@ -10,10 +10,10 @@ Ward cutover made this more than one section's worth. Everything else about the 
 the storage and the wire contract is still there.
 
 ### Accounts are the app's own, and Ward is a linked second way in
-_2026-10-13, brief 25 (Ward's corpus), under Ward's decision (`wzd_auth/corpus/wiki/decisions-oidc.md`)._
+_2026-10-13, Ward's local-accounts change, under Ward's decision (`wzd_auth/corpus/wiki/decisions-oidc.md`)._
 The state service has **its own accounts**, in `auth_*` tables of the same SQLite file,
 run by the vendored `ward-auth` library (`server/vendor/ward/` and `client/vendor/ward/`,
-version in their READMEs; 0.7.0 since 2026-10-28, brief 33).
+version in their READMEs; 0.7.0 since 2026-10-28).
 Local sign-in never calls Ward, so the app works while Ward is down. "Sign in with Ward"
 is an OpenID Connect code flow that the service finishes; a first Ward sign-in creates a
 local user, and a person who already has one links Ward from `/account`. Nothing is ever
@@ -63,19 +63,19 @@ library refuses to boot if they disagree. The client reads the same prefix at bu
 for the sign-in routes, because signing in has to work before any document, and so any
 per-browser sync address, exists.
 
-**The sign-in loop (brief 29's bug) is fixed here.** Route guards read the cached username
+**The sign-in loop (found 2026-09-27) is fixed here.** Route guards read the cached username
 synchronously; `GET /api/auth/session` is the missing "who is this cookie" call, and the
 sign-in page writes its answer to the cache whenever the session is signed in. The cache is
 cleared only by an explicit log out, never by a failed or signed-out session call: an
 unreachable service is not a sign-out, and the cache is what keeps the app usable offline.
 
-**A sign-in goes on to the screen that was asked for** (brief 32, 2026-10-27). A guard
+**A sign-in goes on to the screen that was asked for** (2026-10-27). A guard
 sends a signed-out visit to `/login?next=<path>`, and `/login` goes there once it has
 written the cached username. Ward's return is `<base>login?next=<path>`, **never the
 screen itself**: a Ward sign-in that skipped `/login` would skip the write, and the
 screen's guard would send it back to `/login`, which is the loop again. `next` must be a
 path inside the app (`client/src/ui/routes/next.ts`); the service checks the Ward return
-again with the library's `isLocalPath`. Since brief 33 (2026-10-28, ward-auth 0.7.0) a
+again with the library's `isLocalPath`. Since 2026-10-28 (2026-10-28, ward-auth 0.7.0) a
 refused Ward sign-in comes back with the return it was started with
 (`useWardSignIn().returnTo`), and `/login` reads `next` back out of it
 (`nextFromWardReturn`), so a retry, with Ward or a password, still goes on to the screen.

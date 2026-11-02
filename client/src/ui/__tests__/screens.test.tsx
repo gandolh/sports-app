@@ -2,9 +2,9 @@
 //
 // The screens, driven through the real router and the real store.
 //
-// **Scope note.** Brief 27 was split. 27a owns `/` — Today, the finish page and
+// **Scope note.** The 2026-09-04 rebuild was split. Its first half owns `/` — Today, the finish page and
 // the two document states that are not a session — and rebuilt them against the
-// new shell; that block below is unchanged from 27a's version. 27b owns the route
+// new shell; that block below is unchanged from that half's version. The second half owns the route
 // tree, `/plan`, `/progress`, and the port of `/login` and `/account` off the old
 // `app.css` vocabulary; those blocks are new or rewritten.
 //
@@ -385,7 +385,7 @@ describe('/progress', () => {
   })
 
   /**
-   * Brief 28. The chart plots `sessionsDone.push` along the whole ladder, so a
+   * The in-between rungs. The chart plots `sessionsDone.push` along the whole ladder, so a
    * document stored as v4 must reach the chart through the v4 → v5 step. These
    * seed the stored text directly, stamped 4, the way an un-updated phone left it.
    */

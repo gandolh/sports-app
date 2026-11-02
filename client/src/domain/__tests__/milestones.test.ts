@@ -58,7 +58,7 @@ describe('milestonesReached replays history rather than trusting doc.sessionsDon
   const milestones = milestonesReached(doc)
 
   it('attributes the push rung advance to session 27, not to a count derived from sessionsDone', () => {
-    // Push's 14th session climbs from `push-03-knees` into brief 28's in-between
+    // Push's 14th session climbs from `push-03-knees` into the in-between
     // rung, which is an ordinary advance. The named "first full push-up" is one
     // rung later, and has its own test below.
     const found = milestones.find((m) => m.pattern === 'push' && m.label.startsWith('Advanced to'))
@@ -105,7 +105,7 @@ describe('milestonesReached replays history rather than trusting doc.sessionsDon
 })
 
 describe('the first full push-up comes one rung after the in-between rung', () => {
-  // Brief 28 put `push-03a` between the knee push-up and the full push-up, so
+  // The in-between rungs put `push-03a` between the knee push-up and the full push-up, so
   // the named milestone moved from push's 14th session to its 28th. Its meaning
   // did not move: it still fires on arriving at `push-04-full`.
   const history = Array.from({ length: 28 }, () => sessionFor('push'))

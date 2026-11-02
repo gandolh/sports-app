@@ -25,10 +25,10 @@ import type { IconProps } from './icons.tsx'
  *
  * ── All four routes exist now ───────────────────────────────────────────────
  *
- * Brief 27 was split: 27a built Today and the player against the new shell and
+ * The 2026-09-04 rebuild was split: its first half built Today and the player against the new shell and
  * left Plan and Progress as inert, `aria-disabled` cells pointing nowhere — the
  * route tree could not yet type-check a `to="/progress"` that did not exist.
- * 27b added both routes (`routes/plan.tsx`, `routes/progress.tsx`) and this file
+ * The second half added both routes (`routes/plan.tsx`, `routes/progress.tsx`) and this file
  * lost its `Pending` branch along with it: every tab is now a real `Link`.
  */
 

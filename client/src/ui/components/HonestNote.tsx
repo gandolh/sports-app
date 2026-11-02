@@ -6,7 +6,7 @@ import { NoteIcon } from './icons.tsx'
  * A persistent, labelled disclosure in the `warn` hue. **Never dismissible and
  * never red.**
  *
- * ── This is open question 8, and it is why brief 27 is not a reskin ─────────
+ * ── This is open question 8, and it is why the 2026-09-04 rebuild is not a reskin
  *
  * The category standard ships exactly two warning affordances: a red toast and a
  * destructive confirm. Both are *interruptions* — they assume something went
@@ -38,7 +38,7 @@ import { NoteIcon } from './icons.tsx'
  *
  * Three uses ship: `POSTURAL_NOTICE` wherever a pull exercise appears (below),
  * the missed-day line on the plan screen, and what the progress chart plots.
- * The last two are brief 27b's.
+ * The last two came with the plan and progress screens (2026-09-04).
  *
  * `Notices.tsx` rendered this content against `app.css` and was deleted with it
  * on 2026-09-04, along with `/week`. This is the only implementation.
@@ -78,7 +78,7 @@ export function HonestNote({ label, children, inset = false }: HonestNoteProps) 
 
 /**
  * `POSTURAL_NOTICE`, **verbatim**, wherever a pull exercise appears — the plan
- * on Today, the player page, and (27b) the plan screen.
+ * on Today, the player page, and the plan screen.
  *
  * There is no anchor in a zero-equipment programme, so the pull slot trains
  * scapular retraction and upper-back endurance and nothing else. Presenting that

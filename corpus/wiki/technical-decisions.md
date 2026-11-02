@@ -1,6 +1,6 @@
 ---
 summary: Locked stack, storage, routing, timer and rendering choices — read before proposing an alternative implementation.
-updated: 2026-07-29
+updated: 2026-11-02
 ---
 
 # Technical decisions
@@ -33,7 +33,7 @@ written twice. Validate **on blur and submit, never per keystroke**.
 
 The validation rules themselves are **not the form layer's to define**: the username rule
 lives in `shared/username.ts` (`USERNAME_PATTERN`, `USERNAME_RULE`, `isValidUsername`) —
-one definition imported by the client *and* the service, since brief 21. A form that
+one definition imported by the client *and* the service, since 2026-07-29. A form that
 restates the rule is a second source of truth for it. **The password field has no
 validation**, which is the honest reflection of nothing checking it.
 
@@ -65,8 +65,8 @@ browser bundle and a Node service import it. That is the constraint that decides
 allowed in: data shapes and validation, never behaviour. The ladders, the schedule and the
 milestones stay in the client; they are logic the server has no business knowing.
 
-**`shared/` had zero dependencies when brief 21 landed it and has exactly one now** —
-`@sinclair/typebox`, added by brief 22 for the endpoint schemas. It is pure runtime-agnostic
+**`shared/` had zero dependencies when it landed (2026-07-29) and has exactly one now** —
+`@sinclair/typebox`, added on 2026-07-29 for the endpoint schemas. It is pure runtime-agnostic
 JavaScript, so the boundary rule still holds, and it is currently **0 bytes in the client
 bundle** (verified: the client imports `shared/types.ts` and `shared/username.ts` but never
 `shared/api.ts`, so nothing pulls it in). The thing to watch: **the day a client file imports
@@ -75,11 +75,11 @@ via `Static<>` only or keep the schemas server-side — do not let it arrive unn
 
 ### The API is Fastify, and the REST contract is unchanged
 *Decided 2026-07-29 by the user, **reversing the zero-dependency decision below.** Landed
-by brief 22 the same day: `fastify@5.10.0`, all 73 server tests passing unchanged, zero
+by the Fastify move the same day: `fastify@5.10.0`, all 73 server tests passing unchanged, zero
 files under `client/` touched.*
 
-The endpoints, their paths, their status codes and their bodies are exactly as brief 17
-landed them — the client already speaks plain REST and did not change. What changed is
+The endpoints, their paths, their status codes and their bodies are exactly as the multi-user
+server landed them — the client already speaks plain REST and did not change. What changed is
 the implementation underneath: routing, body limits, content-type handling and error
 shaping stopped being hand-rolled, and validation is schema-driven from
 **`shared/api.ts`** (TypeBox: one declaration is both a JSON Schema for Fastify's AJV and a

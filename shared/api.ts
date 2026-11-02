@@ -2,12 +2,12 @@
  * The four endpoints, as schemas — **one declaration per wire shape, read by the
  * service's validator and by the type checker.**
  *
- * ── Why this file exists, and why brief 21 deliberately did not create it ────
+ * ── Why this file exists, and why the workspaces move deliberately did not create it ────
  *
- * Brief 21 built the `shared/` workspace and stopped short of this file on
+ * The workspaces move built the `shared/` workspace and stopped short of this file on
  * purpose: an empty `api.ts` would have been a placeholder pretending to be a
  * contract, and the wire shapes were still hand-checked in
- * `server/state-server.mjs` at the time. Brief 22 moved the service onto Fastify,
+ * `server/state-server.mjs` at the time. The Fastify move put the service on Fastify,
  * whose validation is schema-driven, so there is finally a *consumer* for a schema
  * — and the point of putting it here rather than in `server/` is that one
  * declaration now produces both the runtime guard and the TypeScript type
@@ -69,7 +69,7 @@ import { USERNAME_PATTERN, USERNAME_RULE } from './username.ts'
 // These were written twice — once in `server/state-server.mjs`, once in
 // `client/src/persistence/sync.ts` under a comment reading "mirrors
 // server/state-server.mjs". The service now imports them from here; the client's
-// copy is still its own, because brief 22 may not touch `client/`. That leaves the
+// copy is still its own, because the Fastify move may not touch `client/`. That leaves the
 // same two copies as before rather than adding a third, and puts the definition
 // somewhere the client can delete its copy *into*.
 

@@ -2,9 +2,9 @@
 // geometry, no DOM.
 //
 // This file only owns `Prone.tsx`. It duplicates a little of `rig.test.ts`'s
-// machinery on purpose — that file is wave 1's, shared across all five
-// figures, and touching it would conflict with five agents editing this brief
-// at once. Everything here is scoped to `PRONE_RIG` alone.
+// machinery on purpose — that file is shared across all five figures,
+// and touching it would have conflicted with the agents editing the other
+// figures at once. Everything here is scoped to `PRONE_RIG` alone.
 import { STROKE_WIDTH } from '../constants.ts'
 import { PRONE_MOVEMENT_ARROW, PRONE_RIG } from '../Prone.tsx'
 import { buildTimeline } from '../motion.ts'

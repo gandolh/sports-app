@@ -22,7 +22,7 @@
  *      the returned status carries both counts, *and* no write happens in either
  *      direction (no `PUT` is issued and storage is not touched).
  *
- * `navigator.onLine` gets its own test, because brief 01 observed it reporting
+ * `navigator.onLine` gets its own test, because the scaffold observed it reporting
  * `true` while offline and a reflex to "improve" this module by gating on it
  * would be a regression.
  */
@@ -352,7 +352,7 @@ describe('push', () => {
     expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state')
   })
 
-  it('never reads navigator.onLine — it lies (brief 01)', async () => {
+  it('never reads navigator.onLine — it lies', async () => {
     let reads = 0
     vi.stubGlobal('navigator', {
       get onLine() {
@@ -472,7 +472,7 @@ describe('pull', () => {
   })
 
   it('pulls a v4 document and hands back v5, on the same push rung', async () => {
-    // Brief 28. A phone still on the old build pushes v4, whose counters index the
+    // The in-between rungs. A phone still on the old build pushes v4, whose counters index the
     // ladders as they were before three rungs were inserted. The pull goes through
     // `parse`, so the v4 → v5 step runs on the way in: 14 push sessions was
     // `push-04-full` under v4 and is 28 on the new ladder, the same rung.

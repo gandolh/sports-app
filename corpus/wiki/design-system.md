@@ -1,6 +1,6 @@
 ---
 summary: Design tokens and the doctrine governing them — colour, type, spacing and motion. The banned patterns and accessibility floor live in design-guardrails.md.
-updated: 2026-10-07
+updated: 2026-11-02
 ---
 
 # Design system
@@ -133,7 +133,7 @@ physical key; on 56px it is 4px off a pill, and a pill reads as a template.
 
 ### Two exceptions, and they are content rather than chrome
 
-*Revised 2026-07-29 — brief 18 found this page silently contradicting the code it was
+*Revised 2026-07-29 — the animated figures' build found this page silently contradicting the code it was
 supposed to govern, which is the failure mode a design system exists to prevent.*
 
 - **The countdown ring** animates continuously and **steps once per second**. A smooth

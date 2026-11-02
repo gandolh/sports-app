@@ -20,18 +20,18 @@ import { Eyebrow, SectionHeading } from './Shell.tsx'
  * in. It is deliberately the *last* section of the page — a deployment detail on a
  * screen otherwise about training, and nothing on the way to a first set.
  *
- * ── This file is one line item outside brief 27b's normal boundary ──────────
+ * ── This file was edited outside the rebuild's planned files ────────────────
  *
- * Every other file under `components/` was 27a's, or `TabBar.tsx`, called out by
- * name as the one exception 27b may edit. This one is neither, and it is edited
+ * Every other file under `components/` belonged to the 2026-09-04 rebuild's first
+ * half, or was `TabBar.tsx`, the one exception its second half could edit. This one is neither, and it is edited
  * anyway: it is a hard dependency of `/account`, it rendered entirely against
  * `app.css`'s class vocabulary (`.section`, `.field`, `.actions`, `.result`), and
- * 27b deleted that file — a listed deliverable, not a side effect — leaving
+ * the second half deleted that file — a listed deliverable, not a side effect — leaving
  * nowhere for those class names to resolve to. Recreating them in
  * `index.css` would just rebuild `app.css` under a new name, which that file's own
- * header says brief 27 exists to stop. So this is a mechanical reskin: same hooks,
+ * header says the rebuild exists to stop. So this is a mechanical reskin: same hooks,
  * same validation, same copy, same `data-testid`s — only the class names moved
- * to the same Tailwind vocabulary the rest of brief 27b uses.
+ * to the same Tailwind vocabulary the rest of the second half uses.
  *
  * ── The secret is write-only, and that is a hard rule ───────────────────────
  *

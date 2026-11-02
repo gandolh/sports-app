@@ -760,7 +760,7 @@ function v1Doc(): JsonObject {
  * and proving nothing when it did.
  *
  * The one number that differs is the one v5 is about. Under v4, 30 push sessions
- * put the document on `push-05-full-3s-down`. Brief 28 inserted `push-03a` below
+ * put the document on `push-05-full-3s-down`. The in-between rungs put `push-03a` below
  * that rung, and the v4 → v5 step adds 14 so the document stays on `push-05`.
  * Squat (31) and hinge (29) sit below their insertions and do not move. So this
  * fixture must migrate to exactly `midProgram`, and the tests say so.
@@ -828,7 +828,7 @@ describe('migrate', () => {
   })
 
   it('has a step for v3, and that step returns the document it was handed', () => {
-    // Both halves matter. The *step existing* is the whole of brief 25's migration
+    // Both halves matter. The *step existing* is the whole of the migration
     // — without an entry in the map the loop refuses version 3 outright. The step
     // being the identity is what says v4 is purely additive: it hands back the very
     // same object, so there is no clone to have quietly rewritten anything.
@@ -1011,7 +1011,7 @@ describe('a v1 document migrates all the way to v5 in one call', () => {
 
 describe('a v3 document migrates to v5', () => {
   it('is accepted and re-stamped rather than refused', () => {
-    // The whole of the migration, and the only reason it exists: before brief 25
+    // The whole of the migration, and the only reason it exists: before persistence v4
     // this exact input produced "no migration from version 3 to 4".
     const doc = expectAccepted(JSON.stringify(v3Doc(), null, 2))
     expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
@@ -1095,7 +1095,7 @@ describe('every schema this build has ever written reaches v5 and settles there'
 // ─── v4 → v5: the in-between rungs ──────────────────────────────────────────
 
 /**
- * Brief 28's three inserted rungs. The v4 ladder for a pattern is today's ladder
+ * The three inserted rungs. The v4 ladder for a pattern is today's ladder
  * without its inserted rung: rung ids never change, so that is exactly the list
  * a v4 build indexed into.
  */
@@ -1127,7 +1127,7 @@ function v4Text(counts: Partial<Record<Pattern, unknown>>): string {
 }
 
 describe('a v4 document migrates to v5 and stays on the same exercise', () => {
-  // Brief 28's acceptance table. For each ladder that gained a rung: the first
+  // The acceptance table. For each ladder that gained a rung: the first
   // count on the rung just past the insertion, and the last count on the rung
   // just before it. The rung ids are written out, so a wrong v4 model in the
   // helpers above cannot make these pass on its own.
@@ -1352,7 +1352,7 @@ describe('logged round-trips', () => {
  *
  * This is the same policy the file applies to `cyclePosition`, `sets` and every
  * counter, and choosing it over truncate-or-clamp is the load-bearing decision in
- * brief 25 — see `validateLogged`. Truncating a too-long log would delete a set the
+ * persistence v4 — see `validateLogged`. Truncating a too-long log would delete a set the
  * person recorded *and then write the shorter version back to storage* on the next
  * save, which is the exact "hand-edit becomes permanent data loss" failure the
  * codec's second guarantee exists to prevent.
@@ -1558,7 +1558,7 @@ describe('summarise', () => {
 // ─── The service's contract ─────────────────────────────────────────────────
 
 /**
- * The gap brief 17 left on purpose: its own tests import nothing from the client
+ * The gap the multi-user server left on purpose: its own tests import nothing from the client
  * (deliberately — the service is version-agnostic and must not be coupled to the
  * bundle), so **nothing proved that a document this codec serialises is a document
  * `PUT /api/state` accepts.** That test belongs here, on the client side of the
@@ -1589,7 +1589,7 @@ describe('the sync service accepts what serialise writes', () => {
     })
   })
 
-  // DELETED in brief 21: "uses the same username rule the service enforces,
+  // DELETED in the workspaces move: "uses the same username rule the service enforces,
   // character for character".
   //
   // It compared `codec.ts`'s `USERNAME_PATTERN` with `server/db.mjs`'s and

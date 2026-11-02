@@ -1,6 +1,6 @@
 ---
-summary: What the training actually is — the three-day rotation, what each session contains, the rep ladders rung by rung (with brief 28's three in-between rungs), the per-rung hold caps, and the cardio protocol.
-updated: 2026-10-07
+summary: What the training actually is — the three-day rotation, what each session contains, the rep ladders rung by rung (with the three in-between rungs of 2026-10-07), the per-rung hold caps, and the cardio protocol.
+updated: 2026-11-02
 ---
 
 # The programme
@@ -92,7 +92,7 @@ the lever switches to the next modifier — tempo, pause, range, leverage, unila
 
 The `#` is the number in the rung's id, which never changes. The app's "rung 4 of 9"
 counts by position instead, so the two differ above a gap or an inserted rung. **S** is
-where every document starts; **!** is `safetyCritical`; **new** is brief 28.
+where every document starts; **!** is `safetyCritical`; **new** is from 2026-10-07.
 
 | # | Push | # | Squat | # | Hinge |
 |---|---|---|---|---|---|
@@ -111,7 +111,7 @@ be a different exercise. The gap is deliberate (`ladders.ts`).
 
 ### The three in-between rungs
 
-*Added 2026-10-07 by brief 28, answering open question 7.* At three places the next
+*Added 2026-10-07, answering open question 7.* At three places the next
 rung at 5 reps was much harder than the last one at 12, so its first session was often
 its hardest while the app drew a smooth ramp. The owner is new to exercise and asked
 for the best option at each step, so each was chosen for a beginner:
@@ -133,7 +133,7 @@ for the best option at each step, so each was chosen for a beginner:
 
 Each is zero equipment (towels and a wall), states its tempo, and says in its cues what
 changed from the rung before. The cues call them rung 3a, 4a and 5a, after their ids.
-Adding a rung moves every rung above it up one array index, which is why brief 28 also
+Adding a rung moves every rung above it up one array index, which is why the 2026-10-07 change also
 carried a state migration; see [progression-engine.md](progression-engine.md).
 
 ## The cardio day

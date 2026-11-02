@@ -5,17 +5,17 @@
  *
  * ── What belongs here and what does not ─────────────────────────────────────
  *
- * Since brief 26 every colour, radius, shadow and type size is a utility, so a
+ * Since 2026-09-04 every colour, radius, shadow and type size is a utility, so a
  * component's appearance is written where the component is. What is left for
  * this file is the rules that have no element to hang off: the
  * screen-reader-only clip, the focus ring, the pressed state a `data-`
  * attribute drives, and the safe-area insets. Adding a `.card` or a `.tile`
- * here would re-create `app.css` under a new name, which is the thing brief 27
- * exists to stop.
+ * here would re-create `app.css` under a new name, which is the thing the 2026-09-04
+ * rebuild exists to stop.
  *
  * `ui/app.css` — the white world's vocabulary — and its import here, along with
- * the `TEMPORARY` alias block at the foot of `tokens.css`, were deleted by brief
- * 27b once `/plan`, `/account`, `/login` and the root route's 404 stopped
+ * the `TEMPORARY` alias block at the foot of `tokens.css`, were deleted by the
+ * rebuild's second half once `/plan`, `/account`, `/login` and the root route's 404 stopped
  * rendering against them. Nothing may reference either again.
  *
  * ── Everything below is `@layer base`, and that is load-bearing ────────────
@@ -25,10 +25,10 @@
  * CSS's own rule is that an **unlayered** style always beats every layered one,
  * regardless of source order or specificity — so a plain `button { border: 0 }`
  * written down here, outside any layer, silently wins against `.border` and
- * every colour utility on every `<button>` in the app, brief 26's whole Tailwind
+ * every colour utility on every `<button>` in the app, the whole Tailwind
  * migration notwithstanding. `SecondaryButton`'s `border border-line2` rendered
- * with no border at all until this was caught (27b), on both 27a's screens and
- * this brief's. Putting this file's own rules in `@layer base` — the same layer
+ * with no border at all until this was caught (the rebuild's second half), on
+ * both halves' screens. Putting this file's own rules in `@layer base` — the same layer
  * Tailwind's own preflight uses — is what lets a component's utility classes
  * override the reset the way every one of them already assumes they can.
  */
@@ -130,7 +130,7 @@ input {
 
 /**
  * Visually hidden, still announced. Duplicated from `app.css` on purpose: this
- * is the copy that survives 27b's deletion of that file, and the two are
+ * is the copy that survived the deletion of that file, and the two are
  * identical so the overlap is inert until then.
  */
 .sr-only {

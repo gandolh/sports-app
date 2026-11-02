@@ -248,13 +248,13 @@ export default tseslint.config(
   },
 
   // ---------------------------------------------------------------------------
-  // The state service (brief 11). Plain .mjs run directly by Node and never
+  // The state service. Plain .mjs run directly by Node and never
   // bundled. The explicit globals list is here rather than a `globals` package
   // because the service was once dependency-free and that was worth preserving;
   // it now takes Fastify, but one dependency in the *linter* still buys nothing.
   // It is not under `client/src/`, so none of the pure-core rules above apply.
   //
-  // This block predicted its own survival of brief 22 — it is about the
+  // This block predicted its own survival of the Fastify move — it is about the
   // *runtime*, not the HTTP library — and it was right: the Fastify migration
   // left the service as `server/*.mjs` in place, so the glob never moved. Proved
   // by pointing it at a glob that matches nothing, which turns every `process`,

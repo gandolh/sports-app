@@ -29,7 +29,7 @@ import { itemName, rungSummary, targetLabel, targetText } from './format.ts'
  *
  * Verbatim, wherever a pull exercise appears — and putting it here rather than
  * in each screen is what makes "wherever" true by construction. Today, the
- * player and (27b) the plan screen all render pull work through this component,
+ * player and the plan screen all render pull work through this component,
  * so none of them can forget it, and there is a test on each.
  */
 

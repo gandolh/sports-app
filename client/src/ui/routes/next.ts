@@ -88,7 +88,7 @@ export function wardReturnTo(next: string): string {
  * is a path the library has checked with `isLocalPath`, but nothing more, so it
  * counts only when it is exactly this app's login page with a `next`, and that
  * `next` passes `appPath` like any other. Anything else is dropped and a retry
- * goes to `/`, as before brief 33.
+ * goes to `/`, as before the Ward retry fix.
  */
 export function nextFromWardReturn(returnTo: string | null): string | undefined {
   const page = `${import.meta.env.BASE_URL}login?`

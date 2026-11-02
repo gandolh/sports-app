@@ -209,17 +209,17 @@ export interface Settings {
  * **v3** (2026-07-29): the fixed schedule. `ladders` (four numbers per pattern)
  * collapsed to `sessionsDone` (one), `sessionsCompleted` became derivable from
  * `history.length`, `ExerciseResult.sets` became a count, `day` became
- * `position`, and `variant` appeared. Brief 16 owns the v1/v2 → v3 migration.
+ * `position`, and `variant` appeared. Persistence v3 owns the v1/v2 → v3 migration.
  *
  * **v4** (2026-09-04): `ExerciseRecord.logged`, from the logging reversal
  * (corpus/wiki/reversals.md). The change is additive and the field is optional, so
  * every v3 document is already structurally a valid v4 one — the version still
  * bumps because the service indexes `schema_version`, and "written by a build that
- * could not have recorded logs" is a fact worth being able to ask about. Brief 25
+ * could not have recorded logs" is a fact worth being able to ask about. Persistence v4
  * owns the v3 → v4 migration; nothing in this file performs one.
  *
  * **v5** (2026-10-07): no field changed. What changed is what a `sessionsDone`
- * counter *means*. Brief 28 inserted a rung into each of the push, hinge and squat
+ * counter *means*. The in-between rungs inserted a rung into each of the push, hinge and squat
  * ladders, and a counter is turned into a rung by array index, so the same count
  * names a different exercise on the new ladders. The v4 → v5 step in
  * `client/src/persistence/codec.ts` moves each counter past an insertion forward

@@ -10,7 +10,7 @@
  * **This is the one file under `client/src/` allowed to contain a hex colour.**
  * `__tests__/noHexColors.test.ts` fails the build on a hex literal anywhere else,
  * which is what stops a one-off `#1a1a1a` from quietly forking the palette.
- * Everything else references `var(--…)` — or, from brief 26 onward, a Tailwind
+ * Everything else references `var(--…)` — or, from the token system onward, a Tailwind
  * utility, which is the same thing by another name (see `@theme inline` below).
  *
  * ── Why the palette moved again ─────────────────────────────────────────────
@@ -29,7 +29,7 @@
  *     shadow is the single most common template tell. On near-black a card does
  *     not read as a card without real offset and blur, so there is a `--sh-*`
  *     scale and it is meant to be used. (`src/index.css` still carries a global
- *     `box-shadow: none` from the old world; brief 27 owns removing it.)
+ *     `box-shadow: none` from the old world; the 2026-09-04 rebuild owns removing it.)
  *
  * ── The three theme states, and why the order is load-bearing ───────────────
  *

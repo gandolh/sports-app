@@ -51,8 +51,8 @@ describe('ladder shape', () => {
     // Hard-coded on purpose: a silently dropped rung would otherwise pass every
     // other test in this file. Push LOST one — `push-07-feet-elevated` needed a
     // chair and was deliberately not backfilled — while hinge gained one when the
-    // two couch-anchored nordic negatives became three sliding-curl rungs. Brief
-    // 28 then added one rung to each of push, squat and hinge.
+    // two couch-anchored nordic negatives became three sliding-curl rungs. On
+    // 2026-10-07 one more rung went to each of push, squat and hinge.
     expect(LADDERS.push.rungs).toHaveLength(9)
     expect(LADDERS.squat.rungs).toHaveLength(9)
     expect(LADDERS.hinge.rungs).toHaveLength(8)
@@ -61,7 +61,7 @@ describe('ladder shape', () => {
   })
 
   it('puts each in-between rung exactly between the two rungs of its big step', () => {
-    // Brief 28. The neighbours are the point: each inserted rung exists to split
+    // The in-between rungs. The neighbours are the point: each inserted rung exists to split
     // one step that was too big, so it must sit between those two rungs and no
     // others. The v4 → v5 migration in `codec.ts` also assumes these positions.
     const inserted: readonly [Pattern, string, string, string][] = [
@@ -195,7 +195,7 @@ describe('target ranges', () => {
 
 describe('floor only — towels and the floor', () => {
   // Zero equipment means zero furniture. Every one of these words was in a cue
-  // before brief 15, and each one made a rung undoable in a bare room.
+  // before the v3 domain, and each one made a rung undoable in a bare room.
   const FURNITURE = [
     'chair',
     'couch',
@@ -310,7 +310,7 @@ describe('safetyCritical and the starting-rung cap', () => {
   })
 
   it('opens every safetyCritical rung with the safety check, in cues[0]', () => {
-    // The UI contract brief 19 implements: on these rungs cues[0] renders first
+    // The UI contract the four-screen shell implements: on these rungs cues[0] renders first
     // and visually separated. It has to actually BE the safety check.
     for (const rung of safetyCritical) {
       const first = rung.cues[0]!
@@ -467,7 +467,7 @@ describe('rung ids', () => {
     }
   })
 
-  it('has exactly the three lettered rungs brief 28 inserted', () => {
+  it('has exactly the three lettered rungs inserted on 2026-10-07', () => {
     // Same reasoning as the gap: an inserted rung is a content decision with a
     // migration attached, never a pattern to reach for casually.
     const lettered = allRungs.map(([, , rung]) => rung.id).filter((id) => LETTERED.test(id))

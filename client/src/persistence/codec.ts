@@ -83,7 +83,7 @@
  *
  * ── v5 moved counters once, and that is all it did ─────────────────────────
  *
- * Brief 28 inserted a rung into three ladders. No field changed, but a stored
+ * The in-between rungs inserted a rung into three ladders. No field changed, but a stored
  * `sessionsDone` is turned into a rung by array index, so the same number now
  * names a different exercise. The v4 → v5 step (`keepPlaceAcrossInsertedRungs`)
  * moves each affected counter forward by one rung's worth of sessions so the
@@ -500,7 +500,7 @@ const V4_TO_V5_INSERTIONS: ReadonlyMap<Pattern, V4Insertion> = new Map<Pattern, 
 ])
 
 /**
- * v4 → v5: brief 28 inserted a rung into the push, hinge and squat ladders, and
+ * v4 → v5: the in-between rungs inserted a rung into the push, hinge and squat ladders, and
  * this step keeps every document on the exercise it was on.
  *
  * Position is not stored as a rung. It is `sessionsDone`, and the rung is
@@ -947,7 +947,7 @@ function validateDoc(ctx: Ctx, raw: JsonObject): StateDoc | undefined {
 
 /**
  * The username is validated against the same allowlist the sync service uses —
- * literally the same one since brief 21, not a matching copy — so a document this
+ * literally the same one since 2026-07-29, not a matching copy — so a document this
  * codec accepts is a document that can be pushed. See
  * `@sports-app/shared/username.ts`.
  */

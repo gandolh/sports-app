@@ -65,7 +65,7 @@ export const ROUTE_PREFIX = '/api/auth'
  * snapshot stream is keyed by the username, not the user id, so a rename would
  * leave the person's history under the old name and open an empty stream under
  * the new one. A rename screen would have to move the stream with the name, and
- * offering one is the owner's choice (brief 33).
+ * offering one is the owner's choice.
  */
 export const ALLOW_RENAME = false
 

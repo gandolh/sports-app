@@ -1,136 +1,65 @@
 ---
-summary: Dated snapshot of where every brief stands and what's next.
-updated: 2026-10-28
+summary: Dated snapshot (2026-11-02) of sports-app, per area. The fixed schedule (v2, 2026-07-29), the category-standard rebuild with logging and the token system (2026-09-04), the rigged figures (2026-10-02), the in-between rungs (2026-10-07), local accounts with Ward as a second way in (2026-10-13), the docs site on Docusaurus and the sign-in fixes (2026-10-19 to 2026-10-28); 1,223 tests; what is still open and left for the owner; what is deliberately out.
+updated: 2026-11-02
 ---
 
-# Status — 2026-09-06
+# Status — 2026-11-02
 
-**Where things stand: the app is the category standard, it is green, and it builds.**
-Briefs 24–27 shipped on 2026-09-04 on branch `v3-category-standard` — schema v4 with
-optional logging, a Tailwind v4 token system carrying eight accents across light and
-dark, and four rebuilt screens. **1115 tests** (704 at baseline), typecheck and lint
-clean, and the client builds at both `/` and under `SPORTS_APP_BASE=/sports-app/`.
+`main` is pushed through `7bb5541` (2026-11-01). The app runs on the VPS as a
+container stack of `vps-deploy`, which depends on Ward; deploying is the
+owner's step there. **1,223 tests** pass; typecheck and lint are clean. No brief
+is open; brief numbering restarted at 01 on 2026-11-02 (see [`../log.md`](../log.md)).
 
-**The repo had not built since 2026-08-13** and nobody noticed: `0d7d4f3` left
-`Prone.tsx` half-converted while `figures/index.ts` still imported the component it
-deleted. Vitest does not typecheck and no test renders a prone figure, so the suite
-stayed green over a tree that could not be built. Fixed by restoring the component
-alongside the rig; see [`../log.md`](../log.md).
+## By area
 
-**Nothing is committed.** The branch holds the work; the deploy has still never been run.
+- **The fixed schedule** (2026-07-29). The prescription is one law — a rung
+  takes about six weeks and the step is the span divided by the sessions in it —
+  and never adapts to what is logged. The rotation is Push · Legs · Cardio with
+  a core-and-posture block every day ([progression-engine.md](progression-engine.md),
+  [programme.md](programme.md)).
+- **Workspaces and the service** (2026-07-29). npm workspaces with `shared/`;
+  the state service on Fastify, one hand-editable JSON document per user in
+  SQLite ([architecture.md](architecture.md), [technical-decisions.md](technical-decisions.md)).
+- **The category standard** (2026-09-04). Schema v4 with optional logging and
+  the stop rule, a Tailwind v4 token system carrying eight accents in light and
+  dark, and four rebuilt screens: `/`, `/plan`, `/progress`, `/library`, plus
+  `/account` ([design-system.md](design-system.md), [reversals.md](reversals.md)).
+- **Figures** (2026-10-02). Rigged figures that morph between poses; the
+  crossfade is gone.
+- **In-between rungs** (2026-10-07). Three rungs at the three big steps, with
+  schema v5 and a state migration.
+- **Identity** (2026-10-13, fixes to 2026-10-28). Local accounts on the state
+  service with "Sign in with Ward" as a linked second way in; the sign-in loop
+  on a fresh browser fixed; a sign-in, and a Ward retry, return to the screen
+  that was asked for; ward-auth 0.7.0 with rename off
+  ([decisions-identity.md](decisions-identity.md)).
+- **Docs** (2026-10-19). The docs site at `/sports-app/docs` on Docusaurus.
+- **Copy** (2026-10-19). The Account page's total-work note says logged sets
+  are not counted.
 
-## What changed, in one paragraph
+## Open
 
-The prescription never adapts to what is logged (the app has recorded sets and shown
-dates since 2026-09-04; see [reversals.md](reversals.md)). Progression
-is one law — a rung takes ~6 weeks, and the step is the span divided by the sessions in
-it — which reproduces all three step sizes the user specified independently. State
-collapses to one integer per pattern, so rung and target are interpolated rather than
-stored, and top-of-ladder cycling falls out for free. The rotation is Push · Legs ·
-Cardio with a core-and-posture block every day. Screens: `/`, `/plan`, `/progress`,
-`/library`, `/account`; sign-in is Ward's. Dates are displayed but never schedule anything. Full detail in
-[progression-engine.md](progression-engine.md) and [programme.md](programme.md).
-
-## Briefs
-
-| # | Brief | State | Depends on |
-|---|---|---|---|
-| 01 | [Project scaffold & toolchain](../briefs/done/01-project-scaffold.md) | **done** | — |
-| 02 | [Domain types & state document](../briefs/done/02-domain-types.md) | **done** (v1 contract, replaced by 15) | 01 |
-| 03 | [Ladder content data](../briefs/done/03-ladder-content.md) | **done** (edited by 15) | 02 |
-| 04 | [Progression engine + simulation](../briefs/done/04-progression-engine.md) | **done** (deleted by 15) | 02, 03 |
-| 05 | [Persistence: store, codec, export](../briefs/done/05-persistence.md) | **done** (revised by 16) | 02 |
-| 06 | [Session player](../briefs/superseded/06-session-player.md) | superseded by 19 | — |
-| 07 | [Audio cues](../briefs/superseded/07-audio-cues.md) | superseded — out of v2 scope | — |
-| 08 | [Guided warmup](../briefs/superseded/08-guided-warmup.md) | superseded — dropped | — |
-| 09 | [Progress charts](../briefs/superseded/09-progress-charts.md) | superseded by 20 | — |
-| 10 | [SVG figure system](../briefs/done/10-svg-figures.md) | **done** (animated by 18) | 01 |
-| 11 | [SQLite persistence service](../briefs/done/11-sqlite-persistence.md) | **done** (revised by 17) | 05 |
-| 12 | [Domain v2: no effort, 7-day cycle, mid-ladder starts](../briefs/done/12-domain-v2-no-effort.md) | **done** (superseded in substance by 15) | 04 |
-| 13 | [Cardio + floor-only content + extras](../briefs/superseded/13-cardio-and-floor-only-content.md) | superseded — content moved into 15 | — |
-| 14 | [UI shell v1](../briefs/superseded/14-ui-shell-and-screens.md) | superseded by 19 | — |
-| 15 | [Domain v3: the fixed schedule](../briefs/done/15-domain-v3-fixed-schedule.md) | **done** | — |
-| 16 | [Persistence v3](../briefs/done/16-persistence-v3.md) | **done** | 15 |
-| 17 | [Multi-user server + login](../briefs/done/17-multi-user-server.md) | **done** | — |
-| 18 | [Animated figures](../briefs/done/18-animated-figures.md) | **done** | — |
-| 19 | [UI shell: four screens](../briefs/done/19-ui-shell-and-four-screens.md) | **done** | 15, 16, 18, 20 |
-| 20 | [Milestones + total work](../briefs/done/20-milestones-and-total-work.md) | **done** | 15 |
-| 21 | [npm workspaces + shared](../briefs/done/21-npm-workspaces-and-shared.md) | **done** | — |
-| 22 | [Fastify API](../briefs/done/22-fastify-api.md) | **done** | 21 |
-| 23 | [Figure rig + morph](../briefs/done/23-figure-rig-and-morph.md) | **done** 2026-10-02 — the rig renders; the crossfade is gone | 18 |
-| 24 | [Schema v4: logging + stop rule](../briefs/done/24-schema-v4-logging-and-stop-rule.md) | **done** | — |
-| 25 | [Persistence v4](../briefs/done/25-persistence-v4.md) | **done** | 24 |
-| 26 | [Tailwind + canon tokens](../briefs/done/26-tailwind-and-canon-tokens.md) | **done** | — |
-| 27 | [The four screens](../briefs/done/27-the-four-screens.md) | **done** | 24, 25, 26 |
-| 28 | [In-between rungs at the three big steps](../briefs/done/28-in-between-rungs.md) | **done** 2026-10-07 — three rungs, schema v5 | — |
-| 29 | [Sign-in loops on a fresh browser](../briefs/done/29-sign-in-loops-on-a-fresh-browser.md) | **done** 2026-10-19 — fixed by Ward brief 25; verified, tests and docs added | — |
-| 30 | [Account "Total work ever" note is out of date](../briefs/done/30-account-total-work-copy-is-outdated.md) | **done** 2026-10-19 — copy only; totals still the schedule's | — |
-| 31 | [Docs site from Starlight to Docusaurus](../briefs/done/31-docs-site-on-docusaurus.md) | **done** 2026-10-19 — same URLs plus /search/; not deployed | — |
-| 32 | [Sign-in returns to the screen that was asked for](../briefs/done/32-sign-in-returns-to-the-asked-screen.md) | **done** 2026-10-27 — `?next=` through `/login`, Ward too; Ward round trip not run live | — |
-| 33 | [A Ward retry returns to the asked screen](../briefs/done/33-ward-retry-keeps-the-asked-screen.md) | **done** 2026-10-28 — ward-auth 0.7.0 (rename off, migration 4 checked on a copy); `/login` reads `next` back after a refused Ward sign-in; live Ward round trip is an owner check | — |
-
-## How it ran
-
-```
-wave 1   15 ‖ 17            ✔  the v3 contract · the multi-user service
-wave 2   16 ‖ 18 ‖ 20       ✔  persistence · figures · milestones
-wave 3   19                 ✔  the four screens
-```
-
-`17` moved up to wave 1 because it owns only `server/**`. Brief 15 deliberately left
-`client/src/persistence/**` and `client/src/ui/**` broken by deleting `engine.ts` and `progress.ts`;
-16 and 19 repaired their own side, and the only file failing typecheck between waves was
-`SettingsScreen.tsx`, which 19 deleted.
-
-**The most valuable output of the run was not code.** Each brief was asked to report an
-honest verdict on something it could not be tested on, and four of the six found a real
-problem: brief 15 caught that declared caps were asymptotes and that the step *between*
-rungs exceeds what the variant can absorb; brief 18 found `design-system.md`
-contradicting the code it governs; brief 19 found five layout defects that only appear
-when the app is operated rather than rendered; brief 20 found `programme.md` claiming a
-per-side side-plank dose the code splits between sides.
-
-## What is left
-
-- **Commit the branch.** `v3-category-standard` is unpushed and uncommitted.
-- **Run the deploy.** Still never executed against the box. Everything below the first
-  run is unverified: SSH, the Node version check, `npm ci`, pm2, the Caddy reload.
-- **Watch the figures move on a phone.** Brief 23 replaced the crossfade with a rigged
-  morph; it was checked as frozen 132px frames in headless Chrome, not watched live.
-  R3 (easing the turnaround) waits on that look.
-- **Decide the malformed-`logged` policy.** A hand-edit typo in a display-only field
-  currently blocks training until repaired. Consistent with `cyclePosition`, and it
-  surfaces the typo rather than hiding it — but it cuts against "arrive with the answer
-  already made". See [`../log.md`](../log.md).
-- **Open questions 7, 8 and 9 are answered.** 8 and 9 in the build (`<HonestNote>` and
-  `<StopRule>`); 7 by brief 28 on 2026-10-07, which added three in-between rungs and
-  schema v5. 1144 tests pass. One display gap is left on purpose (owner, 2026-10-07):
+- **Watch the figures move on a phone.** The rigged morph was checked as frozen
+  frames in headless Chrome, not watched live. Easing the turnaround waits on
+  that look.
+- **The theme on a phone.** Contrast is enforced across all sixteen palettes by
+  test, which is not the same as "it looks right in a bright room".
+- **The malformed-`logged` policy.** A hand-edit typo in a display-only field
+  blocks training until repaired. Consistent with `cyclePosition`, and it
+  surfaces the typo, but it cuts against "arrive with the answer already made".
+- **Milestones after a rung insertion** (left on purpose, owner, 2026-10-07):
   milestones replay history on today's ladders, so a migrated document past an
-  insertion lists the new rung as reached. See
-  [progression-engine.md](progression-engine.md#inserting-a-rung-moves-people-so-it-needs-a-migration).
-- **The theme has not been looked at on a phone.** Contrast is enforced across all
-  sixteen palettes by test, which is a different claim from "it looks right in a bright
-  room at arm's length".
+  insertion lists the new rung as reached
+  ([progression-engine.md](progression-engine.md#inserting-a-rung-moves-people-so-it-needs-a-migration)).
+- **The live Ward round trips.** A sign-in through Ward that returns to the
+  asked screen, and a refusal at Ward then a retry, were checked with a faked
+  service, not a running Ward: open `/plan` signed out, start "Sign in with
+  Ward", refuse, try again, sign in, and `/plan` shows.
 
-## The deploy, in one paragraph
+## Deliberately out
 
-Static PWA → `/var/www/sports-app`, served at `/sports-app/`. Fastify
-state service → pm2 `sports-app-api` on `127.0.0.1:8794`, proxied at `/sports-app-api`
-(**not** its default 8787 — farm-valley holds that port). The sqlite file lives at
-`/srv/sports-app-api/data/app.db`, outside the rsync tree, protected by an anchored
-`--exclude=/data`; the service's own default would have put it *inside* the mirror where
-`rsync --delete` destroys it on the second deploy. Serving under a sub-path needed one
-source change here: `SPORTS_APP_BASE` now drives the Vite `base`, the PWA manifest
-`start_url`/`scope`/`id`, the service worker's `navigateFallback` and the router
-`basepath` together.
-
-## Deliberately out of v2
-
-**Note on the zero-dependency service:** it was a locked decision until 2026-07-29 and is
-now reversed. Deploying the service stops being a file copy and gains an install step —
-that was the decision's actual value, and it was traded knowingly.
-
-Charts of any kind · audio cues · a guided warmup · the extras pool · a rest timer ·
-adaptive progression · deload logic · streaks or a calendar heatmap · exercise
-substitution · body-weight tracking · health-app export · onboarding assessment ·
-real authentication · a pull *strength* ladder (blocked on equipment, by user choice).
+Charts of any kind · audio cues · a guided warmup · the extras pool · a rest
+timer · adaptive progression · deload logic · exercise substitution ·
+body-weight tracking · health-app export · onboarding assessment · a pull
+*strength* ladder (blocked on equipment, by the owner's choice). Dates, streaks
+and a calendar came back on 2026-09-04 as display only ([reversals.md](reversals.md)).

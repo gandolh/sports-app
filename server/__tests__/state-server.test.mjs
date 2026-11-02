@@ -116,7 +116,7 @@ function authorised(extra = {}) {
  * Start the service the way a deployment does — `node server/state-server.mjs`, a
  * real child process — and capture its stdout and stderr as raw pipes.
  *
- * This is the harness for the one thing brief 22 could plausibly have broken
+ * This is the harness for the one thing the Fastify move could plausibly have broken
  * silently: **Fastify logs every request by default.** Its logger is pino, and
  * pino writes to file descriptor 1 *directly* rather than through
  * `process.stdout.write` — so an in-process spy on `process.stdout` would report a
@@ -767,7 +767,7 @@ describe('PUT then GET round-trips byte-identically', () => {
   })
 
   it('accepts 4 and 5 alike, and moves no counter, because migration is the client\'s', async () => {
-    // Brief 28's v5 moves `sessionsDone` counters forward when a v4 document is
+    // The v5 moves `sessionsDone` counters forward when a v4 document is
     // read, in the client codec. The service must not do the same. A v4 document
     // stored with push at 14 has to come back with push at 14, still stamped 4, so
     // the client that pulls it runs the v4 → v5 step exactly once. A service that

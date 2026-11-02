@@ -16,7 +16,7 @@ export interface Joint {
 // input, and a figure file never names them.
 //
 // The governing rule, and the reason these types look the way they do: **a
-// length is declared once per bone, an angle twice — once per phase.** Brief 23
+// length is declared once per bone, an angle twice — once per phase.** The figure rig
 // exists because the previous poses were authored as two independent coordinate
 // sets, which let a single arm be 94.1 units long at the top of a push-up and
 // 52.3 at the bottom (−44%). There is no way to express that here: a rotation

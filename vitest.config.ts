@@ -1,7 +1,7 @@
 // The one place `npm test` starts, and the only reason it exists is that a single
 // number is a better signal than two: the client and the service are separate
 // Vitest projects with different configs, and this aggregates them into one run
-// with one total. Brief 21 is a move, so "all 611 still pass" is the whole
+// with one total. The workspaces move is a move, so "all 611 still pass" is the whole
 // acceptance criterion — and it is not a criterion you can check by adding up two
 // summaries by eye.
 //

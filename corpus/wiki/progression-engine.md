@@ -1,6 +1,6 @@
 ---
 summary: How the app decides today's prescription — the fixed 6-week-per-rung schedule, why it needs no input, and the interpolation that makes state a single integer per pattern.
-updated: 2026-10-07
+updated: 2026-11-02
 ---
 
 # Progression — the fixed schedule
@@ -91,7 +91,7 @@ cheap insurance against a content change rewriting history.
 
 The counter is turned into a rung by **array index**. Insert a rung at index k and the
 same counter names the rung below the one it used to: everyone at or above k silently
-drops back one exercise. Brief 28 inserted three rungs (push 3a, hinge 4a, squat 5a;
+drops back one exercise. On 2026-10-07 three rungs were inserted (push 3a, hinge 4a, squat 5a;
 see [programme.md](programme.md#the-three-in-between-rungs)), so schema v5 carries a
 one-off step in `client/src/persistence/codec.ts`: a v4 counter at or above an
 insertion gains `sessionsPerRung` (14). Same rung, same point in it, same target.

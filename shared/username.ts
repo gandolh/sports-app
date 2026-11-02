@@ -4,7 +4,7 @@
  *
  * ── Why this file exists ────────────────────────────────────────────────────
  *
- * It is the reason `shared/` exists at all. Until brief 21 this rule was written
+ * It is the reason `shared/` exists at all. Until the workspaces move this rule was written
  * **twice** — once in `server/db.mjs` and once in `client/src/persistence/codec.ts`
  * — and kept honest by a test in the codec's suite that imported the server's
  * `USERNAME_PATTERN` and asserted the two regexes were identical character for

@@ -86,7 +86,7 @@ export default defineConfig({
         // of them will flash. Light is the value that stays because it is the
         // unstamped default in `tokens.css`; making the flash follow the user's
         // choice needs a `<meta name="theme-color" media="…">` pair in
-        // `index.html`, which is brief 27's file.
+        // `index.html`, which is the file.
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
@@ -115,7 +115,7 @@ export default defineConfig({
       },
     }),
   ],
-  // Dev only. The state service (brief 11) binds 127.0.0.1 and the app talks to
+  // Dev only. The state service binds 127.0.0.1 and the app talks to
   // it on the same origin through this proxy, so there is no CORS preflight to
   // configure and `settings.sync.baseUrl` can be left empty in development.
   // The port matches `DEFAULT_PORT` in ../server/state-server.mjs; if you override

@@ -4,7 +4,7 @@ A **Fastify** service that holds a copy of each user's state document in SQLite.
 dependencies are `fastify`, and `@sports-app/shared` for the wire contract — the username
 rule, the document types, and the TypeBox schemas the routes validate against.
 
-Brief 22 replaced hand-rolled `node:http` routing with Fastify and **changed nothing on
+The Fastify move replaced hand-rolled `node:http` routing with Fastify and **changed nothing on
 the wire**: same paths, methods, status codes, headers and bodies, so the client needed no
 edit. The 73 pre-existing tests in `__tests__/` are what makes that checkable rather than
 hopeful — they were written against the wire, not the implementation.
@@ -73,7 +73,7 @@ Node **≥ 22.18**. Not 22: the service imports `@sports-app/shared/*.ts` direct
 on Node's unflagged type stripping to load it, so there is no build step for the service —
 but the version that does the stripping is the floor.
 
-**There is now an install step.** Until brief 22 the service used only Node builtins plus a
+**There is now an install step.** Until the Fastify move the service used only Node builtins plus a
 types-and-one-regex package, so deploying it was `rsync` and `pm2 restart`. Fastify has a
 dependency tree, so a server needs `npm ci --omit=dev` (or a shipped `node_modules`) before
 `node state-server.mjs` will start. That is the cost the Fastify decision was taken knowing
@@ -304,7 +304,7 @@ it at both the store and the HTTP layer.
   correct, since a stream belongs to one person training on one device at a time and the
   remote holds a prefix. Remote ahead → both
   counts are shown in Settings and **nothing is written in either direction** until the
-  user picks. `navigator.onLine` is never consulted: brief 01 observed it reporting
+  user picks. `navigator.onLine` is never consulted: the scaffold observed it reporting
   `true` while the network was demonstrably offline.
 
 ### An old secret may still be in exported files
@@ -358,5 +358,5 @@ affect the server.
 They do import `@sports-app/shared/username.ts`, which is a different thing: the
 username rule is a *contract* both ends must apply identically, not a client
 implementation detail. It used to be written out twice — once here, once in the codec —
-with a test comparing the two regexes; brief 21 replaced both copies with one
+with a test comparing the two regexes; the workspaces move replaced both copies with one
 definition and deleted that test as meaningless.

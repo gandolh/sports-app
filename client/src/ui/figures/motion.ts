@@ -18,7 +18,7 @@
  * pose — the same skeleton part-rotated — and `motionStyles` samples the
  * timeline, solves each sample, and emits one `@keyframes` per bone.
  *
- * (Until brief 23 the two poses were independent drawings, crossfaded, and this
+ * (Until the figure rig the two poses were independent drawings, crossfaded, and this
  * comment said there was nothing to tween because their path shapes differed.
  * That was never the blocker: the poses shared a topology. The blocker was that
  * their bone lengths disagreed, and a rig makes that unrepresentable.)

@@ -30,7 +30,7 @@
  * ladder, not that it equals `index + 1`.
  *
  * **A rung inserted between two shipped rungs takes the lower one's `NN` plus a
- * letter.** Brief 28 put one rung into each of the three big steps, and there is
+ * letter.** The in-between rungs put one rung into each of the three big steps, and there is
  * no free number between `03` and `04`. So the new push rung is `push-03a-…`: it
  * sorts after rung 3 and before rung 4, no shipped id moves, and the cue text can
  * call it "rung 3a". Inserting a rung shifts the array index of every rung above
@@ -53,7 +53,7 @@
  * the same way and progression becomes placebo. So each rung's cues cover:
  *
  *   1. setup — hand/foot position, and on a `safetyCritical` rung the safety
- *      check, because `cues[0]` is what brief 19 renders first and separated
+ *      check, because `cues[0]` is what the four-screen shell renders first and separated
  *   2. movement standard — where the rep starts and ends
  *   3. the modifier, **located inside the rep** — never "3s down + 2s pause",
  *      always "three seconds down, then hold still two seconds at the bottom"
@@ -197,7 +197,7 @@ const PUSH_RUNGS: readonly Rung[] = [
       'Stop the set when your hips sag toward the floor, your back arches, or your chest stops reaching a fist off the floor. Do not finish a set on half-reps.',
   },
   {
-    // Inserted by brief 28 between rung 3 and rung 4, the biggest step on this
+    // Inserted on 2026-10-07 between rung 3 and rung 4, the biggest step on this
     // ladder: twelve knee push-ups did not make five full ones possible. Lowering
     // is the half of a push-up you can control first, so this rung does the full
     // push-up's lowering on your toes and keeps the press on your knees.
@@ -364,7 +364,7 @@ const SQUAT_RUNGS: readonly Rung[] = [
       'Stop the set when your lower back rounds at the bottom, when your knees ache instead of your thighs working, or when you can no longer reach the deeper position.',
   },
   {
-    // Inserted by brief 28 between rung 5 and rung 6. Two legs at twelve reps to
+    // Inserted on 2026-10-07 between rung 5 and rung 6. Two legs at twelve reps to
     // one leg at five was the biggest step on this ladder, and most of what made
     // it big was balance. A hand on the wall takes the balance away and leaves the
     // leg work, the same help rung 7 already allows.
@@ -425,7 +425,7 @@ const SQUAT_RUNGS: readonly Rung[] = [
 
 // ─── HINGE — posterior chain, bridge to sliding leg curl ────────────────────
 //
-// Rungs 5–6 were couch-anchored nordic negatives until brief 15: the anchor
+// Rungs 5–6 were couch-anchored nordic negatives until the v3 domain: the anchor
 // violated the floor-only constraint, and a hamstring cannot be anchored to a
 // floor. The sliding leg curl replaces them and is **not** a downgrade — it
 // biases *biceps femoris*, which the nordic does not, and needs nothing but a
@@ -488,7 +488,7 @@ const HINGE_RUNGS: readonly Rung[] = [
       'Stop the set when your hips tilt, when the planted heel slides further away from you, or when your hamstring cramps rather than working hard.',
   },
   {
-    // Inserted by brief 28 between rung 4 and rung 5. A planted single-leg bridge
+    // Inserted on 2026-10-07 between rung 4 and rung 5. A planted single-leg bridge
     // at twelve reps did not prepare anyone for a full sliding curl at five: the
     // slide is a new skill and its far end is a long, loaded lever. This rung
     // teaches the slide over the short half of the range first.
@@ -750,8 +750,8 @@ const START_RUNGS: Readonly<Record<Pattern, number>> = {
   /**
    * `push-03-knees` (index 2 of 9). Failing a knee push-up lowers you onto the
    * floor from a hand's depth with your knees already down — there is nowhere to
-   * fall to. A wall push-up and a short-lever knee push-up sit below it. Brief
-   * 28's insertion sits above it, so this index still names the same rung.
+   * fall to. A wall push-up and a short-lever knee push-up sit below it. The
+   * 2026-10-07 insertion sits above it, so this index still names the same rung.
    */
   push: 2,
   /**
@@ -858,7 +858,7 @@ export const LADDERS: Readonly<Record<Pattern, Ladder>> = {
  * failing this hurt you?") and two lists that can disagree are worse than one.
  *
  * The nordic negatives that used to head this list are gone: they were removed by
- * brief 15's floor-only fix, not for safety, and no sliding-curl rung replaces
+ * the floor-only fix, not for safety, and no sliding-curl rung replaces
  * their failure mode.
  */
 export const NEVER_A_STARTING_RUNG: readonly string[] = [

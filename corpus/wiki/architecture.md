@@ -1,6 +1,6 @@
 ---
 summary: The three npm workspaces, the dependency direction across them, and the pure-core/imperative-shell boundary inside the client.
-updated: 2026-07-29
+updated: 2026-11-02
 ---
 
 # Architecture
@@ -29,7 +29,7 @@ test asserting the two regexes matched.*
 shared/                    THE WIRE CONTRACT. No node:, no DOM — both runtimes import it.
   types.ts                 Pattern · Variant · SessionResult · StateDoc · schemaVersion
   username.ts              the one username rule, formerly duplicated in two places
-  api.ts                   TypeBox schemas + types for the four endpoints (brief 22)
+  api.ts                   TypeBox schemas + types for the four endpoints (2026-07-29)
 
 client/                    the PWA
   src/domain/              PURE. Imports shared/ and nothing else from the repo.
@@ -45,18 +45,18 @@ client/                    the PWA
     components/  figures/  ExerciseFigure.tsx
   src/main.tsx
 
-server/                    the service. Fastify since brief 22.
+server/                    the service. Fastify since 2026-07-29.
   state-server.mjs         /api/state · /api/health, on Fastify, Ward-guarded
   db.mjs                   node:sqlite snapshot rows, one stream per username
 ```
 
-**The service is Fastify as of brief 22, and the files did not move.** The brief sketched a
+**The service is Fastify since 2026-07-29, and the files did not move.** The plan sketched a
 `server/src/` layout in TypeScript; it stayed `server/*.mjs` in place, because moving it
 would have meant editing the 73 tests that are the migration's only proof — including two
 assertions that read `server/state-server.mjs` and `server/db.mjs` as source text — and
 because `db.mjs` derives the `db/` location from its own directory. `eslint.config.js`
 predicted this: its Node-globals block is scoped `server/**/*.mjs` with a note saying it is
-about the runtime, not the HTTP library, and should survive brief 22 unchanged. It did.
+about the runtime, not the HTTP library, and should survive the move unchanged. It did.
 
 **`shared/` holds data shapes and validation, never behaviour.** The ladders, the schedule
 and the milestones stay in the client — they are logic the server has no business knowing,
@@ -123,12 +123,23 @@ surfaced as a blocking error. **`/login` must work offline** — the username is
 locally and the password is never checked, so there is nothing to verify against a
 server.
 
-## Multi-user, weakly
+## Accounts and sign-in
 
-A username keys its own state document, locally and in SQLite. The password is
-accepted and discarded in the request handler; nothing stores or compares it. See
-[decisions.md](decisions.md#multi-user-with-passwords-that-are-never-checked) — this
-is not a security boundary and no feature may treat it as one.
+A username keys its own state document, locally and in SQLite. Since 2026-10-13 the
+accounts are the state service's own, through the vendored ward-auth library, with
+"Sign in with Ward" as a linked second way in; why is in
+[decisions-identity.md](decisions-identity.md). As built:
+
+- `client/src/persistence/session.ts` keeps the signed-in username under
+  `sports-app.session.v3`; `/login` writes it whenever the service says signed in, so
+  a cookie that outlived the key (the state Ward's callback leaves) goes through
+  `/login` once and lands signed in, never in a loop.
+- A screen asked for while signed out comes back after sign-in: `/login?next=…`
+  (`client/src/ui/routes/next.ts`), through Ward's round trip too and after a refused
+  Ward sign-in. An unsafe `next` (another origin, `//host`) is dropped and the sign-in
+  lands on `/`.
+- Ward being down shows as `ward_unavailable` on the button; a password still works.
+- ward-auth's rename route and `usernameFor` stay off (2026-10-28).
 
 ## What does not exist, on purpose
 

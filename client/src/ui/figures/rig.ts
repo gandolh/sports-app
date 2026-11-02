@@ -1,7 +1,7 @@
 /**
  * The figure skeleton: bone lengths in, coordinates out.
  *
- * This module is the geometry half of brief 23. It holds no React, no DOM and no
+ * This module is the geometry half of the figure rig. It holds no React, no DOM and no
  * CSS — it turns a `Rig` (`types.ts`) plus a position on the 0..1 axis
  * `motion.ts` already produces into concrete joints and per-bone angles. Wave 2
  * turns those angles into `@keyframes`; the two figure rules in `index.ts` —

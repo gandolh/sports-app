@@ -1,6 +1,6 @@
 ---
-summary: Nothing open as of 2026-10-07. Questions 8 and 9 were already answered by briefs 24 and 27; 7 landed as brief 28 and is deleted.
-updated: 2026-10-07
+summary: Nothing open as of 2026-10-07. Questions 8 and 9 were answered on 2026-09-04; 7 landed on 2026-10-07 and is deleted.
+updated: 2026-11-02
 ---
 
 # Open questions
@@ -23,7 +23,7 @@ What each answer settled is in [decisions.md](decisions.md); the reasoning trail
 
 ## Answered 2026-10-07
 
-- **8, the three honest warnings**: answered in code by brief 27's `<HonestNote>`
+- **8, the three honest warnings**: answered in code by `<HonestNote>` (2026-09-04)
   (persistent, never dismissible, `warn` hue, never red).
-- **9, the stop rule**: answered by brief 24, which made `stopRule` a field of
-  `Rung`, and brief 27's `<StopRule>`, drawn above the cues in the `dang` hue.
+- **9, the stop rule**: answered on 2026-09-04 by making `stopRule` a field of
+  `Rung`, and by `<StopRule>`, drawn above the cues in the `dang` hue.

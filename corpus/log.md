@@ -53,7 +53,7 @@ an uncached fetch asserted to reject, to prove the offline emulation was genuine
 **Finding for brief 11:** `navigator.onLine` reported `true` while the network was
 demonstrably offline. Sync must attempt-and-catch, never gate on it.
 
-Brief: [briefs/done/01-project-scaffold.md](briefs/done/01-project-scaffold.md).
+Brief: briefs/done/01-project-scaffold.md.
 
 ## [2026-07-29] done | Brief 02 — the domain type contract
 
@@ -75,7 +75,7 @@ The fixture embeds a real push-ladder rung advance (10 → 11 → 12 → reset t
 briefs 04, 05 and 09 the one transition that distinguishes a correct chart from a
 sawtoothing one.
 
-Brief: [briefs/done/02-domain-types.md](briefs/done/02-domain-types.md).
+Brief: briefs/done/02-domain-types.md.
 
 ## [2026-07-29] done | Brief 03 — five ladders, 35 rungs, cue-discriminability gate passed
 
@@ -98,7 +98,7 @@ rung advance below max). Filed as the wave-3 gate in
 [wiki/status.md](wiki/status.md); it blocks brief 04, because an engine written against
 an invalid fixture gets contorted to fit it.
 
-Brief: [briefs/done/03-ladder-content.md](briefs/done/03-ladder-content.md).
+Brief: briefs/done/03-ladder-content.md.
 
 ## [2026-07-29] done | Brief 10 — figure system + all five pose pairs
 
@@ -118,7 +118,7 @@ the purity/quality guards are project infrastructure.
 Outstanding: legibility at ~120px needs a visual pass once brief 06 renders a real
 screen. Tracked in the brief's outcome note.
 
-Brief: [briefs/done/10-svg-figures.md](briefs/done/10-svg-figures.md).
+Brief: briefs/done/10-svg-figures.md.
 
 ## [2026-07-29] done | Brief 05 — persistence, with crash-safety asserted rather than argued
 
@@ -140,7 +140,7 @@ current content (ids are immutable, old docs must load), `sessionsCompleted` nee
 equal `history.length`, `target` is not range-checked, and `_`-prefixed keys are allowed
 as human notes in a format with no comments.
 
-Brief: [briefs/done/05-persistence.md](briefs/done/05-persistence.md).
+Brief: briefs/done/05-persistence.md.
 
 ## [2026-07-29] maintenance | Wave-3 gate: fixture repaired and made provable
 
@@ -190,7 +190,7 @@ knob:** each snapshot embeds the full history, so size grows linearly with sessi
 the database grows *quadratically* with retention × sessions.
 
 Brief 11 was rewritten accordingly as
-[briefs/done/11-sqlite-persistence.md](briefs/done/11-sqlite-persistence.md), replacing
+briefs/done/11-sqlite-persistence.md, replacing
 the earlier remote-file version, and `db/` was added to `.gitignore`. **Deployment
 specifics are intentionally kept out of this repo entirely** — this repo describes the
 service and its local database, nothing about where or how it is hosted.
@@ -214,7 +214,7 @@ sync as a side effect of using it.
 so it is constant-time even for a wrong-length input, where a `length !==` guard would
 leak the secret's length.
 
-Brief: [briefs/done/11-sqlite-persistence.md](briefs/done/11-sqlite-persistence.md).
+Brief: briefs/done/11-sqlite-persistence.md.
 
 ## [2026-07-29] decision | Effort input removed entirely; cardio gets its own day
 
@@ -750,7 +750,7 @@ left alone — those are about viewing distance, not aim.
 ### 2026-07-30, later still — brief 23 written: the figures get a rig
 
 Researched the animation system against `game-engine`, then grilled the
-result into [briefs/done/23-figure-rig-and-morph.md](briefs/done/23-figure-rig-and-morph.md).
+result into briefs/done/23-figure-rig-and-morph.md.
 Nothing implemented.
 
 **The engine turned out not to be the answer.** It has easing curves, an injected-time
@@ -1350,7 +1350,7 @@ introspect", and `wiki/status.md` still lists brief 29 as todo.
 
 ## [2026-10-18] todo | Brief 31 filed: the docs site moves from Starlight to Docusaurus
 
-The owner's call (2026-10-18), one brief in every repo with a docs site. [31](briefs/done/31-docs-site-on-docusaurus.md) keeps the URLs and the light-only look, and teaches `eslint.config.js` the new layout. Building the corpus found three links into `wzd_auth` that Starlight turned into 404s, and one anchor into a decision replaced on 2026-09-04. The deploy waits on vps-deploy brief 11.
+The owner's call (2026-10-18), one brief in every repo with a docs site. 31 keeps the URLs and the light-only look, and teaches `eslint.config.js` the new layout. Building the corpus found three links into `wzd_auth` that Starlight turned into 404s, and one anchor into a decision replaced on 2026-09-04. The deploy waits on vps-deploy brief 11.
 
 ## [2026-10-19] build | brief 29: the sign-in loop, verified fixed and closed
 
@@ -1391,7 +1391,7 @@ owner deploys after vps-deploy brief 11 flips the stack's asset check.
 Promoted from the todo of 2026-10-19. The five route guards pass the asked-for path as
 `next`, `/login` checks it is a path inside the app and goes there, and the Ward button
 sends `returnTo: <base>login?next=…` so `/login` stays the one place that writes the
-cached username. [Brief 32](briefs/done/32-sign-in-returns-to-the-asked-screen.md).
+cached username. Brief 32.
 
 ## [2026-10-27] build | brief 32: a sign-in goes on to the screen that was asked for
 
@@ -1427,7 +1427,7 @@ now says how to adopt it and is ready to promote.
 ## [2026-10-28] todo | Brief 33: a Ward retry returns to the asked screen
 
 The todo `ward-retry-keeps-the-asked-screen` became
-[brief 33](briefs/done/33-ward-retry-keeps-the-asked-screen.md). It re-vendors
+brief 33. It re-vendors
 ward-auth at 0.7.0 (both copies are at 0.3.1), passes `allowRename: false` so
 0.4.0's rename route stays off, lets 0.6.0's migration 4 run, and has `/login`
 pass the same `returnTo` again after a refused Ward sign-in. Not built.
@@ -1445,7 +1445,7 @@ screen. That closes the gap brief 32's entry left. The tests fake the service fo
 round trip and send six bad returns that are not reused. Headless Chrome under
 `/sports-app/` checked the refusal landing and a password sign-in to `/plan`. The live
 Ward round trip was not run, because the local Ward container was down, so it is an
-owner check. The todo is deleted. [Brief 33](briefs/done/33-ward-retry-keeps-the-asked-screen.md).
+owner check. The todo is deleted. Brief 33.
 
 ## [2026-10-28] decision | ward-auth's rename and usernameFor stay off
 
@@ -1458,3 +1458,22 @@ each user's history is stored under the username) and no `usernameFor`.
 A README refresh pass with the readme-docs standard. The README's run section still said signing in and sync need Ward, and its diagram had the service check every session with Ward, the shared-cookie contract retired on 2026-10-13. It now starts the state service beside the app, makes an account with `npm run seed`, and draws Ward as the optional "Sign in with Ward". The link to the state page pointed at the old Starlight path; it points at `docs/docs/state.mdx` now.
 
 Found while running it: a straight `cp .env.example .env` set `WARD_OIDC_ISSUER` with an empty client key, and the service refused to start; with those lines commented out it then refused for want of `SPORTS_APP_PUBLIC_ORIGIN`, which the example left commented because it was derived from the Ward redirect URI. The example now sets the origin to `http://localhost:5173` and comments out the five Ward lines; Ward's `seed.mjs` still supplies them. `docs/getting-started.md` says so. Checked: `npm install`, `npm run server` (`listening on http://127.0.0.1:8787`, `/api/health` ok through the dev proxy), `npm run dev` on `/sports-app/`, and `npm run seed` against a scratch database. The images show the workout screens, which have not changed since 2026-10-09, and were kept.
+
+## [2026-11-02] maintenance | Briefs reset
+
+Part of an estate-wide reset. The twenty-seven done briefs and the six
+superseded ones are folded into the wiki and deleted; brief numbering restarts
+at 01. The old briefs read like the grilling that fed the first corpus. The last
+commit that held them is `038f6ff`: read one with
+`git show 038f6ff:corpus/briefs/done/28-in-between-rungs.md`. Brief numbers in
+the entries above refer to that set.
+
+[wiki/status.md](wiki/status.md) was a 2026-09-06 snapshot that still said
+nothing was committed and described the old pm2 deploy; it is now a dated line
+per area with what is open. [architecture.md](wiki/architecture.md)'s
+"Multi-user, weakly" section, which said passwords are never checked, is now
+"Accounts and sign-in" as built, and the 2026-07-29 decision it came from
+points at its replacement in [decisions-identity.md](wiki/decisions-identity.md).
+The other pages cite dates instead of brief numbers. Code comments no longer
+cite brief numbers.
+

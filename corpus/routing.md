@@ -24,7 +24,7 @@ Read by the `orchestrate` skill at the start of a work request.
 | "grill me", "stress-test this design" | `grill-me` |
 | "make the player screen feel better" | `impeccable` |
 | "is high-rep bodyweight work still strength training?" | `web-research` |
-| "does the engine over-advance?" | run the simulation harness (brief 04), not the wiki |
+| "does the schedule over-advance?" | the schedule's tests (`client/src/domain/__tests__/schedule.test.ts`), not the wiki; nothing adapts, so there is no simulation harness |
 
 ## READ / SKIP / SKILLS
 

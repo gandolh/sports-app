@@ -207,7 +207,7 @@ describe('a retry after a refused Ward sign-in goes on to the screen that was as
     // Off the origin: the library drops these before the page sees them.
     '//evil.example',
     'https://evil.example',
-    // On the origin, but the `next` inside fails brief 32's rules.
+    // On the origin, but the `next` inside fails the rules.
     '/login?next=%2F%2Fevil.example',
     '/login?next=https%3A%2F%2Fevil.example',
     '/login?next=%2Flogin',

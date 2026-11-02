@@ -65,7 +65,7 @@ largest one in the repo's history.
 
 ## The five things Fastify must not do
 
-Brief 22 replaced hand-rolled `node:http` routing with Fastify **without
+On 2026-07-29 Fastify replaced hand-rolled `node:http` routing **without
 changing one byte of the REST contract** — same paths, methods, status codes,
 headers and bodies. The Ward cutover changed the contract later, on purpose. The 73 tests in `server/__tests__/` are what make that claim
 checkable rather than hopeful: they were written against the wire, not the

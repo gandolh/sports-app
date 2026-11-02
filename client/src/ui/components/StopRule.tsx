@@ -5,16 +5,16 @@ import { StopIcon } from './icons.tsx'
  *
  * ── This is open question 9 ─────────────────────────────────────────────────
  *
- * Every rung has had a stop rule since brief 03 — "stop the set when your hips
+ * Every rung has had a stop rule since 2026-07-29 — "stop the set when your hips
  * sag", "stop the clock when your shoulders creep toward your ears" — and until
- * brief 24 it was `cues[3]`, an untyped convention. On screen that meant it
+ * schema v4 it was `cues[3]`, an untyped convention. On screen that meant it
  * rendered as item four of four, below the fold, in the same grey as the setup
  * instructions.
  *
  * It is the one line that tells you when to END a set, in an app whose entire
  * premise is that the engine never adapts to effort and the user autoregulates.
  * Logged sets are optional and never reach the schedule (corpus/wiki/reversals.md). It is the only brake there is. Position was
- * deciding its weight, so brief 24 made it a required field of `Rung` — required,
+ * deciding its weight, so schema v4 made it a required field of `Rung` — required,
  * not optional, because optional means the thirty-sixth rung ships without one —
  * and this component is what that field is for.
  *

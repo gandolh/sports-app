@@ -1,13 +1,13 @@
 // Runs in the default `node` environment — it only reads source text.
 //
 // One palette, in one file. `ui/tokens.css` is the only place a colour literal
-// may appear; everything else references `var(--…)` or, since brief 26, a
+// may appear; everything else references `var(--…)` or, since 2026-09-04, a
 // Tailwind utility that resolves to one. This is what stops a one-off `#1a1a1a`
 // in a component from forking the palette — the failure mode is not that it looks
 // slightly wrong, it is that the design system stops being the source of truth
 // and nobody notices for six months.
 //
-// **Brief 26 widened the glob from `ui/` to the whole of `src/`.** Adopting
+// **The token system widened the glob from `ui/` to the whole of `src/`.** Adopting
 // Tailwind is exactly the moment a colour would escape: the framework's own
 // palette (`bg-slate-800`) is one word away, and a `tailwind.config.js` holding
 // hexes would sit outside the old glob entirely. The CSS-first `@theme inline`
@@ -45,7 +45,7 @@ describe('no hex colour outside the token file', () => {
   // non-empty is what makes that visible.
   //
   // It asserts that *some* `.css` file was found rather than naming `app.css`,
-  // because brief 27 deletes that file and a guard that dies with it is no guard.
+  // because the 2026-09-04 rebuild deletes that file and a guard that dies with it is no guard.
   it('found UI sources to check, and excluded exactly one token file', () => {
     const paths = Object.keys(sources)
     expect(paths.length).toBeGreaterThan(10)

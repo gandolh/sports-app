@@ -580,7 +580,7 @@ describe('toSessionResult', () => {
   })
 
   it('round-trips through recordSession for every slot and every variant', () => {
-    // The property brief 19 depends on: finishing what you were prescribed
+    // The property the four-screen shell depends on: finishing what you were prescribed
     // advances every pattern the session trained by exactly one, and nothing else.
     for (let position = 0; position < ROTATION.length; position++) {
       for (const variant of VARIANTS) {

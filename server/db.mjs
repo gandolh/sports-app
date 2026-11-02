@@ -73,10 +73,10 @@
  * is not a reason to add a dependency.
  *
  * The service is no longer *literally* dependency-free — it takes
- * `@sports-app/shared` for the username rule (brief 21) and Fastify for the HTTP
- * layer (brief 22) — but neither touches the storage layer. This file is a **port,
+ * `@sports-app/shared` for the username rule and Fastify for the HTTP
+ * layer — but neither touches the storage layer. This file is a **port,
  * not a redesign**: WAL, `synchronous = FULL`, per-user retention, pruning by `id`,
- * and the idempotent `PRAGMA table_info` guard are exactly as brief 17 left them.
+ * and the idempotent `PRAGMA table_info` guard are exactly as the multi-user server left them.
  */
 import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
@@ -126,7 +126,7 @@ export const RETENTION = 20
 //
 // The username rule used to be **defined here**, and defined a second time in the
 // client's codec, with a test comparing the two regexes character for character to
-// stop them drifting. Brief 21 replaced both copies with one definition in
+// stop them drifting. The workspaces move replaced both copies with one definition in
 // `@sports-app/shared/username.ts` that this service and the browser bundle both
 // import, and deleted the drift test as meaningless.
 //

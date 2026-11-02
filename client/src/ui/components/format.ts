@@ -9,7 +9,7 @@
  * under `client/src/ui/` for the dozen ways a clock read had previously been
  * smuggled into a UI layer. That rule was reversed in the v3 direction round
  * (corpus/wiki/reversals.md): the app now shows a date, a streak, a heatmap and
- * a calendar. Brief 27 **deleted** the test rather than weakening it, because a
+ * a calendar. The 2026-09-04 rebuild **deleted** the test rather than weakening it, because a
  * test kept alive after its rule is gone tells the next reader something false.
  *
  * ── Everything below is still hand-rolled, for a different reason ───────────
@@ -51,7 +51,7 @@ export function groupDigits(value: number): string {
 /**
  * Hold time, as a duration and never as a clock time: `2h 14m`, `14m 30s`,
  * `45s`. `holdSeconds` arrives from `totalWork` as a bare count of seconds and
- * the domain deliberately does not format it (brief 20) — the choice of unit is
+ * the domain deliberately does not format it — the choice of unit is
  * a display decision, so it is made here.
  *
  * Minutes are dropped once hours are in play. `2h 14m 08s` is a stopwatch
@@ -123,7 +123,7 @@ export const PATTERN_LABEL: Readonly<Record<Pattern, string>> = {
 
 // ─── Dates ──────────────────────────────────────────────────────────────────
 //
-// New in brief 27. See the header for why they are hand-rolled and why they
+// New in the 2026-09-04 rebuild. See the header for why they are hand-rolled and why they
 // exist at all.
 
 const WEEKDAY_NAMES: readonly string[] = [

@@ -23,7 +23,7 @@ import { formatLongDate, itemName, targetLabel, targetText } from '../components
 /**
  * `/plan` — a real month calendar, then the next seven **sessions**.
  *
- * Replaces `/week`, which brief 27's direction round retired along with the
+ * Replaces `/week`, which the direction round retired along with the
  * no-dates rule it was built to keep (corpus/wiki/reversals.md). The seven-session
  * projection that used to be the whole of that screen survives unchanged as
  * "Coming up" — it is still not on the path to a first set, and it still reads
