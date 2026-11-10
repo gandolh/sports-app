@@ -75,3 +75,18 @@ One commit for the bump, `chore(deps): @base-ui/react 1.9.0`.
 ## Interplay
 
 - Brief 03 starts from a tree already on 1.9.0, so the `ToggleGroup` and `Toggle` APIs it uses are the 1.9.0 ones.
+
+## Outcome (2026-11-10)
+
+Commit d4088c7, `chore(deps): @base-ui/react 1.9.0`. `client/package.json` pins `1.9.0` exactly; the lockfile
+resolves one copy and changed the four expected entries (`@base-ui/react` 1.6.0 to 1.9.0, `@base-ui/utils`
+0.3.1 to 0.5.0, `reselect` 5.2.0 to 5.3.0, `use-sync-external-store` 1.6.0 to 1.7.0).
+
+- **Baseline and after:** `npm run check` passes both times with 1,223 tests; `npm run build` passes.
+- **`OTPFieldPreview`/`sanitizeValue` grep:** no hits.
+- **`Field` changelog line:** the release notes were not reachable (GitHub), so none was read. No breaking change
+  to `Field` showed up in the types or the tests, which exercise the three forms.
+- **Browser result:** not run in this pass; the three forms (`/login`, the sign-in and sync settings on
+  `/account`) are an owner or follow-up check after deploy.
+- **Skipped:** `docker build` (Docker is unusable on this machine); the image installs the server tree only.
+- **Board:** moved to Ready for deploy; deploy with `node cli.ts sports-app deploy` from the vps-deploy checkout.

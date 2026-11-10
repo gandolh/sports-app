@@ -1489,3 +1489,9 @@ cite brief numbers.
 - 04: schemas stay TypeBox, with the reason written down (Q55); one error handler keeps `{ error: string }`,
   passes Fastify's 4xx through and never echoes a thrown message (Q43); `db.mjs` stays whole as
   `src/db/store.ts` (Q54); no decorators as a test seam (Q56).
+
+## [2026-11-10] brief | 01 Base UI 1.9.0 built
+
+- `@base-ui/react` 1.6.0 to 1.9.0, pinned exactly in `client/package.json` (d4088c7); lockfile moved four entries,
+  all Base UI's own tree. `npm run check` (1,223 tests) and `npm run build` pass. No source change.
+- Not done: the browser look at the three Field forms and the release notes; Docker build skipped.

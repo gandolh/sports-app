@@ -9,6 +9,7 @@ updated: 2026-11-02
 container stack of `vps-deploy`, which depends on Ward; deploying is the
 owner's step there. **1,223 tests** pass; typecheck and lint are clean. No brief
 is open; brief numbering restarted at 01 on 2026-11-02 (see [`../log.md`](../log.md)).
+Base UI is on 1.9.0 (brief 01, 2026-11-10, built, awaiting deploy).
 
 ## By area
 

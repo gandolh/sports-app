@@ -26,6 +26,8 @@ router and a cache rather than hand-rolled state. **Base UI is `@base-ui/react`*
 wherever it fits; the design system in [design-system.md](design-system.md) is what it
 gets styled into.
 
+`@base-ui/react` is pinned exactly at **1.9.0** (2026-11-10), in `client/package.json` only.
+
 **Forms use `react-hook-form`** (user's call, 2026-07-29). There are only two — the login
 screen and the sync settings — which is a thin case for a dependency, but hand-rolled
 validation state is exactly the code that rots, and the alternative is the same logic
