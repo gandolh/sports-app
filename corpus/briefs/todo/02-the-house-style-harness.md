@@ -4,9 +4,9 @@
 
 - In sports-app: nothing beyond brief 01 being merged, which keeps the lockfile diffs apart.
 - In the owner's skills library:
-  - brief 27, *A house style, and a quality harness that enforces it*: the `house-style` package, the `house-style` skill and the plugin's `Stop` and `PostToolUse` hooks;
+  - brief 27, *A house style, and a quality harness that enforces it*: the `house-style` source (vendored into each repo, Q6), the `house-style` skill and the plugin's `Stop` and `PostToolUse` hooks;
   - brief 15, *Enforce the base-ui and code-structure skills in every repo*: how the convention checkers are wired and when they run `--warn-only`.
-- The owner's grilling of 2026-11-10 (Q5-Q14 of the skills library's open questions, and Q47-Q51 on the Round 8 page).
+- The owner's grilling of 2026-11-10: the owner's answers and the technical calls on Q5-Q14 and Q47-Q51. The decisions below say which each one settles.
 
 **Runs before:** 03, 04 and 05. The reformat touches most of the 112 source files, and those briefs rewrite or move many of them.
 
@@ -42,7 +42,7 @@ On a scratch copy, with Prettier 3.9.10, ESLint 10.8.0, typescript-eslint 8.65.0
 
 Two facts follow:
 
-- **Moving to double quotes and semicolons is the cost, not the width.** It changes about 38% of all lines in 117 of 126 files, at any width. The owner's default (Q9) accepts that in one reformat commit; the second column says what keeping sports-app's own style would cost instead: about 10%.
+- **Moving to double quotes and semicolons is the cost, not the width.** It changes about 38% of all lines in 117 of 126 files, at any width. The owner accepted that on 2026-11-10 (Q9) as one reformat commit; the second column says what keeping sports-app's own style would cost instead: about 10%.
 - The code was written to about 100 columns (95th percentile 87, 99th 156, across 32,147 lines), so a width of 120 or 130 changes about the same lines as 100.
 
 **The house shapes**, counted with the TypeScript parser over every tracked `ts`, `tsx`, `js`, `mjs` and `cjs` file outside `vendor/` and the generated docs (112 files):
@@ -67,29 +67,31 @@ Two facts follow:
 
 `eslint.config.js` sets `no-restricted-syntax` in the `shared/**` block and again in the `client/src/domain/**` block, each with its own selector list (the clock and `Math.random` bans). In a flat config the later matching block **replaces** a rule's options, it does not merge. A general "no `enum`" selector added to a base block would never apply in those two directories. Add the enum selector to all three lists.
 
-## Owner decisions (defaults this brief builds)
+## Owner decisions
 
-1. **Where the configs come from** (Q6, brief 27 decision 1). Default: the `house-style` package, extended from sports-app's configs. The Docker image installs with `npm ci --omit=dev` scoped to the server, which skips dev dependencies, so a root dev dependency from a tarball URL should not reach the image. Check it with `docker build` in step 3. If Q6 goes the other way (configs copied in), the same rules land as local files with a version header.
-2. **Width** (Q8, Q51). Default: the estate's one width. If it isn't settled when this runs, use 120.
-3. **The reformat moves sports-app to the house quotes and semicolons** (Q9). Default: yes, in the one reformat commit: 13,134 lines at width 120. The two repo-specific rules that tests or tooling hold about formatting need checking first: `client/src/ui/__tests__/noHexColors.test.ts` reads `tokens.css`, and `contrast.test.ts` parses it. Prettier lowercases hex colours and may reflow CSS, so run both after the reformat.
-4. **Markdown stays out of Prettier** (the same default as the other repos). `.prettierignore` lists `*.md`.
-5. **tsconfig** (Q11). Default: the base already has `verbatimModuleSyntax`, `erasableSyntaxOnly` and `exactOptionalPropertyTypes`. Add nothing. The `bundler` module setting and the `.ts` import suffixes stay (see above), recorded as the repo's exception in its decisions and in `scripts/conventions.json`.
-6. **Typed lint** (Q12), through `projectService`. The 14 `no-unnecessary-type-assertion` findings are fixed in step 4.
-7. **The house shapes as errors** (Q13, Q47). Default: errors in source, and `no-non-null-assertion` a **warning in tests**, so the 59 `!` in tests stay and are listed. `no-console` is an error outside CLIs and scripts, with `client/src/persistence/sync.ts`'s two calls given an `eslint-disable-next-line` with a reason (the sync warning is the user-visible log of a failed background save), or routed through one logger.
-8. **`check:fast`** (Q10). Default: a typecheck plus ESLint on the changed files, under about 15 s warm with one changed file. The typed lint on 94 files took 51 s cold, so measure the warm single-file time before accepting the default.
-9. **The Claude Code layer** (Q7). Default: the plugin's hooks.
-10. **A root `CLAUDE.md`.** Default: create one, and move the repo-wide hard rules and the brief-board section out of [corpus/CLAUDE.md](../../CLAUDE.md) into it.
+Decided 2026-11-10 (technical calls, each with the question's number; the owner may overrule):
+
+1. **Where the configs come from** (Q5-Q6). `house-style` is **vendored**, not a git, `github:` or tarball dependency: a copy of its configs with a version header at the repo root, refreshed by a `house-style:sync` script that finds the `house-style` checkout by name. sports-app's configs extend the copy. The Docker image installs with `npm ci --omit=dev` scoped to the server, so nothing here reaches it; step 4 still checks it with `docker build`.
+2. **Width** (Q8, Q51). **120**, the estate's one width. At 120 the reformat changes 13,134 lines (38.0%) in 117 files.
+3. **The reformat moves sports-app to the house quotes and semicolons** (Q9). Decided: yes, in the one reformat commit, about 38% of lines at width 120 (the table above). The two repo-specific rules that tests or tooling hold about formatting need checking first: `client/src/ui/__tests__/noHexColors.test.ts` reads `tokens.css`, and `contrast.test.ts` parses it. Prettier lowercases hex colours and may reflow CSS, so run both after the reformat.
+4. **Markdown stays out of Prettier** (Q45). `.prettierignore` lists `*.md`.
+5. **tsconfig** (Q11, Q50). The base already has `verbatimModuleSyntax`, `erasableSyntaxOnly`, `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess`. Add nothing. The `bundler` module setting and the `.ts` import suffixes stay (see above), recorded as the repo's exception in its decisions and in `scripts/conventions.json`.
+6. **Typed lint** (Q12), through `projectService`. `no-floating-promises` names `node:test`'s `describe`/`it`/`test` in `allowForKnownSafeCalls`, which this repo, on vitest, doesn't need. The 14 `no-unnecessary-type-assertion` findings are fixed in step 5.
+7. **The house shapes as errors** (Q13, Q14, Q47). Errors in source, and `no-non-null-assertion` a **warning in tests**, so the 59 `!` (all in tests) stay and are listed. `!` never appears in source today, so none is fixed. `no-console` is an error outside CLIs and scripts, with `client/src/persistence/sync.ts`'s two calls given an `eslint-disable-next-line` with a reason (the sync warning is the user-visible log of a failed background save), or routed through one logger. A default export is allowed where a framework needs one (configs, `Diagram.tsx`). Comments are prose, checked by the review gate.
+8. **`check:fast`** (Q10). A typecheck plus ESLint on the changed files, built incrementally; target 15 s, and up to about 30 s is accepted where the typed lint is slower. The typed lint on 94 files took 51 s cold, so record the warm single-file time.
+9. **The Claude Code layer** (Q7). The plugin's hooks: `Stop` runs `check:fast`, `PostToolUse` formats the saved file.
+10. **A root `CLAUDE.md`** (Q46). A short root `CLAUDE.md` with the commands. Create it, and move the repo-wide hard rules and the brief-board section out of [corpus/CLAUDE.md](../../CLAUDE.md) into it.
 
 ## Files you OWN
 
 - `eslint.config.js`.
-- New: the Prettier config, `.prettierignore`, `.git-blame-ignore-revs`, `scripts/check-fast.mjs` if the package ships none.
+- New: the vendored `house-style` copy and the `house-style:sync` script, the Prettier config, `.prettierignore`, `.git-blame-ignore-revs`, `scripts/check-fast.mjs` if the package ships none.
 - The root `package.json` (scripts, devDependencies) and `package-lock.json`.
 - The reformat: whitespace and quote changes to every file Prettier covers.
 - The fixes the new rules ask for: the 14 redundant assertions, the `TODO` wording at `client/src/ui/ExerciseFigure.tsx:119`, and anything else a typed rule finds, fixed or listed.
 - New: `.claude/rules/client.md`, `.claude/rules/server.md`, `CLAUDE.md`.
 - [corpus/CLAUDE.md](../../CLAUDE.md): its hard rules and brief-board section move out.
-- `scripts/conventions.json` (new), for the module-setting exception.
+- `scripts/conventions.json` (new): the module-setting exception and the checker roots.
 - Corpus: [wiki/technical-decisions.md](../../wiki/technical-decisions.md) (a new entry), [wiki/status.md](../../wiki/status.md), [log.md](../../log.md).
 
 ## Files you must NOT touch
@@ -103,14 +105,15 @@ Two facts follow:
 
 One commit per step, each with `npm run check` and `npm run build` green.
 
-1. **Measure first.** Record in the `log.md` entry: the typed rules' counts (above, re-run), lint time with `projectService` against `project`, knip's findings, `@vitest/eslint-plugin` recommended's count, and warm `check:fast` time. A rule that finds more than about 20 real problems, or mostly false ones, goes back to the owner before it is turned on.
-2. **Prettier, and the reformat.**
-   1. Add `prettier` (pinned) and the config (`printWidth` per decision 2, double quotes, semicolons, `trailingComma: "all"`).
+1. **Vendor `house-style`.** Copy its configs in with a version header and add the `house-style:sync` script (decision 1). Commit alone.
+2. **Measure first.** Record in the `log.md` entry: the typed rules' counts (above, re-run), lint time with `projectService` against `project`, knip's findings, `@vitest/eslint-plugin` recommended's count, and warm `check:fast` time. A rule that finds more than about 20 real problems, or mostly false ones, goes back to the owner before it is turned on.
+3. **Prettier, and the reformat.**
+   1. Add `prettier` (pinned) and the config (`printWidth` 120 (decision 2), double quotes, semicolons, `trailingComma: "all"`).
    2. Add `.prettierignore`: `*.md`, `**/vendor/`, `package-lock.json`, `**/dist/`, `**/dev-dist/`, `coverage/`, `docs/.docusaurus/`, `docs/docs/wiki/`, `docs/static/`, `server/data/`, `client/public/`.
    3. Add `format` and `format:check` scripts, and commit that alone.
    4. Run `npm run format` and commit only that, as `style: format with Prettier`. Run `noHexColors.test.ts` and `contrast.test.ts` after.
    5. Add that commit's hash to `.git-blame-ignore-revs`, in its own commit. Hand the owner `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
-3. **ESLint.** Extend the house config (decision 1), passing the roots (`client/src`, `shared`, the CLIs: `server/seed-users.mjs`, `scripts/`, `docs/scripts/`). The diff against today's config:
+4. **ESLint.** Extend the house config (decision 1), passing the roots (`client/src`, `shared`, the CLIs: `server/seed-users.mjs`, `scripts/`, `docs/scripts/`). The diff against today's config:
 
    | Rule | Today | After | Findings today |
    |---|---|---|---|
@@ -121,26 +124,27 @@ One commit per step, each with `npm run check` and `npm run build` green.
    | `no-console` outside CLIs and scripts | off | error | 2 (`sync.ts`) |
    | `no-default-export` outside `*.config.*` | off | error | 0 (`Diagram.tsx` needs an exception: Docusaurus) |
    | `no-process-env` outside `config.ts` | off | warn on `server/`; brief 04 makes it an error | 2 (`main(process.env)` at `server/state-server.mjs:769` and `server/seed-users.mjs:138`) |
-   | `@vitest/eslint-plugin` recommended on tests | off | error | step 1 |
+   | `@vitest/eslint-plugin` recommended on tests | off | error | step 2 |
    | `no-explicit-any`, `ban-ts-comment` | error | unchanged | 0 |
    | `react-hooks` recommended | on | unchanged | 0 |
    | `better-tailwindcss` | absent | brief 03 adds it | |
 
    The existing `shared/` and `client/src/domain/` boundary blocks stay exactly as they are, apart from the enum selector.
-4. **Fix the findings:** the 14 redundant assertions, the one comment.
-5. **The gate.** `check` runs `typecheck`, `lint`, `format:check`, `check:conventions` (knip, plus the two convention checkers, `--warn-only` until briefs 03 and 04) and `test`. `check:fast` runs `typecheck`, then ESLint on the files changed against `HEAD` plus untracked ones. No shell-only syntax. `lint` stays `eslint .`. Time both.
-6. **`.claude/rules/`**, each under about 40 lines, with `paths:` frontmatter.
+5. **Fix the findings:** the 14 redundant assertions, the one comment.
+6. **The gate.** `check` runs `typecheck`, `lint`, `format:check`, `check:conventions` (knip, plus the two convention checkers, `--warn-only` until briefs 03 and 04) and `test`. `check:fast` runs `typecheck`, then ESLint on the files changed against `HEAD` plus untracked ones. No shell-only syntax. `lint` stays `eslint .`. Time both.
+7. **`.claude/rules/`**, each under about 40 lines, with `paths:` frontmatter.
    - **`client.md`** (`client/src/**`): `prescribe()` is a pure function of `sessionsDone` and nothing logged reaches it; `client/src/domain/` reads no clock and no browser API (dates come in through `persistence/`); the dependency direction `ui` to `session` to `domain` to `shared`; no hex colours outside `ui/tokens.css`; Base UI through wrappers; zero equipment.
    - **`server.md`** (`server/**`, `shared/**`): `shared/` imports nothing from `node:` or the runtimes; the state document is one hand-editable JSON per user; `server/vendor/` is generated; tests drive the real routes.
-7. **`CLAUDE.md`** at the root, under about 60 lines: what the app is; read [corpus/index.md](../../index.md) first; the commands (`npm run dev`, `npm run server`, `npm run check` before every hand-back, `npm run check:fast`, one test with `npx vitest run <file>`, `npm run seed`); the places that mislead (the server has no tsconfig until brief 04, `SPORTS_APP_PUBLIC_ORIGIN` must be set or the service refuses to start, `.env` is read from the repo root); the moved hard rules.
-8. **Corpus.** A `technical-decisions.md` entry, "The house style, formatted and checked" (width, config source, the module-setting exception, what was rejected). Update [wiki/status.md](../../wiki/status.md) and [log.md](../../log.md). Run `bash corpus/lint.sh` until clean.
+8. **`CLAUDE.md`** at the root, under about 60 lines: what the app is; read [corpus/index.md](../../index.md) first; the commands (`npm run dev`, `npm run server`, `npm run check` before every hand-back, `npm run check:fast`, one test with `npx vitest run <file>`, `npm run seed`); the places that mislead (the server has no tsconfig until brief 04, `SPORTS_APP_PUBLIC_ORIGIN` must be set or the service refuses to start, `.env` is read from the repo root); the moved hard rules.
+9. **Corpus.** A `technical-decisions.md` entry, "The house style, formatted and checked" (width, config source, the module-setting exception, what was rejected). Update [wiki/status.md](../../wiki/status.md) and [log.md](../../log.md). Run `bash corpus/lint.sh` until clean.
 
 ## Acceptance
 
 - [ ] `npm run check` passes. Its time and `check:fast`'s (warm, one changed file) are in the outcome note.
-- [ ] `npx prettier --check .` passes, and `git diff -w --ignore-blank-lines <hash>^ <hash> -- '*.ts' '*.tsx'` shows only quote, semicolon and wrapping changes (spot-check, with the count of changed lines in the outcome note). The hash is in `.git-blame-ignore-revs`.
+- [ ] The vendored `house-style` copy carries a version header, `house-style:sync` refreshes it, and no `house-style` entry is in a `package.json` or the lockfile.
+- [ ] `npx prettier --check .` passes at width 120, and `git diff -w --ignore-blank-lines <hash>^ <hash> -- '*.ts' '*.tsx'` shows only quote, semicolon and wrapping changes (spot-check, with the count of changed lines in the outcome note). The hash is in `.git-blame-ignore-revs`.
 - [ ] `npx vitest run client/src/ui/__tests__/noHexColors.test.ts client/src/ui/__tests__/contrast.test.ts` passes after the reformat.
-- [ ] ESLint reports zero errors with every rule in step 3's table. Counts before and after are in the outcome note, with each finding left and its reason.
+- [ ] ESLint reports zero errors with every rule in step 4's table (the 59 test `!` are warnings, Q47). Counts before and after are in the outcome note, with each finding left and its reason.
 - [ ] A deliberate `enum` in `shared/types.ts`, a `!` in `client/src/ui/App.tsx`, a `console.log` in `client/src/ui/App.tsx`, a `// TODO` and an `export default` each fail `npm run lint`. Revert them after.
 - [ ] `.claude/rules/client.md` and `server.md` exist with `paths:` frontmatter. The root `CLAUDE.md` is under about 60 lines and lists `npm run check`.
 - [ ] `docker build -f infrastructure/Dockerfile .` succeeds.

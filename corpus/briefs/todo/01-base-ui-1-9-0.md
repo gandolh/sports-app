@@ -74,4 +74,4 @@ One commit for the bump, `chore(deps): @base-ui/react 1.9.0`.
 
 ## Interplay
 
-- Brief 03 starts from a tree already on 1.9.0, so the `RadioGroup` API it uses is the 1.9.0 one.
+- Brief 03 starts from a tree already on 1.9.0, so the `ToggleGroup` and `Toggle` APIs it uses are the 1.9.0 ones.

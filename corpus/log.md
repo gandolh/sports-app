@@ -1477,3 +1477,15 @@ points at its replacement in [decisions-identity.md](wiki/decisions-identity.md)
 The other pages cite dates instead of brief numbers. Code comments no longer
 cite brief numbers.
 
+
+## [2026-11-10] todo | Briefs 01-04 revised for the owner's grilling and the technical calls
+
+- 02: `house-style` is vendored (a copy with a version header, `house-style:sync`), not a package; width 120 and
+  the 38% reformat accepted (Q8, Q9, Q51); `!` is an error in source and a warning in tests (59 in tests); the
+  decisions carry their question numbers.
+- 03: the theme and accent pickers become a guarded `ToggleGroup`, since they save on each choice (Q57); the type
+  scale is already named in `@theme inline` (Q62) and the root font size is already off the root (Q44); the
+  19 `data-testid` attributes are audited.
+- 04: schemas stay TypeBox, with the reason written down (Q55); one error handler keeps `{ error: string }`,
+  passes Fastify's 4xx through and never echoes a thrown message (Q43); `db.mjs` stays whole as
+  `src/db/store.ts` (Q54); no decorators as a test seam (Q56).

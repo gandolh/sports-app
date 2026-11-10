@@ -9,9 +9,7 @@
   - brief 15, *Enforce the base-ui and code-structure skills in every repo*: `check-structure` runs `--warn-only` until this brief is done.
 - The owner's grilling of 2026-11-10:
   - Q1 (answered: every service runs from its repo's `infrastructure/Dockerfile`, which starts a file path, so renaming the entry changes the `CMD` in the same commit);
-  - Q23 (`server/src/features/`);
-  - Q24 (plugin options, explicit registration);
-  - Q28 (this repo's server gets its own conversion brief; decided as a technical call, 2026-11-10).
+  - the technical calls: Q23 (`server/src/features/`), Q24 and Q56 (plugin options, explicit registration, no decorators), Q25 and Q53 (a schema on every route, stream and raw-body routes exempt), Q43 (one error handler), Q54 (a big store stays whole in `db/`), Q55 (where schemas live), Q28 (this repo's server gets its own conversion brief).
 
 **Runs before:** 05. It is independent of 03; never run the two at the same time (both edit `package-lock.json` and the tests).
 
@@ -39,7 +37,7 @@ That is small. So this brief applies config, the app/server split, plugins, feat
 
 ### Why the zod type provider does not apply
 
-The skills library's rule 6 assumes zod schemas in `shared/`. sports-app's contract is **TypeBox** (`shared/api.ts`: `HealthResponse`, `StateDocumentEnvelope`, `SnapshotReceipt`, `ErrorResponse`; `@sinclair/typebox` 0.34.52), which Fastify's own AJV reads as JSON Schema. No workspace depends on zod (`grep -n zod package.json */package.json` prints nothing; the lockfile's one copy, 4.5.4 at `package-lock.json:28517`, comes in through the docs site). Rewriting the contract to zod would change `shared/` and the client codec for three routes. Default: keep TypeBox, and put the rule's intent (schemas declared on the route, nothing hand-parsed) in terms of TypeBox. Report this to the skills library as a repo the zod rule doesn't fit.
+The skills library's rule 6 assumes zod schemas in `shared/`. sports-app's contract is **TypeBox** (`shared/api.ts`: `HealthResponse`, `StateDocumentEnvelope`, `SnapshotReceipt`, `ErrorResponse`; `@sinclair/typebox` 0.34.52), which Fastify's own AJV reads as JSON Schema. No workspace depends on zod (`grep -n zod package.json */package.json` prints nothing; the lockfile's one copy, 4.5.4 at `package-lock.json:28517`, comes in through the docs site). Rewriting the contract to zod would change `shared/` and the client codec for three routes. Decided 2026-11-10 (technical call, Q55): **keep TypeBox, not zod.** The reason is the repo's existing contract: `shared/api.ts` is TypeBox, the client codec imports it, and Fastify's AJV reads it as it is, so zod would rewrite `shared/` and the client for three routes and add a dependency nothing else here uses. Per Q55 a schema the client imports lives in `shared/`, which is where these already are. Put the rule's intent (schemas declared on the route, nothing hand-parsed) in terms of TypeBox. Report this to the skills library as a repo the zod rule doesn't fit.
 
 ### Where the routes stand against "a schema on every route"
 
@@ -81,18 +79,20 @@ An emit check, `tsc` with `allowJs`, `rewriteRelativeImportExtensions`, `outDir`
 - `server/vitest.config.mjs` says it stays `.mjs` so that no `.ts` file escapes `tsc`. After this brief `server/` is in a tsconfig, so it becomes `.ts`.
 - The Dockerfile's `proddeps` stage copies three workspace manifests, and the root `package.json` lists four workspaces (`shared`, `client`, `server`, `docs`). Step 1 records whether `docker build` passes today.
 
-## Owner decisions (defaults this brief builds)
+## Owner decisions
 
-1. **TypeScript, built with `tsc`** (Q28, a technical call). The service is converted, built to `server/dist`, and run from there in the container. Dev and tests run the `.ts` source directly through Node's type stripping. Alternative: run `.ts` in the image too with no build stage. It works on Node 24 and has fewer moving parts, but it breaks the estate's convention and keeps the 4 MiB-body service outside any emitted build. If the owner prefers it, drop step 3 and the Dockerfile build stage.
-2. **`server/src/features/<name>/`** (Q23): `health` and `state`.
-3. **Typed plugin options and explicit registration** (Q24): `buildApp` takes one deps object (store, accounts, auth, Ward client, config) and registers by name. No decorators, no autoload.
-4. **Schemas stay TypeBox** (see above), with the two exceptions recorded in `scripts/conventions.json`.
-5. **The error body** stays `{ error: string }`, plus `limit` on the 413. The client reads `error` and nothing else; the code-structure skill prescribes one handler, not a shape.
-6. **The entry** (Q1): `server/state-server.mjs` becomes `server/src/server.ts`, built to `server/dist/server.js`, and the Dockerfile `CMD` changes in the same commit as each step that moves it.
-7. **Shutdown.** Default: keep the existing `process.once('SIGINT' | 'SIGTERM')` handler, which closes the server and then the database. It works and has tests; `close-with-grace` would add a dependency to do the same thing. Record it in `conventions.json` if the checker wants one.
-8. **Timeouts.** Default: `connectionTimeout: 10_000`, `requestTimeout: 60_000` (a phone uploading a 1 MB document over a poor link), `keepAliveTimeout: 125_000` (above Caddy's idle keep-alive to its upstreams; check the deploy's snippet). **`trustProxy` is not set**: logging is off (`logger: false`) and the service never reads `request.ip`, so it would change nothing; Ward's lockout reads the socket itself. Record it.
-9. **A big store** (Q54). Default: `db.mjs` stays one store. It splits only at the seam its sections already show: the open and migrate half to `server/src/db/open.ts`, the statements to `server/src/features/state/store.ts`. If the split needs more than a hundred lines of changed code, leave it whole in `db/`.
-10. **Fastify.** Stays 5.12.7. No bump here.
+Items 1-6 and 9 are decided 2026-11-10 (technical calls, the questions named); 7, 8 and 10 are defaults no question covers.
+
+1. **TypeScript, built with `tsc`** (Q28, a technical call, decided 2026-11-10). The service is converted, built to `server/dist`, and run from there in the container. Dev and tests run the `.ts` source directly through Node's type stripping. Alternative: run `.ts` in the image too with no build stage. It works on Node 24 and has fewer moving parts, but it breaks the estate's convention and keeps the 4 MiB-body service outside any emitted build. If the owner prefers it, drop step 3 and the Dockerfile build stage.
+2. **`server/src/features/<name>/`** (Q23, decided): `health` and `state`.
+3. **Typed plugin options and explicit registration** (Q24, Q56, decided): `buildApp` takes one deps object (store, accounts, auth, Ward client, config) and registers by name. No decorators (not even as a test seam: tests pass their dependencies as options), no autoload.
+4. **Schemas stay TypeBox** (see above; Q25, Q53, Q55). Decided: every route has a schema except the two exceptions, the pass-through `GET /api/state` and the raw-body `PUT /api/state`, each recorded in `scripts/conventions.json`.
+5. **The error body** (Q43). Decided: one error handler, keeping the repo's shape, `{ error: string }`, plus `limit` on the 413. The client reads `error` and nothing else. The handler passes Fastify's own 4xx through with their status and message, and never echoes a thrown message to the client: an unexpected error answers a fixed 500 sentence. Step 5 checks both with a test (a route that throws an error with a recognisable message, and a malformed JSON body).
+6. **The entry** (Q1, a fact): `server/state-server.mjs` becomes `server/src/server.ts`, built to `server/dist/server.js`, and the Dockerfile `CMD` changes in the same commit as each step that moves it.
+7. **Shutdown.** Default (no question covers it): keep the existing `process.once('SIGINT' | 'SIGTERM')` handler, which closes the server and then the database. It works and has tests; `close-with-grace` would add a dependency to do the same thing. Record it in `conventions.json` if the checker wants one.
+8. **Timeouts.** Default (no question covers it): `connectionTimeout: 10_000`, `requestTimeout: 60_000` (a phone uploading a 1 MB document over a poor link), `keepAliveTimeout: 125_000` (above Caddy's idle keep-alive to its upstreams; check the deploy's snippet). **`trustProxy` is not set**: logging is off (`logger: false`) and the service never reads `request.ip`, so it would change nothing; Ward's lockout reads the socket itself. Record it.
+9. **A big store** (Q54). Decided: `db.mjs` stays whole, as `server/src/db/store.ts` (a big `store.ts` stays whole in `db/`). It is not split into `open.ts` and a feature store.
+10. **Fastify.** Default (no question covers it): stays 5.12.7. No bump here.
 
 ## The move map (step 6)
 
@@ -107,12 +107,12 @@ Paths are relative to `server/`.
 | `state-server.mjs` (the `GET`/`HEAD /api/health` route) | `src/features/health/routes.ts` | |
 | `state-server.mjs` (the child scope, both state routes, `checkDocument`, the compiled validator) | `src/features/state/routes.ts` and `src/features/state/document.ts` | `document.ts` holds `checkDocument`, which the client test imports |
 | `state-server.mjs` (`readConfig`, the defaults) | `src/config.ts` | with `readAuthConfig` from `ward.mjs` |
-| `db.mjs` | `src/db/open.ts` and `src/features/state/store.ts` | decision 9 |
+| `db.mjs` | `src/db/store.ts` | whole, decision 9 |
 | `ward.mjs` | `src/plugins/auth/` (`index.ts` registers `wardAuth` first; `accounts.ts`, `ward-client.ts`, `streams.ts` for the rest) | `ROUTE_PREFIX`, `ALLOW_RENAME` and the cookie name stay together |
 | `seed-users.mjs` | `src/seed.ts` | a CLI; `npm run seed` points at `dist/seed.js` |
 | `__tests__/state-server.test.mjs` | `src/app.test.ts`, with the `readConfig` block (line 1014 on) to `src/config.test.ts` | |
 | `__tests__/auth.test.mjs`, `auth-fixture.mjs` | `src/plugins/auth/auth.test.ts`, `src/testing/auth-fixture.ts` | |
-| `__tests__/db.test.mjs` | `src/features/state/store.test.ts` | |
+| `__tests__/db.test.mjs` | `src/db/store.test.ts` | |
 | `vitest.config.mjs` | `vitest.config.ts` | |
 | `vendor/ward/` | unchanged | generated; imported as `../vendor/…` from `src` and from `dist` alike |
 
@@ -158,7 +158,7 @@ One commit per numbered step. After each, `npm run check` and `npm test` pass, a
    - `CMD` becomes `["node", "server/dist/state-server.js"]`. `start` runs `dist`; the root `server` script runs the source (`npm run server` still needs no build).
 4. **`config.ts`.** `loadConfig(env = process.env)` returns the typed `Config`, with `readConfig`'s checks (a bad port still prints `SPORTS_APP_PORT must be a port number, got …` and exits non-zero) and `readAuthConfig`'s messages unchanged. `seed.ts` uses it too. `resolveDbFile()` computes the default path once. Turn `no-process-env` into an error outside `config.ts` and tests.
 5. **Split the app from the server, and add the plugins.** `app.ts`, `server.ts`, `plugins/headers.ts`, `plugins/errors.ts`, `plugins/auth/index.ts` as in the map, with `fastify-plugin` (pinned) on the three cross-cutting plugins and the auth plugin still registered first. Rename the entry to `server.ts`, and change `CMD`, `start`, `seed` and `exports` in the same commit.
-6. **Feature folders, the store and the tests**, per the map, with `git mv` so history follows. Add `.dependency-cruiser.cjs`; check that a deliberate import of `features/state/store.js` from `plugins/` fails it.
+6. **Feature folders, the store and the tests**, per the map, with `git mv` so history follows. Add `.dependency-cruiser.cjs`; check that a deliberate import of `features/state/routes.js` from `plugins/` fails it.
 7. **Timeouts** (decision 8), passed through `buildApp`'s options. A test reads them from `app.initialConfig`.
 8. **After.** Re-run step 1's sweep and diff it. Run the 93 tests unchanged. Turn `check-structure` strict, add dependency-cruiser to `check:conventions`, and record the exceptions (the raw-body route, the pass-through reply, `trustProxy`, shutdown). Update the corpus pages and `.claude/rules/server.md`, then run `bash corpus/lint.sh` until clean.
 
@@ -171,6 +171,8 @@ One commit per numbered step. After each, `npm run check` and `npm test` pass, a
 - [ ] The before and after sweeps are identical, status and headers, and the diff (or "no difference") is in `log.md`.
 - [ ] `check-structure` passes strict, with its exceptions in `scripts/conventions.json` and a reason for each. dependency-cruiser fails on the deliberate cross-folder import and passes clean.
 - [ ] `codec.test.ts` has no `@ts-expect-error`.
+- [ ] A test throws an error with a recognisable message from a route and expects the reply not to contain it, and a malformed JSON body keeps Fastify's own 4xx status (Q43).
+- [ ] The conversion adds no `!` in `server/src` outside tests: the rule is an error in source and a warning in tests (Q47), and the fixes for the 25 source type errors use narrowing.
 - [ ] `npm run check` passes, and `bash corpus/lint.sh` ends clean.
 
 ## Interplay

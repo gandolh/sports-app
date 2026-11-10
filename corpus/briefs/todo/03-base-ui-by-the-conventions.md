@@ -6,7 +6,7 @@
 - In the owner's skills library:
   - brief 02, *A base-ui skill, styled with Tailwind*: rules 1-13, the references and `check-base-ui.mjs`;
   - brief 15, *Enforce the base-ui and code-structure skills in every repo*: the checker runs `--warn-only` until this brief is done.
-- The owner's grilling of 2026-11-10: Q15 (Base UI only under `ui/`), Q16 (where native controls stay), Q18 (dark mode), Q57 (an always-one-chosen filter).
+- The owner's grilling of 2026-11-10: the owner's answers (Q18 dark mode, Q19 visual parity) and the technical calls (Q15 Base UI only under `ui/`, Q16 native controls, Q41 and Q57 choice controls, Q44, Q59-Q62), all decided below.
 
 **Runs before:** 05, the redesign. It changes structure and behaviour; the redesign then changes only the look.
 
@@ -47,12 +47,12 @@ Brief 01 leaves `client/package.json` at `1.9.0`, exact. Rules 1 and 2 hold: all
 
 **Rule 13's two:**
 
-1. **The theme choice**, `client/src/ui/routes/account.tsx:236-253`: three `<button role="radio">` in a `role="radiogroup"`, with no arrow keys and three Tab stops. It becomes `RadioGroup` + `Radio`. Each arrow press applies the choice at once, which is wanted here: it is a live preview, and the write is one `localStorage` key.
-2. **The accent choice**, `client/src/ui/routes/account.tsx:276-293`: the same pattern, eight options in a four-column grid. Same fix. The Almanac exception (a picker whose arrow keys must not save) does not apply: choosing an accent only stamps an attribute.
+1. **The theme choice**, `client/src/ui/routes/account.tsx:236-253`: three `<button role="radio">` in a `role="radiogroup"`, with no arrow keys and three Tab stops. It becomes a guarded `ToggleGroup` (Q57, decision 2): it saves on each choice, so arrow keys move focus without saving, a press chooses, and one item always stays pressed.
+2. **The accent choice**, `client/src/ui/routes/account.tsx:276-293`: the same pattern, eight options in a four-column grid. Same fix: choosing an accent also saves (the `sports-app.accent` key), so it is the same kind of picker.
 
 **Considered and left:**
 
-- `client/src/ui/components/LogControls.tsx:77` (an `aria-pressed` button that logs the target, and removes it on a second press) and `:91` (an `aria-expanded` disclosure). Rule 13's list has no toggle button or disclosure, and native `aria-pressed` is correct. Default: left, which is a question for the owner if they want `Toggle` and `Collapsible` (decision 3).
+- `client/src/ui/components/LogControls.tsx:77` (an `aria-pressed` button that logs the target, and removes it on a second press) and `:91` (an `aria-expanded` disclosure). Rule 13's list has no toggle button or disclosure, and native `aria-pressed` is correct. Left native (decision 3).
 - `<details>` in `client/src/ui/routes/library.tsx:182`: native, and the route's own comment says why.
 - `client/src/ui/components/TabBar.tsx`: four router `Link`s, navigation and not tabs. It is the phone navigation, a bottom bar with no panel, so Q40's `Drawer` rule does not apply.
 - Q58's form-dialog rule and the confirm pattern: the app has no dialog.
@@ -84,20 +84,23 @@ What has to change for "light by default, System explicit":
   Check the exact form against Tailwind 4.3.3's docs, and test it with one throwaway `dark:` class.
 - Existing devices: a person who chose System has no key stored (System was "no key"), so they see light once and pick System again. There is no way to tell them from a first visit. Record it in the outcome note.
 
-## Owner decisions (defaults this brief builds)
+## Owner decisions
 
-1. **The wrapper home** (Q15). Default: `client/src/ui/components/ui/<Name>.tsx`, the skill's `components/ui/` placed inside this app's `client/src/ui/components/`. Base UI is imported only there. `check-base-ui` rule 3 must test for `components/ui/`, not for any `ui/` segment, or it passes vacuously on this tree. Report that to the skills library; record the mapping in `scripts/conventions.json`.
-2. **The choice widgets** (Q57). Default: `RadioGroup`, since both choices apply at once and each has exactly one chosen.
-3. **The two considered-and-left widgets** (the log toggle, the disclosure). Default: left native.
-4. **Dark mode** (Q18, answered 2026-11-10). A switch, light by default, System as an explicit choice, kept on the device, keyed to `data-theme`.
-5. **Two stylesheets** (rule 5). Default: kept, as an exception.
+Decided 2026-11-10; 4 is the owner's answer, the rest are technical calls the owner may overrule:
+
+1. **The wrapper home** (Q15, Q59). `client/src/ui/components/ui/<Name>.tsx`, the skill's `components/ui/` placed inside this app's `client/src/ui/components/`. Base UI is imported only there, and wrappers stay in `components/ui/` as in other feature-folder repos. `check-base-ui` rule 3 must test for `components/ui/`, not for any `ui/` segment, or it passes vacuously on this tree: the checkers read their roots from `scripts/conventions.json`, so record the mapping there.
+2. **The choice widgets** (Q41, Q57). The theme and accent pickers **save** on each choice, so they use a guarded `ToggleGroup`: arrow keys move focus without saving, a press chooses, and one item always stays pressed. (A filter that only switches what a list shows would use `RadioGroup`; there is none here.)
+3. **The two considered-and-left widgets** (the log toggle, the disclosure; Q16). Left native.
+4. **Dark mode** (Q18, owner). A switch, light by default, System as an explicit choice, kept on the device, keyed to `data-theme`.
+5. **Two stylesheets** (rule 5). Kept, as a recorded exception.
+6. **The type scale and tests** (Q62, Q60, Q44). The type scale is already named: `--fs-*` tokens mapped to `--text-*` in `@theme inline` (`tokens.css:198-210`, `:532`), so nothing moves. No `phone` variant. `client/src/index.css:53` already forbids a pixel font size on the root, so Q44 needs no change. The 19 `data-testid` attributes (`grep -rn "data-testid" client/src`) are audited in step 3: tests select by role, and an id stays only where no role fits. Component tests stay in jsdom, per file, only where a wrapper holds logic (Q60); the choice-group's guard is one.
 
 ## The wrapper set: `client/src/ui/components/ui/`
 
 | File | What it is | From |
 |---|---|---|
 | `Field.tsx` | Base UI `Field` (`Root`, `Label`, `Control`, `Description`, `Error`) with the `FIELD_*` classes inside | `fields.ts`'s constants, and the three direct users |
-| `RadioGroup.tsx` | Base UI `RadioGroup` + `Radio.Root` + `Radio.Indicator`; takes `options`, `value`, `onValueChange`, a `name`, and a class per state | new; the theme and accent choices |
+| `ToggleGroup.tsx` | Base UI `ToggleGroup` + `Toggle`, guarded (one item always pressed, arrow keys move focus without saving); takes `options`, `value`, `onValueChange`, a label, and a class per state | new; the theme and accent choices |
 
 `fields.ts`'s `FIELD_*` names stay exported if another file still uses them (check with `grep -rn "FIELD_" client/src`).
 
@@ -121,7 +124,7 @@ One commit per numbered step. After each, `npm run check` passes, with `check-ba
 
 1. **Before.** Run `check-base-ui` and record the counts by rule. Take Playwright screenshots at 1280 and 390 px, light and dark, of `/login`, `/account` (both choices) and the two settings panels. Keep them out of git.
 2. **`Field.tsx`**, and the three users on it. Rule 3 drops to 0.
-3. **`RadioGroup.tsx`**, and the two choices on it. Keep the labels, the `Theme` and `Accent colour` group names, the tap height, and the live stamp on each choice. Update the screens test to assert arrow keys move the choice.
+3. **`ToggleGroup.tsx`**, and the two choices on it. Keep the labels, the `Theme` and `Accent colour` group names, the tap height, and the stamp on each choice. Update the screens test to assert that arrow keys move focus without changing the choice, and that a press chooses. Audit the 19 `data-testid` attributes (decision 6).
 4. **The theme switch** as listed under "What Q18 changes", in this order: `theme.ts` and its tests, `index.html`, `tokens.css`, the contrast test, the `@custom-variant`. A first visit (no key, dark OS) shows light.
 5. **The exception file.** `scripts/conventions.json` with the two-stylesheet entry and the wrapper-home mapping, each with its reason.
 6. **After.** Take the screenshots again. Per the owner's call (Q19, "close enough"), there must be no visible change to layout or colour at 1280 and 390 px, and drift of a few pixels needs no listing. Run `check-base-ui` strict: rules 1, 2, 3 and 9-11 report 0. Update the corpus pages and run `bash corpus/lint.sh` until clean.
@@ -132,7 +135,7 @@ One commit per numbered step. After each, `npm run check` passes, with `check-ba
 - [ ] `check-base-ui` strict reports 0 for rules 1, 2, 3, 9, 10 and 11, and the two exceptions are in `scripts/conventions.json`.
 - [ ] A test: with no stored theme, `document.documentElement.getAttribute('data-theme')` is `light` after the blocking script's logic runs, even when `matchMedia('(prefers-color-scheme: dark)')` matches.
 - [ ] A test: choosing System stores `system` and stamps `data-theme="system"`, and `contrast.test.ts` still resolves the dark-OS state and the stamped dark to one palette.
-- [ ] The theme and accent groups move by arrow key and have one Tab stop. That is a test.
+- [ ] The theme and accent groups have one Tab stop, arrow keys move focus without saving, a press chooses, and one item always stays pressed. That is a test.
 - [ ] `npm run check` and `npm run build` pass, and `bash corpus/lint.sh` ends clean.
 - [ ] The before and after screenshots show no visible change at 1280 and 390 px in either theme.
 
