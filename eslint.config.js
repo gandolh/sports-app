@@ -1,70 +1,59 @@
-// @ts-check
-import js from "@eslint/js";
-import tseslint from "typescript-eslint";
-import reactHooks from "eslint-plugin-react-hooks";
+import { houseStyle, restrictedSyntax } from "./vendor/house-style/eslint.config.js";
 
 /**
- * One flat config at the workspace root, covering all three workspaces.
+ * One flat config at the workspace root, covering all workspaces: the house config from the vendored
+ * house-style copy, given this repo's folders, then the two boundary blocks that are specific to it.
  *
- * Deliberately not one config per workspace: the rules that earn ESLint its place
- * in this project are *boundary* rules, and a boundary is a statement about two
- * packages at once. Splitting them per workspace would also mean `shared/`'s
- * constraints could be relaxed by editing a file inside `shared/`, which is
- * precisely what they exist to prevent.
+ * Deliberately not one config per workspace: the rules that earn ESLint its place in this project are
+ * *boundary* rules, and a boundary is a statement about two packages at once. Splitting them per
+ * workspace would also mean `shared/`'s constraints could be relaxed by editing a file inside
+ * `shared/`, which is precisely what they exist to prevent.
  *
- * The load-bearing parts are the two blocks in the middle:
+ * The load-bearing parts are the two boundary blocks:
  *
- *   1. **`shared/**`** — the wire contract. No `node:`, no DOM, no import from
- *      either runtime. It is a dependency of a browser bundle and of a Node
- *      service at the same time, so anything that assumes one breaks the other.
- *   2. **`client/src/domain/**`** — the pure core: the progression engine and the
- *      content it operates on. Its purity is what makes the engine trustworthy —
- *      it can be simulated across hundreds of synthetic sessions with no DOM, no
- *      storage and no clock.
+ *   1. **`shared/**`**: the wire contract. No `node:`, no DOM, no import from either runtime. It is a
+ *      dependency of a browser bundle and of a Node service at the same time, so anything that
+ *      assumes one breaks the other.
+ *   2. **`client/src/domain/**`**: the pure core, the progression engine and the content it operates
+ *      on. Its purity is what makes the engine trustworthy: it can be simulated across hundreds of
+ *      synthetic sessions with no DOM, no storage and no clock.
  *
  * Purity enforced by comment decays. Purity enforced by a failing lint does not.
  */
-export default tseslint.config(
-  // `**/` prefixes rather than bare `dist/`: build output now lives inside a
-  // workspace (`client/dist`, `client/dev-dist`) rather than at the root.
-  //
-  // The `docs/` entries are all GENERATED: Docusaurus's cache, the corpus pages
-  // sync-corpus.mjs renders, TypeDoc's bundled viewer scripts, and archify's
-  // self-contained diagram artifacts. Linting the third-party ones added 387
-  // errors to a 6-error baseline and told us nothing — they are build products
-  // that happen to be committed or cached, not source. `docs/`'s own
-  // hand-written files (docusaurus.config.ts, sidebars.ts, src/, scripts/) are
-  // NOT ignored and do lint: the TypeScript ones under the shared TypeScript
-  // rules below, the scripts in the build-scripts block.
-  {
+export default [
+  ...houseStyle({
+    root: import.meta.dirname,
+    web: "client/src",
+    server: "server",
+    // Scripts run by hand, which print and read the environment directly: the library importer and the
+    // docs build helpers.
+    scripts: ["scripts", "docs/scripts"],
+    // CLIs inside the app: the service entry and the seed command talk to the person running them.
+    console: ["server/seed-users.mjs", "server/state-server.mjs"],
+    // Docusaurus reads `default` from its sidebar file and from its component.
+    defaultExports: ["docs/sidebars.ts", "docs/src/components/Diagram.tsx"],
+    // Test helpers that wrap `expect`, so `vitest/expect-expect` counts a test that calls one.
+    assertFunctionNames: [
+      "expect",
+      "expectTypeOf",
+      "expectRejected",
+      "expectAccepted",
+      "expectLive",
+      "assertBoneLengths",
+      "assertFinite",
+    ],
+    // These docs/ folders are generated: Docusaurus's cache and build, the corpus pages
+    // sync-corpus.mjs renders, TypeDoc's bundled viewer scripts, and archify's self-contained diagram
+    // artifacts. The hand-written files (docusaurus.config.ts, sidebars.ts, src/, scripts/) do lint.
     ignores: [
-      "**/dist/",
       "**/dev-dist/",
-      "**/coverage/",
-      "**/node_modules/",
-      // Vendored, built copies of the shared auth library: generated, never edited
-      // here, and a few hundred KB of bundled third-party code.
-      "**/vendor/",
       "docs/.docusaurus/",
       "docs/dist/",
       "docs/docs/wiki/",
       "docs/static/reference/",
       "docs/static/diagrams/",
     ],
-  },
-
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
-
-  {
-    files: ["client/src/**/*.{ts,tsx}", "shared/**/*.ts"],
-    plugins: { "react-hooks": reactHooks },
-    rules: {
-      ...reactHooks.configs.recommended.rules,
-      "@typescript-eslint/consistent-type-imports": "error",
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
-    },
-  },
+  }),
 
   // ---------------------------------------------------------------------------
   // The wire contract. See corpus/wiki/architecture.md for the dependency
@@ -143,6 +132,7 @@ export default tseslint.config(
       // not a contract.
       "no-restricted-syntax": [
         "error",
+        ...restrictedSyntax,
         {
           selector: "NewExpression[callee.name='Date']",
           message:
@@ -205,6 +195,7 @@ export default tseslint.config(
       // makes the engine deterministic and its simulation reproducible.
       "no-restricted-syntax": [
         "error",
+        ...restrictedSyntax,
         {
           selector: "NewExpression[callee.name='Date']",
           message:
@@ -227,76 +218,22 @@ export default tseslint.config(
     },
   },
 
-  // Config and script files run in Node and are not part of the app. `**/`
-  // because they now live inside workspaces (client/vite.config.ts,
-  // server/vitest.config.mjs) as well as at the root (vitest.config.ts).
+  // Config and script files run in Node and are not part of the app, so the boundary rules do not apply
+  // to them. The enum ban does: this block replaces `no-restricted-syntax`, it does not add to it.
   {
     files: ["**/*.config.{js,mjs,ts}", "scripts/**/*.{js,mjs,ts}"],
     rules: {
       "no-restricted-imports": "off",
       "no-restricted-globals": "off",
-      "no-restricted-syntax": "off",
-    },
-  },
-
-  // ---------------------------------------------------------------------------
-  // The state service. Plain .mjs run directly by Node and never
-  // bundled. The explicit globals list is here rather than a `globals` package
-  // because the service was once dependency-free and that was worth preserving;
-  // it now takes Fastify, but one dependency in the *linter* still buys nothing.
-  // It is not under `client/src/`, so none of the pure-core rules above apply.
-  //
-  // This block predicted its own survival of the Fastify move — it is about the
-  // *runtime*, not the HTTP library — and it was right: the Fastify migration
-  // left the service as `server/*.mjs` in place, so the glob never moved. Proved
-  // by pointing it at a glob that matches nothing, which turns every `process`,
-  // `Buffer` and `URLSearchParams` in the service into a `no-undef` error.
-  // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
-  // Build-time scripts. Node globals, and deliberately a SEPARATE block from the
-  // service's below rather than a widened glob: the service is a long-lived
-  // runtime with a web-API surface (fetch, Response, Headers) and these are
-  // one-shot generators that only ever read argv, write a file and log. Sharing
-  // one block would hand `scripts/` a runtime vocabulary it has no business
-  // reaching for, and would make the service's globals list stop describing the
-  // service.
-  // ---------------------------------------------------------------------------
-  //
-  // `docs/` joins this block rather than getting one of its own: its two build
-  // scripts are exactly the same shape — one-shot generators that read an env
-  // var, write files and log. Its config (`docusaurus.config.ts`, `sidebars.ts`)
-  // and components (`src/**/*.tsx`) are TypeScript, so the shared TypeScript
-  // rules lint them and `npm run typecheck -w @sports-app/docs-site` checks them.
-  {
-    files: ["scripts/**/*.mjs", "docs/scripts/**/*.mjs"],
-    languageOptions: {
-      globals: { process: "readonly", console: "readonly" },
+      "no-restricted-syntax": ["error", ...restrictedSyntax],
     },
   },
 
   {
-    files: ["server/**/*.mjs"],
-    languageOptions: {
-      globals: {
-        process: "readonly",
-        console: "readonly",
-        Buffer: "readonly",
-        fetch: "readonly",
-        Response: "readonly",
-        Request: "readonly",
-        Headers: "readonly",
-        AbortController: "readonly",
-        AbortSignal: "readonly",
-        URL: "readonly",
-        URLSearchParams: "readonly",
-        TextEncoder: "readonly",
-        TextDecoder: "readonly",
-        setTimeout: "readonly",
-        clearTimeout: "readonly",
-        setInterval: "readonly",
-        clearInterval: "readonly",
-        queueMicrotask: "readonly",
-      },
-    },
+    // A warning for now (2026-11-11): these two CLIs still read the environment themselves. When the
+    // server takes its settings from config.ts, this block goes and the rule is an error again.
+    name: "sports-app/process-env-warns",
+    files: ["server/seed-users.mjs", "server/state-server.mjs"],
+    rules: { "n/no-process-env": "warn" },
   },
-);
+];
