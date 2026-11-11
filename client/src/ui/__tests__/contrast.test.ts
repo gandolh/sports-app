@@ -43,11 +43,11 @@
 // the one file — which is why the "parsed the token file" case below is not
 // ceremony. (`css: true` in `vite.config.ts` is the other half; without it Vitest
 // stubs the module to an empty string and every assertion here passes on nothing.)
-const stylesheets = import.meta.glob("../*.css", {
+const stylesheets = import.meta.glob<string>("../*.css", {
   eager: true,
   query: "?raw",
   import: "default",
-}) as Record<string, string>;
+});
 
 const source = Object.entries(stylesheets).find(([path]) => path.endsWith("/tokens.css"))?.[1] ?? "";
 
@@ -373,7 +373,7 @@ describe("the documented exceptions stay exceptions", () => {
   // competing grey ring is a regression. Without this, the next person to run an
   // accessibility sweep "fixes" it and the ring starts shouting.
   for (const state of MEASURED) {
-    describe(state, () => {
+    describe(`${state}`, () => {
       const palette = paletteFor(state, "mint");
       const ground = resolve(palette, "--bg", [255, 255, 255]);
 

@@ -333,7 +333,7 @@ export function motionStyles(timeline: MotionTimeline, rig: Rig): string {
   const samples = sampleTimeline(rig, timeline).map((sample) => ({
     percent: trim(sample.percent, 4),
     pose: sample.pose,
-    local: localAngles(sample.pose) as ReadonlyMap<RigPartId, number>,
+    local: localAngles(sample.pose),
   }));
   const duration = `${timeline.totalMs}ms`;
   const keyframes: string[] = [];

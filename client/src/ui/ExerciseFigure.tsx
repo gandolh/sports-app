@@ -114,7 +114,7 @@ const STYLES = `
  * renders a labelled placeholder instead of throwing. This is the fallback the
  * whole app is expected to live behind for a while (see
  * `corpus/briefs/todo/10-svg-figures.md`), so it is deliberately presentable on
- * its own rather than an obvious "TODO" box.
+ * its own rather than an obvious placeholder box.
  */
 export function ExerciseFigure({ rung, size = 120, className }: ExerciseFigureProps) {
   const reducedMotion = usePrefersReducedMotion();

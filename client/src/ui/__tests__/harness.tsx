@@ -165,7 +165,7 @@ export function installAuth(options: FakeAuthOptions = {}): FakeAuth {
   const href = options.href ?? "http://localhost/sports-app/";
   configureAuth({
     basePath: AUTH_BASE_PATH,
-    fetch: fetchImpl as typeof fetch,
+    fetch: fetchImpl,
     navigate: (url: string) => {
       navigations.push(url);
     },

@@ -205,8 +205,8 @@ describe("totalWork", () => {
         position: 0,
         variant: "medium",
         exercises: [
-          { pattern: "push", rungId: "push-00-fixture" as RungId, sets: 3, targetValue: 8 }, // 24 reps
-          { pattern: "core", rungId: "core-00-fixture" as RungId, sets: 2, targetValue: 30 }, // 60 seconds
+          { pattern: "push", rungId: "push-00-fixture", sets: 3, targetValue: 8 }, // 24 reps
+          { pattern: "core", rungId: "core-00-fixture", sets: 2, targetValue: 30 }, // 60 seconds
         ],
       },
     ]);

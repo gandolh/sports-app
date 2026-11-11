@@ -596,7 +596,7 @@ export function readMeta(username: string, options: StoreOptions = {}): StoreMet
     if (text === null) return { lastSavedAt: null };
     const raw: unknown = JSON.parse(text);
     if (typeof raw === "object" && raw !== null && "lastSavedAt" in raw) {
-      const value = (raw as { lastSavedAt: unknown }).lastSavedAt;
+      const value = raw.lastSavedAt;
       if (typeof value === "string") return { lastSavedAt: value };
     }
   } catch {

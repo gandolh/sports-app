@@ -7,11 +7,11 @@
 //
 // Uses Vite's `import.meta.glob` raw-string import rather than `node:fs` so
 // this test needs no `@types/node` addition to the shared tsconfig.
-const sources = import.meta.glob(["../*.ts", "../*.tsx"], {
+const sources = import.meta.glob<string>(["../*.ts", "../*.tsx"], {
   eager: true,
   query: "?raw",
   import: "default",
-}) as Record<string, string>;
+});
 
 const HEX_COLOR = /#[0-9a-fA-F]{3,8}\b/;
 

@@ -27,7 +27,7 @@
  * would be a regression.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RungId, StateDoc, SyncSettings } from "@sports-app/shared/types.ts";
+import type { StateDoc, SyncSettings } from "@sports-app/shared/types.ts";
 import { CURRENT_SCHEMA_VERSION } from "@sports-app/shared/types.ts";
 import { parse, serialise } from "../codec.ts";
 import { STORAGE_KEYS, clearReadOnly, emptyDoc, isReadOnly, load, readOnlyReason } from "../store.ts";
@@ -121,7 +121,7 @@ function docWith(sessions: number, sync: SyncSettings | null = TARGET, username 
     exercises: [
       {
         pattern: "core" as const,
-        rungId: "core-03-front-plank" as RungId,
+        rungId: "core-03-front-plank",
         sets: 2,
         targetValue: 30,
       },
@@ -140,11 +140,11 @@ type FetchFake = ReturnType<typeof vi.fn> & typeof fetch;
 
 /** A `fetch` that answers every call with the same response. */
 function responder(body: string, init: ResponseInit = { status: 200 }): FetchFake {
-  return vi.fn(() => Promise.resolve(new Response(body, init))) as unknown as FetchFake;
+  return vi.fn(() => Promise.resolve(new Response(body, init)));
 }
 
 function failer(cause: unknown): FetchFake {
-  return vi.fn(() => Promise.reject(cause)) as unknown as FetchFake;
+  return vi.fn(() => Promise.reject(cause));
 }
 
 function callsWithMethod(fetchImpl: FetchFake, method: string): unknown[] {

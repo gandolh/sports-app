@@ -618,6 +618,9 @@ function messageOf(cause: unknown): string {
 }
 
 function warn(message: string, cause?: unknown): void {
+  // The sync warning is the user-visible log of a failed background save, so it goes to the console.
+  /* eslint-disable no-console */
   if (cause === undefined) console.warn(message);
   else console.warn(message, cause);
+  /* eslint-enable no-console */
 }

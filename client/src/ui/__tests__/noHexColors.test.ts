@@ -23,10 +23,10 @@
 //
 // Extends the same idea `figures/__tests__/noHexColors.test.ts` applies to the
 // drawings, from that directory to the whole client source tree.
-const sources = import.meta.glob(
+const sources = import.meta.glob<string>(
   ["../../**/*.ts", "../../**/*.tsx", "../../**/*.css", "!../../**/__tests__/**", "!../../ui/tokens.css"],
   { eager: true, query: "?raw", import: "default" },
-) as Record<string, string>;
+);
 
 const HEX_COLOR = /#[0-9a-fA-F]{3,8}\b/;
 

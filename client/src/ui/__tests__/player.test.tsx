@@ -43,7 +43,7 @@ function withCyclePosition(doc: StateDoc, cyclePosition: number): StateDoc {
 }
 
 function nextButton(): HTMLButtonElement {
-  return screen.getByTestId("next") as HTMLButtonElement;
+  return screen.getByTestId<HTMLButtonElement>("next");
 }
 
 /** Asserts the button is live by every mechanism that could take it away. */
@@ -103,7 +103,7 @@ describe("Next is never gated", () => {
 
     // Abandoned.
     fireEvent.click(screen.getByRole("button", { name: "Stop the clock" }));
-    expect(screen.getByRole("button", { name: /^Start \d+s$/ }));
+    expect(screen.getByRole("button", { name: /^Start \d+s$/ })).toBeTruthy();
     expectLive(nextButton());
   });
 

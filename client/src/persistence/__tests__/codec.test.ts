@@ -1197,7 +1197,7 @@ describe("a v4 document migrates to v5 and stays on the same exercise", () => {
   ];
 
   for (const { pattern, before, beforeRung, past, pastRung } of edges) {
-    describe(pattern, () => {
+    describe(`${pattern}`, () => {
       it(`just past the insertion (${past}), it loads as v5 still on ${pastRung}`, () => {
         expect(v4RungIdAt(pattern, past)).toBe(pastRung);
         const doc = expectAccepted(v4Text({ [pattern]: past }));

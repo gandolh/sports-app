@@ -44,7 +44,7 @@ function storedDoc(): StateDoc {
 }
 
 function field(label: string | RegExp): HTMLInputElement {
-  return screen.getByLabelText(label) as HTMLInputElement;
+  return screen.getByLabelText<HTMLInputElement>(label);
 }
 
 /** A `GET /api/state` that answers with `remote`, or 404 when it is null. */

@@ -6,11 +6,11 @@
 // stays disconnected from the engine.
 import { LIBRARY } from "../library.ts";
 
-const sources = import.meta.glob(["../*.ts", "!../library.ts"], {
+const sources = import.meta.glob<string>(["../*.ts", "!../library.ts"], {
   eager: true,
   query: "?raw",
   import: "default",
-}) as Record<string, string>;
+});
 
 describe("the exercise reference library", () => {
   it("imported the bodyweight subset and nothing else", () => {
