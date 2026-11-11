@@ -8,7 +8,7 @@ import { RETENTION, openSnapshotStore } from "./db/store.ts";
 import { ConfigError, loadConfig } from "./config.ts";
 import type { Config } from "./config.ts";
 import { buildApp } from "./app.ts";
-import type { AppDeps } from "./app.ts";
+import type { AppDeps, AppOptions } from "./app.ts";
 import { messageOf } from "./lib/http.ts";
 import { openAccounts } from "./plugins/auth/accounts.ts";
 import { openWardClient } from "./plugins/auth/ward-client.ts";
@@ -33,8 +33,26 @@ export interface StateService {
 
 export type StateServerConfig = AppDeps;
 
+/**
+ * The server's timeouts, for this service.
+ *
+ * - `connectionTimeout`: a socket that says nothing for 10 s is dropped. The longest silent wait
+ *   here is a phone uploading a document, and the bytes keep arriving while it does.
+ * - `requestTimeout`: the whole request must arrive within a minute: a 1 MB document over a poor link.
+ * - `keepAliveTimeout`: above the 2 minutes the proxy keeps an idle upstream connection, so the
+ *   proxy closes it first and never sends a request into a connection this side just dropped.
+ *
+ * `trustProxy` is deliberately not set: logging is off and nothing here reads `request.ip`
+ * (the guard's lockout reads the socket itself), so it would change nothing.
+ */
+export const TIMEOUTS: AppOptions = {
+  connectionTimeout: 10_000,
+  requestTimeout: 60_000,
+  keepAliveTimeout: 125_000,
+};
+
 export function createStateServer(config: StateServerConfig): StateService {
-  const app = buildApp(config);
+  const app = buildApp(config, TIMEOUTS);
 
   return {
     listen(port, host, onListening) {

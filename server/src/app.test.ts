@@ -46,7 +46,8 @@ import type { AddressInfo } from "node:net";
 import type { SnapshotStore } from "./db/store.ts";
 import { STATE_PATH } from "@sports-app/shared/api.ts";
 import { checkDocument } from "./features/state/document.ts";
-import { createStateServer } from "./server.ts";
+import { buildApp } from "./app.ts";
+import { TIMEOUTS, createStateServer } from "./server.ts";
 import type { StateServerConfig } from "./server.ts";
 import { createTestAuth } from "./testing/auth-fixture.ts";
 
@@ -993,5 +994,64 @@ describe("retention", () => {
     // 1, not 3: a count of every row would tell each user how much the others
     // train.
     expect(((await response.json()) as Record<string, unknown>).retained).toBe(1);
+  });
+});
+
+// ─── The error handler, on a real route ─────────────────────────────────────
+
+describe("the error handler", () => {
+  /** The whole app, driven through `inject()`, plus a route of this test's own that throws. */
+  async function appWithBoom() {
+    const store = openSnapshotStore({ file: ":memory:" });
+    const testAuth = createTestAuth(store);
+    const app = buildApp({ store, accounts: testAuth.accounts, auth: testAuth.auth }, TIMEOUTS);
+    await app.register(async (scope) => {
+      scope.get("/api/boom", () => {
+        throw new Error("a-recognisable-secret-detail");
+      });
+    });
+    cleanups.push(async () => {
+      await app.close();
+      store.close();
+    });
+    return { app, cookie: await testAuth.cookieFor("alice") };
+  }
+
+  it("answers a thrown error with a fixed 500 sentence and never repeats the message", async () => {
+    const { app, cookie } = await appWithBoom();
+    const response = await app.inject({ method: "GET", url: "/api/boom", headers: { cookie } });
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({ error: "internal error" });
+    expect(response.body).not.toContain("a-recognisable-secret-detail");
+  });
+
+  it("keeps Fastify's own 4xx status for a malformed JSON body, in the contract's shape", async () => {
+    const { app } = await appWithBoom();
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      headers: { "content-type": "application/json" },
+      payload: "{{{",
+    });
+    expect(response.statusCode).toBe(400);
+    expect(Object.keys(response.json() as object)).toEqual(["error"]);
+  });
+});
+
+describe("the process options", () => {
+  it("sets the server's timeouts, read back from the app's initial configuration", async () => {
+    const store = openSnapshotStore({ file: ":memory:" });
+    const testAuth = createTestAuth(store);
+    const app = buildApp({ store, accounts: testAuth.accounts, auth: testAuth.auth }, TIMEOUTS);
+    try {
+      expect(app.initialConfig).toMatchObject({
+        connectionTimeout: 10_000,
+        requestTimeout: 60_000,
+        keepAliveTimeout: 125_000,
+      });
+    } finally {
+      await app.close();
+      store.close();
+    }
   });
 });

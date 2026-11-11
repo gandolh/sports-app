@@ -135,6 +135,13 @@ import { stateRoutes } from "./features/state/index.ts";
  * training history to a network. Host and port are environment variables.
  */
 
+/** The process's own options for the server underneath: the timeouts, which `server.ts` sets. */
+export interface AppOptions {
+  connectionTimeout?: number;
+  requestTimeout?: number;
+  keepAliveTimeout?: number;
+}
+
 export interface AppDeps {
   store: SnapshotStore;
   accounts: Accounts;
@@ -148,7 +155,7 @@ export interface AppDeps {
  * The whole service, built and never listening: the plugins in a fixed order, then the features.
  * Every dependency arrives in `deps`, so a test passes its own store and its own accounts.
  */
-export function buildApp(deps: AppDeps): FastifyInstance {
+export function buildApp(deps: AppDeps, options: AppOptions = {}): FastifyInstance {
   const { store, accounts, auth, wardClient } = deps;
   const maxBodyBytes = deps.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
   const log = deps.log ?? (() => {});
@@ -170,6 +177,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     // turn today's `HEAD /api/state` 405 into a 200 with the document's headers.
     exposeHeadRoutes: false,
     bodyLimit: maxBodyBytes,
+    ...options,
   });
 
   // The error handler first, so every scope created below inherits it, then the headers, then the
