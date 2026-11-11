@@ -84,8 +84,6 @@ explicit revisit plus a `log.md` entry.
 - Numbering restarted at 01 on 2026-11-02. The thirty-three briefs before that
   were folded into the wiki and deleted; the last commit holding them is
   `038f6ff` ([log.md](log.md), "Briefs reset").
-- Code comments don't cite brief numbers ("brief 22", "(brief 28)"), this repo's
-  or Ward's. Say what the code does and why; the history belongs in `log.md`.
 - Briefs in `done/` and `superseded/` are **immutable**.
 - Every wiki page carries `summary:` + `updated:` frontmatter.
 - Standard relative markdown links, not `[[wikilinks]]`.
@@ -107,7 +105,7 @@ explicit revisit plus a `log.md` entry.
 - **Verify before quoting.** A wiki page naming a path, function, or commit may
   have drifted. Check it exists before acting on it.
 
-## brief-board
+## Repo-wide rules
 
-Brief progress goes on brief-board. Run `brief-board guide` before you
-start or resume a brief, and follow it.
+The commands, the hard rules and the brief-board section live in the root
+[CLAUDE.md](../CLAUDE.md).
