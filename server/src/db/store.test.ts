@@ -1,7 +1,7 @@
 /**
  * Store-level tests: the schema migration, and the per-user retention rules.
  *
- * These are separate from `state-server.test.mjs` because they are not about
+ * These are separate from `app.test.ts` because they are not about
  * HTTP. Two of them cannot be written at the HTTP layer at all:
  *
  *   1. **Migrating a pre-existing single-stream database.** The interesting
@@ -22,8 +22,8 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { RETENTION, openSnapshotStore } from "../src/db.ts";
-import type { SnapshotStore } from "../src/db.ts";
+import { RETENTION, openSnapshotStore } from "./store.ts";
+import type { SnapshotStore } from "./store.ts";
 import {
   LEGACY_USERNAME,
   USERNAME_MAX_LENGTH,

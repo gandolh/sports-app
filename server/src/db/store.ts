@@ -237,7 +237,7 @@ function addUsernameColumn(db: DatabaseSync): boolean {
   return true;
 }
 
-export interface Snapshot {
+interface Snapshot {
   id: number;
   createdAt: string;
   username: string;
@@ -248,7 +248,7 @@ export interface Snapshot {
   docJson: string;
 }
 
-export interface SnapshotInput {
+interface SnapshotInput {
   username: string;
   docJson: string;
   historyLength: number;

@@ -22,10 +22,10 @@
 import { createInterface } from "node:readline/promises";
 import { pathToFileURL } from "node:url";
 import { Writable } from "node:stream";
-import { openSnapshotStore } from "./db.ts";
+import { openSnapshotStore } from "./db/store.ts";
 import { loadSeedConfig } from "./config.ts";
 import type { SeedConfig } from "./config.ts";
-import type { SnapshotStore } from "./db.ts";
+import type { SnapshotStore } from "./db/store.ts";
 import { DEFAULT_ROLE } from "./plugins/auth/constants.ts";
 import { openAccounts } from "./plugins/auth/accounts.ts";
 import { linkWardStreams, orphanStreamNames } from "./plugins/auth/streams.ts";

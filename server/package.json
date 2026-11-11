@@ -13,7 +13,7 @@
     "start": "node --env-file-if-exists=../.env dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "seed": "node --env-file-if-exists=../.env src/seed-users.ts"
+    "seed": "node --env-file-if-exists=../.env src/seed.ts"
   },
   "dependencies": {
     "@sinclair/typebox": "0.34.52",

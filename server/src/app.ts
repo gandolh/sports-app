@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import type { FastifyInstance } from "fastify";
-import type { SnapshotStore } from "./db.ts";
+import type { SnapshotStore } from "./db/store.ts";
 import { DEFAULT_MAX_BODY_BYTES } from "./config.ts";
 import type { AuthConfig } from "./config.ts";
 import type { Log } from "./lib/http.ts";

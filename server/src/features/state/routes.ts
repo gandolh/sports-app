@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { STATE_PATH, ErrorResponse, SnapshotReceipt } from "@sports-app/shared/api.ts";
-import type { SnapshotStore } from "../../db.ts";
+import type { SnapshotStore } from "../../db/store.ts";
 import { JSON_CONTENT_TYPE, JSON_CONTENT_TYPE_UTF8 } from "../../lib/http.ts";
 import type { Log } from "../../lib/http.ts";
 import { unsupportedMediaType } from "../../plugins/errors.ts";

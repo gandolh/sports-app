@@ -9,7 +9,7 @@ export interface ErrorsOptions {
   log: Log;
 }
 
-export function methodNotAllowed(reply: FastifyReply, allow: string) {
+function methodNotAllowed(reply: FastifyReply, allow: string) {
   return reply
     .header("Allow", allow)
     .code(405)

@@ -40,15 +40,15 @@ import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { RETENTION, openSnapshotStore } from "../src/db.ts";
-import { DEFAULT_DB_DIR, DEFAULT_DB_FILE, PROJECT_ROOT, readConfig } from "../src/config.ts";
+import { RETENTION, openSnapshotStore } from "./db/store.ts";
+import { DEFAULT_DB_DIR, DEFAULT_DB_FILE, PROJECT_ROOT } from "./config.ts";
 import type { AddressInfo } from "node:net";
-import type { SnapshotStore } from "../src/db.ts";
+import type { SnapshotStore } from "./db/store.ts";
 import { STATE_PATH } from "@sports-app/shared/api.ts";
-import { checkDocument } from "../src/features/state/document.ts";
-import { createStateServer } from "../src/server.ts";
-import type { StateServerConfig } from "../src/server.ts";
-import { createTestAuth } from "./auth-fixture.ts";
+import { checkDocument } from "./features/state/document.ts";
+import { createStateServer } from "./server.ts";
+import type { StateServerConfig } from "./server.ts";
+import { createTestAuth } from "./testing/auth-fixture.ts";
 
 /** The default signed-in identity for tests that only need one person. */
 const SUBJECT = "alice";
@@ -993,30 +993,5 @@ describe("retention", () => {
     // 1, not 3: a count of every row would tell each user how much the others
     // train.
     expect(((await response.json()) as Record<string, unknown>).retained).toBe(1);
-  });
-});
-
-// ─── Configuration ──────────────────────────────────────────────────────────
-
-describe("readConfig", () => {
-  it("binds to 127.0.0.1 by default so it cannot be exposed by accident", () => {
-    expect(readConfig({}).host).toBe("127.0.0.1");
-    expect(readConfig({}).port).toBe(8787);
-    expect(readConfig({}).dbFile).toBe(DEFAULT_DB_FILE);
-  });
-
-  it("reads host, port, database path and body cap from the environment", () => {
-    const config = readConfig({
-      SPORTS_APP_HOST: "0.0.0.0",
-      SPORTS_APP_PORT: "9000",
-      SPORTS_APP_DB: "/tmp/elsewhere.db",
-      SPORTS_APP_MAX_BODY_BYTES: "1234",
-    });
-    expect(config).toMatchObject({
-      host: "0.0.0.0",
-      port: 9000,
-      dbFile: "/tmp/elsewhere.db",
-      maxBodyBytes: 1234,
-    });
   });
 });

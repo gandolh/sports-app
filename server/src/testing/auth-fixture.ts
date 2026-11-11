@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
-import { openAccounts } from "../src/plugins/auth/accounts.ts";
-import { ROUTE_PREFIX, SESSION_COOKIE_NAME, DEFAULT_ROLE } from "../src/plugins/auth/constants.ts";
-import type { AuthConfig } from "../src/config.ts";
+import { openAccounts } from "../plugins/auth/accounts.ts";
+import { SESSION_COOKIE_NAME, DEFAULT_ROLE } from "../plugins/auth/constants.ts";
+import type { AuthConfig } from "../config.ts";
 
 /**
  * Real accounts and real sessions for the service tests.
@@ -63,5 +63,3 @@ export function createTestAuth(store: { db?: DatabaseSync }) {
     },
   };
 }
-
-export { ROUTE_PREFIX, SESSION_COOKIE_NAME };

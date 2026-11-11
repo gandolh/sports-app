@@ -16,8 +16,8 @@ import { fileURLToPath } from "node:url";
 import { wardClientOptionsFromEnv } from "../vendor/ward/ward-auth.js";
 import { SESSION_COOKIE_NAME } from "./plugins/auth/constants.ts";
 
-export const DEFAULT_HOST = "127.0.0.1";
-export const DEFAULT_PORT = 8787;
+const DEFAULT_HOST = "127.0.0.1";
+const DEFAULT_PORT = 8787;
 
 /**
  * Body cap. A snapshot at three years of daily training is roughly a megabyte

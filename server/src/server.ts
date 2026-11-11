@@ -4,7 +4,7 @@
  */
 import { pathToFileURL } from "node:url";
 import type { AddressInfo } from "node:net";
-import { RETENTION, openSnapshotStore } from "./db.ts";
+import { RETENTION, openSnapshotStore } from "./db/store.ts";
 import { ConfigError, loadConfig } from "./config.ts";
 import type { Config } from "./config.ts";
 import { buildApp } from "./app.ts";
