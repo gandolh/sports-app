@@ -34,6 +34,19 @@
  */
 @import "./ui/tokens.css";
 
+/* `dark:` keys off the stamped choice, never off the OS alone: Dark always, System only on a dark
+   OS. A `dark:` class therefore agrees with the palette blocks in tokens.css. */
+@custom-variant dark {
+  &:where(:root[data-theme="dark"], :root[data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root[data-theme="system"], :root[data-theme="system"] *) {
+      @slot;
+    }
+  }
+}
+
 @layer base {
   *,
   *::before,

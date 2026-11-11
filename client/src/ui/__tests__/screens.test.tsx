@@ -449,7 +449,7 @@ describe("/account", () => {
    * accent but mint was unreachable while `contrast.test.ts` went on proving all
    * sixteen were legible. Legible and reachable are different claims.
    */
-  it("stamps the chosen theme on the root, and clears it for System", async () => {
+  it("stamps the chosen theme on the root, System included", async () => {
     seedUser(trained(2));
     await renderApp("/account");
 
@@ -459,11 +459,10 @@ describe("/account", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Light" }));
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
 
-    // Removed, not set to 'light': absent is what keeps the page following the
-    // OS when the OS changes at sunset, and a written 'light' would look
-    // identical today and quietly stop tracking.
+    // System is a stamp of its own: it is the one value that follows the OS.
     fireEvent.click(screen.getByRole("radio", { name: "System" }));
-    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+    expect(document.documentElement.getAttribute("data-theme")).toBe("system");
+    expect(localStorage.getItem("sports-app.theme")).toBe("system");
   });
 
   it("stamps a chosen accent, and stores mint as the absence of one", async () => {
@@ -492,12 +491,12 @@ describe("/account", () => {
     expect(stops).toHaveLength(1);
 
     // The picker keeps its choice on the device, so an arrow press may choose, and one stays chosen.
-    const system = screen.getByRole("radio", { name: "System" });
-    expect(system.getAttribute("aria-checked")).toBe("true");
-    system.focus();
-    fireEvent.keyDown(system, { key: "ArrowRight" });
-    await waitFor(() => expect(screen.getByRole("radio", { name: "Light" }).getAttribute("aria-checked")).toBe("true"));
-    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    const light = screen.getByRole("radio", { name: "Light" });
+    expect(light.getAttribute("aria-checked")).toBe("true");
+    light.focus();
+    fireEvent.keyDown(light, { key: "ArrowRight" });
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Dark" }).getAttribute("aria-checked")).toBe("true"));
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
   });
 
   it("offers every accent the palette declares, so none is unreachable", async () => {

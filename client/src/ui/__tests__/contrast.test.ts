@@ -151,7 +151,7 @@ function rulesOf(css: string): ReadonlyArray<Rule> {
   return rules;
 }
 
-/** Decode `:root:not([data-theme='light'])[data-accent='lime']` and friends. */
+/** Decode `:root[data-theme='system'][data-accent='lime']` and friends. */
 function conditionsOf(selector: string): Conditions {
   let rest = selector.trim();
   if (!rest.startsWith(":root")) {
@@ -161,12 +161,13 @@ function conditionsOf(selector: string): Conditions {
   let theme: "light" | "dark" | null = null;
   let accent: string | null = null;
   while (rest.length > 0) {
-    const notLight = /^:not\(\[data-theme=['"]light['"]\]\)/.exec(rest);
+    const system = /^\[data-theme=['"]system['"]\]/.exec(rest);
     const stamped = /^\[data-theme=['"](light|dark)['"]\]/.exec(rest);
     const onAccent = /^\[data-accent=['"]([a-z0-9-]+)['"]\]/.exec(rest);
-    if (notLight !== null) {
+    if (system !== null) {
+      // Only ever written inside the dark media block, so it stands for the OS dark.
       theme = "dark";
-      rest = rest.slice(notLight[0].length);
+      rest = rest.slice(system[0].length);
     } else if (stamped !== null) {
       theme = stamped[1] as "light" | "dark";
       rest = rest.slice(stamped[0].length);

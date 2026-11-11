@@ -14,13 +14,20 @@
  * the cascade pick the right pair for the theme in play, which is the whole
  * reason there are sixteen accent definitions rather than eight.
  *
- * ── The three theme states are three, not two ───────────────────────────────
+ * ── Light, Dark and System are three explicit choices ──────────────────────
  *
- * `null` is not "light". An unstamped root follows the OS and keeps following it
- * when the OS changes at sunset; an explicit `'light'` opts out of that
- * permanently. Collapsing them into a boolean is how a user who never touched
- * the setting ends up pinned to whatever they happened to be on the first time
- * the app ran.
+ * A first visit shows light, whatever the OS prefers: nothing stored reads as
+ * `'light'`. System is a choice a person makes, stamped as `data-theme="system"`
+ * and stored as `'system'`, and it is the only one that follows the OS and keeps
+ * following it when the OS changes at sunset. A device that chose System before
+ * this change had no key stored (System used to be the absence of one), so it
+ * shows light once and the person picks System again; the two cases can't be told apart.
+ *
+ * ── The browser bar ─────────────────────────────────────────────────────────
+ *
+ * One `<meta name="theme-color">` follows the resolved theme. The blocking script
+ * sets it before the first paint; `stamp` re-sets it from the root's own `--bg`, so
+ * the value comes from `tokens.css` and this file carries no colour.
  *
  * ── Storage ─────────────────────────────────────────────────────────────────
  *
@@ -33,10 +40,7 @@
  * changes, and the two must agree on the key names.
  */
 
-export type Theme = "light" | "dark";
-
-/** `null` = follow the OS. See the header: this is a third state, not a default. */
-export type ThemeChoice = Theme | null;
+export type ThemeChoice = "light" | "dark" | "system";
 
 export const ACCENTS = ["mint", "azure", "violet", "magenta", "coral", "amber", "lime", "slate"] as const;
 
@@ -48,8 +52,8 @@ export const DEFAULT_ACCENT: Accent = "mint";
 export const THEME_KEY = "sports-app.theme";
 export const ACCENT_KEY = "sports-app.accent";
 
-export function isTheme(value: unknown): value is Theme {
-  return value === "light" || value === "dark";
+export function isTheme(value: unknown): value is ThemeChoice {
+  return value === "light" || value === "dark" || value === "system";
 }
 
 export function isAccent(value: unknown): value is Accent {
@@ -80,9 +84,10 @@ function write(key: string, value: string | null): void {
   }
 }
 
+/** The stored choice, or light when there is none. */
 export function readTheme(): ThemeChoice {
   const stored = read(THEME_KEY);
-  return isTheme(stored) ? stored : null;
+  return isTheme(stored) ? stored : "light";
 }
 
 export function readAccent(): Accent {
@@ -90,14 +95,30 @@ export function readAccent(): Accent {
   return isAccent(stored) ? stored : DEFAULT_ACCENT;
 }
 
+/** Point the browser bar at the page colour the stamped theme resolves to. */
+export function syncThemeColor(): void {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+  if (meta !== null && bg !== "") meta.setAttribute("content", bg);
+}
+
 /**
- * Stamp and persist. Removing the attribute — rather than setting it to
- * `'light'` — is what returns the page to following the OS.
+ * Re-point the browser bar when the OS changes its scheme under a System choice.
+ * Returns the function that stops listening.
  */
+export function followSystemThemeColor(): () => void {
+  const query = window.matchMedia("(prefers-color-scheme: dark)");
+  const onChange = (): void => {
+    if (document.documentElement.getAttribute("data-theme") === "system") syncThemeColor();
+  };
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+/** Stamp and persist. */
 export function setTheme(choice: ThemeChoice): void {
-  const root = document.documentElement;
-  if (choice === null) root.removeAttribute("data-theme");
-  else root.setAttribute("data-theme", choice);
+  document.documentElement.setAttribute("data-theme", choice);
+  syncThemeColor();
   write(THEME_KEY, choice);
 }
 

@@ -186,17 +186,15 @@ function AccountBody({ doc }: { readonly doc: StateDoc }) {
  * most people set once. The account screen is already where everything that is
  * about *this browser* rather than about the training lives.
  *
- * ── Why "System" is the absence of a choice, not a third theme ──────────────
+ * ── Light, Dark and System are three stamped choices ────────────────────────
  *
- * `setTheme(null)` removes the attribute rather than writing `'light'`, so the
- * page falls back to `prefers-color-scheme` and keeps following the OS when the
- * OS changes at sunset. Writing `'light'` would look identical on the day it was
- * picked and then stop tracking, which is the bug people report as "it went dark
- * on its own". The same reasoning makes mint an unstamped root rather than
- * `data-accent="mint"`.
+ * A first visit shows light. System is chosen like the others and stamps
+ * `data-theme="system"`, the one value that follows `prefers-color-scheme` and
+ * keeps following it when the OS changes at sunset. Mint is still an unstamped
+ * root rather than `data-accent="mint"`.
  *
- * State is seeded from the DOM by way of `readTheme`/`readAccent`, so it agrees
- * with the stamp `main.tsx` already applied instead of assuming a default and
+ * State is seeded from storage by way of `readTheme`/`readAccent`, so it agrees
+ * with the stamp the blocking script already applied instead of assuming a default and
  * flickering to it on mount.
  */
 function Appearance() {
@@ -228,8 +226,8 @@ function Appearance() {
       <RadioGroup
         label="Theme"
         options={themes}
-        value={theme ?? "system"}
-        onValueChange={(value) => chooseTheme(value === "system" ? null : value)}
+        value={theme}
+        onValueChange={chooseTheme}
         className="mt-[var(--sp-2)] flex gap-[var(--sp-2)]"
         optionClassName="flex-1 text-btn"
       />

@@ -6,21 +6,19 @@
          maximum-scale is deliberately omitted (pinch-zoom must stay available). -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <!--
-      Two theme-colors, not one. The app has had two themes at parity since the
-      2026-09-04 direction round, and a single value paints the OS chrome the
-      wrong colour for whichever theme loses — visibly, as a white strip above a
-      near-black app. The manifest still carries only the light pair, because a
-      manifest has exactly one of them; these override it in the browser, which
-      is where the app is actually looked at.
+      One theme-color, set to the resolved theme. The manifest carries the light
+      value, because a manifest has exactly one; this overrides it in the browser,
+      where the app is actually looked at. The blocking script below sets the dark
+      value before the first paint, and `setTheme` in `theme.ts` re-sets it from
+      `--bg` when the choice changes.
 
-      The values are `--bg` from `ui/tokens.css`, light and dark. They are the
-      one pair of hex literals outside that file, because `<meta>` cannot read a
+      The two values are `--bg` from `ui/tokens.css`, light here and dark in the
+      script. They are the only hex literals outside that file, because `<meta>` cannot read a
       custom property — there is no `var()` in an attribute. `noHexColors` globs
       `client/src/**`, so this file is outside it by construction rather than by
       exemption.
     -->
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0a0d11" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <!-- `default`, not `black-translucent`: translucent draws the status bar's
          own text in white over the page, which on the light theme is invisible.
@@ -58,11 +56,15 @@
     <script>
       try {
         var t = localStorage.getItem("sports-app.theme");
-        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        if (t !== "dark" && t !== "system") t = "light";
+        document.documentElement.setAttribute("data-theme", t);
+        var dark = t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) document.querySelector('meta[name="theme-color"]').setAttribute("content", "#0a0d11");
         var a = localStorage.getItem("sports-app.accent");
         if (a && /^[a-z]{4,8}$/.test(a)) document.documentElement.setAttribute("data-accent", a);
       } catch (_) {
-        /* No stored preference is readable. The unstamped default is correct. */
+        /* No stored preference is readable. Light, the first-visit default, is correct. */
+        document.documentElement.setAttribute("data-theme", "light");
       }
     </script>
     <title>Calisthenics</title>

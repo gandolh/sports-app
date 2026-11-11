@@ -34,8 +34,8 @@
  * ── The three theme states, and why the order is load-bearing ───────────────
  *
  *   1. bare `:root` declares the **complete light palette**;
- *   2. `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`
- *      redefines those tokens for an unstamped page on a dark OS;
+ *   2. `@media (prefers-color-scheme: dark) { :root[data-theme="system"] }`
+ *      redefines those tokens when the choice is System and the OS is dark;
  *   3. `:root[data-theme="dark"]` redefines them again for an explicit choice.
  *
  * A colour whose only definition lives inside (2) or (3) simply does not exist in
@@ -309,13 +309,13 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    2 · Dark by OS preference, for a page that has not been stamped.
 
-   `:not([data-theme="light"])` is the whole mechanism: an explicit light choice
-   opts out of this block, and an explicit dark choice is handled by block 3,
-   which is identical and comes later so it wins the specificity tie.
+   `[data-theme="system"]` is the whole mechanism: Light and Dark are stamped
+   choices and opt out of this block (a stamped dark is block 3, which is
+   identical), and System is the one stamp that follows the operating system.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root[data-theme="system"] {
     color-scheme: dark;
 
     --bg: #0a0d11;
@@ -351,42 +351,42 @@
      3.8–4.3:1 against, and the primary button's gradient puts that ink squarely
      on the partner end. Lifting the partner was the cheap fix; darkening the ink
      would have cost its contrast on `--accent`. */
-  :root:not([data-theme="light"])[data-accent="mint"] {
+  :root[data-theme="system"][data-accent="mint"] {
     --accent: #2bd9a4;
     --accent-2: #9075ff;
     --on-accent: #04231a;
   }
-  :root:not([data-theme="light"])[data-accent="azure"] {
+  :root[data-theme="system"][data-accent="azure"] {
     --accent: #3b9bff;
     --accent-2: #9075ff;
     --on-accent: #04182e;
   }
-  :root:not([data-theme="light"])[data-accent="violet"] {
+  :root[data-theme="system"][data-accent="violet"] {
     --accent: #9b7bff;
     --accent-2: #4a7dff;
     --on-accent: #150a33;
   }
-  :root:not([data-theme="light"])[data-accent="magenta"] {
+  :root[data-theme="system"][data-accent="magenta"] {
     --accent: #f062b0;
     --accent-2: #a163ff;
     --on-accent: #2e0620;
   }
-  :root:not([data-theme="light"])[data-accent="coral"] {
+  :root[data-theme="system"][data-accent="coral"] {
     --accent: #ff7a5c;
     --accent-2: #f0b457;
     --on-accent: #2e0c04;
   }
-  :root:not([data-theme="light"])[data-accent="amber"] {
+  :root[data-theme="system"][data-accent="amber"] {
     --accent: #f5b93c;
     --accent-2: #ff7a5c;
     --on-accent: #2b1b00;
   }
-  :root:not([data-theme="light"])[data-accent="lime"] {
+  :root[data-theme="system"][data-accent="lime"] {
     --accent: #9be04a;
     --accent-2: #2bd9a4;
     --on-accent: #152600;
   }
-  :root:not([data-theme="light"])[data-accent="slate"] {
+  :root[data-theme="system"][data-accent="slate"] {
     --accent: #8fa3b8;
     --accent-2: #6486a7;
     --on-accent: #0a141e;
