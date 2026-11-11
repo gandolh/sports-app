@@ -28,7 +28,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:fast": "npm run typecheck && node scripts/check-fast.mjs",
-    "check:conventions": "knip && depcruise client/src server shared && node vendor/house-style/bin/check-base-ui.mjs --warn-only && node vendor/house-style/bin/check-structure.mjs --warn-only"
+    "check:conventions": "knip && depcruise client/src server shared && node vendor/house-style/bin/check-base-ui.mjs && node vendor/house-style/bin/check-structure.mjs --warn-only"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

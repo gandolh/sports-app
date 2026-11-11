@@ -16,6 +16,43 @@
       "path": "**/*.ts",
       "match": ".ts\"",
       "reason": "Relative imports end in .ts, not .js (allowImportingTsExtensions), because Node runs shared/ source directly under type stripping."
+    },
+    {
+      "check": "base-ui",
+      "rule": 5,
+      "path": "client/src/ui/tokens.css",
+      "reason": "Two stylesheets on purpose: noHexColors.test.ts and contrast.test.ts read tokens.css as the one file that holds colour, so it stays apart from index.css, which holds the document-level base rules."
+    },
+    {
+      "check": "base-ui",
+      "rule": 5,
+      "path": "client/src/index.css",
+      "reason": "The second of the two stylesheets: the base layer and the dark: variant. tokens.css is the colour file the tests read, so the two stay separate."
+    },
+    {
+      "check": "base-ui",
+      "rule": 6,
+      "path": "client/src/ui/components/AlertBanner.tsx",
+      "reason": "A translucent mix of two tokens (color-mix over var(--token)) that no utility names; the colours still come from tokens.css and noHexColors.test.ts keeps literals out."
+    },
+    {
+      "check": "base-ui",
+      "rule": 6,
+      "path": "client/src/ui/components/Cues.tsx",
+      "reason": "A translucent mix of two tokens (color-mix over var(--token)) that no utility names; the colours still come from tokens.css and noHexColors.test.ts keeps literals out."
+    },
+    {
+      "check": "base-ui",
+      "rule": 6,
+      "path": "client/src/ui/components/Heatmap.tsx",
+      "reason": "A translucent mix of two tokens (color-mix over var(--token)) that no utility names; the colours still come from tokens.css and noHexColors.test.ts keeps literals out."
+    },
+    {
+      "check": "base-ui",
+      "rule": 6,
+      "path": "client/src/ui/components/HonestNote.tsx",
+      "reason": "A translucent mix of two tokens (color-mix over var(--token)) that no utility names; the colours still come from tokens.css and noHexColors.test.ts keeps literals out."
     }
-  ]
+  ],
+  "ui": ["**/components/ui"]
 }

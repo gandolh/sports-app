@@ -198,5 +198,5 @@ convention checkers) and tests; `check:fast` is the typecheck plus ESLint on the
 **The exception:** the tsconfig base keeps `module: ESNext`, `moduleResolution: bundler` and `.ts` import
 suffixes, because Node runs `shared/` source directly under type stripping. `scripts/conventions.json`
 records it. **Warnings for now:** `no-circular` (one type-only loop in `ui/figures`), the two `process.env`
-reads in `server/`, and both checkers run `--warn-only`. **Rejected:** keeping single quotes and no
+reads in `server/`, and `check-structure` runs `--warn-only`. **Rejected:** keeping single quotes and no
 semicolons (10% of lines instead of 38%, but a second style); `project` instead of `projectService`.

@@ -64,6 +64,27 @@ palette ships a failing pair.
    themes would double the palette and halve the attention on each half; the app has one
    user and he picked this one.
 
+## The theme switch (2026-11-11)
+
+Light, Dark and System are three stamped choices, kept on the device (`sports-app.theme`, not the synced
+document). A first visit shows **light**, whatever the OS prefers; System is picked like the others and stamps
+`data-theme="system"`. The palette is three states: bare `:root` (light), `:root[data-theme="dark"]`, and a
+`prefers-color-scheme: dark` block under `:root[data-theme="system"]`. Tailwind's `dark:` variant keys off the same
+attribute (`@custom-variant` in `index.css`). One `<meta name="theme-color">` follows the resolved theme: the blocking
+script in `index.html` sets it before paint and `theme.ts` re-sets it from `--bg`. A device that had System before
+this change stored no key, so it shows light once and the person picks System again. The paragraph above that says
+the app has one light theme is the 2026-07-30 history; the dark theme came back on 2026-09-04.
+
+## Base UI behind wrappers (2026-11-11)
+Decided 2026-11-10, built 2026-11-11. Base UI is imported only under `client/src/ui/components/ui/`
+(`Field.tsx`, `RadioGroup.tsx`); `scripts/conventions.json` names that folder, so `check-base-ui` rule 3 does not
+pass vacuously on a tree that is all under `ui/`. `check-base-ui` runs strict (0 errors). The theme and accent
+pickers are **`RadioGroup`s**, not the guarded `ToggleGroup` the brief named: both keep their choice on the device
+and write nothing to the server, so the base-ui skill's rule 16 gives them one Tab stop with arrow keys that move
+and choose. The two stylesheets (`tokens.css`, read by the colour tests, and `index.css`) and four
+`color-mix` token blends are recorded exceptions. The 19 `data-testid` attributes stay: each marks a container or
+a region with no role, and the player's `next` button changes its name (Set, Round, Finish).
+
 ## Type
 
 **Archivo Variable** (SIL OFL), self-hosted woff2, subset to latin-basic + digits (~28 KB),

@@ -1508,3 +1508,12 @@ cite brief numbers.
   workspace, one unused dev dependency and one undeclared Typebox import (both recorded); 42 unused exports and
   21 unused types are warnings. Lint 13-16 s cold with `projectService` or `project`; `check:fast` 10 s warm;
   `check` 35 s warm.
+
+## [2026-11-11] brief | 03 Base UI by the conventions, and the theme switch built
+
+- `Field` and a new `RadioGroup` wrapped in `client/src/ui/components/ui/`; the three forms and the theme and
+  accent choices use them; `fields.ts` is gone. Light / Dark / System with light on a first visit, one
+  `theme-color` meta that follows the theme, `dark:` keyed to `data-theme`. `check-base-ui` strict, 0 errors, with
+  the two-stylesheet and four `color-mix` exceptions in `scripts/conventions.json`.
+- The pickers are `RadioGroup`s, not the brief's guarded `ToggleGroup`: the base-ui skill's rule 16 wins for a
+  device-only choice. 1,232 tests pass (9 new).
