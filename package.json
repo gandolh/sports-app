@@ -24,7 +24,9 @@
     "lint": "eslint .",
     "check": "npm run typecheck && npm run lint && npm run test",
     "seed": "npm run seed --workspace @sports-app/server",
-    "house-style:sync": "node vendor/house-style/bin/sync.mjs"
+    "house-style:sync": "node vendor/house-style/bin/sync.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

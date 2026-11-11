@@ -1,0 +1,18 @@
+# Markdown stays out of Prettier (decided 2026-11-10).
+*.md
+
+# Generated or vendored copies (the Ward library, house-style).
+**/vendor/
+
+# Lockfile, build output, coverage, local data and static assets.
+package-lock.json
+**/dist/
+**/dev-dist/
+coverage/
+server/data/
+client/public/
+
+# Docusaurus's cache and the pages and files it generates.
+docs/.docusaurus/
+docs/docs/wiki/
+docs/static/
