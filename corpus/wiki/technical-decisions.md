@@ -1,6 +1,6 @@
 ---
 summary: Locked stack, storage, routing, timer and rendering choices — read before proposing an alternative implementation.
-updated: 2026-11-02
+updated: 2026-11-11
 ---
 
 # Technical decisions
@@ -58,7 +58,7 @@ derived**, so a hand-edit cannot produce a state that disagrees with itself. See
 
 `shared/` owns **the wire contract and the document shape** — nothing else. It is the fix
 for a duplication the build already had to paper over: the username rule existed in both
-`server/db.mjs` and the client codec, kept honest by a test that asserted the two regexes
+the service's store and the client codec, kept honest by a test that asserted the two regexes
 matched. One definition, imported by both, is strictly better than two definitions plus a
 test.
 
@@ -102,7 +102,7 @@ each pinned by a test that was proved to fail when the switch is flipped back:
 
 **What this costs, stated plainly rather than discovered later:** the service gained a
 dependency tree, so deploying stops being a file copy and gains an install step
-(`npm ci --omit=dev` on the server before `node state-server.mjs` will start). That was the
+(`npm ci --omit=dev` on the server before `node server/dist/server.js` will start). That was the
 actual value of the zero-dependency choice — not code aesthetics. Storage is untouched:
 `node:sqlite` is still built in, so there is still nothing to compile.
 
@@ -111,6 +111,8 @@ query string, so a `PUT` that is wrong in *both* ways — bad `?user=` *and* a n
 content type — now answers `415` where it used to answer `400`. Both are 4xx, no test
 pinned the precedence, and the client cannot produce the case. Recorded because "the
 contract did not change" should mean it, or say where it did.
+
+### The service is TypeScript (2026-11-11), overriding "no build step": see [server-structure.md](server-structure.md)
 
 ### SUPERSEDED — the service was zero-dependency
 Until 2026-07-29 the service used only `node:sqlite`, `node:http` and `node:crypto`, and
@@ -126,7 +128,7 @@ The service owns `db/app.db` (gitignored) via Node's built-in `node:sqlite`, and
 client `PUT`s/`GET`s a JSON document against it. **Snapshot rows are keyed by username**,
 so each user has an independent append-only stream. Local-first, last-write-wins per user
 — correct here because a user trains on one device at a time. `node:sqlite` stayed: it is
-built in, and the Fastify migration was a port of `db.mjs`, not a redesign — WAL,
+built in, and the Fastify migration was a port of the store (then `db.mjs`, now `db/store.ts`), not a redesign — WAL,
 `synchronous = FULL`, retention per user, pruning by `id`, and the idempotent
 `PRAGMA table_info` guard are all untouched.
 

@@ -1,13 +1,40 @@
 # The state service
 
-A **Fastify** service that holds a copy of each user's state document in SQLite. Its
-dependencies are `fastify`, and `@sports-app/shared` for the wire contract — the username
-rule, the document types, and the TypeBox schemas the routes validate against.
+A **Fastify** service, written in TypeScript, that holds a copy of each user's state
+document in SQLite. Its dependencies are `fastify`, `fastify-plugin`, `@sinclair/typebox`, and
+`@sports-app/shared` for the wire contract — the username rule, the document types, and the
+TypeBox schemas the routes validate against.
 
 The Fastify move replaced hand-rolled `node:http` routing with Fastify and **changed nothing on
 the wire**: same paths, methods, status codes, headers and bodies, so the client needed no
-edit. The 73 pre-existing tests in `__tests__/` are what makes that checkable rather than
-hopeful — they were written against the wire, not the implementation.
+edit. The tests (93 of them since the TypeScript move, which changed nothing they assert) are
+what makes that checkable rather than hopeful — they were written against the wire, not the
+implementation.
+
+## Layout
+
+The code structure the estate's servers share (`code-structure`), at the size of three routes:
+
+```text
+src/
+  server.ts          the entry: settings, buildApp, the signals, listen. Nothing else listens.
+  app.ts             buildApp(deps, options): plugins, then features; never listens
+  config.ts          the one reader of the environment: loadConfig, loadSeedConfig, the db path
+  plugins/           fastify-plugin wrapped: errors (the one error handler), headers, auth/
+  features/health/   GET and HEAD /api/health
+  features/state/    GET and PUT /api/state; document.ts holds checkDocument
+  db/store.ts        the SQLite store, whole
+  lib/http.ts        pure helpers: the content types, pathOf, messageOf
+  testing/           the auth fixture the tests sign in through
+  seed.ts            the npm run seed command
+vendor/ward/         the generated auth library: never edited
+```
+
+Tests sit beside what they test (`*.test.ts`). **TypeBox, not zod:** the contract in
+`shared/api.ts` is TypeBox, which Fastify's own validator reads, so there is no type provider.
+Every route has a schema except two, on purpose: `GET /api/state` is a pass-through (a response
+schema would re-serialise the stored bytes) and `PUT /api/state` takes its body as the raw string
+(so the stored bytes are the sent bytes) and checks it with `checkDocument`.
 
 It is the durability half of the persistence design: browser storage keeps the app fast
 and offline, this keeps the history alive when the phone is lost or the browser evicts
@@ -20,8 +47,9 @@ in `auth_*` tables of the same SQLite file, owned by the library (`vendor/ward/`
 
 It is the `server` workspace of a three-workspace repo (`client` · `server` ·
 `shared`). It did not move when the workspaces were introduced, so `db/` is still a
-sibling directory at the repo root and still gitignored. Run it with `npm run server`
-from the root, or `npm start` from here.
+sibling directory at the repo root and still gitignored. Run it from source with
+`npm run server` at the root (no build needed), or build it and run the result with
+`npm run build -w @sports-app/server` then `npm start` here, which is what the container does.
 
 ## Who the caller is: an account on this service
 
@@ -49,14 +77,15 @@ Ward ends it within 30 seconds; a local session is never checked. The session is
 before anything else, so a caller without one gets a `401` and never a `400` that would
 describe the document — and the same `401` for a path that does not exist.
 
-`ward.mjs` is the configuration and the app's own rules; the library does the rest. Its
+`src/plugins/auth/` is the wiring and the app's own rules (`src/config.ts` reads the settings);
+the library does the rest. Its
 README is the contract: `../shared-library/README.md` in Ward's repo, vendored at
 `vendor/ward/README.md` with the version.
 
 **Creating accounts.** There is no register route. `npm run seed` creates one (it asks for
 a username and a password, or reads `SPORTS_APP_SEED_USERNAME` and
 `SPORTS_APP_SEED_PASSWORD`; never put them in a file). It never resets an existing
-account's password or role, so it is safe to run on every deploy. A first Ward sign-in also
+account's password or role, so it is safe to run on every deploy. In the container the built command is `node server/dist/seed.js`. A first Ward sign-in also
 creates an account, if Ward holds a grant for that person. A person who already has an
 account links Ward from `/account`; nothing is ever matched by username.
 
@@ -70,13 +99,14 @@ stream that has no account yet.
 ## Requirements
 
 Node **≥ 22.18**. Not 22: the service imports `@sports-app/shared/*.ts` directly and relies
-on Node's unflagged type stripping to load it, so there is no build step for the service —
-but the version that does the stripping is the floor.
+on Node's unflagged type stripping to load it. In development and in the tests the `.ts` runs as it
+is; the image runs the `tsc` build in `server/dist` (`npm run build`). The version that does the
+stripping is the floor.
 
 **There is now an install step.** Until the Fastify move the service used only Node builtins plus a
 types-and-one-regex package, so deploying it was `rsync` and `pm2 restart`. Fastify has a
 dependency tree, so a server needs `npm ci --omit=dev` (or a shipped `node_modules`) before
-`node state-server.mjs` will start. That is the cost the Fastify decision was taken knowing
+`node dist/server.js` will start. That is the cost the Fastify decision was taken knowing
 about — see `corpus/wiki/technical-decisions.md § "The API is Fastify"` — and it is the one
 thing about this service a deploy has to learn.
 
@@ -325,12 +355,12 @@ secret was reused somewhere else, and the Settings screen says the stored value 
 npx vitest run server
 ```
 
-Three test files, all against a **real temporary SQLite file** rather than a mock. Ward is
-the one thing faked, and only in `auth.test.mjs`: a `fetch` handed to `createWardClient`
+Four test files, all against a **real temporary SQLite file** rather than a mock. Ward is
+the one thing faked, and only in `plugins/auth/auth.test.ts`: a `fetch` handed to `createWardClient`
 answers discovery and the 30-second session check. The other files sign in through real
-sessions minted by the library (`__tests__/auth-fixture.mjs`), so the guard is never stubbed.
+sessions minted by the library (`src/testing/auth-fixture.ts`), so the guard is never stubbed.
 
-- `__tests__/state-server.test.mjs` drives the service over a real HTTP socket. `GET`
+- `src/app.test.ts` drives the service over a real HTTP socket. `GET`
   before any `PUT` returns 404, a missing or unrecognised session returns 401 before
   anything is validated, each session gets its own stream and a
   `?user=` naming somebody else is ignored, `PUT` then `GET` round-trips byte-identically,
@@ -338,13 +368,13 @@ sessions minted by the library (`__tests__/auth-fixture.mjs`), so the guard is n
   a store that throws on every method, the old login path is a 404, and **a distinctive
   password sent there is searched for in the database files on disk and in every
   captured log line.**
-- `__tests__/auth.test.mjs` covers getting a session and what the app does with it: local
+- `src/plugins/auth/auth.test.ts` covers getting a session and what the app does with it: local
   sign-in over HTTP, the guard on every route, `GET /api/auth/session` (the call that ended
   the sign-in loop), the stream following the *local* username, the Ward routes being wired
   (the start URL, the cookie path and redirect URI moving together), a Ward session failing
   closed with `ward_unavailable` while a local one keeps working, the configuration, and the
   seed.
-- `__tests__/db.test.mjs` covers what HTTP cannot reach: a database built with the *old*
+- `src/db/store.test.ts` covers what HTTP cannot reach: a database built with the *old*
   single-stream DDL is migrated and its rows stay readable, re-opening it migrates nothing
   and leaves the same schema as a fresh database, a busy user cannot evict a quiet one,
   and pruning keeps the right rows even when `created_at` goes **backwards** mid-stream.

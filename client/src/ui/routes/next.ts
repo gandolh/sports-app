@@ -71,7 +71,7 @@ export function validateLoginSearch(raw: Record<string, unknown>): LoginSearch {
 /**
  * The Ward return for a sign-in that should go on to `next`: `/login` on the
  * origin, under the base path the app is served from, carrying `next` along.
- * `import.meta.env.BASE_URL` is the same base `server/ward.mjs` builds
+ * `import.meta.env.BASE_URL` is the same base `server/src/config.ts` builds
  * `afterSignInPath` from, so this is that page with one search param more.
  */
 export function wardReturnTo(next: string): string {

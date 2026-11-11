@@ -12,6 +12,8 @@ is open; brief numbering restarted at 01 on 2026-11-02 (see [`../log.md`](../log
 Base UI is on 1.9.0 (brief 01, 2026-11-10, built, awaiting deploy). Brief 03 (2026-11-11): Base UI sits behind
 `components/ui/` wrappers, the theme is Light / Dark / System with light on a first visit, `check-base-ui` is strict;
 awaiting deploy.
+Brief 04 (2026-11-11): the service is TypeScript in `server/src/`, built with `tsc` to `server/dist`, in the
+code structure ([server-structure.md](server-structure.md)); 1,235 tests; awaiting deploy (`server` phase).
 The house style is in (2026-11-11): Prettier at 120 columns, the house ESLint
 config, `npm run check` with knip and dependency-cruiser, a root `CLAUDE.md`
 and `.claude/rules/` ([technical-decisions.md](technical-decisions.md)).

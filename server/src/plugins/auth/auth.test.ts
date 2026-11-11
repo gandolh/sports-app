@@ -7,7 +7,7 @@
  * the way Ward does, so the routes are exercised without a container. The flow
  * against a real Ward is the library's own suite and the boot check in the brief.
  *
- * Why this file exists beside `state-server.test.mjs`: that one is about the
+ * Why this file exists beside `app.test.ts`: that one is about the
  * document and its stream, and signs in through a fixture. This one is about
  * *getting* a session and what the app does with it, with no fixture in the way.
  */

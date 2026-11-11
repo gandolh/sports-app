@@ -435,7 +435,7 @@ describe("there is no login route any more", () => {
   /*
    * `POST /api/login` never authenticated anybody: it validated a username and
    * echoed it back so a login screen had something to fail against. Signing in
-   * is `/api/auth/login` now (`auth.test.mjs`), so the old route is gone rather
+   * is `/api/auth/login` now (`plugins/auth/auth.test.ts`), so the old route is gone rather
    * than reimplemented — and with it
    * the whole "the password is never stored, logged, echoed, or compared"
    * block, which asserted a property of a body this service no longer receives.
@@ -1034,7 +1034,7 @@ describe("the error handler", () => {
       payload: "{{{",
     });
     expect(response.statusCode).toBe(400);
-    expect(Object.keys(response.json() as object)).toEqual(["error"]);
+    expect(Object.keys(response.json<object>())).toEqual(["error"]);
   });
 });
 

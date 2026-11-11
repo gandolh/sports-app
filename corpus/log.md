@@ -1517,3 +1517,29 @@ cite brief numbers.
   the two-stylesheet and four `color-mix` exceptions in `scripts/conventions.json`.
 - The pickers are `RadioGroup`s, not the brief's guarded `ToggleGroup`: the base-ui skill's rule 16 wins for a
   device-only choice. 1,232 tests pass (9 new).
+
+## [2026-11-11] brief | 04 The server in TypeScript and the code structure built
+
+- `server/*.mjs` is TypeScript in `server/src/` (`server.ts`, `app.ts`, `config.ts`, `plugins/`, `features/health` and
+  `features/state`, `db/store.ts`, `seed.ts`), typechecked with its tests for the first time (the 119 errors fixed by
+  narrowing, no `!` in source), built with `tsc` to `server/dist` and run from there in the image (`CMD node
+  server/dist/server.js`). `ward.ts` was converted types only in a commit of its own, then split verbatim into
+  `plugins/auth/`: every block of the old file is found unchanged in the new ones. TypeBox stays (no zod type provider).
+- Captured replies, before and after (36: health GET, HEAD and POST, state GET and PUT with a good, a malformed, an
+  array, a null, a wrong-user, a bad-username, a no-body, a text/plain, an oversize and a missing-content-type body,
+  signed in and out, `?user=`, 404, 405, the login route with a bad and a malformed body, an over-long path): identical
+  in status, headers and body from the first conversion to the last, on the source and on the built `dist`. One
+  difference, on purpose: the `Keep-Alive: timeout=` header reads 125 (was 72, Fastify's default) from brief step 7.
+  Removing `retained` from `SnapshotReceipt` once changed the two PUT replies, so the response schema is live.
+- Not the same as before, both on purpose: a start that cannot configure itself (a bad port, no public origin, a
+  half-set Ward configuration, a bad Ward key) exits 1 (it printed the reason and exited 0); the PUT route declares its
+  400 and 415 bodies (`ErrorResponse`), which serialise to the same bytes. The package exports one path now
+  (`./document.ts`), which the client's codec test imports.
+- 96 server tests (the 93 unchanged, plus the error handler on a real route twice and the timeouts); 1,235 in all.
+  `check-structure` strict (0 findings; two `conventions.json` exceptions: the pass-through `GET /api/state`, and the
+  402-line store, Q54), a new dependency-cruiser rule (a plugin never imports a feature; a probe import failed it).
+  `docker build` was not run (local Docker gives an I/O error): the build stage was reproduced with `npm ci -w
+  @sports-app/server` and `tsc` in a scratch copy, and the built `server.js` was run from a scratch folder with every
+  setting pinned (health 200, signed-out state 401, SIGTERM exit 0 in 0.02 s). Owner: deploy with the `server` phase
+  and check the container turns healthy.
+

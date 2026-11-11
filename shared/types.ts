@@ -5,7 +5,7 @@
  * ── What this package is for, and what it is not ─────────────────────────────
  *
  * `shared/` is not "a place for common code". It exists to end a specific
- * duplication: the username rule lived in both `server/db.mjs` and the client
+ * duplication: the username rule lived in both the service's store and the client
  * codec, kept honest by a test that asserted the two regexes matched. One
  * definition imported twice is strictly better than two definitions plus a test
  * that they agree. See `username.ts`, and

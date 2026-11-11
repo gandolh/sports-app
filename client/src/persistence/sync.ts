@@ -16,7 +16,7 @@
  * ── The session names the stream ────────────────────────────────────────────
  *
  * `/api/state` carries no username. The service keys the stream by the signed-in
- * account's username (`server/state-server.mjs`), and a `PUT` whose document's
+ * account's username (`server/src/features/state/routes.ts`), and a `PUT` whose document's
  * `username` is not that one is refused with a 400. The browser sends the
  * `sports_app_session` cookie; this module sends no credential of its own.
  *
@@ -72,7 +72,7 @@ import { parse, serialise } from "./codec.ts";
 import type { SaveResult, StoreOptions } from "./store.ts";
 import { isReadOnly, save } from "./store.ts";
 
-// ─── Wire contract (mirrors server/state-server.mjs) ────────────────────────
+// ─── Wire contract (mirrors server/src/features/state/routes.ts) ────────────────────────
 
 export const STATE_PATH = "/api/state";
 export const HEALTH_PATH = "/api/health";

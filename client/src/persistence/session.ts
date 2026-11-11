@@ -80,7 +80,7 @@ export function currentUsername(options: StoreOptions = {}): string | null {
  * is safe because a space cannot appear in a valid username, so it can never
  * merge two different accounts; case-folding is *not* safe in that way, which is
  * why `Alice` is rejected rather than quietly turned into `alice` — the same
- * decision the service makes, for the same reason (`server/db.mjs`). A client that
+ * decision the service makes, for the same reason (`server/src/db/store.ts`). A client that
  * folded would let two people believe they had separate accounts while sharing one
  * document.
  */

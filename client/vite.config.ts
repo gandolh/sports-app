@@ -8,8 +8,8 @@ import { VitePWA } from "vite-plugin-pwa";
 
 /**
  * This repo deliberately carries no `@types/node` — `client/tsconfig.json` pins
- * `types` to the three it actually wants, and the service is untypechecked
- * `.mjs`. One env var does not justify reversing that, so this declares the
+ * `types` to the three it actually wants, and the service is typechecked
+ * by its own tsconfig. One env var does not justify reversing that, so this declares the
  * single member of `process` used below and nothing else.
  */
 declare const process: { readonly env: Readonly<Record<string, string | undefined>> };
@@ -118,7 +118,7 @@ export default defineConfig({
   // Dev only. The state service binds 127.0.0.1 and the app talks to
   // it on the same origin through this proxy, so there is no CORS preflight to
   // configure and `settings.sync.baseUrl` can be left empty in development.
-  // The port matches `DEFAULT_PORT` in ../server/state-server.mjs; if you override
+  // The port matches `DEFAULT_PORT` in ../server/src/config.ts; if you override
   // SPORTS_APP_PORT, override this too. Splitting the repo into workspaces changed
   // nothing here — the proxy target is a port on the loopback interface, not a
   // path, so the service being a sibling package rather than a sibling directory
@@ -151,7 +151,7 @@ export default defineConfig({
     css: true,
     globals: true,
     // Client tests only. The service's tests are a separate Vitest project
-    // (server/vitest.config.mjs) that the root config aggregates, so `npm test`
+    // (server/vitest.config.ts) that the root config aggregates, so `npm test`
     // at the root still reports one total across both.
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },

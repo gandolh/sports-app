@@ -84,7 +84,7 @@ import { dirname } from "node:path";
 // The only import that is not a Node builtin, and it is deliberately types plus
 // one regex: `shared/` may not touch `node:` anything, so importing it here can
 // never drag a browser-hostile dependency into the bundle or a Node-only one into
-// the client. Node ≥22.18 strips the types at load; there is no build step.
+// the client. Node ≥22.18 strips the types at load, so `shared/` ships as source.
 import { LEGACY_USERNAME, USERNAME_RULE, isValidUsername } from "@sports-app/shared/username.ts";
 
 /**

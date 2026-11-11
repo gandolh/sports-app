@@ -16,7 +16,8 @@ A zero-equipment calisthenics trainer: an offline-first PWA (`client/`) plus a s
 
 - `SPORTS_APP_PUBLIC_ORIGIN` must be set, or the service refuses to start.
 - `.env` is read from the repo root, not from `server/`.
-- The server is plain `.mjs` and has no tsconfig yet, so `tsc` never sees it.
+- The server is TypeScript in `server/src/`: `npm run server` runs the source, `npm run build:server` writes
+  `server/dist`, which is what the container runs.
 - Relative imports end in `.ts`, not `.js`: Node strips types and runs `shared/` source directly.
 - `vendor/house-style/`, `client/vendor/` and `server/vendor/` are generated copies. Never edit them;
   `npm run house-style:sync` refreshes the first.

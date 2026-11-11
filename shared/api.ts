@@ -7,7 +7,7 @@
  * The workspaces move built the `shared/` workspace and stopped short of this file on
  * purpose: an empty `api.ts` would have been a placeholder pretending to be a
  * contract, and the wire shapes were still hand-checked in
- * `server/state-server.mjs` at the time. The Fastify move put the service on Fastify,
+ * the service's own file at the time (it is `server/src/` now). The Fastify move put the service on Fastify,
  * whose validation is schema-driven, so there is finally a *consumer* for a schema
  * — and the point of putting it here rather than in `server/` is that one
  * declaration now produces both the runtime guard and the TypeScript type
@@ -66,9 +66,9 @@ import { USERNAME_PATTERN, USERNAME_RULE } from "./username.ts";
 
 // ─── Where the routes live ──────────────────────────────────────────────────
 //
-// These were written twice — once in `server/state-server.mjs`, once in
+// These were written twice — once in the service, once in
 // `client/src/persistence/sync.ts` under a comment reading "mirrors
-// server/state-server.mjs". The service now imports them from here; the client's
+// the service". The service now imports them from here; the client's
 // copy is still its own, because the Fastify move may not touch `client/`. That leaves the
 // same two copies as before rather than adding a third, and puts the definition
 // somewhere the client can delete its copy *into*.

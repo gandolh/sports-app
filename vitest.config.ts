@@ -17,12 +17,12 @@ export default defineConfig({
     // would resolve `root` against the process working directory instead.
     //
     //   client → client/vite.config.ts   (React plugin, PWA, jsdom opt-in per file)
-    //   server → server/vitest.config.mjs (plain Node, no transform pipeline)
+    //   server → server/vitest.config.ts (plain Node, no transform pipeline)
     //
     // `shared/` has no project of its own. Its own tests would have nowhere to
     // stand: it is types plus one regex, and every behaviour that depends on it is
     // already covered from the side that consumes it — the codec's suite for the
-    // client, `state-server.test.mjs` for the service. A third project collecting
+    // client, `server/src/app.test.ts` for the service. A third project collecting
     // zero files would be a config entry pretending to be coverage.
     projects: ["client", "server"],
   },

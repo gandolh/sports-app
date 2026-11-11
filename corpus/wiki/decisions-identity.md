@@ -35,7 +35,7 @@ taken here is `alice-2` and their stream is `alice-2`. Snapshots were always a r
   (`linkWardStreams`, idempotent), so the person's next Ward sign-in finds their history
   instead of creating an empty `alice`. The cost is that their displayed name is the hex
   string until it is renamed by hand. The library's self-rename route (0.4.0) is off
-  here (`ALLOW_RENAME` in `server/ward.mjs`), because a stream cannot move without
+  here (`ALLOW_RENAME` in `server/src/plugins/auth/constants.ts`), because a stream cannot move without
   rewriting the documents inside it.
 - **Keyed by a name** (`local`, or whatever was typed before Ward): only the name is known,
   never a subject. The stream is read again as soon as an account with that exact username
@@ -46,7 +46,7 @@ taken here is `alice-2` and their stream is `alice-2`. Snapshots were always a r
 which is stricter than the library's. The library has had a hook to reshape a name it
 creates on a first Ward sign-in since 0.5.0 (`usernameFor`), and this app does not pass
 one yet. A session whose username fails the rule is refused with
-`reason: "unsupported_username"` (`requireSupportedUsername` in `server/ward.mjs`) and the
+`reason: "unsupported_username"` (`requireSupportedUsername` in `server/src/plugins/auth/accounts.ts`) and the
 sign-in page says so, rather than signing the person in to an app whose every save is a
 `400`. The seed refuses such a name before writing anything. The fix, if it ever bites, is to
 pass that hook (and `usernameMaxLength: 32`), not a rename in this app.

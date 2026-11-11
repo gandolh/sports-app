@@ -45,18 +45,24 @@ client/                    the PWA
     components/  figures/  ExerciseFigure.tsx
   src/main.tsx
 
-server/                    the service. Fastify since 2026-07-29.
-  state-server.mjs         /api/state · /api/health, on Fastify, Ward-guarded
-  db.mjs                   node:sqlite snapshot rows, one stream per username
+server/                    the service. Fastify since 2026-07-29, TypeScript since 2026-11-11.
+  src/server.ts            the entry: settings, buildApp, signals, listen
+  src/app.ts               buildApp(deps, options): plugins, then features
+  src/config.ts            the one reader of process.env
+  src/plugins/             errors · headers · auth/ (the wardAuth wiring, accounts, streams)
+  src/features/            health · state (/api/health, /api/state on Fastify, Ward-guarded)
+  src/db/store.ts          node:sqlite snapshot rows, one stream per username
+  vendor/ward/             the generated auth library
 ```
 
-**The service is Fastify since 2026-07-29, and the files did not move.** The plan sketched a
-`server/src/` layout in TypeScript; it stayed `server/*.mjs` in place, because moving it
-would have meant editing the 73 tests that are the migration's only proof — including two
-assertions that read `server/state-server.mjs` and `server/db.mjs` as source text — and
-because `db.mjs` derives the `db/` location from its own directory. `eslint.config.js`
-predicted this: its Node-globals block is scoped `server/**/*.mjs` with a note saying it is
-about the runtime, not the HTTP library, and should survive the move unchanged. It did.
+**The service is Fastify since 2026-07-29, and it moved to `server/src/` in TypeScript on
+2026-11-11.** The 2026-07-29 move kept the files flat `.mjs` on purpose: moving them would
+have meant editing the 73 tests that were the migration's only proof, and `db.mjs` derived the
+`db/` location from its own directory. Brief 04 did it once the tests were typechecked
+and the structure was settled: `config.ts` computes the database path once, at the same depth
+under `src/` and `dist/`, and the 93 tests assert what they always did. The contract is still
+TypeBox (`shared/api.ts`), so there is no zod type provider; `GET /api/state` has no response
+schema and `PUT /api/state` takes its body as a raw string, both on purpose.
 
 **`shared/` holds data shapes and validation, never behaviour.** The ladders, the schedule
 and the milestones stay in the client — they are logic the server has no business knowing,

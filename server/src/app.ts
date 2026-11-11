@@ -49,13 +49,13 @@ import { stateRoutes } from "./features/state/index.ts";
  * No session is a `401` with no hint at what exists. A session that began with
  * Ward is checked against Ward at most every 30 seconds, and while Ward cannot
  * answer it is a `401` whose `reason` is `ward_unavailable`; a local session is
- * never checked and keeps working. See `ward.mjs` for the prefixes and for the
+ * never checked and keeps working. See `plugins/auth/` for the prefixes and for the
  * one rule that is this app's own (a username has to fit the document schema).
  *
  * ── Fastify, and what the framework is NOT allowed to do ──────────
  *
  * The Fastify move replaced hand-rolled `node:http` routing with Fastify without
- * changing the REST contract, and the tests in `__tests__/` are written against
+ * changing the REST contract, and the tests beside the code are written against
  * the wire, not the implementation. Five things a framework does helpfully by
  * default and must not do here, each load-bearing and each pinned by a test:
  *
@@ -123,7 +123,7 @@ import { stateRoutes } from "./features/state/index.ts";
  * ── Configuration ────────────────────────────────────────────────────────────
  *
  * Accounts need an origin and a prefix, and "Sign in with Ward" needs the five
- * `WARD_OIDC_*` values; `ward.mjs` reads them, says what each is, and explains why
+ * `WARD_OIDC_*` values; `config.ts` reads them, says what each is, and explains why
  * the cookie's `Path` and Ward's redirect URI both come from configuration rather
  * than from a literal. With no `WARD_OIDC_ISSUER` the service runs with local
  * accounts only and the sign-in page offers no Ward button. **No key is committed

@@ -9,7 +9,7 @@ import { ALLOW_RENAME, ROUTE_PREFIX } from "./constants.ts";
 /**
  * Accounts and "Sign in with Ward", as this service wires them.
  *
- * ── What this file used to be ────────────────────────────────────────────────
+ * ── What this folder used to be ──────────────────────────────────────────────
  *
  * ~290 lines of hand-written Ward client: a JWKS-verified access token, an
  * introspection call with an app key, a 30-second cache, fail-closed. All of it
@@ -17,8 +17,8 @@ import { ALLOW_RENAME, ROUTE_PREFIX } from "./constants.ts";
  * the library does it from the other side: the app owns its accounts and its
  * sessions, and Ward is a second way in that this service reaches through
  * OpenID Connect. Local sign-in never calls Ward, so the service works while
- * Ward is down. This file is what is left: the configuration, and the two
- * decisions that are this app's own.
+ * Ward is down. This folder is what is left: the wiring, and the two
+ * decisions that are this app's own (`config.ts` reads the settings).
  *
  * ── The two prefixes, and why there are two ──────────────────────────────────
  *
@@ -75,14 +75,14 @@ export const authPlugin = fp<AuthOptions>(
     //
     // `routePrefix` and `cookiePath` are two views of one address: Fastify sees
     // `/api/auth/...` everywhere, and the browser sees it behind whatever the
-    // deploy's proxy strips. `ward.mjs` explains where each comes from.
+    // deploy's proxy strips. `config.ts` explains where each comes from.
     app.register(wardAuth, {
       accounts,
       cookieName: auth.cookieName,
       cookiePath: auth.cookiePath,
       publicOrigin: auth.publicOrigin,
       routePrefix: ROUTE_PREFIX,
-      // No `POST /api/auth/username`: a stream is keyed by the username (ward.mjs).
+      // No `POST /api/auth/username`: a stream is keyed by the username (constants.ts).
       allowRename: ALLOW_RENAME,
       // The one route with no session: liveness needs no credential. `GET` covers
       // `HEAD`, which the route also answers.

@@ -138,7 +138,7 @@ export const stateRoutes: FastifyPluginAsync<StateRoutesOptions> = async (scope,
       }
 
       // `text`, not a re-serialisation of a parsed object — there is no parsed
-      // object. See the "Bytes in, same bytes out" note in db.mjs.
+      // object. See the "Bytes in, same bytes out" note in db/store.ts.
       const written = store.insert({
         username,
         docJson: text,

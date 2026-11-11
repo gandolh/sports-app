@@ -1632,7 +1632,7 @@ describe("the sync service accepts what serialise writes", () => {
   // DELETED in the workspaces move: "uses the same username rule the service enforces,
   // character for character".
   //
-  // It compared `codec.ts`'s `USERNAME_PATTERN` with `server/db.mjs`'s and
+  // It compared `codec.ts`'s `USERNAME_PATTERN` with the server store's and
   // asserted the two regexes were identical. There is now **one** definition, in
   // `@sports-app/shared/username.ts`, which both sides import — so the test
   // reduced to `x === x` and would have gone on passing while proving nothing.

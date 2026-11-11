@@ -52,6 +52,19 @@
       "rule": 6,
       "path": "client/src/ui/components/HonestNote.tsx",
       "reason": "A translucent mix of two tokens (color-mix over var(--token)) that no utility names; the colours still come from tokens.css and noHexColors.test.ts keeps literals out."
+    },
+    {
+      "check": "structure",
+      "rule": 6,
+      "path": "server/src/features/state/routes.ts",
+      "match": "GET (computed url) declares no schema",
+      "reason": "GET /api/state is a pass-through: the reply is the stored document's bytes, verbatim. A response schema would hand it to fast-json-stringify and re-serialise it, destroying the layout the codec wrote and the byte comparison the client's crash-safe save relies on (Q25, Q53)."
+    },
+    {
+      "check": "structure",
+      "rule": 11,
+      "path": "server/src/db/store.ts",
+      "reason": "A store this size stays whole in db/ (Q54): the schema, the username migration and the prepared statements are one unit, and splitting them would only scatter one transaction across files."
     }
   ],
   "ui": ["**/components/ui"]
