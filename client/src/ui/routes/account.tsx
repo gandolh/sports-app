@@ -15,6 +15,7 @@ import { SignInSettings } from "../components/SignInSettings.tsx";
 import { SyncSettings } from "../components/SyncSettings.tsx";
 import { TabBar } from "../components/TabBar.tsx";
 import { Eyebrow, SectionHeading, Shell, ShellBody, ShellRail, ShellTitle } from "../components/Shell.tsx";
+import { RadioGroup } from "../components/ui/RadioGroup.tsx";
 import { ACCENTS, readAccent, readTheme, setAccent, setTheme } from "../components/theme.ts";
 import type { Accent, ThemeChoice } from "../components/theme.ts";
 import { PATTERN_LABEL, formatHoldTime, groupDigits } from "../components/format.ts";
@@ -212,33 +213,26 @@ function Appearance() {
     setAccentState(choice);
   }
 
-  const themes: readonly { readonly value: ThemeChoice; readonly label: string }[] = [
-    { value: null, label: "System" },
+  const accents = ACCENTS.map((name) => ({ value: name, label: name }));
+  const themes = [
+    { value: "system", label: "System" },
     { value: "light", label: "Light" },
     { value: "dark", label: "Dark" },
-  ];
+  ] as const;
 
   return (
     <>
       <SectionHeading>Appearance</SectionHeading>
 
       <Eyebrow>Theme</Eyebrow>
-      <div role="radiogroup" aria-label="Theme" className="mt-[var(--sp-2)] flex gap-[var(--sp-2)]">
-        {themes.map(({ value, label }) => (
-          <button
-            key={label}
-            type="button"
-            role="radio"
-            aria-checked={theme === value}
-            onClick={() => chooseTheme(value)}
-            className={`min-h-[var(--tap-row)] flex-1 rounded border text-btn font-semibold ${
-              theme === value ? "border-accent text-accent" : "border-line2 text-tx2"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <RadioGroup
+        label="Theme"
+        options={themes}
+        value={theme ?? "system"}
+        onValueChange={(value) => chooseTheme(value === "system" ? null : value)}
+        className="mt-[var(--sp-2)] flex gap-[var(--sp-2)]"
+        optionClassName="flex-1 text-btn"
+      />
 
       <div className="mt-[var(--sp-4)]">
         <Eyebrow>Accent</Eyebrow>
@@ -262,22 +256,14 @@ function Appearance() {
         larger and more honest sample than a swatch, and it cannot drift from
         `tokens.css` the way a duplicated hex would.
       */}
-      <div role="radiogroup" aria-label="Accent colour" className="mt-[var(--sp-2)] grid grid-cols-4 gap-[var(--sp-2)]">
-        {ACCENTS.map((name) => (
-          <button
-            key={name}
-            type="button"
-            role="radio"
-            aria-checked={accent === name}
-            onClick={() => chooseAccent(name)}
-            className={`min-h-[var(--tap-row)] rounded border text-meta font-semibold capitalize ${
-              accent === name ? "border-accent text-accent" : "border-line2 text-tx2"
-            }`}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
+      <RadioGroup
+        label="Accent colour"
+        options={accents}
+        value={accent}
+        onValueChange={chooseAccent}
+        className="mt-[var(--sp-2)] grid grid-cols-4 gap-[var(--sp-2)]"
+        optionClassName="text-meta capitalize"
+      />
     </>
   );
 }

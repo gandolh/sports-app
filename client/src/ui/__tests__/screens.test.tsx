@@ -481,6 +481,25 @@ describe("/account", () => {
     expect(localStorage.getItem("sports-app.accent")).toBeNull();
   });
 
+  it("makes each appearance group one Tab stop, with arrow keys that move and choose", async () => {
+    seedUser(trained(2));
+    await renderApp("/account");
+
+    const group = screen.getByRole("radiogroup", { name: "Theme" });
+    const stops = Array.from(group.querySelectorAll('[role="radio"]')).filter(
+      (node) => node.getAttribute("tabindex") === "0",
+    );
+    expect(stops).toHaveLength(1);
+
+    // The picker keeps its choice on the device, so an arrow press may choose, and one stays chosen.
+    const system = screen.getByRole("radio", { name: "System" });
+    expect(system.getAttribute("aria-checked")).toBe("true");
+    system.focus();
+    fireEvent.keyDown(system, { key: "ArrowRight" });
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Light" }).getAttribute("aria-checked")).toBe("true"));
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+  });
+
   it("offers every accent the palette declares, so none is unreachable", async () => {
     seedUser(trained(2));
     await renderApp("/account");
