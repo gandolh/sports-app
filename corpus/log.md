@@ -1495,3 +1495,16 @@ cite brief numbers.
 - `@base-ui/react` 1.6.0 to 1.9.0, pinned exactly in `client/package.json` (d4088c7); lockfile moved four entries,
   all Base UI's own tree. `npm run check` (1,223 tests) and `npm run build` pass. No source change.
 - Not done: the browser look at the three Field forms and the release notes; Docker build skipped.
+
+## [2026-11-11] brief | 02 The house style and the quality harness built
+
+- Vendored house-style 1.1.0 and pinned its tools; Prettier at 120 and one reformat commit (121 files, 13,081
+  lines added and 14,617 removed); ESLint on the house config with this repo's two boundary blocks kept;
+  the gate (`check`, `check:fast`, `check:conventions`); a root `CLAUDE.md` and `.claude/rules/`.
+- Measured before the reformat, with the house config: typed rules 14 (`no-unnecessary-type-assertion`, all
+  fixed), `vitest/expect-expect` 38 (false: helpers such as `expectRejected` assert, so they are named in
+  `assertFunctionNames`), `valid-title` 2 and `valid-expect` 1 (fixed), `no-console` 2 (`sync.ts`, kept with a
+  reason), `n/no-process-env` 2 (warnings), `!` 59 in tests (warnings). knip: no errors after ignoring the docs
+  workspace, one unused dev dependency and one undeclared Typebox import (both recorded); 42 unused exports and
+  21 unused types are warnings. Lint 13-16 s cold with `projectService` or `project`; `check:fast` 10 s warm;
+  `check` 35 s warm.

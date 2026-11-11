@@ -1,6 +1,6 @@
 ---
 summary: Dated snapshot (2026-11-02) of sports-app, per area. The fixed schedule (v2, 2026-07-29), the category-standard rebuild with logging and the token system (2026-09-04), the rigged figures (2026-10-02), the in-between rungs (2026-10-07), local accounts with Ward as a second way in (2026-10-13), the docs site on Docusaurus and the sign-in fixes (2026-10-19 to 2026-10-28); 1,223 tests; what is still open and left for the owner; what is deliberately out.
-updated: 2026-11-02
+updated: 2026-11-11
 ---
 
 # Status — 2026-11-02
@@ -10,6 +10,9 @@ container stack of `vps-deploy`, which depends on Ward; deploying is the
 owner's step there. **1,223 tests** pass; typecheck and lint are clean. No brief
 is open; brief numbering restarted at 01 on 2026-11-02 (see [`../log.md`](../log.md)).
 Base UI is on 1.9.0 (brief 01, 2026-11-10, built, awaiting deploy).
+The house style is in (2026-11-11): Prettier at 120 columns, the house ESLint
+config, `npm run check` with knip and dependency-cruiser, a root `CLAUDE.md`
+and `.claude/rules/` ([technical-decisions.md](technical-decisions.md)).
 
 ## By area
 

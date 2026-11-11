@@ -185,3 +185,18 @@ never on the critical path.
 ### No code graph for now
 Greenfield single package; `grep` over a small `client/src/` is cheaper than maintaining an
 index. Revisit past ~50 files. See [`../routing.md`](../routing.md).
+
+### The house style, formatted and checked
+Decided 2026-11-10, built 2026-11-11. The estate's `house-style` is **vendored**: a generated copy in
+`vendor/house-style/` with a version header, refreshed by `npm run house-style:sync`, never a package.
+Prettier runs at **120 columns** with double quotes, semicolons and trailing commas (one reformat commit,
+listed in `.git-blame-ignore-revs`; Markdown stays out). ESLint is the house config plus this repo's two
+boundary blocks (`shared/` and `client/src/domain/`), with the six typed rules through `projectService`.
+`npm run check` is typecheck, lint, format check, `check:conventions` (knip, dependency-cruiser and the two
+convention checkers) and tests; `check:fast` is the typecheck plus ESLint on the changed files.
+
+**The exception:** the tsconfig base keeps `module: ESNext`, `moduleResolution: bundler` and `.ts` import
+suffixes, because Node runs `shared/` source directly under type stripping. `scripts/conventions.json`
+records it. **Warnings for now:** `no-circular` (one type-only loop in `ui/figures`), the two `process.env`
+reads in `server/`, and both checkers run `--warn-only`. **Rejected:** keeping single quotes and no
+semicolons (10% of lines instead of 38%, but a second style); `project` instead of `projectService`.

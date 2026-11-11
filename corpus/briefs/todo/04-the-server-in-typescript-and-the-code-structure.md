@@ -179,3 +179,5 @@ One commit per numbered step. After each, `npm run check` and `npm test` pass, a
 
 - If brief 02's knip run reports `server/package.json`'s `exports` as unused, drop the ones nothing imports. Only the client's `codec.test.ts` uses one today.
 - The skills library should hear three things from this brief: its zod rule does not fit a TypeBox contract; a pass-through reply and a raw-body route are exceptions the `.parse(request.` test cannot see; and a repo may keep a "no build" rule that the tsc-built default overrides, which is why decision 1 names the alternative.
+
+(2026-11-11, brief 02: dependency-cruiser landed there instead, as `.dependency-cruiser.cjs` and in `check:conventions`, by the controller's call. This brief keeps the cross-folder import check, drops the lowered `no-circular` there once the `ui/figures` type loop is gone, and drops the `n/no-process-env` warning on `server/seed-users.mjs` and `server/state-server.mjs` and the knip `ignoreDependencies` for `@sinclair/typebox` in `knip.config.js`.)
