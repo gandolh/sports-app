@@ -143,3 +143,22 @@ One commit per numbered step. After each, `npm run check` passes, with `check-ba
 
 - Brief 05 changes the tokens and the layout. The theme switch must survive it in both themes, so brief 05's checks reuse the tests added here.
 - The skills library's `check-base-ui` rule 3 needs the `components/ui/` path test described in decision 1, and its rule 5 needs an exception list for a token file that tests depend on. Both are reports to that library, not local patches.
+
+## Outcome (2026-11-11)
+
+Commits `56c3e21` (Field wrapper), `2596bb7` (RadioGroup wrapper and the two choices), `a02b2ff` (the theme
+switch), `fb1f9dd` (exceptions, strict checker, corpus). `npm run check` (1,232 tests) and `npm run build` pass;
+`check-base-ui` runs strict at 0 errors with 6 excepted (the two stylesheets, four `color-mix` token blends);
+`corpus/lint.sh` is clean. Board: Ready for deploy; `node cli.ts sports-app deploy` from the vps-deploy checkout.
+
+- **Before:** rule 3 3, rule 5 2, rule 6 4. **After:** 0, the other six recorded as exceptions.
+- **Screenshots** (`/login`, `/account` signed in, 1280 and 390 px, light and dark, a local seeded account): no
+  pixel differs by more than a faint rounding in the before and after pairs.
+- **Deviation:** the pickers are `RadioGroup`s, not guarded `ToggleGroup`s. They keep their choice on the device and
+  write nothing to the server, so the base-ui skill's rule 16 (which names this brief) gives them one Tab stop with
+  arrows that move and choose. The jsdom test asserts the Tab stop and the arrow choice.
+- **Left in the old order:** System, Light, Dark, to keep the layout unchanged (Q19).
+- **`data-testid`:** all 19 kept; each marks a region or container with no role, and the player's `next` button
+  changes its name.
+- **Existing devices:** a device that chose System had no key stored, so it shows light once.
+- **Not done:** a real-browser keyboard walk; Docker build.
