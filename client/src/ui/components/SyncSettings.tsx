@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Field } from "@base-ui/react/field";
 import { useForm } from "react-hook-form";
 import type { StateDoc, SyncSettings as SyncTarget } from "@sports-app/shared/types.ts";
 import type { SyncStatus } from "../../persistence/sync.ts";
 import { useBackupNow, useSaveSync, useSyncCheck } from "../document.ts";
 import { AlertBanner } from "./AlertBanner.tsx";
 import { QuietButton, SecondaryButton } from "./Buttons.tsx";
-import { FIELD_DESCRIPTION, FIELD_ERROR, FIELD_INPUT, FIELD_LABEL } from "./fields.ts";
+import { FIELD_DESCRIPTION, FieldControl, FieldDescription, FieldError, FieldLabel, FieldRoot } from "./ui/Field.tsx";
 import { Eyebrow, SectionHeading } from "./Shell.tsx";
 
 /**
@@ -227,10 +226,9 @@ export function SyncSettings({ doc, username }: { readonly doc: StateDoc; readon
       </p>
 
       <div className="mt-[var(--sp-3)] flex flex-col gap-[var(--sp-3)]">
-        <Field.Root invalid={errors.baseUrl !== undefined}>
-          <Field.Label className={FIELD_LABEL}>Service address</Field.Label>
-          <Field.Control
-            className={FIELD_INPUT}
+        <FieldRoot invalid={errors.baseUrl !== undefined}>
+          <FieldLabel>Service address</FieldLabel>
+          <FieldControl
             type="url"
             inputMode="url"
             autoCapitalize="none"
@@ -242,17 +240,13 @@ export function SyncSettings({ doc, username }: { readonly doc: StateDoc; readon
               meaningful reads as a stored value, and the one thing this field must
               never do is make somebody think they have configured a service they
               have not. The example goes in the description instead. */}
-          <p className={FIELD_DESCRIPTION}>
+          <FieldDescription>
             Something like <span className="font-mono text-tx2">http://192.168.1.20:8787</span>. Leave it empty to use
             this app&rsquo;s own origin, under the same path you sign in through, which is what a co-hosted service and
             the dev proxy both want.
-          </p>
-          {errors.baseUrl === undefined ? null : (
-            <Field.Error className={FIELD_ERROR} match>
-              {errors.baseUrl.message}
-            </Field.Error>
-          )}
-        </Field.Root>
+          </FieldDescription>
+          {errors.baseUrl === undefined ? null : <FieldError match>{errors.baseUrl.message}</FieldError>}
+        </FieldRoot>
 
         {/*
           The secret field is gone.

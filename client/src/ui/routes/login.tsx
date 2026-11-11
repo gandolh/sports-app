@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Field } from "@base-ui/react/field";
 import { createRoute, useNavigate } from "@tanstack/react-router";
 import { rootRoute } from "./__root.tsx";
 import { nextFromWardReturn, validateLoginSearch, wardReturnTo } from "./next.ts";
@@ -9,7 +8,7 @@ import { setCurrentUsername } from "../../persistence/session.ts";
 import { AlertBanner } from "../components/AlertBanner.tsx";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons.tsx";
 import { describeAuthIssue } from "../components/authMessages.ts";
-import { FIELD_INPUT, FIELD_LABEL } from "../components/fields.ts";
+import { FieldControl, FieldLabel, FieldRoot } from "../components/ui/Field.tsx";
 import { Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from "../components/Shell.tsx";
 
 /**
@@ -127,10 +126,9 @@ function LoginRoute() {
 
         <form id="login-form" onSubmit={submit} noValidate className="mt-[var(--sp-3)]">
           <div className="flex flex-col gap-[var(--sp-3)]">
-            <Field.Root>
-              <Field.Label className={FIELD_LABEL}>Username</Field.Label>
-              <Field.Control
-                className={FIELD_INPUT}
+            <FieldRoot>
+              <FieldLabel>Username</FieldLabel>
+              <FieldControl
                 value={username}
                 onChange={(event) => {
                   setUsername(event.target.value);
@@ -141,11 +139,10 @@ function LoginRoute() {
                 autoCorrect="off"
                 spellCheck={false}
               />
-            </Field.Root>
-            <Field.Root>
-              <Field.Label className={FIELD_LABEL}>Password</Field.Label>
-              <Field.Control
-                className={FIELD_INPUT}
+            </FieldRoot>
+            <FieldRoot>
+              <FieldLabel>Password</FieldLabel>
+              <FieldControl
                 type="password"
                 value={password}
                 onChange={(event) => {
@@ -154,7 +151,7 @@ function LoginRoute() {
                 }}
                 autoComplete="current-password"
               />
-            </Field.Root>
+            </FieldRoot>
           </div>
         </form>
       </ShellBody>

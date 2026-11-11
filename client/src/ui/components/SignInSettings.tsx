@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { Field } from "@base-ui/react/field";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   useChangePassword,
@@ -17,7 +16,7 @@ import { clearCurrentUsername } from "../../persistence/session.ts";
 import { AlertBanner } from "./AlertBanner.tsx";
 import { QuietButton, SecondaryButton } from "./Buttons.tsx";
 import { describeAuthIssue } from "./authMessages.ts";
-import { FIELD_DESCRIPTION, FIELD_INPUT, FIELD_LABEL } from "./fields.ts";
+import { FieldControl, FieldDescription, FieldLabel, FieldRoot } from "./ui/Field.tsx";
 import { Eyebrow, SectionHeading } from "./Shell.tsx";
 
 /**
@@ -195,17 +194,16 @@ function PasswordField({
   readonly description?: ReactNode;
 }) {
   return (
-    <Field.Root>
-      <Field.Label className={FIELD_LABEL}>{label}</Field.Label>
-      <Field.Control
-        className={FIELD_INPUT}
+    <FieldRoot>
+      <FieldLabel>{label}</FieldLabel>
+      <FieldControl
         type="password"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         autoComplete={autoComplete}
       />
-      {description === undefined ? null : <p className={FIELD_DESCRIPTION}>{description}</p>}
-    </Field.Root>
+      {description === undefined ? null : <FieldDescription>{description}</FieldDescription>}
+    </FieldRoot>
   );
 }
 
