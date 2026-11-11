@@ -80,31 +80,12 @@
  */
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
 // The only import that is not a Node builtin, and it is deliberately types plus
 // one regex: `shared/` may not touch `node:` anything, so importing it here can
 // never drag a browser-hostile dependency into the bundle or a Node-only one into
 // the client. Node ≥22.18 strips the types at load; there is no build step.
 import { LEGACY_USERNAME, USERNAME_RULE, isValidUsername } from "@sports-app/shared/username.ts";
-
-const SERVICE_DIR = dirname(fileURLToPath(import.meta.url));
-
-/**
- * The repository root — the service is the `server/` workspace directly beneath
- * it, and this file sits one folder down in it, in `src/` and in `dist/` alike, so the
- * root is two levels up from either. `db/` is still a sibling of `server/` at the repo
- * root and still gitignored.
- */
-export const PROJECT_ROOT = resolve(SERVICE_DIR, "..", "..");
-
-/**
- * The database directory. Gitignored — see `.gitignore`. It holds real training
- * history and must never end up in a commit.
- */
-export const DEFAULT_DB_DIR = resolve(PROJECT_ROOT, "db");
-
-export const DEFAULT_DB_FILE = resolve(DEFAULT_DB_DIR, "app.db");
 
 /**
  * How many snapshots to keep **per username**.
@@ -296,8 +277,8 @@ export interface SnapshotStore {
 }
 
 /** Open (creating if absent) the snapshot database. */
-export function openSnapshotStore(options: { file?: string; retention?: number } = {}): SnapshotStore {
-  const file = options.file ?? DEFAULT_DB_FILE;
+export function openSnapshotStore(options: { file: string; retention?: number }): SnapshotStore {
+  const file = options.file;
   const retention = options.retention ?? RETENTION;
 
   if (!Number.isInteger(retention) || retention < 1) {

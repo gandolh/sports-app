@@ -40,10 +40,11 @@ import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { DEFAULT_DB_DIR, DEFAULT_DB_FILE, PROJECT_ROOT, RETENTION, openSnapshotStore } from "../src/db.ts";
+import { RETENTION, openSnapshotStore } from "../src/db.ts";
+import { DEFAULT_DB_DIR, DEFAULT_DB_FILE, PROJECT_ROOT, readConfig } from "../src/config.ts";
 import type { AddressInfo } from "node:net";
 import type { SnapshotStore } from "../src/db.ts";
-import { STATE_PATH, checkDocument, createStateServer, readConfig } from "../src/state-server.ts";
+import { STATE_PATH, checkDocument, createStateServer } from "../src/state-server.ts";
 import type { StateServerConfig } from "../src/state-server.ts";
 import { createTestAuth } from "./auth-fixture.ts";
 

@@ -17,17 +17,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
-import { PROJECT_ROOT, openSnapshotStore } from "../src/db.ts";
+import { openSnapshotStore } from "../src/db.ts";
+import { PROJECT_ROOT, readAuthConfig } from "../src/config.ts";
 import { createStateServer } from "../src/state-server.ts";
-import {
-  SESSION_COOKIE_NAME,
-  UNSUPPORTED_USERNAME,
-  openAccounts,
-  linkWardStreams,
-  openWardClient,
-  orphanStreamNames,
-  readAuthConfig,
-} from "../src/ward.ts";
+import { SESSION_COOKIE_NAME, UNSUPPORTED_USERNAME } from "../src/plugins/auth/constants.ts";
+import { openAccounts, linkWardStreams, openWardClient, orphanStreamNames } from "../src/ward.ts";
 import { seedAccount } from "../src/seed-users.ts";
 import { createWardIdentities } from "../vendor/ward/ward-auth.js";
 import type { Accounts, WardClient } from "../vendor/ward/ward-auth.js";

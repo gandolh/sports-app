@@ -228,12 +228,4 @@ export default [
       "no-restricted-syntax": ["error", ...restrictedSyntax],
     },
   },
-
-  {
-    // A warning for now (2026-11-11): these two CLIs still read the environment themselves. When the
-    // server takes its settings from config.ts, this block goes and the rule is an error again.
-    name: "sports-app/process-env-warns",
-    files: ["server/src/seed-users.ts", "server/src/state-server.ts"],
-    rules: { "n/no-process-env": "warn" },
-  },
 ];

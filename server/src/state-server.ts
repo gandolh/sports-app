@@ -126,19 +126,12 @@ import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import type { AddressInfo } from "node:net";
 import { pathToFileURL } from "node:url";
 import { TypeCompiler } from "@sinclair/typebox/compiler";
-import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from "./db.ts";
+import { RETENTION, openSnapshotStore } from "./db.ts";
 import type { SnapshotStore } from "./db.ts";
-import {
-  ALLOW_RENAME,
-  ROUTE_PREFIX,
-  openAccounts,
-  linkWardStreams,
-  openWardClient,
-  orphanStreamNames,
-  readAuthConfig,
-  requireSupportedUsername,
-} from "./ward.ts";
-import type { AuthConfig } from "./ward.ts";
+import { ConfigError, DEFAULT_MAX_BODY_BYTES, loadConfig } from "./config.ts";
+import type { AuthConfig, Config } from "./config.ts";
+import { ALLOW_RENAME, ROUTE_PREFIX } from "./plugins/auth/constants.ts";
+import { openAccounts, linkWardStreams, openWardClient, orphanStreamNames, requireSupportedUsername } from "./ward.ts";
 import { wardAuth } from "../vendor/ward/ward-auth.js";
 import type { Accounts, WardClient } from "../vendor/ward/ward-auth.js";
 // The wire contract, from the one place it is declared. `shared/` may not import
@@ -159,17 +152,6 @@ import {
 // they are declared beside the schemas that describe them. Callers keep naming
 // them through this module, which is the module they are talking to.
 export { HEALTH_PATH, STATE_PATH };
-
-export const DEFAULT_HOST = "127.0.0.1";
-export const DEFAULT_PORT = 8787;
-
-/**
- * Body cap. A snapshot at three years of daily training is roughly a megabyte
- * (see `RETENTION` in db.mjs for why that number matters), so 4 MiB is generous
- * for the document this service exists to hold and small enough that a stray
- * upload cannot fill a disk.
- */
-export const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 const JSON_CONTENT_TYPE = "application/json";
 const JSON_CONTENT_TYPE_UTF8 = `${JSON_CONTENT_TYPE}; charset=utf-8`;
@@ -636,49 +618,21 @@ export function createStateServer(config: StateServerConfig): StateService {
   };
 }
 
-// ─── Configuration ──────────────────────────────────────────────────────────
-
-export function readConfig(env: Record<string, string | undefined>) {
-  const rawPort = env.SPORTS_APP_PORT;
-  const port = rawPort === undefined || rawPort === "" ? DEFAULT_PORT : Number(rawPort);
-  const rawMax = env.SPORTS_APP_MAX_BODY_BYTES;
-  const maxBodyBytes = rawMax === undefined || rawMax === "" ? DEFAULT_MAX_BODY_BYTES : Number(rawMax);
-
-  return {
-    host: env.SPORTS_APP_HOST ?? DEFAULT_HOST,
-    port,
-    dbFile: env.SPORTS_APP_DB ?? DEFAULT_DB_FILE,
-    maxBodyBytes,
-    quiet: env.SPORTS_APP_QUIET === "1",
-  };
-}
-
 // ─── Entry point ────────────────────────────────────────────────────────────
 
-export async function main(
-  env: Record<string, string | undefined>,
-  out: { error: (m: string) => void; log: (m: string) => void } = console,
-) {
-  const config = readConfig(env);
-
-  if (!Number.isInteger(config.port) || config.port < 0 || config.port > 65535) {
-    out.error(`SPORTS_APP_PORT must be a port number, got ${String(config.port)}`);
-    return null;
-  }
-
-  /*
-   * The origin and the prefix are required to be knowable, and the Ward values
-   * are all-or-nothing. A missing origin would mint cookies that are not marked
-   * Secure or not sent back; a half-set Ward configuration is always a deploy
-   * mistake, and `readAuthConfig` names what is missing.
-   */
-  let auth: AuthConfig;
+/**
+ * Start the service. Resolves to `null` when it could not start, after saying why on `out`.
+ */
+export async function main(out: { error: (m: string) => void; log: (m: string) => void } = console) {
+  let config: Config;
   try {
-    auth = readAuthConfig(env);
+    config = loadConfig();
   } catch (error) {
-    out.error(`${messageOf(error)}\n\nSee server/README.md, "Configuration".`);
+    if (!(error instanceof ConfigError)) throw error;
+    out.error(error.message);
     return null;
   }
+  const { auth } = config;
 
   const store = openSnapshotStore({ file: config.dbFile });
   const log = config.quiet ? () => {} : (message: string) => out.log(`[state] ${message}`);
@@ -768,8 +722,13 @@ export async function main(
 const invokedDirectly = process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url;
 
 if (invokedDirectly) {
-  main(process.env).catch((cause) => {
-    console.error(messageOf(cause));
-    process.exitCode = 1;
-  });
+  main()
+    .then((started) => {
+      // A start that failed has already said why; the exit code is what a supervisor reads.
+      if (started === null) process.exitCode = 1;
+    })
+    .catch((cause) => {
+      console.error(messageOf(cause));
+      process.exitCode = 1;
+    });
 }

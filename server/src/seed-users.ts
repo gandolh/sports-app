@@ -22,10 +22,13 @@
 import { createInterface } from "node:readline/promises";
 import { pathToFileURL } from "node:url";
 import { Writable } from "node:stream";
-import { DEFAULT_DB_FILE, openSnapshotStore } from "./db.ts";
+import { openSnapshotStore } from "./db.ts";
+import { loadSeedConfig } from "./config.ts";
+import type { SeedConfig } from "./config.ts";
 import type { SnapshotStore } from "./db.ts";
-import { DEFAULT_ROLE, USERNAME_RULE, linkWardStreams, openAccounts, orphanStreamNames } from "./ward.ts";
-import { isValidUsername } from "@sports-app/shared/username.ts";
+import { DEFAULT_ROLE } from "./plugins/auth/constants.ts";
+import { linkWardStreams, openAccounts, orphanStreamNames } from "./ward.ts";
+import { USERNAME_RULE, isValidUsername } from "@sports-app/shared/username.ts";
 import { seedUsers } from "../vendor/ward/ward-auth.js";
 import type { Accounts } from "../vendor/ward/ward-auth.js";
 
@@ -88,12 +91,11 @@ export async function seedAccount({
   };
 }
 
-async function main(env: Record<string, string | undefined>) {
-  const dbFile = env.SPORTS_APP_DB ?? DEFAULT_DB_FILE;
+async function main({ dbFile, username: seedUsername, password: seedPassword }: SeedConfig) {
   const interactive = process.stdin.isTTY === true;
 
-  let username = env.SPORTS_APP_SEED_USERNAME ?? "";
-  let password = env.SPORTS_APP_SEED_PASSWORD ?? "";
+  let username = seedUsername;
+  let password = seedPassword;
   if (username === "") {
     if (!interactive) throw new Error("Set SPORTS_APP_SEED_USERNAME, or run this in a terminal.");
     username = await ask("Username: ");
@@ -129,7 +131,7 @@ async function main(env: Record<string, string | undefined>) {
 const invokedDirectly = process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url;
 
 if (invokedDirectly) {
-  main(process.env).catch((cause) => {
+  main(loadSeedConfig()).catch((cause) => {
     console.error(cause instanceof Error ? cause.message : String(cause));
     process.exitCode = 1;
   });

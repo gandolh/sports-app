@@ -1,12 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import { isValidUsername, USERNAME_RULE } from "@sports-app/shared/username.ts";
-import {
-  createAccounts,
-  createSqliteStore,
-  createWardClient,
-  createWardIdentities,
-  wardClientOptionsFromEnv,
-} from "../vendor/ward/ward-auth.js";
+import { createAccounts, createSqliteStore, createWardClient, createWardIdentities } from "../vendor/ward/ward-auth.js";
+import { DEFAULT_ROLE, UNSUPPORTED_USERNAME } from "./plugins/auth/constants.ts";
+import type { AuthConfig } from "./config.ts";
 import type { Accounts, ResolvedSession, SessionVerdict, WardClient } from "../vendor/ward/ward-auth.js";
 
 /**
@@ -54,106 +50,9 @@ import type { Accounts, ResolvedSession, SessionVerdict, WardClient } from "../v
  * The same key is why renaming is off (`ALLOW_RENAME`).
  */
 
-/** Everything the auth wiring reads from the environment: the result of `readAuthConfig`. */
-export type AuthConfig = ReturnType<typeof readAuthConfig>;
-
 /** What the stream-linking helpers need from the snapshot store: the stream keys it holds. */
 interface StreamKeys {
   usernames(): string[];
-}
-
-/** The session cookie. Unique in the estate, because every app shares one origin. */
-export const SESSION_COOKIE_NAME = "sports_app_session";
-
-/** Where the library's routes live, as Fastify sees them. */
-export const ROUTE_PREFIX = "/api/auth";
-
-/**
- * Whether a signed-in user may rename themselves (`POST /api/auth/username`).
- *
- * ward-auth turns that route on by default since 0.4.0. Here it stays off: the
- * snapshot stream is keyed by the username, not the user id, so a rename would
- * leave the person's history under the old name and open an empty stream under
- * the new one. A rename screen would have to move the stream with the name, and
- * offering one is the owner's choice.
- */
-export const ALLOW_RENAME = false;
-
-/** What a new user created by this service holds. The app has no roles of its own. */
-export const DEFAULT_ROLE = "user";
-
-/** The sub-path the client is served from, matching `SPORTS_APP_BASE` in the client build. */
-const DEFAULT_BASE = "/sports-app/";
-
-/**
- * The reason a session is refused for a name the document schema cannot hold.
- * The login page words it; nothing here does.
- */
-export const UNSUPPORTED_USERNAME = "unsupported_username";
-
-/**
- * `''` or a leading-slash path with no trailing slash. A typo here would put the
- * cookie on a path the browser never visits, which fails as "sign-in does
- * nothing" — so it is refused at boot instead.
- */
-function normaliseApiPrefix(value: string | undefined) {
-  const prefix = (value ?? "").trim();
-  if (prefix === "") return "";
-  if (!/^\/[A-Za-z0-9._~/-]*[A-Za-z0-9._~-]$/.test(prefix)) {
-    throw new Error(
-      `SPORTS_APP_API_PREFIX must be empty or a path like /sports-app-api (a leading slash, no trailing one), got "${prefix}"`,
-    );
-  }
-  return prefix;
-}
-
-/** `/sports-app/` with a leading and trailing slash, the way the client build reads it. */
-function normaliseBase(value: string | undefined) {
-  const segment = (value ?? "").replace(/^\/+|\/+$/g, "");
-  return segment === "" ? "/" : `/${segment}/`;
-}
-
-/**
- * Everything the auth wiring needs from the environment.
- *
- * Throws, naming what is missing, rather than returning a half-configured value:
- * a service that cannot say what origin it is served from would mint cookies
- * that are either not `Secure` or not sent back.
- */
-export function readAuthConfig(env: Record<string, string | undefined>) {
-  const wardOptions = wardClientOptionsFromEnv(env);
-
-  // The redirect URI is, by definition, an address on the app's public origin, so
-  // it names it when nothing else does. An explicit value wins.
-  const explicit = (env.SPORTS_APP_PUBLIC_ORIGIN ?? "").trim();
-  let publicOrigin = explicit;
-  if (publicOrigin === "" && wardOptions !== undefined) {
-    publicOrigin = new URL(wardOptions.redirectUri).origin;
-  }
-  if (publicOrigin === "") {
-    throw new Error(
-      "SPORTS_APP_PUBLIC_ORIGIN is not set, so the service cannot tell whether cookies may be marked Secure.\n" +
-        "Set it to the address the browser uses for the app, without a path, e.g. https://example.com\n" +
-        "(http://localhost:5173 in development).",
-    );
-  }
-  publicOrigin = new URL(publicOrigin).origin;
-
-  const apiPrefix = normaliseApiPrefix(env.SPORTS_APP_API_PREFIX);
-  const base = normaliseBase(env.SPORTS_APP_BASE ?? DEFAULT_BASE);
-
-  return {
-    publicOrigin,
-    apiPrefix,
-    cookiePath: `${apiPrefix}/api`,
-    cookieName: SESSION_COOKIE_NAME,
-    // Browser paths on the app's own origin, built from the same base the client
-    // build uses, so the callback lands on pages that exist.
-    loginPath: `${base}login`,
-    settingsPath: `${base}account`,
-    afterSignInPath: `${base}login`,
-    wardOptions,
-  };
 }
 
 /**

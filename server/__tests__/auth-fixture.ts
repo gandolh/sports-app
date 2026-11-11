@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
-import { ROUTE_PREFIX, SESSION_COOKIE_NAME, DEFAULT_ROLE, openAccounts } from "../src/ward.ts";
-import type { AuthConfig } from "../src/ward.ts";
+import { openAccounts } from "../src/ward.ts";
+import { ROUTE_PREFIX, SESSION_COOKIE_NAME, DEFAULT_ROLE } from "../src/plugins/auth/constants.ts";
+import type { AuthConfig } from "../src/config.ts";
 
 /**
  * Real accounts and real sessions for the service tests.
