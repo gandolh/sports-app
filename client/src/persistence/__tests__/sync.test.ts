@@ -121,7 +121,7 @@ function docWith(sessions: number, sync: SyncSettings | null = TARGET, username 
     exercises: [
       {
         pattern: "core" as const,
-        rungId: "core-03-front-plank",
+        rungId: "core-03-front-plank" as const,
         sets: 2,
         targetValue: 30,
       },
