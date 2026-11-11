@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    /* Node's own types, and nothing else: no DOM. The service's tests run through Vitest,
+       whose `globals` are switched on in vitest.config.ts, so the test files name them. */
+    "lib": ["ES2022"],
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["vendor", "dist"]
+}

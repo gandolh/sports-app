@@ -23,7 +23,7 @@ import { createInterface } from "node:readline/promises";
 import { pathToFileURL } from "node:url";
 import { Writable } from "node:stream";
 import { DEFAULT_DB_FILE, openSnapshotStore } from "./db.mjs";
-import { DEFAULT_ROLE, USERNAME_RULE, linkWardStreams, openAccounts, orphanStreamNames } from "./ward.mjs";
+import { DEFAULT_ROLE, USERNAME_RULE, linkWardStreams, openAccounts, orphanStreamNames } from "./ward.ts";
 import { isValidUsername } from "@sports-app/shared/username.ts";
 import { seedUsers } from "./vendor/ward/ward-auth.js";
 

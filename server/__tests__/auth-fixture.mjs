@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import { ROUTE_PREFIX, SESSION_COOKIE_NAME, DEFAULT_ROLE, openAccounts } from "../ward.mjs";
+import { ROUTE_PREFIX, SESSION_COOKIE_NAME, DEFAULT_ROLE, openAccounts } from "../ward.ts";
 
 /**
  * Real accounts and real sessions for the service tests.

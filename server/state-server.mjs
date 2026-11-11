@@ -134,7 +134,7 @@ import {
   orphanStreamNames,
   readAuthConfig,
   requireSupportedUsername,
-} from "./ward.mjs";
+} from "./ward.ts";
 import { wardAuth } from "./vendor/ward/ward-auth.js";
 // The wire contract, from the one place it is declared. `shared/` may not import
 // `node:` anything, so nothing in here can drag a Node-only module into the client

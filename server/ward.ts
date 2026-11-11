@@ -1,3 +1,4 @@
+import type { DatabaseSync } from "node:sqlite";
 import { isValidUsername, USERNAME_RULE } from "@sports-app/shared/username.ts";
 import {
   createAccounts,
@@ -6,6 +7,7 @@ import {
   createWardIdentities,
   wardClientOptionsFromEnv,
 } from "./vendor/ward/ward-auth.js";
+import type { Accounts, ResolvedSession, SessionVerdict, WardClient } from "./vendor/ward/ward-auth.js";
 
 /**
  * Accounts and "Sign in with Ward", as this service wires them.
@@ -52,6 +54,14 @@ import {
  * The same key is why renaming is off (`ALLOW_RENAME`).
  */
 
+/** Everything the auth wiring reads from the environment: the result of `readAuthConfig`. */
+export type AuthConfig = ReturnType<typeof readAuthConfig>;
+
+/** What the stream-linking helpers need from the snapshot store: the stream keys it holds. */
+interface StreamKeys {
+  usernames(): string[];
+}
+
 /** The session cookie. Unique in the estate, because every app shares one origin. */
 export const SESSION_COOKIE_NAME = "sports_app_session";
 
@@ -85,10 +95,8 @@ export const UNSUPPORTED_USERNAME = "unsupported_username";
  * `''` or a leading-slash path with no trailing slash. A typo here would put the
  * cookie on a path the browser never visits, which fails as "sign-in does
  * nothing" — so it is refused at boot instead.
- *
- * @param {string | undefined} value
  */
-function normaliseApiPrefix(value) {
+function normaliseApiPrefix(value: string | undefined) {
   const prefix = (value ?? "").trim();
   if (prefix === "") return "";
   if (!/^\/[A-Za-z0-9._~/-]*[A-Za-z0-9._~-]$/.test(prefix)) {
@@ -100,7 +108,7 @@ function normaliseApiPrefix(value) {
 }
 
 /** `/sports-app/` with a leading and trailing slash, the way the client build reads it. */
-function normaliseBase(value) {
+function normaliseBase(value: string | undefined) {
   const segment = (value ?? "").replace(/^\/+|\/+$/g, "");
   return segment === "" ? "/" : `/${segment}/`;
 }
@@ -111,10 +119,8 @@ function normaliseBase(value) {
  * Throws, naming what is missing, rather than returning a half-configured value:
  * a service that cannot say what origin it is served from would mint cookies
  * that are either not `Secure` or not sent back.
- *
- * @param {Record<string, string | undefined>} env
  */
-export function readAuthConfig(env) {
+export function readAuthConfig(env: Record<string, string | undefined>) {
   const wardOptions = wardClientOptionsFromEnv(env);
 
   // The redirect URI is, by definition, an address on the app's public origin, so
@@ -156,10 +162,8 @@ export function readAuthConfig(env) {
  * `createSqliteStore` applies the library's migrations to the same database
  * file, in its own `auth_*` tables. It can run before or after anything else
  * here, because the two never touch each other's tables.
- *
- * @param {import('node:sqlite').DatabaseSync} db
  */
-export function openAccounts(db) {
+export function openAccounts(db: DatabaseSync) {
   return createAccounts({ store: createSqliteStore(db) });
 }
 
@@ -189,13 +193,11 @@ const WARD_SUBJECT = /^[0-9a-f]{32}$/;
  * Streams that are not a subject (`local`, a name typed before Ward) are left to
  * `orphanStreamNames` and the seed.
  *
- * @param {import('./db.mjs').SnapshotStore} store
- * @param {import('./vendor/ward/ward-auth.js').Accounts} accounts
- * @returns {Promise<string[]>} the subjects linked by this call
+ * Returns the subjects linked by this call.
  */
-export async function linkWardStreams(store, accounts) {
+export async function linkWardStreams(store: StreamKeys, accounts: Accounts): Promise<string[]> {
   const identities = createWardIdentities({ accounts });
-  const linked = [];
+  const linked: string[] = [];
   for (const key of store.usernames()) {
     if (!WARD_SUBJECT.test(key)) continue;
     if ((await identities.findUserBySubject(key)) !== undefined) continue;
@@ -224,13 +226,9 @@ export async function linkWardStreams(store, accounts) {
  * exact username exists (`npm run seed`, then "Link Ward" in settings). A stream
  * whose key matches no account is not lost, only unreachable until then, so the
  * list is worth a line at startup rather than a warning.
- *
- * @param {import('./db.mjs').SnapshotStore} store
- * @param {import('./vendor/ward/ward-auth.js').Accounts} accounts
- * @returns {Promise<string[]>}
  */
-export async function orphanStreamNames(store, accounts) {
-  const orphans = [];
+export async function orphanStreamNames(store: StreamKeys, accounts: Accounts): Promise<string[]> {
+  const orphans: string[] = [];
   for (const username of store.usernames()) {
     if ((await accounts.findUserByUsername(username)) === undefined) orphans.push(username);
   }
@@ -244,11 +242,11 @@ export async function orphanStreamNames(store, accounts) {
  * `createWardClient` checks the values and imports the key now, so a bad key
  * fails at startup. It does **not** contact Ward: discovery is lazy, so the
  * service starts while Ward is down.
- *
- * @param {ReturnType<typeof readAuthConfig>} config
- * @param {{ fetch?: typeof fetch }} [overrides]
  */
-export async function openWardClient(config, overrides = {}) {
+export async function openWardClient(
+  config: AuthConfig,
+  overrides: { fetch?: typeof fetch } = {},
+): Promise<WardClient | undefined> {
   if (config.wardOptions === undefined) return undefined;
   return createWardClient({ ...config.wardOptions, ...overrides });
 }
@@ -261,10 +259,8 @@ export async function openWardClient(config, overrides = {}) {
  * document schema accepts. Refused without ending the session, so the answer
  * stays visible (`reason` on `GET /api/auth/session`) instead of looping the
  * person through a sign-in that succeeds and is then silently discarded.
- *
- * @type {import('./vendor/ward/ward-auth.js').SessionValidator}
  */
-export function requireSupportedUsername(resolved) {
+export function requireSupportedUsername(resolved: ResolvedSession): SessionVerdict {
   if (isValidUsername(resolved.user.username)) return { ok: true };
   return { ok: false, reason: UNSUPPORTED_USERNAME };
 }

@@ -27,7 +27,7 @@ import {
   openWardClient,
   orphanStreamNames,
   readAuthConfig,
-} from "../ward.mjs";
+} from "../ward.ts";
 import { seedAccount } from "../seed-users.mjs";
 import { createWardIdentities } from "../vendor/ward/ward-auth.js";
 import { testAuthConfig } from "./auth-fixture.mjs";
