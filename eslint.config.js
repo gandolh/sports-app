@@ -24,12 +24,12 @@ export default [
   ...houseStyle({
     root: import.meta.dirname,
     web: "client/src",
-    server: "server",
+    server: "server/src",
     // Scripts run by hand, which print and read the environment directly: the library importer and the
     // docs build helpers.
     scripts: ["scripts", "docs/scripts"],
     // CLIs inside the app: the service entry and the seed command talk to the person running them.
-    console: ["server/src/seed-users.ts", "server/src/state-server.ts"],
+    console: ["server/src/seed-users.ts", "server/src/server.ts"],
     // Docusaurus reads `default` from its sidebar file and from its component.
     defaultExports: ["docs/sidebars.ts", "docs/src/components/Diagram.tsx"],
     // Test helpers that wrap `expect`, so `vitest/expect-expect` counts a test that calls one.

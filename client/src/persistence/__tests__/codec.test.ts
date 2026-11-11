@@ -50,7 +50,7 @@ import type { JsonObject, ParseResult } from "../codec.ts";
 // makes the edge visible: `@sports-app/server` is a devDependency of
 // `@sports-app/client` for this one test and nothing else. Runtime code never
 // imports it — the client talks to the service over HTTP.
-import { checkDocument } from "@sports-app/server/state-server.ts";
+import { checkDocument } from "@sports-app/server/document.ts";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
