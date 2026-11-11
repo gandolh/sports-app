@@ -181,3 +181,28 @@ One commit per numbered step. After each, `npm run check` and `npm test` pass, a
 - The skills library should hear three things from this brief: its zod rule does not fit a TypeBox contract; a pass-through reply and a raw-body route are exceptions the `.parse(request.` test cannot see; and a repo may keep a "no build" rule that the tsc-built default overrides, which is why decision 1 names the alternative.
 
 (2026-11-11, brief 02: dependency-cruiser landed there instead, as `.dependency-cruiser.cjs` and in `check:conventions`, by the controller's call. This brief keeps the cross-folder import check, drops the lowered `no-circular` there once the `ui/figures` type loop is gone, and drops the `n/no-process-env` warning on `server/seed-users.mjs` and `server/state-server.mjs` and the knip `ignoreDependencies` for `@sinclair/typebox` in `knip.config.js`.)
+
+## Outcome (2026-11-11)
+
+Commits `4db7e89` (ward.ts, types only), `32a8012` (the rest to `.ts`, in place), `110b1af` (`tsc` build, Dockerfile build
+stage), `ef521c9` (`config.ts`), `eaccc67` (app, server, plugins, features, auth split), `89c52aa` (store, seed and tests
+to their places), `c04cfdd` (timeouts), `028f72e` (strict checker, docs), `2186f71` (timeout room for Ward, strict test
+reads, seed script). `npm run check` (1,235 tests; 96 on the server) passes; `check-structure` runs strict at 0 findings
+with two exceptions; `corpus/lint.sh` is clean. Board: Ready for deploy; `node cli.ts sports-app server` from the
+vps-deploy checkout, then check the container turns healthy (the `CMD` changed). Seeding in the container is `node
+server/dist/seed.js`.
+
+- **Replies:** 36 captured, identical before and after on source and on the built `dist`, except `Keep-Alive: timeout=`
+  (72 to 125, on purpose). The proxy keeps an idle upstream connection for 2 minutes by default; the deploy's snippet was
+  not read.
+- **Not the same as before, on purpose:** a start that cannot configure itself exits 1 (it exited 0); the PUT route
+  declares its 400 and 415 bodies so `reply.code(400)` type-checks, which serialise to the same bytes.
+- **Deviations:** the service moved into `server/src/` in step 3 (a flat `dist/` cannot import `./vendor`); the
+  registration order is errors, headers, auth (the error handler first); `connectionTimeout` is 30 s, not 10 s (Node cuts a
+  silent socket mid-response, and the Ward callback chains three 5 s calls); the server's `seed` runs `dist/seed.js` and the
+  root `seed` runs the source through `seed:dev`; no `resolveDbFile()` (the path is a constant in `config.ts`, and
+  `openSnapshotStore` requires `file`); the raw-body PUT, `trustProxy` and shutdown are recorded in
+  `wiki/server-structure.md`, not `conventions.json` (the checker raises no finding for them); one dependency-cruiser rule
+  added (a plugin never imports a feature), because the house preset passed the brief's probe; `no-circular` stays lowered
+  for the client's figures loop.
+- **Not done:** `docker build`.
