@@ -1,0 +1,21 @@
+{
+  "$schema": "../vendor/house-style/conventions.schema.json",
+  "web": ["client/src"],
+  "server": ["server"],
+  "shared": ["shared"],
+  "exceptions": [
+    {
+      "check": "house-style",
+      "rule": 1,
+      "path": "tsconfig.base.json",
+      "reason": "The base sets module ESNext and moduleResolution bundler, not NodeNext: Vite bundles the client and Node strips types and runs shared/ source directly, and the file's own comment says why."
+    },
+    {
+      "check": "house-style",
+      "rule": 3,
+      "path": "**/*.ts",
+      "match": ".ts\"",
+      "reason": "Relative imports end in .ts, not .js (allowImportingTsExtensions), because Node runs shared/ source directly under type stripping."
+    }
+  ]
+}
