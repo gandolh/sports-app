@@ -31,19 +31,15 @@
  *      that saves documents the service refuses would look fine until the day
  *      someone needed the backup.
  */
-import { describe, expect, it } from 'vitest'
-import type { Pattern, StateDoc } from '@sports-app/shared/types.ts'
-import { CURRENT_SCHEMA_VERSION, PATTERNS } from '@sports-app/shared/types.ts'
-import {
-  LEGACY_USERNAME,
-  USERNAME_MAX_LENGTH,
-  isValidUsername,
-} from '@sports-app/shared/username.ts'
-import { midProgram } from '../../domain/__tests__/fixtures.ts'
-import { LADDERS, getRung } from '../../domain/ladders.ts'
-import { rungIndexAt, targetAt } from '../../domain/schedule.ts'
-import { emptyDoc, migrate, parse, serialise, summarise } from '../codec.ts'
-import type { JsonObject, ParseResult } from '../codec.ts'
+import { describe, expect, it } from "vitest";
+import type { Pattern, StateDoc } from "@sports-app/shared/types.ts";
+import { CURRENT_SCHEMA_VERSION, PATTERNS } from "@sports-app/shared/types.ts";
+import { LEGACY_USERNAME, USERNAME_MAX_LENGTH, isValidUsername } from "@sports-app/shared/username.ts";
+import { midProgram } from "../../domain/__tests__/fixtures.ts";
+import { LADDERS, getRung } from "../../domain/ladders.ts";
+import { rungIndexAt, targetAt } from "../../domain/schedule.ts";
+import { emptyDoc, migrate, parse, serialise, summarise } from "../codec.ts";
+import type { JsonObject, ParseResult } from "../codec.ts";
 // The state service is still plain `.mjs` run directly by Node — it is outside
 // every `tsconfig.json` and outside the bundle, so it has no types and cannot be
 // imported without this. Importing the *real* thing is the entire point of the
@@ -55,19 +51,19 @@ import type { JsonObject, ParseResult } from '../codec.ts'
 // `@sports-app/client` for this one test and nothing else. Runtime code never
 // imports it — the client talks to the service over HTTP.
 // @ts-expect-error untyped .mjs, imported on purpose
-import { checkDocument } from '@sports-app/server/state-server.mjs'
+import { checkDocument } from "@sports-app/server/state-server.mjs";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /** Serialised `midProgram`, re-parsed into a mutable tree for corruption. */
 function mutableDoc(): Record<string, unknown> {
-  return JSON.parse(serialise(midProgram)) as Record<string, unknown>
+  return JSON.parse(serialise(midProgram)) as Record<string, unknown>;
 }
 
 function corrupt(mutate: (doc: Record<string, unknown>) => void): string {
-  const doc = mutableDoc()
-  mutate(doc)
-  return JSON.stringify(doc, null, 2)
+  const doc = mutableDoc();
+  mutate(doc);
+  return JSON.stringify(doc, null, 2);
 }
 
 /**
@@ -75,57 +71,51 @@ function corrupt(mutate: (doc: Record<string, unknown>) => void): string {
  * document handed back under any key.
  */
 function expectRejected(text: unknown, ...expectedFragments: string[]): string {
-  let result: ParseResult | undefined
+  let result: ParseResult | undefined;
   expect(() => {
-    result = parse(text)
-  }).not.toThrow()
-  if (!result) throw new Error('parse returned nothing')
-  expect(result.ok).toBe(false)
+    result = parse(text);
+  }).not.toThrow();
+  if (!result) throw new Error("parse returned nothing");
+  expect(result.ok).toBe(false);
   // No partially-valid document, under any name.
-  expect(Object.keys(result)).toEqual(['ok', 'error'])
-  if (result.ok) throw new Error('unreachable')
+  expect(Object.keys(result)).toEqual(["ok", "error"]);
+  if (result.ok) throw new Error("unreachable");
   for (const fragment of expectedFragments) {
-    expect(result.error).toContain(fragment)
+    expect(result.error).toContain(fragment);
   }
   // A message with no content is as bad as a throw.
-  expect(result.error.length).toBeGreaterThan(10)
-  return result.error
+  expect(result.error.length).toBeGreaterThan(10);
+  return result.error;
 }
 
 function expectAccepted(text: string, username?: string): StateDoc {
-  const result = username === undefined ? parse(text) : parse(text, { username })
-  if (!result.ok) throw new Error(`expected a valid document, got: ${result.error}`)
-  return result.doc
+  const result = username === undefined ? parse(text) : parse(text, { username });
+  if (!result.ok) throw new Error(`expected a valid document, got: ${result.error}`);
+  return result.doc;
 }
 
 function sessionAt(doc: Record<string, unknown>, index: number): Record<string, unknown> {
-  return (doc['history'] as Record<string, unknown>[])[index] as Record<string, unknown>
+  return (doc["history"] as Record<string, unknown>[])[index] as Record<string, unknown>;
 }
 
-function exerciseAt(
-  doc: Record<string, unknown>,
-  session: number,
-  index: number,
-): Record<string, unknown> {
-  return (sessionAt(doc, session)['exercises'] as Record<string, unknown>[])[
-    index
-  ] as Record<string, unknown>
+function exerciseAt(doc: Record<string, unknown>, session: number, index: number): Record<string, unknown> {
+  return (sessionAt(doc, session)["exercises"] as Record<string, unknown>[])[index] as Record<string, unknown>;
 }
 
 // ─── Round trip ─────────────────────────────────────────────────────────────
 
-describe('round trip on the mid-program fixture', () => {
-  it('serialises and parses back to a deeply equal document', () => {
-    expect(expectAccepted(serialise(midProgram))).toEqual(midProgram)
-  })
+describe("round trip on the mid-program fixture", () => {
+  it("serialises and parses back to a deeply equal document", () => {
+    expect(expectAccepted(serialise(midProgram))).toEqual(midProgram);
+  });
 
-  it('is stable: re-serialising a parsed document produces identical text', () => {
-    const first = serialise(midProgram)
-    const second = serialise(expectAccepted(first))
-    expect(second).toBe(first)
-  })
+  it("is stable: re-serialising a parsed document produces identical text", () => {
+    const first = serialise(midProgram);
+    const second = serialise(expectAccepted(first));
+    expect(second).toBe(first);
+  });
 
-  it('key order does not depend on how the object was built', () => {
+  it("key order does not depend on how the object was built", () => {
     // Same data, opposite insertion order. `serialise` must not care.
     const reordered = {
       settings: midProgram.settings,
@@ -140,502 +130,568 @@ describe('round trip on the mid-program fixture', () => {
       cyclePosition: midProgram.cyclePosition,
       username: midProgram.username,
       schemaVersion: midProgram.schemaVersion,
-    } as StateDoc
-    expect(serialise(reordered)).toBe(serialise(midProgram))
-  })
+    } as StateDoc;
+    expect(serialise(reordered)).toBe(serialise(midProgram));
+  });
 
-  it('round-trips an empty document', () => {
-    const fresh = emptyDoc('alice')
-    expect(expectAccepted(serialise(fresh))).toEqual(fresh)
-  })
+  it("round-trips an empty document", () => {
+    const fresh = emptyDoc("alice");
+    expect(expectAccepted(serialise(fresh))).toEqual(fresh);
+  });
 
-  it('round-trips configured sync settings', () => {
+  it("round-trips configured sync settings", () => {
     const withSync: StateDoc = {
       ...midProgram,
-      settings: { ...midProgram.settings, sync: { baseUrl: 'https://x.example/s', secret: 'shh' } },
-    }
-    expect(expectAccepted(serialise(withSync))).toEqual(withSync)
-  })
+      settings: { ...midProgram.settings, sync: { baseUrl: "https://x.example/s", secret: "shh" } },
+    };
+    expect(expectAccepted(serialise(withSync))).toEqual(withSync);
+  });
 
-  it('round-trips a document whose history has been pruned by hand', () => {
+  it("round-trips a document whose history has been pruned by hand", () => {
     // `sessionsDone` is the state; history is a list a user may trim. The two are
     // deliberately not required to agree, so pruning must not invalidate the file.
-    const pruned: StateDoc = { ...midProgram, history: midProgram.history.slice(-1) }
-    const doc = expectAccepted(serialise(pruned))
-    expect(doc.sessionsDone).toEqual(midProgram.sessionsDone)
-    expect(doc.history).toHaveLength(1)
-  })
+    const pruned: StateDoc = { ...midProgram, history: midProgram.history.slice(-1) };
+    const doc = expectAccepted(serialise(pruned));
+    expect(doc.sessionsDone).toEqual(midProgram.sessionsDone);
+    expect(doc.history).toHaveLength(1);
+  });
 
-  it('round-trips a counter far past the top of its ladder', () => {
+  it("round-trips a counter far past the top of its ladder", () => {
     // The top rung cycles forever, so a four-figure counter is a fact rather than
     // a typo and there is deliberately no upper bound to trip over.
     const veteran: StateDoc = {
       ...midProgram,
       sessionsDone: { ...midProgram.sessionsDone, core: 4000 },
-    }
-    expect(expectAccepted(serialise(veteran)).sessionsDone.core).toBe(4000)
-  })
-})
+    };
+    expect(expectAccepted(serialise(veteran)).sessionsDone.core).toBe(4000);
+  });
+});
 
 // ─── Serialised form is human-readable ──────────────────────────────────────
 
-describe('serialised form', () => {
-  const text = serialise(midProgram)
+describe("serialised form", () => {
+  const text = serialise(midProgram);
 
-  it('is valid JSON and ends with a newline', () => {
-    expect(() => JSON.parse(text)).not.toThrow()
-    expect(text.endsWith('\n')).toBe(true)
-  })
+  it("is valid JSON and ends with a newline", () => {
+    expect(() => JSON.parse(text)).not.toThrow();
+    expect(text.endsWith("\n")).toBe(true);
+  });
 
-  it('leads with who and where, and puts history last', () => {
-    const lines = text.split('\n')
-    expect(lines[1]).toContain('"schemaVersion"')
-    expect(lines[2]).toContain('"username"')
-    expect(lines[3]).toContain('"cyclePosition"')
-    expect(text.indexOf('"history"')).toBeGreaterThan(text.indexOf('"sessionsDone"'))
-    expect(text.indexOf('"history"')).toBeGreaterThan(text.indexOf('"settings"'))
-  })
+  it("leads with who and where, and puts history last", () => {
+    const lines = text.split("\n");
+    expect(lines[1]).toContain('"schemaVersion"');
+    expect(lines[2]).toContain('"username"');
+    expect(lines[3]).toContain('"cyclePosition"');
+    expect(text.indexOf('"history"')).toBeGreaterThan(text.indexOf('"sessionsDone"'));
+    expect(text.indexOf('"history"')).toBeGreaterThan(text.indexOf('"settings"'));
+  });
 
-  it('puts the whole of the mutable state on one line', () => {
+  it("puts the whole of the mutable state on one line", () => {
     // Five integers, in PATTERNS order, visible at a glance. This is the line a
     // person edits when the schedule has them on the wrong rung.
-    expect(text).toContain(
-      '"sessionsDone": { "push": 44, "squat": 31, "hinge": 29, "core": 90, "pull": 90 },',
-    )
-  })
+    expect(text).toContain('"sessionsDone": { "push": 44, "squat": 31, "hinge": 29, "core": 90, "pull": 90 },');
+  });
 
-  it('keeps each exercise record on one line, so history stays scannable', () => {
-    expect(text).toContain(
-      '{ "pattern": "push", "rungId": "push-05-full-3s-down", "sets": 3, "targetValue": 8 }',
-    )
-  })
+  it("keeps each exercise record on one line, so history stays scannable", () => {
+    expect(text).toContain('{ "pattern": "push", "rungId": "push-05-full-3s-down", "sets": 3, "targetValue": 8 }');
+  });
 
-  it('carries none of the fields v3 deleted', () => {
+  it("carries none of the fields v3 deleted", () => {
     for (const gone of [
-      'effort',
-      'actualValue',
-      'ladders',
-      'rungIndex',
-      'cleanAtMax',
-      'missedStreak',
-      'sessionsCompleted',
-      'soundEnabled',
-      'voiceEnabled',
-      'skipWarmupByDefault',
+      "effort",
+      "actualValue",
+      "ladders",
+      "rungIndex",
+      "cleanAtMax",
+      "missedStreak",
+      "sessionsCompleted",
+      "soundEnabled",
+      "voiceEnabled",
+      "skipWarmupByDefault",
       '"day"',
     ]) {
-      expect(text, gone).not.toContain(gone)
+      expect(text, gone).not.toContain(gone);
     }
-  })
+  });
 
-  it('is small enough that localStorage is not a constraint', () => {
+  it("is small enough that localStorage is not a constraint", () => {
     // Five years of daily training is ~1800 sessions.
-    const perSession = text.length / midProgram.history.length
-    expect(perSession * 1800).toBeLessThan(1_000_000)
-  })
-})
+    const perSession = text.length / midProgram.history.length;
+    expect(perSession * 1800).toBeLessThan(1_000_000);
+  });
+});
 
 // ─── Malformed input: never throws, never yields a document ─────────────────
 
-describe('parse rejects malformed input', () => {
-  it('non-string input', () => {
-    expectRejected(undefined, 'expected the document as text')
-    expectRejected(null, 'expected the document as text')
-    expectRejected(42, 'expected the document as text')
-    expectRejected({ schemaVersion: 3 }, 'expected the document as text')
-  })
+describe("parse rejects malformed input", () => {
+  it("non-string input", () => {
+    expectRejected(undefined, "expected the document as text");
+    expectRejected(null, "expected the document as text");
+    expectRejected(42, "expected the document as text");
+    expectRejected({ schemaVersion: 3 }, "expected the document as text");
+  });
 
-  it('empty or whitespace-only text', () => {
-    expectRejected('', 'empty')
-    expectRejected('   \n  ', 'empty')
-  })
+  it("empty or whitespace-only text", () => {
+    expectRejected("", "empty");
+    expectRejected("   \n  ", "empty");
+  });
 
-  it('a truncated file', () => {
-    expectRejected(serialise(midProgram).slice(0, 200), 'not valid JSON')
-  })
+  it("a truncated file", () => {
+    expectRejected(serialise(midProgram).slice(0, 200), "not valid JSON");
+  });
 
-  it('a stray trailing comma, the classic hand-edit slip', () => {
-    expectRejected('{ "schemaVersion": 3, }', 'not valid JSON')
-  })
+  it("a stray trailing comma, the classic hand-edit slip", () => {
+    expectRejected('{ "schemaVersion": 3, }', "not valid JSON");
+  });
 
-  it('JSON that is not an object', () => {
-    expectRejected('[]', 'must be a JSON object')
-    expectRejected('"a string"', 'must be a JSON object')
-    expectRejected('null', 'must be a JSON object')
-    expectRejected('12', 'must be a JSON object')
-  })
+  it("JSON that is not an object", () => {
+    expectRejected("[]", "must be a JSON object");
+    expectRejected('"a string"', "must be a JSON object");
+    expectRejected("null", "must be a JSON object");
+    expectRejected("12", "must be a JSON object");
+  });
 
-  it('an unrelated JSON file', () => {
+  it("an unrelated JSON file", () => {
     const error = expectRejected(
       '{ "name": "some-package", "version": "1.0.0" }',
-      'schemaVersion',
-      'probably not a state document',
-    )
-    expect(error).not.toContain('history')
-  })
+      "schemaVersion",
+      "probably not a state document",
+    );
+    expect(error).not.toContain("history");
+  });
 
-  it('a missing, non-integer or zero schemaVersion', () => {
-    expectRejected(corrupt((d) => delete d['schemaVersion']), 'schemaVersion', 'missing')
-    expectRejected(corrupt((d) => (d['schemaVersion'] = 0)), 'schemaVersion')
-    expectRejected(corrupt((d) => (d['schemaVersion'] = 2.5)), 'schemaVersion')
-    expectRejected(corrupt((d) => (d['schemaVersion'] = '3')), 'schemaVersion', '"3"')
-  })
+  it("a missing, non-integer or zero schemaVersion", () => {
+    expectRejected(
+      corrupt((d) => delete d["schemaVersion"]),
+      "schemaVersion",
+      "missing",
+    );
+    expectRejected(
+      corrupt((d) => (d["schemaVersion"] = 0)),
+      "schemaVersion",
+    );
+    expectRejected(
+      corrupt((d) => (d["schemaVersion"] = 2.5)),
+      "schemaVersion",
+    );
+    expectRejected(
+      corrupt((d) => (d["schemaVersion"] = "3")),
+      "schemaVersion",
+      '"3"',
+    );
+  });
 
-  it('a document from a newer build, without misreading it', () => {
+  it("a document from a newer build, without misreading it", () => {
     // v6 does not exist. It must be refused, never coerced down to v5 — a field
     // v6 renamed would otherwise be read as the v5 field of the same name. The
     // number is `CURRENT_SCHEMA_VERSION + 1` rather than a literal so the next
     // schema bump moves the goalposts instead of quietly retiring this test: when
     // 4 became current, the old literal 4 here stopped meaning "the future".
-    const future = CURRENT_SCHEMA_VERSION + 1
+    const future = CURRENT_SCHEMA_VERSION + 1;
     const error = expectRejected(
-      corrupt((d) => (d['schemaVersion'] = future)),
-      'newer version of the app',
-    )
-    expect(error).toContain('update the app')
-    expect(error).toContain(`version ${future}`)
-  })
+      corrupt((d) => (d["schemaVersion"] = future)),
+      "newer version of the app",
+    );
+    expect(error).toContain("update the app");
+    expect(error).toContain(`version ${future}`);
+  });
 
-  it('a missing or misspelled username', () => {
-    expectRejected(corrupt((d) => delete d['username']), 'username', 'missing')
-    expectRejected(corrupt((d) => (d['username'] = 'Alice')), 'username', 'lowercase')
-    expectRejected(corrupt((d) => (d['username'] = '')), 'username')
-    expectRejected(corrupt((d) => (d['username'] = 'a'.repeat(USERNAME_MAX_LENGTH + 1))), 'username')
-    expectRejected(corrupt((d) => (d['username'] = 42)), 'username', 'expected a string')
-  })
-
-  it('a missing counter', () => {
+  it("a missing or misspelled username", () => {
     expectRejected(
-      corrupt((d) => delete (d['sessionsDone'] as Record<string, unknown>)['hinge']),
-      'sessionsDone.hinge',
-      'missing',
-    )
-  })
-
-  it('sessionsDone that is not an object', () => {
-    expectRejected(corrupt((d) => (d['sessionsDone'] = [])), 'sessionsDone', 'expected an object')
-    expectRejected(corrupt((d) => delete d['sessionsDone']), 'sessionsDone', 'missing')
-  })
-
-  it('a negative or fractional counter', () => {
+      corrupt((d) => delete d["username"]),
+      "username",
+      "missing",
+    );
     expectRejected(
-      corrupt((d) => ((d['sessionsDone'] as Record<string, unknown>)['push'] = -1)),
-      'sessionsDone.push',
-      '>= 0',
-    )
+      corrupt((d) => (d["username"] = "Alice")),
+      "username",
+      "lowercase",
+    );
     expectRejected(
-      corrupt((d) => ((d['sessionsDone'] as Record<string, unknown>)['core'] = 2.5)),
-      'sessionsDone.core',
-      'whole number',
-    )
+      corrupt((d) => (d["username"] = "")),
+      "username",
+    );
     expectRejected(
-      corrupt((d) => ((d['sessionsDone'] as Record<string, unknown>)['pull'] = null)),
-      'sessionsDone.pull',
-    )
-  })
+      corrupt((d) => (d["username"] = "a".repeat(USERNAME_MAX_LENGTH + 1))),
+      "username",
+    );
+    expectRejected(
+      corrupt((d) => (d["username"] = 42)),
+      "username",
+      "expected a string",
+    );
+  });
 
-  it('an unknown key inside sessionsDone', () => {
+  it("a missing counter", () => {
     expectRejected(
-      corrupt((d) => ((d['sessionsDone'] as Record<string, unknown>)['pushup'] = 2)),
-      'sessionsDone.pushup',
-      'unknown field',
-    )
-  })
+      corrupt((d) => delete (d["sessionsDone"] as Record<string, unknown>)["hinge"]),
+      "sessionsDone.hinge",
+      "missing",
+    );
+  });
 
-  it('history that is not an array', () => {
-    expectRejected(corrupt((d) => (d['history'] = {})), 'history', 'expected an array')
-    expectRejected(corrupt((d) => delete d['history']), 'history', 'missing')
-  })
-
-  it('a history entry that is not an object', () => {
+  it("sessionsDone that is not an object", () => {
     expectRejected(
-      corrupt((d) => ((d['history'] as unknown[])[1] = 'a session')),
-      'history[1]',
-      'expected an object',
-    )
-  })
-
-  it('a bad variant', () => {
+      corrupt((d) => (d["sessionsDone"] = [])),
+      "sessionsDone",
+      "expected an object",
+    );
     expectRejected(
-      corrupt((d) => (sessionAt(d, 1)['variant'] = 'brutal')),
-      'history[1].variant',
+      corrupt((d) => delete d["sessionsDone"]),
+      "sessionsDone",
+      "missing",
+    );
+  });
+
+  it("a negative or fractional counter", () => {
+    expectRejected(
+      corrupt((d) => ((d["sessionsDone"] as Record<string, unknown>)["push"] = -1)),
+      "sessionsDone.push",
+      ">= 0",
+    );
+    expectRejected(
+      corrupt((d) => ((d["sessionsDone"] as Record<string, unknown>)["core"] = 2.5)),
+      "sessionsDone.core",
+      "whole number",
+    );
+    expectRejected(
+      corrupt((d) => ((d["sessionsDone"] as Record<string, unknown>)["pull"] = null)),
+      "sessionsDone.pull",
+    );
+  });
+
+  it("an unknown key inside sessionsDone", () => {
+    expectRejected(
+      corrupt((d) => ((d["sessionsDone"] as Record<string, unknown>)["pushup"] = 2)),
+      "sessionsDone.pushup",
+      "unknown field",
+    );
+  });
+
+  it("history that is not an array", () => {
+    expectRejected(
+      corrupt((d) => (d["history"] = {})),
+      "history",
+      "expected an array",
+    );
+    expectRejected(
+      corrupt((d) => delete d["history"]),
+      "history",
+      "missing",
+    );
+  });
+
+  it("a history entry that is not an object", () => {
+    expectRejected(
+      corrupt((d) => ((d["history"] as unknown[])[1] = "a session")),
+      "history[1]",
+      "expected an object",
+    );
+  });
+
+  it("a bad variant", () => {
+    expectRejected(
+      corrupt((d) => (sessionAt(d, 1)["variant"] = "brutal")),
+      "history[1].variant",
       '"easy", "medium" or "hard"',
-    )
-    expectRejected(corrupt((d) => delete sessionAt(d, 1)['variant']), 'history[1].variant')
-  })
+    );
+    expectRejected(
+      corrupt((d) => delete sessionAt(d, 1)["variant"]),
+      "history[1].variant",
+    );
+  });
 
-  it('a bad position', () => {
+  it("a bad position", () => {
     expectRejected(
-      corrupt((d) => (sessionAt(d, 0)['position'] = -1)),
-      'history[0].position',
-      '>= 0',
-    )
+      corrupt((d) => (sessionAt(d, 0)["position"] = -1)),
+      "history[0].position",
+      ">= 0",
+    );
     expectRejected(
-      corrupt((d) => (sessionAt(d, 0)['position'] = 'A')),
-      'history[0].position',
-      'whole number',
-    )
-  })
+      corrupt((d) => (sessionAt(d, 0)["position"] = "A")),
+      "history[0].position",
+      "whole number",
+    );
+  });
 
-  it('a completedAt that is not an ISO instant', () => {
+  it("a completedAt that is not an ISO instant", () => {
     expectRejected(
-      corrupt((d) => (sessionAt(d, 0)['completedAt'] = 'last tuesday')),
-      'history[0].completedAt',
-      'ISO-8601',
-    )
+      corrupt((d) => (sessionAt(d, 0)["completedAt"] = "last tuesday")),
+      "history[0].completedAt",
+      "ISO-8601",
+    );
     expectRejected(
-      corrupt((d) => (sessionAt(d, 0)['completedAt'] = '2026-13-45T99:00:00.000Z')),
-      'history[0].completedAt',
-    )
-  })
+      corrupt((d) => (sessionAt(d, 0)["completedAt"] = "2026-13-45T99:00:00.000Z")),
+      "history[0].completedAt",
+    );
+  });
 
-  it('a bad pattern or rungId inside an exercise', () => {
+  it("a bad pattern or rungId inside an exercise", () => {
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['pattern'] = 'bench')),
-      'history[0].exercises[0].pattern',
-      'push, squat, hinge, core, pull',
-    )
+      corrupt((d) => (exerciseAt(d, 0, 0)["pattern"] = "bench")),
+      "history[0].exercises[0].pattern",
+      "push, squat, hinge, core, pull",
+    );
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['rungId'] = 'pushup-3')),
-      'history[0].exercises[0].rungId',
-      'push-04-full',
-    )
+      corrupt((d) => (exerciseAt(d, 0, 0)["rungId"] = "pushup-3")),
+      "history[0].exercises[0].rungId",
+      "push-04-full",
+    );
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['rungId'] = 'push-')),
-      'history[0].exercises[0].rungId',
-    )
-  })
+      corrupt((d) => (exerciseAt(d, 0, 0)["rungId"] = "push-")),
+      "history[0].exercises[0].rungId",
+    );
+  });
 
-  it('a v2 set array left in place of a set count', () => {
+  it("a v2 set array left in place of a set count", () => {
     // The shape v2 wrote. It is not silently accepted and not silently collapsed:
     // only `migrate` collapses, and only for a document that says it is v2.
     expectRejected(
       corrupt(
         (d) =>
-          (exerciseAt(d, 0, 0)['sets'] = [
+          (exerciseAt(d, 0, 0)["sets"] = [
             { targetValue: 8, actualValue: 8 },
             { targetValue: 8, actualValue: 7 },
           ]),
       ),
-      'history[0].exercises[0].sets',
-      'whole number',
-    )
-  })
+      "history[0].exercises[0].sets",
+      "whole number",
+    );
+  });
 
-  it('an exercise recorded as zero sets', () => {
+  it("an exercise recorded as zero sets", () => {
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['sets'] = 0)),
-      'history[0].exercises[0].sets',
-      '>= 1',
-    )
-  })
+      corrupt((d) => (exerciseAt(d, 0, 0)["sets"] = 0)),
+      "history[0].exercises[0].sets",
+      ">= 1",
+    );
+  });
 
-  it('a missing or non-numeric targetValue', () => {
+  it("a missing or non-numeric targetValue", () => {
     expectRejected(
-      corrupt((d) => delete exerciseAt(d, 0, 1)['targetValue']),
-      'history[0].exercises[1].targetValue',
-      'missing',
-    )
+      corrupt((d) => delete exerciseAt(d, 0, 1)["targetValue"]),
+      "history[0].exercises[1].targetValue",
+      "missing",
+    );
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 1)['targetValue'] = 'eight')),
-      'history[0].exercises[1].targetValue',
-      'expected a number',
-    )
-  })
+      corrupt((d) => (exerciseAt(d, 0, 1)["targetValue"] = "eight")),
+      "history[0].exercises[1].targetValue",
+      "expected a number",
+    );
+  });
 
-  it('an effort field hand-typed into a v3 document', () => {
+  it("an effort field hand-typed into a v3 document", () => {
     // Migration strips it from a v1 document; a document already claiming v3 has
     // no excuse, and the field is reported as the unknown key it is rather than
     // silently dropped.
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['effort'] = 'hard')),
-      'history[0].exercises[0].effort',
-      'unknown field',
-    )
-  })
+      corrupt((d) => (exerciseAt(d, 0, 0)["effort"] = "hard")),
+      "history[0].exercises[0].effort",
+      "unknown field",
+    );
+  });
 
-  it('every settings field, when missing or mistyped', () => {
-    const settings = (d: Record<string, unknown>): Record<string, unknown> =>
-      d['settings'] as Record<string, unknown>
+  it("every settings field, when missing or mistyped", () => {
+    const settings = (d: Record<string, unknown>): Record<string, unknown> => d["settings"] as Record<string, unknown>;
 
     expectRejected(
-      corrupt((d) => (settings(d)['persistGranted'] = 'granted')),
-      'settings.persistGranted',
-      'not requested yet',
-    )
-    expectRejected(corrupt((d) => delete settings(d)['persistGranted']), 'settings.persistGranted')
-    expectRejected(corrupt((d) => delete settings(d)['sync']), 'settings.sync', 'missing')
-    expectRejected(corrupt((d) => delete d['settings']), 'settings', 'missing')
-  })
+      corrupt((d) => (settings(d)["persistGranted"] = "granted")),
+      "settings.persistGranted",
+      "not requested yet",
+    );
+    expectRejected(
+      corrupt((d) => delete settings(d)["persistGranted"]),
+      "settings.persistGranted",
+    );
+    expectRejected(
+      corrupt((d) => delete settings(d)["sync"]),
+      "settings.sync",
+      "missing",
+    );
+    expectRejected(
+      corrupt((d) => delete d["settings"]),
+      "settings",
+      "missing",
+    );
+  });
 
-  it('a v2 settings field left behind', () => {
+  it("a v2 settings field left behind", () => {
     // Audio and the guided warmup are out of v3 scope. A v2 *document* is
     // migrated; a v3 document with `soundEnabled` in it is a hand-edit.
     expectRejected(
-      corrupt((d) => ((d['settings'] as Record<string, unknown>)['soundEnabled'] = true)),
-      'settings.soundEnabled',
-      'unknown field',
-    )
-  })
+      corrupt((d) => ((d["settings"] as Record<string, unknown>)["soundEnabled"] = true)),
+      "settings.soundEnabled",
+      "unknown field",
+    );
+  });
 
-  it('half-configured sync settings', () => {
+  it("half-configured sync settings", () => {
     expectRejected(
-      corrupt((d) => ((d['settings'] as Record<string, unknown>)['sync'] = { baseUrl: 'https://x' })),
-      'settings.sync.secret',
-      'missing',
-    )
+      corrupt((d) => ((d["settings"] as Record<string, unknown>)["sync"] = { baseUrl: "https://x" })),
+      "settings.sync.secret",
+      "missing",
+    );
     expectRejected(
-      corrupt((d) => ((d['settings'] as Record<string, unknown>)['sync'] = { baseUrl: 5, secret: 'x' })),
-      'settings.sync.baseUrl',
-      'expected a string',
-    )
-  })
+      corrupt((d) => ((d["settings"] as Record<string, unknown>)["sync"] = { baseUrl: 5, secret: "x" })),
+      "settings.sync.baseUrl",
+      "expected a string",
+    );
+  });
 
-  it('a negative or fractional cyclePosition', () => {
-    expectRejected(corrupt((d) => (d['cyclePosition'] = -1)), 'cyclePosition')
-    expectRejected(corrupt((d) => (d['cyclePosition'] = 1.5)), 'cyclePosition', 'whole number')
-  })
+  it("a negative or fractional cyclePosition", () => {
+    expectRejected(
+      corrupt((d) => (d["cyclePosition"] = -1)),
+      "cyclePosition",
+    );
+    expectRejected(
+      corrupt((d) => (d["cyclePosition"] = 1.5)),
+      "cyclePosition",
+      "whole number",
+    );
+  });
 
-  it('a misspelled top-level key, and says what it probably meant', () => {
+  it("a misspelled top-level key, and says what it probably meant", () => {
     const error = expectRejected(
       corrupt((d) => {
-        d['sessionsdone'] = d['sessionsDone']
-        delete d['sessionsDone']
+        d["sessionsdone"] = d["sessionsDone"];
+        delete d["sessionsDone"];
       }),
-      'sessionsdone',
+      "sessionsdone",
       'did you mean "sessionsDone"',
-    )
+    );
     // And still reports the field that is now missing.
-    expect(error).toContain('sessionsDone: expected an object')
-  })
+    expect(error).toContain("sessionsDone: expected an object");
+  });
 
-  it('an unrecognised top-level key', () => {
-    expectRejected(corrupt((d) => (d['streak'] = 12)), 'streak', 'unknown field')
-  })
+  it("an unrecognised top-level key", () => {
+    expectRejected(
+      corrupt((d) => (d["streak"] = 12)),
+      "streak",
+      "unknown field",
+    );
+  });
 
-  it('reports several problems at once, because a hand-edit rarely breaks one thing', () => {
+  it("reports several problems at once, because a hand-edit rarely breaks one thing", () => {
     const error = expectRejected(
       corrupt((d) => {
-        d['cyclePosition'] = null
-        d['username'] = 'NOPE'
-        ;(d['sessionsDone'] as Record<string, unknown>)['squat'] = 'nine'
+        d["cyclePosition"] = null;
+        d["username"] = "NOPE";
+        (d["sessionsDone"] as Record<string, unknown>)["squat"] = "nine";
       }),
-      'problems in the state document',
-    )
-    expect(error).toContain('cyclePosition')
-    expect(error).toContain('username')
-    expect(error).toContain('sessionsDone.squat')
-  })
-})
+      "problems in the state document",
+    );
+    expect(error).toContain("cyclePosition");
+    expect(error).toContain("username");
+    expect(error).toContain("sessionsDone.squat");
+  });
+});
 
 // ─── Deliberate leniency ────────────────────────────────────────────────────
 
-describe('parse is lenient exactly where it should be', () => {
-  it('allows a hand-written note under an underscore key, and drops it', () => {
+describe("parse is lenient exactly where it should be", () => {
+  it("allows a hand-written note under an underscore key, and drops it", () => {
     const doc = expectAccepted(
       corrupt((d) => {
-        d['_note'] = 'bumped push by hand on 2026-07-20'
+        d["_note"] = "bumped push by hand on 2026-07-20";
       }),
-    )
-    expect(doc).toEqual(midProgram)
-    expect(serialise(doc)).not.toContain('_note')
-  })
+    );
+    expect(doc).toEqual(midProgram);
+    expect(serialise(doc)).not.toContain("_note");
+  });
 
-  it('accepts a rungId from an older content revision', () => {
+  it("accepts a rungId from an older content revision", () => {
     // Rung ids are immutable so history can reference them forever. Validating
     // them against current content would reject a legitimately old document.
-    const doc = expectAccepted(
-      corrupt((d) => (exerciseAt(d, 0, 0)['rungId'] = 'push-99-retired-variant')),
-    )
-    expect(doc.history[0]?.exercises[0]?.rungId).toBe('push-99-retired-variant')
-  })
+    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 0)["rungId"] = "push-99-retired-variant")));
+    expect(doc.history[0]?.exercises[0]?.rungId).toBe("push-99-retired-variant");
+  });
 
-  it('accepts an empty history', () => {
-    expect(expectAccepted(corrupt((d) => (d['history'] = []))).history).toEqual([])
-  })
+  it("accepts an empty history", () => {
+    expect(expectAccepted(corrupt((d) => (d["history"] = []))).history).toEqual([]);
+  });
 
-  it('accepts a session with no exercises, which is what a hand-pruned cardio day looks like', () => {
-    const doc = expectAccepted(corrupt((d) => (sessionAt(d, 2)['exercises'] = [])))
-    expect(doc.history[2]?.exercises).toEqual([])
-  })
+  it("accepts a session with no exercises, which is what a hand-pruned cardio day looks like", () => {
+    const doc = expectAccepted(corrupt((d) => (sessionAt(d, 2)["exercises"] = [])));
+    expect(doc.history[2]?.exercises).toEqual([]);
+  });
 
-  it('accepts a target above any ladder maximum', () => {
+  it("accepts a target above any ladder maximum", () => {
     // "I can actually do 20 of these" is a legitimate record of what was
     // prescribed; history is not re-derived, so nothing downstream disagrees.
-    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 0)['targetValue'] = 200)))
-    expect(doc.history[0]?.exercises[0]?.targetValue).toBe(200)
-  })
-})
+    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 0)["targetValue"] = 200)));
+    expect(doc.history[0]?.exercises[0]?.targetValue).toBe(200);
+  });
+});
 
 // ─── Never throws, on anything ──────────────────────────────────────────────
 
-describe('parse never throws', () => {
-  it('on every prefix of a valid document', () => {
-    const full = serialise(midProgram)
+describe("parse never throws", () => {
+  it("on every prefix of a valid document", () => {
+    const full = serialise(midProgram);
     for (let end = 0; end < full.length; end += 7) {
-      const prefix = full.slice(0, end)
-      let result: ParseResult | undefined
+      const prefix = full.slice(0, end);
+      let result: ParseResult | undefined;
       expect(() => {
-        result = parse(prefix)
-      }).not.toThrow()
+        result = parse(prefix);
+      }).not.toThrow();
       // Any proper prefix is an incomplete document. (The one exception is a
       // prefix that only drops the trailing newline, which is still valid JSON.)
-      if (prefix.trim() !== full.trim()) expect(result?.ok).toBe(false)
+      if (prefix.trim() !== full.trim()) expect(result?.ok).toBe(false);
     }
-    expect(parse(full).ok).toBe(true)
-  })
+    expect(parse(full).ok).toBe(true);
+  });
 
-  it('on hostile and degenerate input', () => {
+  it("on hostile and degenerate input", () => {
     const inputs: unknown[] = [
-      '{}',
+      "{}",
       '{"schemaVersion":3}',
-      '[[[[[[[[[[]]]]]]]]]]',
+      "[[[[[[[[[[]]]]]]]]]]",
       '{"schemaVersion":3,"sessionsDone":{"push":{"push":1}}}',
       '{"__proto__":{"polluted":true},"schemaVersion":3}',
       '{"schemaVersion":2,"history":[[[]]]}',
-      ' ',
+      " ",
       Number.NaN,
-      Symbol('nope'),
-      () => 'not text',
+      Symbol("nope"),
+      () => "not text",
       new Map(),
       Object.create(null),
-    ]
+    ];
     for (const input of inputs) {
-      expect(() => parse(input)).not.toThrow()
-      expect(parse(input).ok).toBe(false)
+      expect(() => parse(input)).not.toThrow();
+      expect(parse(input).ok).toBe(false);
     }
     // Prototype pollution via a "__proto__" key must not have happened either.
-    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined()
-  })
-})
+    expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
+  });
+});
 
 // ─── emptyDoc ───────────────────────────────────────────────────────────────
 
-describe('emptyDoc', () => {
-  const fresh = emptyDoc('alice')
+describe("emptyDoc", () => {
+  const fresh = emptyDoc("alice");
 
-  it('starts every counter at zero, which is the whole of a fresh document', () => {
+  it("starts every counter at zero, which is the whole of a fresh document", () => {
     for (const pattern of PATTERNS) {
-      expect(fresh.sessionsDone[pattern], pattern).toBe(0)
+      expect(fresh.sessionsDone[pattern], pattern).toBe(0);
     }
-    expect(fresh.history).toEqual([])
-    expect(fresh.cyclePosition).toBe(0)
-  })
+    expect(fresh.history).toEqual([]);
+    expect(fresh.cyclePosition).toBe(0);
+  });
 
-  it('belongs to the username it was asked for', () => {
-    expect(fresh.username).toBe('alice')
-    expect(emptyDoc('bob').username).toBe('bob')
-  })
+  it("belongs to the username it was asked for", () => {
+    expect(fresh.username).toBe("alice");
+    expect(emptyDoc("bob").username).toBe("bob");
+  });
 
-  it('has not asked about persistence yet, and has no sync configured', () => {
-    expect(fresh.settings.persistGranted).toBeNull()
-    expect(fresh.settings.sync).toBeNull()
-  })
+  it("has not asked about persistence yet, and has no sync configured", () => {
+    expect(fresh.settings.persistGranted).toBeNull();
+    expect(fresh.settings.sync).toBeNull();
+  });
 
-  it('is itself a valid document', () => {
-    expect(parse(serialise(fresh)).ok).toBe(true)
-  })
-})
+  it("is itself a valid document", () => {
+    expect(parse(serialise(fresh)).ok).toBe(true);
+  });
+});
 
 // ─── The v2 fixture ─────────────────────────────────────────────────────────
 
@@ -669,47 +725,39 @@ function v2Sets(count: number, target: number): Record<string, number>[] {
     // The last set falls short. Nothing in v3 records this, and this fixture is
     // where that becomes provable rather than assumed.
     actualValue: i === count - 1 ? target - 1 : target,
-  }))
+  }));
 }
 
-function v2Exercise(
-  pattern: Pattern,
-  rungId: string,
-  sets: number,
-  target: number,
-): Record<string, unknown> {
-  return { pattern, rungId, sets: v2Sets(sets, target) }
+function v2Exercise(pattern: Pattern, rungId: string, sets: number, target: number): Record<string, unknown> {
+  return { pattern, rungId, sets: v2Sets(sets, target) };
 }
 
-const V2_DAILY_BLOCK = [
-  v2Exercise('core', 'core-03-front-plank', 2, 35),
-  v2Exercise('pull', 'pull-02-prone-t', 2, 22),
-]
+const V2_DAILY_BLOCK = [v2Exercise("core", "core-03-front-plank", 2, 35), v2Exercise("pull", "pull-02-prone-t", 2, 22)];
 
 function v2Session(day: string, at: string, own: Record<string, unknown>[]): Record<string, unknown> {
-  return { completedAt: at, day, exercises: [...own, ...V2_DAILY_BLOCK] }
+  return { completedAt: at, day, exercises: [...own, ...V2_DAILY_BLOCK] };
 }
 
 const V2_HISTORY: Record<string, unknown>[] = [
-  v2Session('A', '2026-06-01T07:05:00.000Z', [v2Exercise('push', 'push-04-full', 3, 7)]),
-  v2Session('B', '2026-06-02T07:11:00.000Z', [
-    v2Exercise('squat', 'squat-03-full', 3, 9),
-    v2Exercise('hinge', 'hinge-03-single-leg-heel-near', 3, 6),
+  v2Session("A", "2026-06-01T07:05:00.000Z", [v2Exercise("push", "push-04-full", 3, 7)]),
+  v2Session("B", "2026-06-02T07:11:00.000Z", [
+    v2Exercise("squat", "squat-03-full", 3, 9),
+    v2Exercise("hinge", "hinge-03-single-leg-heel-near", 3, 6),
   ]),
   // A cardio day trains no ladder of its own; the daily block still records.
-  v2Session('D', '2026-06-03T18:40:00.000Z', []),
-  v2Session('A', '2026-06-04T07:02:00.000Z', [v2Exercise('push', 'push-04-full', 3, 8)]),
+  v2Session("D", "2026-06-03T18:40:00.000Z", []),
+  v2Session("A", "2026-06-04T07:02:00.000Z", [v2Exercise("push", "push-04-full", 3, 8)]),
   // Abandoned half way: squat done, hinge never started.
-  v2Session('B', '2026-06-05T07:20:00.000Z', [v2Exercise('squat', 'squat-03-full', 3, 10)]),
-  v2Session('D', '2026-06-06T19:02:00.000Z', []),
-  v2Session('A', '2026-06-07T07:00:00.000Z', [v2Exercise('push', 'push-04-full', 3, 8)]),
-  v2Session('B', '2026-06-08T07:14:00.000Z', [
-    v2Exercise('squat', 'squat-03-full', 3, 10),
+  v2Session("B", "2026-06-05T07:20:00.000Z", [v2Exercise("squat", "squat-03-full", 3, 10)]),
+  v2Session("D", "2026-06-06T19:02:00.000Z", []),
+  v2Session("A", "2026-06-07T07:00:00.000Z", [v2Exercise("push", "push-04-full", 3, 8)]),
+  v2Session("B", "2026-06-08T07:14:00.000Z", [
+    v2Exercise("squat", "squat-03-full", 3, 10),
     // Two sets, not three.
-    v2Exercise('hinge', 'hinge-03-single-leg-heel-near', 2, 7),
+    v2Exercise("hinge", "hinge-03-single-leg-heel-near", 2, 7),
   ]),
-  v2Session('C', '2026-06-09T07:33:00.000Z', []),
-]
+  v2Session("C", "2026-06-09T07:33:00.000Z", []),
+];
 
 function v2Doc(): JsonObject {
   return {
@@ -728,25 +776,25 @@ function v2Doc(): JsonObject {
       voiceEnabled: false,
       skipWarmupByDefault: true,
       persistGranted: true,
-      sync: { baseUrl: 'http://127.0.0.1:8787', secret: 'shared' },
+      sync: { baseUrl: "http://127.0.0.1:8787", secret: "shared" },
     },
     history: structuredClone(V2_HISTORY),
-  }
+  };
 }
 
 /** The same document as v1: `schemaVersion: 1` and an `effort` on every exercise. */
 function v1Doc(): JsonObject {
-  const V1_EFFORTS = ['easy', 'ok', 'hard'] as const
-  const raw = v2Doc() as Record<string, unknown>
-  let n = 0
-  raw['schemaVersion'] = 1
-  for (const session of raw['history'] as Record<string, unknown>[]) {
-    for (const exercise of session['exercises'] as Record<string, unknown>[]) {
-      exercise['effort'] = V1_EFFORTS[n % V1_EFFORTS.length]
-      n += 1
+  const V1_EFFORTS = ["easy", "ok", "hard"] as const;
+  const raw = v2Doc() as Record<string, unknown>;
+  let n = 0;
+  raw["schemaVersion"] = 1;
+  for (const session of raw["history"] as Record<string, unknown>[]) {
+    for (const exercise of session["exercises"] as Record<string, unknown>[]) {
+      exercise["effort"] = V1_EFFORTS[n % V1_EFFORTS.length];
+      n += 1;
     }
   }
-  return raw
+  return raw;
 }
 
 /**
@@ -766,10 +814,10 @@ function v1Doc(): JsonObject {
  * fixture must migrate to exactly `midProgram`, and the tests say so.
  */
 function v4Doc(): JsonObject {
-  const raw = JSON.parse(serialise(midProgram)) as Record<string, unknown>
-  raw['schemaVersion'] = 4
-  raw['sessionsDone'] = { ...(raw['sessionsDone'] as Record<string, number>), push: 30 }
-  return raw
+  const raw = JSON.parse(serialise(midProgram)) as Record<string, unknown>;
+  raw["schemaVersion"] = 4;
+  raw["sessionsDone"] = { ...(raw["sessionsDone"] as Record<string, number>), push: 30 };
+  return raw;
 }
 
 /**
@@ -778,56 +826,56 @@ function v4Doc(): JsonObject {
  * the v3 → v4 step being the identity is what the tests below rely on.
  */
 function v3Doc(): JsonObject {
-  return { ...v4Doc(), schemaVersion: 3 }
+  return { ...v4Doc(), schemaVersion: 3 };
 }
 
 /** Sessions in which `pattern` appears — the definition of `sessionsDone`. */
 function appearances(pattern: Pattern): number {
   return V2_HISTORY.filter((session) =>
-    (session['exercises'] as Record<string, unknown>[]).some((e) => e['pattern'] === pattern),
-  ).length
+    (session["exercises"] as Record<string, unknown>[]).some((e) => e["pattern"] === pattern),
+  ).length;
 }
 
 // ─── migrate ────────────────────────────────────────────────────────────────
 
-describe('migrate', () => {
-  it('is the identity for the current version', () => {
-    const raw = mutableDoc()
-    const result = migrate(raw, CURRENT_SCHEMA_VERSION)
-    expect(result.ok).toBe(true)
-    if (result.ok) expect(result.value).toBe(raw)
-  })
+describe("migrate", () => {
+  it("is the identity for the current version", () => {
+    const raw = mutableDoc();
+    const result = migrate(raw, CURRENT_SCHEMA_VERSION);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(raw);
+  });
 
-  it('refuses a version it has no path from, rather than guessing', () => {
-    const result = migrate(mutableDoc(), 0)
-    expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.error).toContain('no migration from version 0')
-  })
+  it("refuses a version it has no path from, rather than guessing", () => {
+    const result = migrate(mutableDoc(), 0);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("no migration from version 0");
+  });
 
-  it('does not mutate the document it was handed', () => {
+  it("does not mutate the document it was handed", () => {
     // `parse` hands `migrate` its own freshly-parsed tree, but a migration that
     // mutated in place would be a trap for any other caller.
-    const raw = v2Doc() as Record<string, unknown>
-    migrate(raw, 2)
-    expect(raw['ladders']).toBeDefined()
-    expect(raw['sessionsCompleted']).toBe(9)
-    const first = (raw['history'] as Record<string, unknown>[])[0] as Record<string, unknown>
-    expect(first['day']).toBe('A')
-    expect(Array.isArray((first['exercises'] as Record<string, unknown>[])[0]?.['sets'])).toBe(true)
-  })
+    const raw = v2Doc() as Record<string, unknown>;
+    migrate(raw, 2);
+    expect(raw["ladders"]).toBeDefined();
+    expect(raw["sessionsCompleted"]).toBe(9);
+    const first = (raw["history"] as Record<string, unknown>[])[0] as Record<string, unknown>;
+    expect(first["day"]).toBe("A");
+    expect(Array.isArray((first["exercises"] as Record<string, unknown>[])[0]?.["sets"])).toBe(true);
+  });
 
-  it('leaves a malformed history to the validator rather than throwing on it', () => {
+  it("leaves a malformed history to the validator rather than throwing on it", () => {
     // Migration runs before validation, on unvalidated input. Anything not shaped
     // the way v2 promised must pass straight through.
-    for (const history of [undefined, null, 42, 'nope', {}, [null], [{ exercises: 7 }], [[]]]) {
+    for (const history of [undefined, null, 42, "nope", {}, [null], [{ exercises: 7 }], [[]]]) {
       for (const from of [1, 2]) {
-        const result = migrate({ schemaVersion: from, history }, from)
-        expect(result.ok, `${from}: ${JSON.stringify(history)}`).toBe(true)
+        const result = migrate({ schemaVersion: from, history }, from);
+        expect(result.ok, `${from}: ${JSON.stringify(history)}`).toBe(true);
       }
     }
-  })
+  });
 
-  it('has a step for v3, and that step returns the document it was handed', () => {
+  it("has a step for v3, and that step returns the document it was handed", () => {
     // Both halves matter. The *step existing* is the whole of the migration
     // — without an entry in the map the loop refuses version 3 outright. The step
     // being the identity is what says v4 is purely additive: it hands back the very
@@ -836,13 +884,13 @@ describe('migrate', () => {
     // Push is set below its insertion so the v4 → v5 step has nothing to move and
     // also hands the object straight back. Otherwise the same-object check would
     // be about the v5 step rather than the v3 one.
-    const raw = { ...v3Doc(), sessionsDone: { push: 13, squat: 31, hinge: 29, core: 90, pull: 90 } }
-    const result = migrate(raw, 3)
-    expect(result.ok).toBe(true)
-    if (result.ok) expect(result.value).toBe(raw)
-  })
+    const raw = { ...v3Doc(), sessionsDone: { push: 13, squat: 31, hinge: 29, core: 90, pull: 90 } };
+    const result = migrate(raw, 3);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value).toBe(raw);
+  });
 
-  it('counts a pattern recorded twice in one session once', () => {
+  it("counts a pattern recorded twice in one session once", () => {
     // A hand-edit can duplicate an exercise. `sessionsDone` counts sessions, and
     // the schedule divides it by sessionsPerRung, so double-counting would
     // advance a ladder for free.
@@ -851,118 +899,111 @@ describe('migrate', () => {
         schemaVersion: 2,
         history: [
           {
-            completedAt: '2026-06-01T07:05:00.000Z',
-            day: 'A',
-            exercises: [
-              v2Exercise('push', 'push-04-full', 3, 7),
-              v2Exercise('push', 'push-04-full', 3, 7),
-            ],
+            completedAt: "2026-06-01T07:05:00.000Z",
+            day: "A",
+            exercises: [v2Exercise("push", "push-04-full", 3, 7), v2Exercise("push", "push-04-full", 3, 7)],
           },
         ],
       },
       2,
-    )
-    expect(result.ok).toBe(true)
-    if (result.ok) expect((result.value['sessionsDone'] as Record<string, number>)['push']).toBe(1)
-  })
-})
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect((result.value["sessionsDone"] as Record<string, number>)["push"]).toBe(1);
+  });
+});
 
-describe('a v2 document migrates to v5', () => {
-  const doc = expectAccepted(JSON.stringify(v2Doc(), null, 2), 'dana')
+describe("a v2 document migrates to v5", () => {
+  const doc = expectAccepted(JSON.stringify(v2Doc(), null, 2), "dana");
 
-  it('reconstructs every counter from the history, not from the rung indices', () => {
+  it("reconstructs every counter from the history, not from the rung indices", () => {
     // The acceptance criterion, stated as the definition rather than as five
     // literals: `sessionsDone[p]` is the number of sessions `p` appears in.
     for (const pattern of PATTERNS) {
-      expect(doc.sessionsDone[pattern], pattern).toBe(appearances(pattern))
+      expect(doc.sessionsDone[pattern], pattern).toBe(appearances(pattern));
     }
     // And concretely, so a bug in `appearances` cannot make this vacuous.
-    expect(doc.sessionsDone).toEqual({ push: 3, squat: 3, hinge: 2, core: 9, pull: 9 })
-  })
+    expect(doc.sessionsDone).toEqual({ push: 3, squat: 3, hinge: 2, core: 9, pull: 9 });
+  });
 
-  it('ignores the v2 rung indices completely', () => {
+  it("ignores the v2 rung indices completely", () => {
     // The document said push was on rung 4 and core on rung 2. Those numbers were
     // produced by adaptive rules that no longer exist, so nothing about them may
     // survive — including into the counters, where they would be invisible.
-    const serialised = serialise(doc)
-    expect(serialised).not.toContain('rungIndex')
-    expect(serialised).not.toContain('cleanAtMax')
-    expect(serialised).not.toContain('missedStreak')
+    const serialised = serialise(doc);
+    expect(serialised).not.toContain("rungIndex");
+    expect(serialised).not.toContain("cleanAtMax");
+    expect(serialised).not.toContain("missedStreak");
     // Rung 4 of push at 14 sessions per rung would have meant ~28 sessions.
-    expect(doc.sessionsDone.push).toBe(3)
-  })
+    expect(doc.sessionsDone.push).toBe(3);
+  });
 
-  it('collapses each set array to its measured length', () => {
-    const sets = doc.history.flatMap((session) =>
-      session.exercises.map((e) => `${e.pattern}:${e.sets}`),
-    )
+  it("collapses each set array to its measured length", () => {
+    const sets = doc.history.flatMap((session) => session.exercises.map((e) => `${e.pattern}:${e.sets}`));
     // Three on the rotating patterns, two on the daily block — and the two-set
     // hinge on the last legs day, which is why the length is measured.
-    expect(sets).toContain('push:3')
-    expect(sets).toContain('core:2')
-    expect(sets).toContain('hinge:2')
-    expect(sets).toContain('hinge:3')
-    expect(new Set(doc.history.flatMap((s) => s.exercises.map((e) => e.sets)))).toEqual(
-      new Set([2, 3]),
-    )
-  })
+    expect(sets).toContain("push:3");
+    expect(sets).toContain("core:2");
+    expect(sets).toContain("hinge:2");
+    expect(sets).toContain("hinge:3");
+    expect(new Set(doc.history.flatMap((s) => s.exercises.map((e) => e.sets)))).toEqual(new Set([2, 3]));
+  });
 
-  it('keeps what was prescribed and discards what was achieved', () => {
+  it("keeps what was prescribed and discards what was achieved", () => {
     // Every v2 set carried the same target and the last one fell short of it, so
     // a targetValue of 7 on the first push session proves the prescribed number
     // survived and the achieved 6 did not.
     expect(doc.history[0]?.exercises[0]).toEqual({
-      pattern: 'push',
-      rungId: 'push-04-full',
+      pattern: "push",
+      rungId: "push-04-full",
       sets: 3,
       targetValue: 7,
-    })
-    expect(serialise(doc)).not.toContain('actualValue')
-  })
+    });
+    expect(serialise(doc)).not.toContain("actualValue");
+  });
 
-  it('numbers historical sessions by their index in history, modulo the rotation', () => {
+  it("numbers historical sessions by their index in history, modulo the rotation", () => {
     // Not a mapping from the old day letters — there isn't one. The value is only
     // ever used to label a past session.
-    expect(doc.history.map((s) => s.position)).toEqual([0, 1, 2, 0, 1, 2, 0, 1, 2])
-  })
+    expect(doc.history.map((s) => s.position)).toEqual([0, 1, 2, 0, 1, 2, 0, 1, 2]);
+  });
 
-  it('defaults every historical session to the medium variant', () => {
+  it("defaults every historical session to the medium variant", () => {
     // v2 had no variant, and `medium` means "the schedule's own number" — which
     // is what v2 always prescribed.
-    expect(doc.history.every((s) => s.variant === 'medium')).toBe(true)
-  })
+    expect(doc.history.every((s) => s.variant === "medium")).toBe(true);
+  });
 
-  it('takes the username from the caller, because a v2 document has none', () => {
-    expect(doc.username).toBe('dana')
-  })
+  it("takes the username from the caller, because a v2 document has none", () => {
+    expect(doc.username).toBe("dana");
+  });
 
-  it('falls back to a documented constant when the caller does not say', () => {
+  it("falls back to a documented constant when the caller does not say", () => {
     // Matches the service's own name for pre-username rows, so a client that
     // migrates offline and a database that migrated on the server agree.
-    expect(expectAccepted(JSON.stringify(v2Doc())).username).toBe(LEGACY_USERNAME)
-    expect(LEGACY_USERNAME).toBe('local')
-  })
+    expect(expectAccepted(JSON.stringify(v2Doc())).username).toBe(LEGACY_USERNAME);
+    expect(LEGACY_USERNAME).toBe("local");
+  });
 
-  it('drops the retired settings and keeps the rest', () => {
+  it("drops the retired settings and keeps the rest", () => {
     expect(doc.settings).toEqual({
       persistGranted: true,
-      sync: { baseUrl: 'http://127.0.0.1:8787', secret: 'shared' },
-    })
-  })
+      sync: { baseUrl: "http://127.0.0.1:8787", secret: "shared" },
+    });
+  });
 
-  it('carries cyclePosition over unchanged', () => {
+  it("carries cyclePosition over unchanged", () => {
     // A bare counter in both schemas: `slotAt` takes it modulo three and nothing
     // else reads it, so there is nothing to remap and nothing to invent.
-    expect(doc.cyclePosition).toBe(4)
-  })
+    expect(doc.cyclePosition).toBe(4);
+  });
 
-  it('re-serialises as clean v5 that loads again', () => {
-    const text = serialise(doc)
-    expect(text).toContain(`"schemaVersion": ${CURRENT_SCHEMA_VERSION}`)
-    expect(expectAccepted(text)).toEqual(doc)
-  })
+  it("re-serialises as clean v5 that loads again", () => {
+    const text = serialise(doc);
+    expect(text).toContain(`"schemaVersion": ${CURRENT_SCHEMA_VERSION}`);
+    expect(expectAccepted(text)).toEqual(doc);
+  });
 
-  it('adds no logs, because a v2 document has no answer to add', () => {
+  it("adds no logs, because a v2 document has no answer to add", () => {
     // The v3→v4 step is the identity function and this is what that means in
     // practice: `logged` is absent everywhere, not `[]`. v2 recorded `actualValue`
     // per set, so there was a number available to carry over — and carrying it over
@@ -971,95 +1012,95 @@ describe('a v2 document migrates to v5', () => {
     // a field the engine is forbidden to ever read.
     for (const session of doc.history) {
       for (const exercise of session.exercises) {
-        expect('logged' in exercise, JSON.stringify(exercise)).toBe(false)
+        expect("logged" in exercise, JSON.stringify(exercise)).toBe(false);
       }
     }
-    expect(serialise(doc)).not.toContain('logged')
-  })
+    expect(serialise(doc)).not.toContain("logged");
+  });
 
-  it('refuses a v2 document that is broken for reasons other than its version', () => {
+  it("refuses a v2 document that is broken for reasons other than its version", () => {
     // Migration must not become a repair tool. A v2 file with a broken timestamp
     // is still a broken file.
-    const broken = v2Doc() as Record<string, unknown>
-    ;(broken['history'] as Record<string, unknown>[])[3]!['completedAt'] = 'thursday'
-    expectRejected(JSON.stringify(broken), 'history[3].completedAt')
-  })
-})
+    const broken = v2Doc() as Record<string, unknown>;
+    (broken["history"] as Record<string, unknown>[])[3]!["completedAt"] = "thursday";
+    expectRejected(JSON.stringify(broken), "history[3].completedAt");
+  });
+});
 
-describe('a v1 document migrates all the way to v5 in one call', () => {
-  it('composes all four steps rather than needing a v1→v5 shortcut', () => {
-    const v5 = expectAccepted(JSON.stringify(v1Doc(), null, 2), 'dana')
+describe("a v1 document migrates all the way to v5 in one call", () => {
+  it("composes all four steps rather than needing a v1→v5 shortcut", () => {
+    const v5 = expectAccepted(JSON.stringify(v1Doc(), null, 2), "dana");
     // Identical to the v2 document's outcome: the effort ratings the first step
     // strips are the only difference between the two inputs.
-    expect(v5).toEqual(expectAccepted(JSON.stringify(v2Doc(), null, 2), 'dana'))
-    expect(serialise(v5)).not.toContain('effort')
-    expect(v5.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
-  })
+    expect(v5).toEqual(expectAccepted(JSON.stringify(v2Doc(), null, 2), "dana"));
+    expect(serialise(v5)).not.toContain("effort");
+    expect(v5.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+  });
 
-  it('runs one step at a time, so each step only knows its own version', () => {
-    const once = migrate(v1Doc(), 1)
-    expect(once.ok).toBe(true)
-    if (!once.ok) throw new Error('unreachable')
+  it("runs one step at a time, so each step only knows its own version", () => {
+    const once = migrate(v1Doc(), 1);
+    expect(once.ok).toBe(true);
+    if (!once.ok) throw new Error("unreachable");
     // The v1 step ran (no effort survives) and so did the v2 step (no ladders).
     // The v3 step is the identity function, so there is nothing of its own to see
     // — its only observable effect is that the loop reached the end at all.
-    expect(JSON.stringify(once.value)).not.toContain('effort')
-    expect(once.value['ladders']).toBeUndefined()
-    expect(once.value['sessionsDone']).toBeDefined()
-  })
-})
+    expect(JSON.stringify(once.value)).not.toContain("effort");
+    expect(once.value["ladders"]).toBeUndefined();
+    expect(once.value["sessionsDone"]).toBeDefined();
+  });
+});
 
-describe('a v3 document migrates to v5', () => {
-  it('is accepted and re-stamped rather than refused', () => {
+describe("a v3 document migrates to v5", () => {
+  it("is accepted and re-stamped rather than refused", () => {
     // The whole of the migration, and the only reason it exists: before persistence v4
     // this exact input produced "no migration from version 3 to 4".
-    const doc = expectAccepted(JSON.stringify(v3Doc(), null, 2))
-    expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
-  })
+    const doc = expectAccepted(JSON.stringify(v3Doc(), null, 2));
+    expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+  });
 
-  it('changes nothing else at all', () => {
+  it("changes nothing else at all", () => {
     // Equal to `midProgram` itself, which is the strongest available statement
     // that the v3 step is the identity: the fixture differs from `midProgram` only
     // in its version and in the push counter, and the v4 → v5 step moves that
     // counter from 30 to 44 exactly as it does for a v4 document.
-    expect(expectAccepted(JSON.stringify(v3Doc(), null, 2))).toEqual(midProgram)
-  })
+    expect(expectAccepted(JSON.stringify(v3Doc(), null, 2))).toEqual(midProgram);
+  });
 
-  it('does not invent an empty log for a document that has no answer', () => {
+  it("does not invent an empty log for a document that has no answer", () => {
     // `logged: []` would say "trained and recorded nothing", which is a claim about
     // a session a v3 build could not have made. Absent is the truthful value and it
     // is already there, so the migration's job is to leave it alone.
-    const doc = expectAccepted(JSON.stringify(v3Doc(), null, 2))
+    const doc = expectAccepted(JSON.stringify(v3Doc(), null, 2));
     for (const session of doc.history) {
       for (const exercise of session.exercises) {
-        expect('logged' in exercise).toBe(false)
+        expect("logged" in exercise).toBe(false);
       }
     }
-  })
+  });
 
-  it('passes a hand-typed log through to the validator rather than stripping it', () => {
+  it("passes a hand-typed log through to the validator rather than stripping it", () => {
     // A `logged` in a document still claiming v3 is a hand-edit. Migration does not
     // repair and does not tidy: the field is legal in v4, so it survives the step
     // and is judged on its merits — which here means it is kept.
-    const raw = v3Doc() as Record<string, unknown>
-    exerciseAt(raw, 0, 0)['logged'] = [8, 8, 6]
-    expect(expectAccepted(JSON.stringify(raw)).history[0]?.exercises[0]?.logged).toEqual([8, 8, 6])
+    const raw = v3Doc() as Record<string, unknown>;
+    exerciseAt(raw, 0, 0)["logged"] = [8, 8, 6];
+    expect(expectAccepted(JSON.stringify(raw)).history[0]?.exercises[0]?.logged).toEqual([8, 8, 6]);
 
     // …and, being judged rather than waved through, a bad one is still refused.
-    const bent = v3Doc() as Record<string, unknown>
-    exerciseAt(bent, 0, 0)['logged'] = [8, -1]
-    expectRejected(JSON.stringify(bent), 'history[0].exercises[0].logged[1]')
-  })
+    const bent = v3Doc() as Record<string, unknown>;
+    exerciseAt(bent, 0, 0)["logged"] = [8, -1];
+    expectRejected(JSON.stringify(bent), "history[0].exercises[0].logged[1]");
+  });
 
-  it('refuses a v3 document that is broken for reasons other than its version', () => {
+  it("refuses a v3 document that is broken for reasons other than its version", () => {
     // Same rule as the v2 step: migration is not a repair tool.
-    const broken = v3Doc() as Record<string, unknown>
-    sessionAt(broken, 1)['variant'] = 'brutal'
-    expectRejected(JSON.stringify(broken), 'history[1].variant')
-  })
-})
+    const broken = v3Doc() as Record<string, unknown>;
+    sessionAt(broken, 1)["variant"] = "brutal";
+    expectRejected(JSON.stringify(broken), "history[1].variant");
+  });
+});
 
-describe('every schema this build has ever written reaches v5 and settles there', () => {
+describe("every schema this build has ever written reaches v5 and settles there", () => {
   // One table rather than three near-identical tests, because the property is the
   // same for all three and stating it once makes the *absence* of a version
   // obvious if one is ever added to the chain without being added here.
@@ -1068,29 +1109,29 @@ describe('every schema this build has ever written reaches v5 and settles there'
     [2, v2Doc],
     [3, v3Doc],
     [4, v4Doc],
-  ]
+  ];
 
   for (const [version, build] of fixtures) {
     it(`a v${version} document migrates and then round-trips stably`, () => {
-      const doc = expectAccepted(JSON.stringify(build(), null, 2), 'dana')
-      expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+      const doc = expectAccepted(JSON.stringify(build(), null, 2), "dana");
+      expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
 
       // encode → decode → encode. The second encoding must be byte-identical to the
       // first: a migration that left something the validator merely *tolerates*
       // would show up here as text that changes shape every time it is saved, which
       // on a file people keep in git is a diff on every session.
-      const once = serialise(doc)
-      const twice = serialise(expectAccepted(once))
-      expect(twice).toBe(once)
-      expect(expectAccepted(twice)).toEqual(doc)
+      const once = serialise(doc);
+      const twice = serialise(expectAccepted(once));
+      expect(twice).toBe(once);
+      expect(expectAccepted(twice)).toEqual(doc);
 
       // And migrating the already-migrated text is a no-op rather than a second
       // pass through the chain: it is v5 now, so there is no step left to run,
       // and no counter moves twice.
-      expect(expectAccepted(once).sessionsDone).toEqual(doc.sessionsDone)
-    })
+      expect(expectAccepted(once).sessionsDone).toEqual(doc.sessionsDone);
+    });
   }
-})
+});
 
 // ─── v4 → v5: the in-between rungs ──────────────────────────────────────────
 
@@ -1100,157 +1141,157 @@ describe('every schema this build has ever written reaches v5 and settles there'
  * a v4 build indexed into.
  */
 const INSERTED: Readonly<Partial<Record<Pattern, string>>> = {
-  push: 'push-03a-3s-down-knee-press',
-  hinge: 'hinge-04a-sliding-curl-half-range',
-  squat: 'squat-05a-split-hand-on-wall',
-}
+  push: "push-03a-3s-down-knee-press",
+  hinge: "hinge-04a-sliding-curl-half-range",
+  squat: "squat-05a-split-hand-on-wall",
+};
 
 /** The rung a v4 build put `sessionsDone` on: v4 indexing over the v4 ladder. */
 function v4RungIdAt(pattern: Pattern, sessionsDone: number): string {
-  const ladder = LADDERS[pattern]
-  const ids = ladder.rungs.map((r) => r.id).filter((id) => id !== INSERTED[pattern])
-  const climbed = Math.floor(sessionsDone / ladder.sessionsPerRung)
-  return ids[Math.min(ladder.startRungIndex + climbed, ids.length - 1)]!
+  const ladder = LADDERS[pattern];
+  const ids = ladder.rungs.map((r) => r.id).filter((id) => id !== INSERTED[pattern]);
+  const climbed = Math.floor(sessionsDone / ladder.sessionsPerRung);
+  return ids[Math.min(ladder.startRungIndex + climbed, ids.length - 1)]!;
 }
 
 /** The rung this build puts `sessionsDone` on. */
 function rungIdAt(pattern: Pattern, sessionsDone: number): string {
-  return getRung(pattern, rungIndexAt(pattern, sessionsDone)).id
+  return getRung(pattern, rungIndexAt(pattern, sessionsDone)).id;
 }
 
 /** A fresh document stamped 4, with `counts` as its counters, as text. */
 function v4Text(counts: Partial<Record<Pattern, unknown>>): string {
-  const raw = JSON.parse(serialise(emptyDoc('alice'))) as Record<string, unknown>
-  raw['schemaVersion'] = 4
-  raw['sessionsDone'] = { ...(raw['sessionsDone'] as Record<string, unknown>), ...counts }
-  return JSON.stringify(raw, null, 2)
+  const raw = JSON.parse(serialise(emptyDoc("alice"))) as Record<string, unknown>;
+  raw["schemaVersion"] = 4;
+  raw["sessionsDone"] = { ...(raw["sessionsDone"] as Record<string, unknown>), ...counts };
+  return JSON.stringify(raw, null, 2);
 }
 
-describe('a v4 document migrates to v5 and stays on the same exercise', () => {
+describe("a v4 document migrates to v5 and stays on the same exercise", () => {
   // The acceptance table. For each ladder that gained a rung: the first
   // count on the rung just past the insertion, and the last count on the rung
   // just before it. The rung ids are written out, so a wrong v4 model in the
   // helpers above cannot make these pass on its own.
   const edges: readonly {
-    readonly pattern: Pattern
-    readonly before: number
-    readonly beforeRung: string
-    readonly past: number
-    readonly pastRung: string
+    readonly pattern: Pattern;
+    readonly before: number;
+    readonly beforeRung: string;
+    readonly past: number;
+    readonly pastRung: string;
   }[] = [
-    { pattern: 'push', before: 13, beforeRung: 'push-03-knees', past: 14, pastRung: 'push-04-full' },
+    { pattern: "push", before: 13, beforeRung: "push-03-knees", past: 14, pastRung: "push-04-full" },
     {
-      pattern: 'hinge',
+      pattern: "hinge",
       before: 41,
-      beforeRung: 'hinge-04-single-leg-heel-far',
+      beforeRung: "hinge-04-single-leg-heel-far",
       past: 42,
-      pastRung: 'hinge-05-sliding-leg-curl',
+      pastRung: "hinge-05-sliding-leg-curl",
     },
     {
-      pattern: 'squat',
+      pattern: "squat",
       before: 55,
-      beforeRung: 'squat-05-heels-elevated',
+      beforeRung: "squat-05-heels-elevated",
       past: 56,
-      pastRung: 'squat-06-split',
+      pastRung: "squat-06-split",
     },
-  ]
+  ];
 
   for (const { pattern, before, beforeRung, past, pastRung } of edges) {
     describe(pattern, () => {
       it(`just past the insertion (${past}), it loads as v5 still on ${pastRung}`, () => {
-        expect(v4RungIdAt(pattern, past)).toBe(pastRung)
-        const doc = expectAccepted(v4Text({ [pattern]: past }))
-        expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
-        expect(doc.sessionsDone[pattern]).toBe(past + 14)
-        expect(rungIdAt(pattern, doc.sessionsDone[pattern])).toBe(pastRung)
+        expect(v4RungIdAt(pattern, past)).toBe(pastRung);
+        const doc = expectAccepted(v4Text({ [pattern]: past }));
+        expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+        expect(doc.sessionsDone[pattern]).toBe(past + 14);
+        expect(rungIdAt(pattern, doc.sessionsDone[pattern])).toBe(pastRung);
         // Same number as well as the same exercise: the first session of a rung
         // prescribes its floor.
-        expect(targetAt(pattern, doc.sessionsDone[pattern])).toBe(5)
+        expect(targetAt(pattern, doc.sessionsDone[pattern])).toBe(5);
         // Without the migration the same count would have dropped back one rung,
         // onto the new one. That is the bug this step exists to prevent.
-        expect(rungIdAt(pattern, past)).toBe(INSERTED[pattern])
-      })
+        expect(rungIdAt(pattern, past)).toBe(INSERTED[pattern]);
+      });
 
       it(`just before it (${before}), it loads unchanged and still on ${beforeRung}`, () => {
-        expect(v4RungIdAt(pattern, before)).toBe(beforeRung)
-        const doc = expectAccepted(v4Text({ [pattern]: before }))
-        expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
-        expect(doc.sessionsDone[pattern]).toBe(before)
-        expect(rungIdAt(pattern, before)).toBe(beforeRung)
-        expect(targetAt(pattern, before)).toBe(12)
+        expect(v4RungIdAt(pattern, before)).toBe(beforeRung);
+        const doc = expectAccepted(v4Text({ [pattern]: before }));
+        expect(doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+        expect(doc.sessionsDone[pattern]).toBe(before);
+        expect(rungIdAt(pattern, before)).toBe(beforeRung);
+        expect(targetAt(pattern, before)).toBe(12);
         // The next session meets the new rung in its turn.
-        expect(rungIdAt(pattern, before + 1)).toBe(INSERTED[pattern])
-      })
-    })
+        expect(rungIdAt(pattern, before + 1)).toBe(INSERTED[pattern]);
+      });
+    });
   }
 
-  it('keeps every count on the same rung at the same point in it, on every ladder', () => {
+  it("keeps every count on the same rung at the same point in it, on every ladder", () => {
     // The sweep behind the table, from a fresh document to far past the top of
     // every ladder. A count either stays put or moves by exactly one rung's worth
     // of sessions, so the rung is the same and so is the position inside it.
     // `targetAt` reads nothing else, so the target is the same too.
     for (const pattern of PATTERNS) {
-      const per = LADDERS[pattern].sessionsPerRung
+      const per = LADDERS[pattern].sessionsPerRung;
       for (let count = 0; count <= 400; count += 1) {
-        const migrated = expectAccepted(v4Text({ [pattern]: count })).sessionsDone[pattern]
-        const label = `${pattern} at ${count}`
-        expect(rungIdAt(pattern, migrated), label).toBe(v4RungIdAt(pattern, count))
-        expect([0, per], label).toContain(migrated - count)
-        expect(migrated % per, label).toBe(count % per)
+        const migrated = expectAccepted(v4Text({ [pattern]: count })).sessionsDone[pattern];
+        const label = `${pattern} at ${count}`;
+        expect(rungIdAt(pattern, migrated), label).toBe(v4RungIdAt(pattern, count));
+        expect([0, per], label).toContain(migrated - count);
+        expect(migrated % per, label).toBe(count % per);
       }
     }
-  })
+  });
 
-  it('moves each ladder on its own counter, and never core or pull', () => {
-    const doc = expectAccepted(v4Text({ push: 14, squat: 55, hinge: 42, core: 300, pull: 7 }))
-    expect(doc.sessionsDone).toEqual({ push: 28, squat: 55, hinge: 56, core: 300, pull: 7 })
-  })
+  it("moves each ladder on its own counter, and never core or pull", () => {
+    const doc = expectAccepted(v4Text({ push: 14, squat: 55, hinge: 42, core: 300, pull: 7 }));
+    expect(doc.sessionsDone).toEqual({ push: 28, squat: 55, hinge: 56, core: 300, pull: 7 });
+  });
 
-  it('leaves history alone, because each record stores its rung id', () => {
-    const doc = expectAccepted(JSON.stringify(v4Doc(), null, 2))
-    expect(doc.history).toEqual(midProgram.history)
-    expect(doc.sessionsDone).toEqual(midProgram.sessionsDone)
+  it("leaves history alone, because each record stores its rung id", () => {
+    const doc = expectAccepted(JSON.stringify(v4Doc(), null, 2));
+    expect(doc.history).toEqual(midProgram.history);
+    expect(doc.sessionsDone).toEqual(midProgram.sessionsDone);
     // The last push record says `push-05`, and so does the moved counter.
-    expect(doc.history[0]?.exercises[0]?.rungId).toBe('push-05-full-3s-down')
-    expect(rungIdAt('push', doc.sessionsDone.push)).toBe('push-05-full-3s-down')
-  })
+    expect(doc.history[0]?.exercises[0]?.rungId).toBe("push-05-full-3s-down");
+    expect(rungIdAt("push", doc.sessionsDone.push)).toBe("push-05-full-3s-down");
+  });
 
-  it('never moves a v5 counter', () => {
+  it("never moves a v5 counter", () => {
     // Only a document stamped 4 reaches the step. On the v5 ladders a push count
     // of 14 is the in-between rung, and it must stay there.
     const text = serialise({
-      ...emptyDoc('alice'),
+      ...emptyDoc("alice"),
       sessionsDone: { push: 14, squat: 56, hinge: 42, core: 0, pull: 0 },
-    })
-    const doc = expectAccepted(text)
-    expect(doc.sessionsDone).toEqual({ push: 14, squat: 56, hinge: 42, core: 0, pull: 0 })
-    expect(rungIdAt('push', 14)).toBe('push-03a-3s-down-knee-press')
-    expect(serialise(doc)).toBe(text)
-  })
+    });
+    const doc = expectAccepted(text);
+    expect(doc.sessionsDone).toEqual({ push: 14, squat: 56, hinge: 42, core: 0, pull: 0 });
+    expect(rungIdAt("push", 14)).toBe("push-03a-3s-down-knee-press");
+    expect(serialise(doc)).toBe(text);
+  });
 
-  it('does not mutate the document it was handed', () => {
-    const raw = JSON.parse(v4Text({ push: 14 })) as Record<string, unknown>
-    const result = migrate(raw, 4)
-    expect((raw['sessionsDone'] as Record<string, number>)['push']).toBe(14)
-    if (result.ok) expect((result.value['sessionsDone'] as Record<string, number>)['push']).toBe(28)
-  })
+  it("does not mutate the document it was handed", () => {
+    const raw = JSON.parse(v4Text({ push: 14 })) as Record<string, unknown>;
+    const result = migrate(raw, 4);
+    expect((raw["sessionsDone"] as Record<string, number>)["push"]).toBe(14);
+    if (result.ok) expect((result.value["sessionsDone"] as Record<string, number>)["push"]).toBe(28);
+  });
 
-  it('leaves a malformed counter to the validator rather than moving it', () => {
-    for (const bad of [-14, 14.5, '14', null, true]) {
-      const raw = JSON.parse(v4Text({ push: bad })) as JsonObject
-      const result = migrate(raw, 4)
-      expect(result.ok, JSON.stringify(bad)).toBe(true)
+  it("leaves a malformed counter to the validator rather than moving it", () => {
+    for (const bad of [-14, 14.5, "14", null, true]) {
+      const raw = JSON.parse(v4Text({ push: bad })) as JsonObject;
+      const result = migrate(raw, 4);
+      expect(result.ok, JSON.stringify(bad)).toBe(true);
       if (result.ok) {
-        expect((result.value['sessionsDone'] as Record<string, unknown>)['push']).toBe(bad)
+        expect((result.value["sessionsDone"] as Record<string, unknown>)["push"]).toBe(bad);
       }
-      expectRejected(JSON.stringify(raw), 'sessionsDone.push')
+      expectRejected(JSON.stringify(raw), "sessionsDone.push");
     }
-    for (const sessionsDone of [undefined, null, 42, 'x', [14]]) {
-      const result = migrate({ schemaVersion: 4, sessionsDone }, 4)
-      expect(result.ok, JSON.stringify(sessionsDone)).toBe(true)
+    for (const sessionsDone of [undefined, null, 42, "x", [14]]) {
+      const result = migrate({ schemaVersion: 4, sessionsDone }, 4);
+      expect(result.ok, JSON.stringify(sessionsDone)).toBe(true);
     }
-  })
-})
+  });
+});
 
 // ─── logged: v4's one optional field ────────────────────────────────────────
 
@@ -1279,30 +1320,30 @@ const LOGGED: StateDoc = {
             logged: si === 0 && ei === 1 ? [27] : [0, 8, 7].slice(0, exercise.sets),
           })),
   })),
-}
+};
 
-describe('logged round-trips', () => {
-  it('survives serialise → parse → serialise unchanged', () => {
-    const first = serialise(LOGGED)
-    const doc = expectAccepted(first)
-    expect(doc).toEqual(LOGGED)
-    expect(serialise(doc)).toBe(first)
-  })
+describe("logged round-trips", () => {
+  it("survives serialise → parse → serialise unchanged", () => {
+    const first = serialise(LOGGED);
+    const doc = expectAccepted(first);
+    expect(doc).toEqual(LOGGED);
+    expect(serialise(doc)).toBe(first);
+  });
 
-  it('is written last on the exercise line, after the whole prescription', () => {
+  it("is written last on the exercise line, after the whole prescription", () => {
     expect(serialise(LOGGED)).toContain(
       '{ "pattern": "push", "rungId": "push-05-full-3s-down", "sets": 3, "targetValue": 8, "logged": [0, 8, 7] }',
-    )
-  })
+    );
+  });
 
-  it('keeps absent and empty apart, because they are different facts', () => {
+  it("keeps absent and empty apart, because they are different facts", () => {
     // Absent: "not logged". `[]`: "logged, and recorded nothing". A codec that
     // collapsed the two would make the second unsayable, and would also break the
     // round trip in the direction nobody tests — writing `[]` and reading back
     // nothing.
-    const absent = midProgram.history[0]?.exercises[0]
-    expect(absent && 'logged' in absent).toBe(false)
-    expect(serialise(midProgram)).not.toContain('logged')
+    const absent = midProgram.history[0]?.exercises[0];
+    expect(absent && "logged" in absent).toBe(false);
+    expect(serialise(midProgram)).not.toContain("logged");
 
     const empty: StateDoc = {
       ...midProgram,
@@ -1312,35 +1353,35 @@ describe('logged round-trips', () => {
           exercises: [{ ...midProgram.history[0]!.exercises[0]!, logged: [] }],
         },
       ],
-    }
-    expect(serialise(empty)).toContain('"logged": []')
-    const back = expectAccepted(serialise(empty))
-    expect(back.history[0]?.exercises[0]?.logged).toEqual([])
-    expect(back).toEqual(empty)
-  })
+    };
+    expect(serialise(empty)).toContain('"logged": []');
+    const back = expectAccepted(serialise(empty));
+    expect(back.history[0]?.exercises[0]?.logged).toEqual([]);
+    expect(back).toEqual(empty);
+  });
 
-  it('accepts a shorter log than there were sets', () => {
+  it("accepts a shorter log than there were sets", () => {
     // Logging two of three and stopping is normal. Nothing pads it.
-    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [8, 7])))
-    expect(doc.history[0]?.exercises[0]?.logged).toEqual([8, 7])
-    expect(doc.history[0]?.exercises[0]?.sets).toBe(3)
-  })
+    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = [8, 7])));
+    expect(doc.history[0]?.exercises[0]?.logged).toEqual([8, 7]);
+    expect(doc.history[0]?.exercises[0]?.sets).toBe(3);
+  });
 
-  it('accepts a zero and a log far above the target', () => {
+  it("accepts a zero and a log far above the target", () => {
     // Zero is "I attempted it and managed none", which is worth recording. A log
     // above `targetValue` is "I had a good day" — history is a record of what
     // happened, and nothing re-derives a prescription from it.
-    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [0, 200, 8])))
-    expect(doc.history[0]?.exercises[0]?.logged).toEqual([0, 200, 8])
-  })
+    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = [0, 200, 8])));
+    expect(doc.history[0]?.exercises[0]?.logged).toEqual([0, 200, 8]);
+  });
 
-  it('accepts a fractional log, because held time is not whole seconds', () => {
+  it("accepts a fractional log, because held time is not whole seconds", () => {
     // `targetValue` is `finiteAt`, not `intAt`, and a log is measured in the same
     // unit as the target it sits next to. A 27.5-second hollow hold is a fact.
-    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 1)['logged'] = [27.5, 26])))
-    expect(doc.history[0]?.exercises[1]?.logged).toEqual([27.5, 26])
-  })
-})
+    const doc = expectAccepted(corrupt((d) => (exerciseAt(d, 0, 1)["logged"] = [27.5, 26])));
+    expect(doc.history[0]?.exercises[1]?.logged).toEqual([27.5, 26]);
+  });
+});
 
 /**
  * The corruption table, and the property it is really asserting.
@@ -1357,132 +1398,132 @@ describe('logged round-trips', () => {
  * save, which is the exact "hand-edit becomes permanent data loss" failure the
  * codec's second guarantee exists to prevent.
  */
-describe('a hand-corrupted logged is refused, and the file is left alone', () => {
-  it('longer than sets — the entry describes a set that was never prescribed', () => {
+describe("a hand-corrupted logged is refused, and the file is left alone", () => {
+  it("longer than sets — the entry describes a set that was never prescribed", () => {
     const error = expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [8, 8, 8, 8])),
-      'history[0].exercises[0].logged',
-      'at most 3 entries',
-    )
+      corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = [8, 8, 8, 8])),
+      "history[0].exercises[0].logged",
+      "at most 3 entries",
+    );
     // The message says what to do about it rather than only what is wrong.
-    expect(error).toContain('Fewer is fine')
-    expect(error).toContain('not logged')
-  })
+    expect(error).toContain("Fewer is fine");
+    expect(error).toContain("not logged");
+  });
 
-  it('longer than sets, when sets is 1 — the message stays grammatical', () => {
+  it("longer than sets, when sets is 1 — the message stays grammatical", () => {
     expectRejected(
       corrupt((d) => {
-        exerciseAt(d, 0, 0)['sets'] = 1
-        exerciseAt(d, 0, 0)['logged'] = [8, 8]
+        exerciseAt(d, 0, 0)["sets"] = 1;
+        exerciseAt(d, 0, 0)["logged"] = [8, 8];
       }),
-      'at most 1 entry ',
-    )
-  })
+      "at most 1 entry ",
+    );
+  });
 
-  it('a negative entry, reported by index', () => {
+  it("a negative entry, reported by index", () => {
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [8, -3, 7])),
-      'history[0].exercises[0].logged[1]',
-      '>= 0',
-    )
-  })
+      corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = [8, -3, 7])),
+      "history[0].exercises[0].logged[1]",
+      ">= 0",
+    );
+  });
 
-  it('a NaN, which JSON cannot even hold and arrives as null', () => {
+  it("a NaN, which JSON cannot even hold and arrives as null", () => {
     // `JSON.stringify(NaN)` is `null`, so the way a NaN reaches a document at all
     // is as a null — and that is what has to be reported, at the right index.
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [8, Number.NaN, 7])),
-      'history[0].exercises[0].logged[1]',
-      'expected a number',
-    )
+      corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = [8, Number.NaN, 7])),
+      "history[0].exercises[0].logged[1]",
+      "expected a number",
+    );
     // And spelled out by hand, which is the shape a person actually types. `NaN`
     // is not a JSON token at all, so it never reaches the validator — the parse
     // error is the right answer and points at the character.
     expectRejected(
       serialise(midProgram).replace('"targetValue": 8 }', '"targetValue": 8, "logged": [NaN] }'),
-      'not valid JSON',
-    )
-  })
+      "not valid JSON",
+    );
+  });
 
-  it('an Infinity, likewise', () => {
+  it("an Infinity, likewise", () => {
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [Number.POSITIVE_INFINITY])),
-      'history[0].exercises[0].logged[0]',
-      'expected a number',
-    )
-  })
+      corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = [Number.POSITIVE_INFINITY])),
+      "history[0].exercises[0].logged[0]",
+      "expected a number",
+    );
+  });
 
-  it('not an array', () => {
-    for (const wrong of [8, '8, 8, 7', { '0': 8 }, true]) {
+  it("not an array", () => {
+    for (const wrong of [8, "8, 8, 7", { "0": 8 }, true]) {
       expectRejected(
-        corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = wrong)),
-        'history[0].exercises[0].logged',
-        'expected an array',
-      )
+        corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = wrong)),
+        "history[0].exercises[0].logged",
+        "expected an array",
+      );
     }
-  })
+  });
 
-  it('null, which is what an explicitly blanked field looks like', () => {
+  it("null, which is what an explicitly blanked field looks like", () => {
     // Not treated as absent. Absent is the key not being there; `null` is somebody
     // having typed something, and guessing what they meant is repair.
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = null)),
-      'history[0].exercises[0].logged',
-      'expected an array',
-    )
-  })
+      corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = null)),
+      "history[0].exercises[0].logged",
+      "expected an array",
+    );
+  });
 
-  it('a hole, which is a null once it has been through JSON', () => {
+  it("a hole, which is a null once it has been through JSON", () => {
     // `JSON.stringify([8, , 7])` writes `[8,null,7]` — a hole has no other
     // representation in a document — so this is the corruption shape, and it is
     // reported at the index that has it rather than silently skipped.
     // Built by assignment rather than as `[8, , 7]`, which eslint refuses on the
     // grounds that a comma-hole in a literal is almost always a typo. Here the hole
     // is the subject, so it is spelled out.
-    const sparse: unknown[] = []
-    sparse[0] = 8
-    sparse[2] = 7
-    expect(sparse).toHaveLength(3)
-    expect(JSON.stringify(sparse)).toBe('[8,null,7]')
+    const sparse: unknown[] = [];
+    sparse[0] = 8;
+    sparse[2] = 7;
+    expect(sparse).toHaveLength(3);
+    expect(JSON.stringify(sparse)).toBe("[8,null,7]");
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = sparse)),
-      'history[0].exercises[0].logged[1]',
-      'null',
-    )
-  })
+      corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = sparse)),
+      "history[0].exercises[0].logged[1]",
+      "null",
+    );
+  });
 
-  it('a string entry among good ones', () => {
+  it("a string entry among good ones", () => {
     expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [8, 'eight', 7])),
-      'history[0].exercises[0].logged[1]',
-      'expected a number',
-    )
-  })
+      corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = [8, "eight", 7])),
+      "history[0].exercises[0].logged[1]",
+      "expected a number",
+    );
+  });
 
-  it('reports every bad entry, not just the first', () => {
+  it("reports every bad entry, not just the first", () => {
     const error = expectRejected(
-      corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [-1, null, 'x'])),
-      'problems in the state document',
-    )
+      corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = [-1, null, "x"])),
+      "problems in the state document",
+    );
     for (const index of [0, 1, 2]) {
-      expect(error).toContain(`history[0].exercises[0].logged[${index}]`)
+      expect(error).toContain(`history[0].exercises[0].logged[${index}]`);
     }
-  })
+  });
 
-  it('says nothing about the length when sets is itself broken', () => {
+  it("says nothing about the length when sets is itself broken", () => {
     // The record is already rejected. A second error derived from a `sets` we do
     // not trust would be noise pointing at the wrong field.
     const error = expectRejected(
       corrupt((d) => {
-        exerciseAt(d, 0, 0)['sets'] = 'three'
-        exerciseAt(d, 0, 0)['logged'] = [8, 8, 8, 8, 8]
+        exerciseAt(d, 0, 0)["sets"] = "three";
+        exerciseAt(d, 0, 0)["logged"] = [8, 8, 8, 8, 8];
       }),
-      'history[0].exercises[0].sets',
-    )
-    expect(error).not.toContain('at most')
-  })
+      "history[0].exercises[0].sets",
+    );
+    expect(error).not.toContain("at most");
+  });
 
-  it('never throws, on any of it', () => {
+  it("never throws, on any of it", () => {
     // The guarantee restated over the whole table at once, including inputs no
     // `corrupt()` case above can build.
     const shapes: unknown[] = [
@@ -1493,15 +1534,15 @@ describe('a hand-corrupted logged is refused, and the file is left alone', () =>
       [[8]],
       [{ reps: 8 }],
       Array.from({ length: 5000 }, () => 8),
-      'x'.repeat(1000),
+      "x".repeat(1000),
       { length: 3 },
-    ]
+    ];
     for (const shape of shapes) {
-      const text = corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = shape))
-      expect(() => parse(text), JSON.stringify(shape)?.slice(0, 40)).not.toThrow()
+      const text = corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = shape));
+      expect(() => parse(text), JSON.stringify(shape)?.slice(0, 40)).not.toThrow();
     }
-  })
-})
+  });
+});
 
 /**
  * The invariant that outranks everything else in corpus/CLAUDE.md, checked at the
@@ -1514,46 +1555,46 @@ describe('a hand-corrupted logged is refused, and the file is left alone', () =>
  * be the first consumer, and the first consumer is how a field ends up in a
  * decision.
  */
-describe('the codec has no opinion about what a logged value means', () => {
-  it('summarise reports nothing derived from logs', () => {
+describe("the codec has no opinion about what a logged value means", () => {
+  it("summarise reports nothing derived from logs", () => {
     // Same summary for a document with logs and the same document without them.
-    expect(summarise(LOGGED)).toEqual(summarise(midProgram))
-  })
+    expect(summarise(LOGGED)).toEqual(summarise(midProgram));
+  });
 
-  it('two documents differing only in their logs are equally valid', () => {
+  it("two documents differing only in their logs are equally valid", () => {
     // No threshold, no "you logged less than the target" rejection. The codec
     // stores what happened; judging it is not its job, and would not be anyone's.
-    const lowRungs = corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [1, 1, 1]))
-    const highRungs = corrupt((d) => (exerciseAt(d, 0, 0)['logged'] = [80, 80, 80]))
-    expect(parse(lowRungs).ok).toBe(true)
-    expect(parse(highRungs).ok).toBe(true)
-  })
-})
+    const lowRungs = corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = [1, 1, 1]));
+    const highRungs = corrupt((d) => (exerciseAt(d, 0, 0)["logged"] = [80, 80, 80]));
+    expect(parse(lowRungs).ok).toBe(true);
+    expect(parse(highRungs).ok).toBe(true);
+  });
+});
 
 // ─── summarise ──────────────────────────────────────────────────────────────
 
-describe('summarise', () => {
-  it('reports the facts needed to confirm a destructive import', () => {
-    const summary = summarise(midProgram)
-    expect(summary.username).toBe(midProgram.username)
-    expect(summary.cyclePosition).toBe(midProgram.cyclePosition)
-    expect(summary.historyLength).toBe(midProgram.history.length)
-    expect(summary.lastSessionAt).toBe(midProgram.history.at(-1)?.completedAt)
+describe("summarise", () => {
+  it("reports the facts needed to confirm a destructive import", () => {
+    const summary = summarise(midProgram);
+    expect(summary.username).toBe(midProgram.username);
+    expect(summary.cyclePosition).toBe(midProgram.cyclePosition);
+    expect(summary.historyLength).toBe(midProgram.history.length);
+    expect(summary.lastSessionAt).toBe(midProgram.history.at(-1)?.completedAt);
     // Derived from the fixture rather than restated, so repairing the fixture
     // cannot break a test that is really only asserting the fixture back to
     // itself. What matters is that the counters are reported in PATTERNS order.
     expect(summary.sessionsDone).toEqual(
       PATTERNS.map((pattern) => ({ pattern, sessions: midProgram.sessionsDone[pattern] })),
-    )
-  })
+    );
+  });
 
-  it('handles a fresh document', () => {
-    const summary = summarise(emptyDoc('alice'))
-    expect(summary.historyLength).toBe(0)
-    expect(summary.lastSessionAt).toBeNull()
-    expect(summary.sessionsDone.every((entry) => entry.sessions === 0)).toBe(true)
-  })
-})
+  it("handles a fresh document", () => {
+    const summary = summarise(emptyDoc("alice"));
+    expect(summary.historyLength).toBe(0);
+    expect(summary.lastSessionAt).toBeNull();
+    expect(summary.sessionsDone.every((entry) => entry.sessions === 0)).toBe(true);
+  });
+});
 
 // ─── The service's contract ─────────────────────────────────────────────────
 
@@ -1564,30 +1605,30 @@ describe('summarise', () => {
  * `PUT /api/state` accepts.** That test belongs here, on the client side of the
  * contract, and it runs the real `checkDocument` rather than a restatement of it.
  */
-describe('the sync service accepts what serialise writes', () => {
-  it('passes the shallow check, with the fields the receipt is built from', () => {
+describe("the sync service accepts what serialise writes", () => {
+  it("passes the shallow check, with the fields the receipt is built from", () => {
     expect(checkDocument(serialise(midProgram))).toEqual({
       ok: true,
       schemaVersion: CURRENT_SCHEMA_VERSION,
       username: midProgram.username,
       historyLength: midProgram.history.length,
-    })
-  })
+    });
+  });
 
-  it('passes for a fresh document and for a migrated v2 one', () => {
-    expect(checkDocument(serialise(emptyDoc('alice')))).toMatchObject({
+  it("passes for a fresh document and for a migrated v2 one", () => {
+    expect(checkDocument(serialise(emptyDoc("alice")))).toMatchObject({
       ok: true,
-      username: 'alice',
+      username: "alice",
       historyLength: 0,
-    })
-    const migrated = expectAccepted(JSON.stringify(v2Doc()), 'dana')
+    });
+    const migrated = expectAccepted(JSON.stringify(v2Doc()), "dana");
     expect(checkDocument(serialise(migrated))).toMatchObject({
       ok: true,
       schemaVersion: CURRENT_SCHEMA_VERSION,
-      username: 'dana',
+      username: "dana",
       historyLength: 9,
-    })
-  })
+    });
+  });
 
   // DELETED in the workspaces move: "uses the same username rule the service enforces,
   // character for character".
@@ -1605,30 +1646,30 @@ describe('the sync service accepts what serialise writes', () => {
   // codec's real `parse` over a table of names, so it proves both ends still
   // *apply* the shared rule — which a shared definition does not guarantee, since
   // either side could simply forget to call it.
-  it('agrees with the service about which usernames are legal', () => {
+  it("agrees with the service about which usernames are legal", () => {
     const cases = [
-      'alice',
-      'a',
-      '0',
-      'a.b-c_d',
-      'local',
-      'a'.repeat(USERNAME_MAX_LENGTH),
+      "alice",
+      "a",
+      "0",
+      "a.b-c_d",
+      "local",
+      "a".repeat(USERNAME_MAX_LENGTH),
       // …and the ones both must refuse.
-      '',
-      'Alice',
-      '.hidden',
-      '-dash',
-      '_score',
-      'a b',
-      'a/b',
-      'a'.repeat(USERNAME_MAX_LENGTH + 1),
-      'düsseldorf',
-    ]
+      "",
+      "Alice",
+      ".hidden",
+      "-dash",
+      "_score",
+      "a b",
+      "a/b",
+      "a".repeat(USERNAME_MAX_LENGTH + 1),
+      "düsseldorf",
+    ];
     for (const candidate of cases) {
-      const doc = serialise({ ...emptyDoc('placeholder'), username: candidate })
-      const serverSaysOk = (checkDocument(doc) as { ok: boolean }).ok
-      expect(isValidUsername(candidate), candidate).toBe(serverSaysOk)
-      expect(parse(doc).ok, candidate).toBe(serverSaysOk)
+      const doc = serialise({ ...emptyDoc("placeholder"), username: candidate });
+      const serverSaysOk = (checkDocument(doc) as { ok: boolean }).ok;
+      expect(isValidUsername(candidate), candidate).toBe(serverSaysOk);
+      expect(parse(doc).ok, candidate).toBe(serverSaysOk);
     }
-  })
-})
+  });
+});

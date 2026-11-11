@@ -1,11 +1,11 @@
-import { isValidUsername, USERNAME_RULE } from '@sports-app/shared/username.ts'
+import { isValidUsername, USERNAME_RULE } from "@sports-app/shared/username.ts";
 import {
   createAccounts,
   createSqliteStore,
   createWardClient,
   createWardIdentities,
   wardClientOptionsFromEnv,
-} from './vendor/ward/ward-auth.js'
+} from "./vendor/ward/ward-auth.js";
 
 /**
  * Accounts and "Sign in with Ward", as this service wires them.
@@ -53,10 +53,10 @@ import {
  */
 
 /** The session cookie. Unique in the estate, because every app shares one origin. */
-export const SESSION_COOKIE_NAME = 'sports_app_session'
+export const SESSION_COOKIE_NAME = "sports_app_session";
 
 /** Where the library's routes live, as Fastify sees them. */
-export const ROUTE_PREFIX = '/api/auth'
+export const ROUTE_PREFIX = "/api/auth";
 
 /**
  * Whether a signed-in user may rename themselves (`POST /api/auth/username`).
@@ -67,19 +67,19 @@ export const ROUTE_PREFIX = '/api/auth'
  * the new one. A rename screen would have to move the stream with the name, and
  * offering one is the owner's choice.
  */
-export const ALLOW_RENAME = false
+export const ALLOW_RENAME = false;
 
 /** What a new user created by this service holds. The app has no roles of its own. */
-export const DEFAULT_ROLE = 'user'
+export const DEFAULT_ROLE = "user";
 
 /** The sub-path the client is served from, matching `SPORTS_APP_BASE` in the client build. */
-const DEFAULT_BASE = '/sports-app/'
+const DEFAULT_BASE = "/sports-app/";
 
 /**
  * The reason a session is refused for a name the document schema cannot hold.
  * The login page words it; nothing here does.
  */
-export const UNSUPPORTED_USERNAME = 'unsupported_username'
+export const UNSUPPORTED_USERNAME = "unsupported_username";
 
 /**
  * `''` or a leading-slash path with no trailing slash. A typo here would put the
@@ -89,20 +89,20 @@ export const UNSUPPORTED_USERNAME = 'unsupported_username'
  * @param {string | undefined} value
  */
 function normaliseApiPrefix(value) {
-  const prefix = (value ?? '').trim()
-  if (prefix === '') return ''
+  const prefix = (value ?? "").trim();
+  if (prefix === "") return "";
   if (!/^\/[A-Za-z0-9._~/-]*[A-Za-z0-9._~-]$/.test(prefix)) {
     throw new Error(
       `SPORTS_APP_API_PREFIX must be empty or a path like /sports-app-api (a leading slash, no trailing one), got "${prefix}"`,
-    )
+    );
   }
-  return prefix
+  return prefix;
 }
 
 /** `/sports-app/` with a leading and trailing slash, the way the client build reads it. */
 function normaliseBase(value) {
-  const segment = (value ?? '').replace(/^\/+|\/+$/g, '')
-  return segment === '' ? '/' : `/${segment}/`
+  const segment = (value ?? "").replace(/^\/+|\/+$/g, "");
+  return segment === "" ? "/" : `/${segment}/`;
 }
 
 /**
@@ -115,26 +115,26 @@ function normaliseBase(value) {
  * @param {Record<string, string | undefined>} env
  */
 export function readAuthConfig(env) {
-  const wardOptions = wardClientOptionsFromEnv(env)
+  const wardOptions = wardClientOptionsFromEnv(env);
 
   // The redirect URI is, by definition, an address on the app's public origin, so
   // it names it when nothing else does. An explicit value wins.
-  const explicit = (env.SPORTS_APP_PUBLIC_ORIGIN ?? '').trim()
-  let publicOrigin = explicit
-  if (publicOrigin === '' && wardOptions !== undefined) {
-    publicOrigin = new URL(wardOptions.redirectUri).origin
+  const explicit = (env.SPORTS_APP_PUBLIC_ORIGIN ?? "").trim();
+  let publicOrigin = explicit;
+  if (publicOrigin === "" && wardOptions !== undefined) {
+    publicOrigin = new URL(wardOptions.redirectUri).origin;
   }
-  if (publicOrigin === '') {
+  if (publicOrigin === "") {
     throw new Error(
-      'SPORTS_APP_PUBLIC_ORIGIN is not set, so the service cannot tell whether cookies may be marked Secure.\n' +
-        'Set it to the address the browser uses for the app, without a path, e.g. https://example.com\n' +
-        '(http://localhost:5173 in development).',
-    )
+      "SPORTS_APP_PUBLIC_ORIGIN is not set, so the service cannot tell whether cookies may be marked Secure.\n" +
+        "Set it to the address the browser uses for the app, without a path, e.g. https://example.com\n" +
+        "(http://localhost:5173 in development).",
+    );
   }
-  publicOrigin = new URL(publicOrigin).origin
+  publicOrigin = new URL(publicOrigin).origin;
 
-  const apiPrefix = normaliseApiPrefix(env.SPORTS_APP_API_PREFIX)
-  const base = normaliseBase(env.SPORTS_APP_BASE ?? DEFAULT_BASE)
+  const apiPrefix = normaliseApiPrefix(env.SPORTS_APP_API_PREFIX);
+  const base = normaliseBase(env.SPORTS_APP_BASE ?? DEFAULT_BASE);
 
   return {
     publicOrigin,
@@ -147,7 +147,7 @@ export function readAuthConfig(env) {
     settingsPath: `${base}account`,
     afterSignInPath: `${base}login`,
     wardOptions,
-  }
+  };
 }
 
 /**
@@ -160,11 +160,11 @@ export function readAuthConfig(env) {
  * @param {import('node:sqlite').DatabaseSync} db
  */
 export function openAccounts(db) {
-  return createAccounts({ store: createSqliteStore(db) })
+  return createAccounts({ store: createSqliteStore(db) });
 }
 
 /** A Ward subject: 128 random bits, hex. What the stream key was between 2026-09-06 and accounts. */
-const WARD_SUBJECT = /^[0-9a-f]{32}$/
+const WARD_SUBJECT = /^[0-9a-f]{32}$/;
 
 /**
  * Give every stream keyed by a Ward subject an account that Ward can find.
@@ -194,25 +194,25 @@ const WARD_SUBJECT = /^[0-9a-f]{32}$/
  * @returns {Promise<string[]>} the subjects linked by this call
  */
 export async function linkWardStreams(store, accounts) {
-  const identities = createWardIdentities({ accounts })
-  const linked = []
+  const identities = createWardIdentities({ accounts });
+  const linked = [];
   for (const key of store.usernames()) {
-    if (!WARD_SUBJECT.test(key)) continue
-    if ((await identities.findUserBySubject(key)) !== undefined) continue
+    if (!WARD_SUBJECT.test(key)) continue;
+    if ((await identities.findUserBySubject(key)) !== undefined) continue;
     // A user already owns this key, id or name, but has no Ward link: a migrated
     // user who unlinked Ward. Re-linking them is not ours to do (createLinkedUser
     // would throw, and the service would never start). Same rule as atrium.
-    if ((await accounts.findUserById(key)) !== undefined) continue
-    if ((await accounts.findUserByUsername(key)) !== undefined) continue
+    if ((await accounts.findUserById(key)) !== undefined) continue;
+    if ((await accounts.findUserByUsername(key)) !== undefined) continue;
     await identities.createLinkedUser({
       subject: key,
       id: key,
       username: key,
       role: DEFAULT_ROLE,
-    })
-    linked.push(key)
+    });
+    linked.push(key);
   }
-  return linked
+  return linked;
 }
 
 /**
@@ -230,11 +230,11 @@ export async function linkWardStreams(store, accounts) {
  * @returns {Promise<string[]>}
  */
 export async function orphanStreamNames(store, accounts) {
-  const orphans = []
+  const orphans = [];
   for (const username of store.usernames()) {
-    if ((await accounts.findUserByUsername(username)) === undefined) orphans.push(username)
+    if ((await accounts.findUserByUsername(username)) === undefined) orphans.push(username);
   }
-  return orphans
+  return orphans;
 }
 
 /**
@@ -249,8 +249,8 @@ export async function orphanStreamNames(store, accounts) {
  * @param {{ fetch?: typeof fetch }} [overrides]
  */
 export async function openWardClient(config, overrides = {}) {
-  if (config.wardOptions === undefined) return undefined
-  return createWardClient({ ...config.wardOptions, ...overrides })
+  if (config.wardOptions === undefined) return undefined;
+  return createWardClient({ ...config.wardOptions, ...overrides });
 }
 
 /**
@@ -265,9 +265,9 @@ export async function openWardClient(config, overrides = {}) {
  * @type {import('./vendor/ward/ward-auth.js').SessionValidator}
  */
 export function requireSupportedUsername(resolved) {
-  if (isValidUsername(resolved.user.username)) return { ok: true }
-  return { ok: false, reason: UNSUPPORTED_USERNAME }
+  if (isValidUsername(resolved.user.username)) return { ok: true };
+  return { ok: false, reason: UNSUPPORTED_USERNAME };
 }
 
 /** For the seed script, which has to say the same thing before it creates anyone. */
-export { USERNAME_RULE }
+export { USERNAME_RULE };

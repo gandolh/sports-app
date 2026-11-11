@@ -1,4 +1,4 @@
-import { ShieldIcon } from './icons.tsx'
+import { ShieldIcon } from "./icons.tsx";
 
 /**
  * Cues, and the one rule about them that is a safety requirement rather than a
@@ -49,7 +49,7 @@ export function SafetyCue({ text }: { readonly text: string }) {
         <p className="mt-[2px] text-body leading-[var(--lh-body)] text-tx">{text}</p>
       </div>
     </div>
-  )
+  );
 }
 
 export function CueList({ cues }: { readonly cues: readonly string[] }) {
@@ -70,5 +70,5 @@ export function CueList({ cues }: { readonly cues: readonly string[] }) {
         </li>
       ))}
     </ol>
-  )
+  );
 }

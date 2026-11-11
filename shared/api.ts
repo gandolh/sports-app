@@ -61,8 +61,8 @@
  * stronger statement than the old one — that a login body was accepted without
  * the field being named.
  */
-import { Type, type Static } from '@sinclair/typebox'
-import { USERNAME_PATTERN, USERNAME_RULE } from './username.ts'
+import { Type, type Static } from "@sinclair/typebox";
+import { USERNAME_PATTERN, USERNAME_RULE } from "./username.ts";
 
 // ─── Where the routes live ──────────────────────────────────────────────────
 //
@@ -73,8 +73,8 @@ import { USERNAME_PATTERN, USERNAME_RULE } from './username.ts'
 // same two copies as before rather than adding a third, and puts the definition
 // somewhere the client can delete its copy *into*.
 
-export const HEALTH_PATH = '/api/health'
-export const STATE_PATH = '/api/state'
+export const HEALTH_PATH = "/api/health";
+export const STATE_PATH = "/api/state";
 
 /*
  * `SECRET_HEADER`, `LOGIN_PATH` and `USER_PARAM` are gone (2026-09-06).
@@ -103,7 +103,7 @@ export const STATE_PATH = '/api/state'
 export const Username = Type.String({
   pattern: USERNAME_PATTERN.source,
   description: USERNAME_RULE,
-})
+});
 
 // ─── GET /api/health ────────────────────────────────────────────────────────
 
@@ -116,11 +116,8 @@ export const Username = Type.String({
  * silently dropped rather than turning `/api/health` into an oracle for who uses
  * this deployment. There is a test asserting the response has one key.
  */
-export const HealthResponse = Type.Object(
-  { status: Type.Literal('ok') },
-  { additionalProperties: false },
-)
-export type HealthResponse = Static<typeof HealthResponse>
+export const HealthResponse = Type.Object({ status: Type.Literal("ok") }, { additionalProperties: false });
+export type HealthResponse = Static<typeof HealthResponse>;
 
 // ─── /api/state ─────────────────────────────────────────────────────────────
 
@@ -152,8 +149,8 @@ export const StateDocumentEnvelope = Type.Object({
   schemaVersion: Type.Number(),
   username: Username,
   history: Type.Array(Type.Unknown()),
-})
-export type StateDocumentEnvelope = Static<typeof StateDocumentEnvelope>
+});
+export type StateDocumentEnvelope = Static<typeof StateDocumentEnvelope>;
 
 /**
  * What a successful `PUT` reports back.
@@ -175,8 +172,8 @@ export const SnapshotReceipt = Type.Object(
     retained: Type.Number(),
   },
   { additionalProperties: false },
-)
-export type SnapshotReceipt = Static<typeof SnapshotReceipt>
+);
+export type SnapshotReceipt = Static<typeof SnapshotReceipt>;
 
 // ─── Errors ─────────────────────────────────────────────────────────────────
 
@@ -191,5 +188,5 @@ export type SnapshotReceipt = Static<typeof SnapshotReceipt>
 export const ErrorResponse = Type.Object({
   error: Type.String(),
   limit: Type.Optional(Type.Number()),
-})
-export type ErrorResponse = Static<typeof ErrorResponse>
+});
+export type ErrorResponse = Static<typeof ErrorResponse>;

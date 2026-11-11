@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef } from 'react'
-import { animate } from 'animejs'
-import { Eyebrow } from './Shell.tsx'
+import { useEffect, useId, useRef } from "react";
+import { animate } from "animejs";
+import { Eyebrow } from "./Shell.tsx";
 
 /**
  * The weekly-goal ring, and **the one authored moment in the whole app**.
@@ -46,67 +46,63 @@ import { Eyebrow } from './Shell.tsx'
 
 // A 120-unit box. `r` and the stroke are in those units, so the ring scales
 // with its CSS width and the geometry below stays readable as plain numbers.
-const RADIUS = 50
-const STROKE = 11
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS
+const RADIUS = 50;
+const STROKE = 11;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-const DURATION_MS = 1200
+const DURATION_MS = 1200;
 
 function prefersReducedMotion(): boolean {
   try {
     return (
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    )
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
   } catch {
     // A matchMedia that throws is a matchMedia that cannot be asked. Assume the
     // user did not opt out, which is the state the vast majority are in.
-    return false
+    return false;
   }
 }
 
 export interface RingProps {
   /** `0 .. 1`. Clamped here as well as at the source; a ring past full reads as broken. */
-  readonly fraction: number
+  readonly fraction: number;
   /** The numeral inside, already formatted: `62%`, or `4/7`. */
-  readonly value: string
+  readonly value: string;
   /** The uppercase caption under it. Two or three words. */
-  readonly caption: string
+  readonly caption: string;
   /** The whole ring as one sentence, for a screen reader. */
-  readonly label: string
+  readonly label: string;
 }
 
 export function Ring({ fraction, value, caption, label }: RingProps) {
-  const progress = useRef<SVGCircleElement>(null)
+  const progress = useRef<SVGCircleElement>(null);
   // One gradient per instance. Two rings on a page sharing a `<defs>` id is the
   // classic SVG bug where the second one silently paints with the first one's
   // stops — or with nothing, if the first unmounts.
-  const gradientId = useId()
+  const gradientId = useId();
 
-  const clamped = Math.min(Math.max(fraction, 0), 1)
-  const offset = CIRCUMFERENCE * (1 - clamped)
+  const clamped = Math.min(Math.max(fraction, 0), 1);
+  const offset = CIRCUMFERENCE * (1 - clamped);
 
   useEffect(() => {
-    const element = progress.current
-    if (element === null || prefersReducedMotion()) return
+    const element = progress.current;
+    if (element === null || prefersReducedMotion()) return;
     try {
       animate(element, {
         strokeDashoffset: [CIRCUMFERENCE, offset],
         duration: DURATION_MS,
-        ease: 'outExpo',
-      })
+        ease: "outExpo",
+      });
     } catch {
       /* The attribute below already holds the final value. Nothing is lost. */
     }
-  }, [offset])
+  }, [offset]);
 
   return (
-    <div
-      className="relative grid place-items-center py-[var(--sp-2)]"
-      role="img"
-      aria-label={label}
-    >
+    <div className="relative grid place-items-center py-[var(--sp-2)]" role="img" aria-label={label}>
       <svg viewBox="0 0 120 120" className="block h-[172px] w-[172px]" aria-hidden="true">
         <defs>
           <linearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">
@@ -114,14 +110,7 @@ export function Ring({ fraction, value, caption, label }: RingProps) {
             <stop offset="1" stopColor="var(--accent)" />
           </linearGradient>
         </defs>
-        <circle
-          cx="60"
-          cy="60"
-          r={RADIUS}
-          fill="none"
-          stroke="var(--grid0)"
-          strokeWidth={STROKE}
-        />
+        <circle cx="60" cy="60" r={RADIUS} fill="none" stroke="var(--grid0)" strokeWidth={STROKE} />
         <circle
           ref={progress}
           cx="60"
@@ -139,11 +128,9 @@ export function Ring({ fraction, value, caption, label }: RingProps) {
         />
       </svg>
       <div className="absolute text-center" aria-hidden="true">
-        <span className="block text-display leading-none font-extrabold tracking-[-0.04em] tabular-nums">
-          {value}
-        </span>
+        <span className="block text-display leading-none font-extrabold tracking-[-0.04em] tabular-nums">{value}</span>
         <Eyebrow>{caption}</Eyebrow>
       </div>
     </div>
-  )
+  );
 }

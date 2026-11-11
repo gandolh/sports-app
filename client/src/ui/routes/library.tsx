@@ -1,9 +1,9 @@
-import { Suspense, lazy, useDeferredValue, useMemo, useState } from 'react'
-import { Link, createRoute } from '@tanstack/react-router'
-import { rootRoute } from './__root.tsx'
-import { toLogin } from './next.ts'
-import { Eyebrow, Shell, ShellBody, ShellRail, ShellTitle } from '../components/Shell.tsx'
-import { HonestNote } from '../components/HonestNote.tsx'
+import { Suspense, lazy, useDeferredValue, useMemo, useState } from "react";
+import { Link, createRoute } from "@tanstack/react-router";
+import { rootRoute } from "./__root.tsx";
+import { toLogin } from "./next.ts";
+import { Eyebrow, Shell, ShellBody, ShellRail, ShellTitle } from "../components/Shell.tsx";
+import { HonestNote } from "../components/HonestNote.tsx";
 
 /**
  * `/library` — a bodyweight exercise reference, and the only page in the app
@@ -36,19 +36,19 @@ import { HonestNote } from '../components/HonestNote.tsx'
  */
 
 const LibraryList = lazy(async () => {
-  const { LIBRARY } = await import('../../domain/library.ts')
-  return { default: () => <List exercises={LIBRARY} /> }
-})
+  const { LIBRARY } = await import("../../domain/library.ts");
+  return { default: () => <List exercises={LIBRARY} /> };
+});
 
 export const libraryRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/library',
+  path: "/library",
   beforeLoad: ({ context, location }) => {
-    if (context.username === null) throw toLogin(location)
-    return { username: context.username }
+    if (context.username === null) throw toLogin(location);
+    return { username: context.username };
   },
   component: LibraryRoute,
-})
+});
 
 function LibraryRoute() {
   return (
@@ -65,9 +65,8 @@ function LibraryRoute() {
       <ShellTitle title="Exercise reference" subtitle="Bodyweight movements, for looking things up" />
       <ShellBody>
         <HonestNote label="What this list is not">
-          A reference, not a plan. Nothing here is scheduled, and opening this page changes
-          nothing about what you are asked to do next — the programme is still the five
-          ladders, on the same fixed clock.
+          A reference, not a plan. Nothing here is scheduled, and opening this page changes nothing about what you are
+          asked to do next — the programme is still the five ladders, on the same fixed clock.
         </HonestNote>
 
         <Suspense
@@ -81,19 +80,19 @@ function LibraryRoute() {
         </Suspense>
       </ShellBody>
     </Shell>
-  )
+  );
 }
 
 interface Entry {
-  readonly id: string
-  readonly name: string
-  readonly category: string
-  readonly force: 'push' | 'pull' | 'static' | null
-  readonly level: string
-  readonly mechanic: string | null
-  readonly primaryMuscles: readonly string[]
-  readonly secondaryMuscles: readonly string[]
-  readonly instructions: readonly string[]
+  readonly id: string;
+  readonly name: string;
+  readonly category: string;
+  readonly force: "push" | "pull" | "static" | null;
+  readonly level: string;
+  readonly mechanic: string | null;
+  readonly primaryMuscles: readonly string[];
+  readonly secondaryMuscles: readonly string[];
+  readonly instructions: readonly string[];
 }
 
 /**
@@ -104,22 +103,22 @@ interface Entry {
  * badly and with a magic number.
  */
 function List({ exercises }: { readonly exercises: readonly Entry[] }) {
-  const [query, setQuery] = useState('')
-  const deferred = useDeferredValue(query)
+  const [query, setQuery] = useState("");
+  const deferred = useDeferredValue(query);
 
   const matches = useMemo(() => {
-    const needle = deferred.trim().toLowerCase()
-    if (needle === '') return exercises
+    const needle = deferred.trim().toLowerCase();
+    if (needle === "") return exercises;
     return exercises.filter(
       (e) =>
         e.name.toLowerCase().includes(needle) ||
         e.category.toLowerCase().includes(needle) ||
         e.level.toLowerCase().includes(needle) ||
-        (e.force ?? '').toLowerCase().includes(needle) ||
+        (e.force ?? "").toLowerCase().includes(needle) ||
         e.primaryMuscles.some((muscle) => muscle.toLowerCase().includes(needle)) ||
         e.secondaryMuscles.some((muscle) => muscle.toLowerCase().includes(needle)),
-    )
-  }, [exercises, deferred])
+    );
+  }, [exercises, deferred]);
 
   return (
     <>
@@ -142,8 +141,8 @@ function List({ exercises }: { readonly exercises: readonly Entry[] }) {
 
       {matches.length === 0 ? (
         <p className="mt-[var(--sp-5)] text-body text-tx2">
-          Nothing matches “{deferred.trim()}”. This reference is bodyweight only, so anything
-          needing a bar, a bench or a machine is deliberately absent.
+          Nothing matches “{deferred.trim()}”. This reference is bodyweight only, so anything needing a bar, a bench or
+          a machine is deliberately absent.
         </p>
       ) : (
         <ul className="mt-[var(--sp-3)] grid gap-[var(--sp-2)]">
@@ -153,7 +152,7 @@ function List({ exercises }: { readonly exercises: readonly Entry[] }) {
         </ul>
       )}
     </>
-  )
+  );
 }
 
 /**
@@ -169,21 +168,21 @@ function Row({ exercise }: { readonly exercise: Entry }) {
   // already. First-seen order keeps the primary muscles first without sorting.
   const muscles = [...new Set([...exercise.primaryMuscles, ...exercise.secondaryMuscles])].filter(
     (muscle) => muscle.length > 0,
-  )
+  );
 
   // `force` is the one field worth surfacing beside the category: it is the axis
   // the five ladders are built on, so "static" next to a hold is the reference
   // agreeing with the programme rather than restating a body part.
   const meta = [exercise.category, exercise.force, exercise.level].filter(
     (part): part is string => part !== null && part.length > 0,
-  )
+  );
   return (
     <li>
       <details className="rounded border border-line bg-s1">
         <summary className="flex min-h-[var(--tap-row)] cursor-pointer items-center justify-between gap-[var(--sp-3)] px-[var(--sp-3)] py-[var(--sp-2)]">
           <span>
             <span className="block text-body font-semibold capitalize">{exercise.name}</span>
-            <span className="block text-label text-tx3 capitalize">{meta.join(' · ')}</span>
+            <span className="block text-label text-tx3 capitalize">{meta.join(" · ")}</span>
           </span>
         </summary>
         <div className="border-t border-line px-[var(--sp-3)] py-[var(--sp-3)]">
@@ -191,16 +190,13 @@ function Row({ exercise }: { readonly exercise: Entry }) {
             <>
               <Eyebrow>Muscles</Eyebrow>
               <p data-testid="muscles" className="mt-[var(--sp-1)] text-meta text-tx2 capitalize">
-                {muscles.join(' · ')}
+                {muscles.join(" · ")}
               </p>
             </>
           )}
           <ol className="mt-[var(--sp-3)] grid gap-[var(--sp-2)]">
             {exercise.instructions.map((step, index) => (
-              <li
-                key={index}
-                className="grid grid-cols-[1.3rem_minmax(0,1fr)] gap-[var(--sp-1)] text-meta text-tx2"
-              >
+              <li key={index} className="grid grid-cols-[1.3rem_minmax(0,1fr)] gap-[var(--sp-1)] text-meta text-tx2">
                 <span className="font-bold text-tx3 tabular-nums">{index + 1}</span>
                 <span>{step}</span>
               </li>
@@ -209,5 +205,5 @@ function Row({ exercise }: { readonly exercise: Entry }) {
         </div>
       </details>
     </li>
-  )
+  );
 }

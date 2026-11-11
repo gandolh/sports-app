@@ -78,32 +78,32 @@
  * not a redesign**: WAL, `synchronous = FULL`, per-user retention, pruning by `id`,
  * and the idempotent `PRAGMA table_info` guard are exactly as the multi-user server left them.
  */
-import { DatabaseSync } from 'node:sqlite'
-import { mkdirSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { DatabaseSync } from "node:sqlite";
+import { mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 // The only import that is not a Node builtin, and it is deliberately types plus
 // one regex: `shared/` may not touch `node:` anything, so importing it here can
 // never drag a browser-hostile dependency into the bundle or a Node-only one into
 // the client. Node ≥22.18 strips the types at load; there is no build step.
-import { LEGACY_USERNAME, USERNAME_RULE, isValidUsername } from '@sports-app/shared/username.ts'
+import { LEGACY_USERNAME, USERNAME_RULE, isValidUsername } from "@sports-app/shared/username.ts";
 
-const SERVICE_DIR = dirname(fileURLToPath(import.meta.url))
+const SERVICE_DIR = dirname(fileURLToPath(import.meta.url));
 
 /**
  * The repository root — the service is the `server/` workspace directly beneath
  * it. Unchanged by the workspace split: `server/` did not move, so `db/` is still
  * a sibling of it at the repo root and still gitignored.
  */
-export const PROJECT_ROOT = resolve(SERVICE_DIR, '..')
+export const PROJECT_ROOT = resolve(SERVICE_DIR, "..");
 
 /**
  * The database directory. Gitignored — see `.gitignore`. It holds real training
  * history and must never end up in a commit.
  */
-export const DEFAULT_DB_DIR = resolve(PROJECT_ROOT, 'db')
+export const DEFAULT_DB_DIR = resolve(PROJECT_ROOT, "db");
 
-export const DEFAULT_DB_FILE = resolve(DEFAULT_DB_DIR, 'app.db')
+export const DEFAULT_DB_FILE = resolve(DEFAULT_DB_DIR, "app.db");
 
 /**
  * How many snapshots to keep **per username**.
@@ -120,7 +120,7 @@ export const DEFAULT_DB_FILE = resolve(DEFAULT_DB_DIR, 'app.db')
  * (a couple of weeks of pushes) and shallow enough that the quadratic term
  * never becomes the story. Raising it is a real capacity decision.
  */
-export const RETENTION = 20
+export const RETENTION = 20;
 
 // ─── Who a stream belongs to ────────────────────────────────────────────────
 //
@@ -144,7 +144,7 @@ if (!isValidUsername(LEGACY_USERNAME)) {
   // `LEGACY_USERNAME` is interpolated into DDL below, where a bound parameter is
   // not available. This assertion is what makes that interpolation safe: the
   // allowlist has no quote in it, so a constant that passes cannot carry one.
-  throw new Error(`LEGACY_USERNAME must satisfy USERNAME_PATTERN, got ${LEGACY_USERNAME}`)
+  throw new Error(`LEGACY_USERNAME must satisfy USERNAME_PATTERN, got ${LEGACY_USERNAME}`);
 }
 
 // ─── Schema ─────────────────────────────────────────────────────────────────
@@ -176,7 +176,7 @@ const SCHEMA = `
     doc_json           TEXT    NOT NULL,
     username           TEXT    NOT NULL DEFAULT '${LEGACY_USERNAME}'
   );
-`
+`;
 
 /**
  * `(username, id DESC)` covers every query this service makes: the newest
@@ -186,7 +186,7 @@ const SCHEMA = `
  */
 const INDEX = `
   CREATE INDEX IF NOT EXISTS snapshots_by_user_id ON snapshots (username, id DESC);
-`
+`;
 
 const SELECT_LATEST = `
   SELECT id, created_at, sessions_completed, schema_version, doc_json, username
@@ -194,12 +194,12 @@ const SELECT_LATEST = `
    WHERE username = ?
    ORDER BY id DESC
    LIMIT 1
-`
+`;
 
 const INSERT_SNAPSHOT = `
   INSERT INTO snapshots (created_at, sessions_completed, schema_version, doc_json, username)
   VALUES (?, ?, ?, ?, ?)
-`
+`;
 
 /**
  * Keep the newest `?` rows **of one username** by `id` and delete the rest of
@@ -224,7 +224,7 @@ const PRUNE = `
      AND id NOT IN (
        SELECT id FROM snapshots WHERE username = ? ORDER BY id DESC LIMIT ?
      )
-`
+`;
 
 /**
  * Add `username` to a database that predates it, once.
@@ -246,14 +246,14 @@ const PRUNE = `
  */
 function addUsernameColumn(db) {
   const columns = db
-    .prepare('PRAGMA table_info(snapshots)')
+    .prepare("PRAGMA table_info(snapshots)")
     .all()
-    .map((row) => String(row.name))
+    .map((row) => String(row.name));
 
-  if (columns.includes('username')) return false
+  if (columns.includes("username")) return false;
 
-  db.exec(`ALTER TABLE snapshots ADD COLUMN username TEXT NOT NULL DEFAULT '${LEGACY_USERNAME}'`)
-  return true
+  db.exec(`ALTER TABLE snapshots ADD COLUMN username TEXT NOT NULL DEFAULT '${LEGACY_USERNAME}'`);
+  return true;
 }
 
 /**
@@ -288,50 +288,46 @@ function addUsernameColumn(db) {
  * @returns {SnapshotStore}
  */
 export function openSnapshotStore(options = {}) {
-  const file = options.file ?? DEFAULT_DB_FILE
-  const retention = options.retention ?? RETENTION
+  const file = options.file ?? DEFAULT_DB_FILE;
+  const retention = options.retention ?? RETENTION;
 
   if (!Number.isInteger(retention) || retention < 1) {
-    throw new Error(`retention must be a whole number >= 1, got ${String(retention)}`)
+    throw new Error(`retention must be a whole number >= 1, got ${String(retention)}`);
   }
 
   // The directory is created here rather than at startup so that every entry
   // point — the service, a test, a one-off script — gets the same behaviour.
-  if (file !== ':memory:') {
-    mkdirSync(dirname(file), { recursive: true })
+  if (file !== ":memory:") {
+    mkdirSync(dirname(file), { recursive: true });
   }
 
-  const db = new DatabaseSync(file)
+  const db = new DatabaseSync(file);
 
   // WAL for readers-don't-block-writers, and FULL synchronous because this
   // writes roughly once per workout. Durability beats throughput by several
   // orders of magnitude here: the cost is one fsync a day, and the thing being
   // protected is the only remaining copy of months of training after a phone is
   // lost. `:memory:` ignores journal_mode, which is harmless.
-  db.exec('PRAGMA journal_mode = WAL')
-  db.exec('PRAGMA synchronous = FULL')
+  db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA synchronous = FULL");
 
   // Order matters: create the table if it is absent, *then* migrate, so a
   // pre-existing single-stream table (which `CREATE TABLE IF NOT EXISTS` leaves
   // alone) still gets its column, and a table this call just created skips the
   // `ALTER` because it already has one. Then the index, which needs the column
   // to exist either way.
-  db.exec(SCHEMA)
-  const migrated = addUsernameColumn(db)
-  db.exec(INDEX)
+  db.exec(SCHEMA);
+  const migrated = addUsernameColumn(db);
+  db.exec(INDEX);
 
-  const selectLatest = db.prepare(SELECT_LATEST)
-  const insertSnapshot = db.prepare(INSERT_SNAPSHOT)
-  const prune = db.prepare(PRUNE)
-  const countAll = db.prepare('SELECT COUNT(*) AS n FROM snapshots')
-  const countForUser = db.prepare('SELECT COUNT(*) AS n FROM snapshots WHERE username = ?')
-  const selectAllIds = db.prepare('SELECT id FROM snapshots ORDER BY id DESC')
-  const selectIdsForUser = db.prepare(
-    'SELECT id FROM snapshots WHERE username = ? ORDER BY id DESC',
-  )
-  const selectUsernames = db.prepare(
-    'SELECT DISTINCT username FROM snapshots ORDER BY username ASC',
-  )
+  const selectLatest = db.prepare(SELECT_LATEST);
+  const insertSnapshot = db.prepare(INSERT_SNAPSHOT);
+  const prune = db.prepare(PRUNE);
+  const countAll = db.prepare("SELECT COUNT(*) AS n FROM snapshots");
+  const countForUser = db.prepare("SELECT COUNT(*) AS n FROM snapshots WHERE username = ?");
+  const selectAllIds = db.prepare("SELECT id FROM snapshots ORDER BY id DESC");
+  const selectIdsForUser = db.prepare("SELECT id FROM snapshots WHERE username = ? ORDER BY id DESC");
+  const selectUsernames = db.prepare("SELECT DISTINCT username FROM snapshots ORDER BY username ASC");
 
   /**
    * Every entry point that takes a username goes through this.
@@ -347,9 +343,9 @@ export function openSnapshotStore(options = {}) {
    */
   function requireUsername(username) {
     if (!isValidUsername(username)) {
-      throw new TypeError(`username must be ${USERNAME_RULE}; got ${JSON.stringify(username)}`)
+      throw new TypeError(`username must be ${USERNAME_RULE}; got ${JSON.stringify(username)}`);
     }
-    return /** @type {string} */ (username)
+    return /** @type {string} */ (username);
   }
 
   return {
@@ -362,8 +358,8 @@ export function openSnapshotStore(options = {}) {
     migrated,
 
     latest(username) {
-      const row = selectLatest.get(requireUsername(username))
-      if (!row) return null
+      const row = selectLatest.get(requireUsername(username));
+      if (!row) return null;
       return {
         id: Number(row.id),
         createdAt: String(row.created_at),
@@ -371,53 +367,49 @@ export function openSnapshotStore(options = {}) {
         historyLength: Number(row.sessions_completed),
         schemaVersion: Number(row.schema_version),
         docJson: String(row.doc_json),
-      }
+      };
     },
 
     insert({ username, docJson, historyLength, schemaVersion, createdAt }) {
-      const owner = requireUsername(username)
-      const stamp = createdAt ?? new Date().toISOString()
+      const owner = requireUsername(username);
+      const stamp = createdAt ?? new Date().toISOString();
 
       // Insert and prune in one transaction. Without it a crash between the two
       // leaves the cap exceeded — recoverable — but an interrupted prune could
       // in principle be observed by a concurrent reader as a gap. One
       // transaction makes "insert the new snapshot and drop the oldest" a
       // single visible event.
-      db.exec('BEGIN IMMEDIATE')
+      db.exec("BEGIN IMMEDIATE");
       try {
-        const info = insertSnapshot.run(stamp, historyLength, schemaVersion, docJson, owner)
+        const info = insertSnapshot.run(stamp, historyLength, schemaVersion, docJson, owner);
         // Both bindings are the same username: one scopes the `DELETE`, the
         // other scopes the "rows worth keeping" subquery. Dropping either turns
         // a per-user cap back into a global one.
-        const { changes } = prune.run(owner, owner, retention)
-        db.exec('COMMIT')
-        return { id: Number(info.lastInsertRowid), createdAt: stamp, pruned: Number(changes) }
+        const { changes } = prune.run(owner, owner, retention);
+        db.exec("COMMIT");
+        return { id: Number(info.lastInsertRowid), createdAt: stamp, pruned: Number(changes) };
       } catch (cause) {
-        db.exec('ROLLBACK')
-        throw cause
+        db.exec("ROLLBACK");
+        throw cause;
       }
     },
 
     count(username) {
-      const row =
-        username === undefined ? countAll.get() : countForUser.get(requireUsername(username))
-      return row ? Number(row.n) : 0
+      const row = username === undefined ? countAll.get() : countForUser.get(requireUsername(username));
+      return row ? Number(row.n) : 0;
     },
 
     ids(username) {
-      const rows =
-        username === undefined
-          ? selectAllIds.all()
-          : selectIdsForUser.all(requireUsername(username))
-      return rows.map((row) => Number(row.id))
+      const rows = username === undefined ? selectAllIds.all() : selectIdsForUser.all(requireUsername(username));
+      return rows.map((row) => Number(row.id));
     },
 
     usernames() {
-      return selectUsernames.all().map((row) => String(row.username))
+      return selectUsernames.all().map((row) => String(row.username));
     },
 
     close() {
-      db.close()
+      db.close();
     },
-  }
+  };
 }

@@ -47,11 +47,11 @@
  * single factor (`MOTION_SCALE`), so every ratio that distinguishes one rung from
  * another survives intact. See the constant for why 0.6.
  */
-import type { Modifier } from '../../domain/types.ts'
-import type { RigPartId } from './primitives.tsx'
-import { boneEntries, localAngles, resolvePhasePose, sampleTimeline } from './rig.ts'
-import type { RigPose } from './rig.ts'
-import type { FigurePhase, Rig } from './types.ts'
+import type { Modifier } from "../../domain/types.ts";
+import type { RigPartId } from "./primitives.tsx";
+import { boneEntries, localAngles, resolvePhasePose, sampleTimeline } from "./rig.ts";
+import type { RigPose } from "./rig.ts";
+import type { FigurePhase, Rig } from "./types.ts";
 
 /**
  * Which drawn phase is the **lowered / de-loaded** end of each pattern's rep —
@@ -90,19 +90,19 @@ import type { FigurePhase, Rig } from './types.ts'
  * content typo already renders a placeholder that never animates at all.
  */
 export const LOWERED_PHASE: Readonly<Record<string, FigurePhase>> = {
-  push: 'end',
-  squat: 'end',
-  hinge: 'start',
-  prone: 'start',
-  plank: 'start',
-}
+  push: "end",
+  squat: "end",
+  hinge: "start",
+  prone: "start",
+  plank: "start",
+};
 
 /**
  * One second per unmodified phase — the tempo every rung without an
  * `eccentricSeconds` states in words ("about one second down, one second up").
  * The animation says exactly what the cue says.
  */
-export const BASE_PHASE_SECONDS = 1
+export const BASE_PHASE_SECONDS = 1;
 
 /**
  * Everything is scaled by this before it becomes CSS.
@@ -120,34 +120,34 @@ export const BASE_PHASE_SECONDS = 1
  * preserved exactly, so compressing cannot cost discriminability. It is also
  * the only knob: nothing else in this file is a tuned number.
  */
-export const MOTION_SCALE = 0.6
+export const MOTION_SCALE = 0.6;
 
 /** `eccentric` and `concentric` move; `hold` is the segment with no movement. */
-export type MotionSegmentPhase = 'eccentric' | 'concentric' | 'hold'
+export type MotionSegmentPhase = "eccentric" | "concentric" | "hold";
 
 export interface MotionSegment {
-  readonly phase: MotionSegmentPhase
-  readonly durationMs: number
+  readonly phase: MotionSegmentPhase;
+  readonly durationMs: number;
   /** Position at the segment's start. `0` = the drawn `start` pose, `1` = `end`. */
-  readonly from: number
+  readonly from: number;
   /** Position at the segment's end. Equal to `from` on a `hold`, by definition. */
-  readonly to: number
+  readonly to: number;
 }
 
 export interface MotionTimeline {
   /** In order, and cyclic: the last segment's `to` returns to the first's `from`. */
-  readonly segments: readonly MotionSegment[]
-  readonly totalMs: number
+  readonly segments: readonly MotionSegment[];
+  readonly totalMs: number;
   /** Which drawn phase this pattern's eccentric arrives at. See `LOWERED_PHASE`. */
-  readonly loweredPhase: FigurePhase
+  readonly loweredPhase: FigurePhase;
   /** Position of the still segment, or `undefined` when the rung has no pause. */
-  readonly holdAt: number | undefined
+  readonly holdAt: number | undefined;
 }
 
 function scaledMs(seconds: number): number {
   // A hand-editable content file can hold a zero or a negative; clamp rather
   // than emit a CSS duration that would freeze or reverse the loop.
-  return Math.max(1, Math.round(Math.max(0, seconds) * 1000 * MOTION_SCALE))
+  return Math.max(1, Math.round(Math.max(0, seconds) * 1000 * MOTION_SCALE));
 }
 
 /**
@@ -158,10 +158,10 @@ function scaledMs(seconds: number): number {
  * `LOWERED_PHASE`. `'mid'` has no drawn pose, so it holds the crossfade halfway;
  * no rung currently uses it.
  */
-function holdPosition(pauseAt: NonNullable<Modifier['pauseAt']>, loweredPhase: FigurePhase): number {
-  if (pauseAt === 'mid') return 0.5
-  const loweredPosition = loweredPhase === 'end' ? 1 : 0
-  return pauseAt === 'bottom' ? loweredPosition : 1 - loweredPosition
+function holdPosition(pauseAt: NonNullable<Modifier["pauseAt"]>, loweredPhase: FigurePhase): number {
+  if (pauseAt === "mid") return 0.5;
+  const loweredPosition = loweredPhase === "end" ? 1 : 0;
+  return pauseAt === "bottom" ? loweredPosition : 1 - loweredPosition;
 }
 
 /**
@@ -172,72 +172,69 @@ function holdPosition(pauseAt: NonNullable<Modifier['pauseAt']>, loweredPhase: F
  * would make two rungs that differ only in leverage animate at different speeds,
  * which would be a lie about the tempo the cue text prescribes.
  */
-export function buildTimeline(
-  figureId: string | undefined,
-  modifier: Modifier | undefined,
-): MotionTimeline {
-  const loweredPhase = (figureId ? LOWERED_PHASE[figureId] : undefined) ?? 'end'
-  const eccentricMs = scaledMs(modifier?.eccentricSeconds ?? BASE_PHASE_SECONDS)
-  const concentricMs = scaledMs(BASE_PHASE_SECONDS)
+export function buildTimeline(figureId: string | undefined, modifier: Modifier | undefined): MotionTimeline {
+  const loweredPhase = (figureId ? LOWERED_PHASE[figureId] : undefined) ?? "end";
+  const eccentricMs = scaledMs(modifier?.eccentricSeconds ?? BASE_PHASE_SECONDS);
+  const concentricMs = scaledMs(BASE_PHASE_SECONDS);
 
   // The loop always walks 0 → 1 → 0, because the drawn `start` pose is where
   // every rep begins. Which of those two legs is the *eccentric* is what
   // `loweredPhase` decides.
-  const outboundIsEccentric = loweredPhase === 'end'
+  const outboundIsEccentric = loweredPhase === "end";
   const outbound: MotionSegment = {
-    phase: outboundIsEccentric ? 'eccentric' : 'concentric',
+    phase: outboundIsEccentric ? "eccentric" : "concentric",
     durationMs: outboundIsEccentric ? eccentricMs : concentricMs,
     from: 0,
     to: 1,
-  }
+  };
   const inbound: MotionSegment = {
-    phase: outboundIsEccentric ? 'concentric' : 'eccentric',
+    phase: outboundIsEccentric ? "concentric" : "eccentric",
     durationMs: outboundIsEccentric ? concentricMs : eccentricMs,
     from: 1,
     to: 0,
-  }
+  };
 
-  const segments: MotionSegment[] = []
-  let holdAt: number | undefined
+  const segments: MotionSegment[] = [];
+  let holdAt: number | undefined;
 
   if (modifier?.pauseSeconds) {
     // `pauseSeconds` with no `pauseAt` still means "the figure stops". The
     // loaded end is where a hold lives on every rung that names one, so guess
     // there rather than silently dropping a prescribed hold from the clock.
-    holdAt = holdPosition(modifier.pauseAt ?? 'bottom', loweredPhase)
+    holdAt = holdPosition(modifier.pauseAt ?? "bottom", loweredPhase);
     const hold: MotionSegment = {
-      phase: 'hold',
+      phase: "hold",
       durationMs: scaledMs(modifier.pauseSeconds),
       from: holdAt,
       to: holdAt,
-    }
+    };
 
     if (holdAt === 0) {
       // A hold at the drawn `start` pose is the loop's own boundary. Placing it
       // first means the figure is at rest on first paint and only then moves —
       // the design system's "nothing animates on load" instinct, as close as a
       // looping clock can get to it.
-      segments.push(hold, outbound, inbound)
+      segments.push(hold, outbound, inbound);
     } else if (holdAt === 1) {
-      segments.push(outbound, hold, inbound)
+      segments.push(outbound, hold, inbound);
     } else {
       // A mid-rep pause splits the *eccentric* in half: a paused rep pauses
       // under load, on the way down, never on the way back. Both branches still
       // open at position 0, so the loop always begins from the pose the rep
       // begins from.
-      const eccentric = outboundIsEccentric ? outbound : inbound
-      const firstHalfMs = Math.max(1, Math.round(eccentric.durationMs / 2))
-      const secondHalfMs = Math.max(1, eccentric.durationMs - firstHalfMs)
+      const eccentric = outboundIsEccentric ? outbound : inbound;
+      const firstHalfMs = Math.max(1, Math.round(eccentric.durationMs / 2));
+      const secondHalfMs = Math.max(1, eccentric.durationMs - firstHalfMs);
       const descend = [
         { ...eccentric, to: holdAt, durationMs: firstHalfMs },
         hold,
         { ...eccentric, from: holdAt, durationMs: secondHalfMs },
-      ]
-      if (outboundIsEccentric) segments.push(...descend, inbound)
-      else segments.push(outbound, ...descend)
+      ];
+      if (outboundIsEccentric) segments.push(...descend, inbound);
+      else segments.push(outbound, ...descend);
     }
   } else {
-    segments.push(outbound, inbound)
+    segments.push(outbound, inbound);
   }
 
   return {
@@ -245,18 +242,15 @@ export function buildTimeline(
     totalMs: segments.reduce((sum, segment) => sum + segment.durationMs, 0),
     loweredPhase,
     holdAt,
-  }
+  };
 }
 
 /** The timeline as a CSS identifier fragment, readable in devtools as the
  * clock itself: `e0-100-1800_h100-100-1200_c100-0-600`. */
 function timelineSlug(timeline: MotionTimeline): string {
   return timeline.segments
-    .map(
-      (s) =>
-        `${s.phase.slice(0, 1)}${Math.round(s.from * 100)}-${Math.round(s.to * 100)}-${s.durationMs}`,
-    )
-    .join('_')
+    .map((s) => `${s.phase.slice(0, 1)}${Math.round(s.from * 100)}-${Math.round(s.to * 100)}-${s.durationMs}`)
+    .join("_");
 }
 
 /**
@@ -271,12 +265,12 @@ function timelineSlug(timeline: MotionTimeline): string {
  * changes exactly when the keyframes would — and identical rigs still share.
  */
 function rigSlug(rig: Rig): string {
-  let hash = 0x811c9dc5
+  let hash = 0x811c9dc5;
   for (const char of JSON.stringify(rig)) {
-    hash ^= char.charCodeAt(0)
-    hash = Math.imul(hash, 0x01000193) >>> 0
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
   }
-  return hash.toString(36)
+  return hash.toString(36);
 }
 
 /**
@@ -287,26 +281,23 @@ function rigSlug(rig: Rig): string {
  * The 20-odd rungs that share both a clock and a figure share one set of
  * `@keyframes`, so duplicated `<style>` tags are identical and harmless.
  */
-export function motionClassNames(
-  timeline: MotionTimeline,
-  rig: Rig,
-): ReadonlyMap<RigPartId, string> {
-  const base = `exercise-figure-clock-${timelineSlug(timeline)}-${rigSlug(rig)}`
-  const names = new Map<RigPartId, string>([['anchor', `${base}-anchor`]])
-  for (const [id] of boneEntries(resolvePhasePose(rig, 'start'))) names.set(id, `${base}-${id}`)
-  return names
+export function motionClassNames(timeline: MotionTimeline, rig: Rig): ReadonlyMap<RigPartId, string> {
+  const base = `exercise-figure-clock-${timelineSlug(timeline)}-${rigSlug(rig)}`;
+  const names = new Map<RigPartId, string>([["anchor", `${base}-anchor`]]);
+  for (const [id] of boneEntries(resolvePhasePose(rig, "start"))) names.set(id, `${base}-${id}`);
+  return names;
 }
 
 /** Percentages and angles to four and three decimals, trailing zeros dropped. */
 function trim(value: number, digits: number): string {
-  return value.toFixed(digits).replace(/\.?0+$/, '') || '0'
+  return value.toFixed(digits).replace(/\.?0+$/, "") || "0";
 }
 
 function partTransform(pose: RigPose, local: ReadonlyMap<RigPartId, number>, part: RigPartId): string {
-  if (part === 'anchor') {
-    return `translate(${trim(pose.shoulder.x, 3)}px, ${trim(pose.shoulder.y, 3)}px)`
+  if (part === "anchor") {
+    return `translate(${trim(pose.shoulder.x, 3)}px, ${trim(pose.shoulder.y, 3)}px)`;
   }
-  return `rotate(${trim(local.get(part) ?? 0, 3)}deg)`
+  return `rotate(${trim(local.get(part) ?? 0, 3)}deg)`;
 }
 
 /**
@@ -338,27 +329,27 @@ function partTransform(pose: RigPose, local: ReadonlyMap<RigPartId, number>, par
  * attribute, which is the `end` pose (`RigFigure`).
  */
 export function motionStyles(timeline: MotionTimeline, rig: Rig): string {
-  const names = motionClassNames(timeline, rig)
+  const names = motionClassNames(timeline, rig);
   const samples = sampleTimeline(rig, timeline).map((sample) => ({
     percent: trim(sample.percent, 4),
     pose: sample.pose,
     local: localAngles(sample.pose) as ReadonlyMap<RigPartId, number>,
-  }))
-  const duration = `${timeline.totalMs}ms`
-  const keyframes: string[] = []
-  const rules: string[] = []
+  }));
+  const duration = `${timeline.totalMs}ms`;
+  const keyframes: string[] = [];
+  const rules: string[] = [];
   for (const [part, name] of names) {
     const stops = samples.map(
       (sample) => `  ${sample.percent}% { transform: ${partTransform(sample.pose, sample.local, part)}; }`,
-    )
-    keyframes.push(`@keyframes ${name} {\n${stops.join('\n')}\n}`)
-    rules.push(`.${name} { animation: ${name} ${duration} linear infinite; }`)
+    );
+    keyframes.push(`@keyframes ${name} {\n${stops.join("\n")}\n}`);
+    rules.push(`.${name} { animation: ${name} ${duration} linear infinite; }`);
   }
   return [
     ...keyframes,
     ...rules,
-    '@media (prefers-reduced-motion: reduce) {',
-    `  ${[...names.values()].map((name) => `.${name}`).join(', ')} { animation: none; }`,
-    '}',
-  ].join('\n')
+    "@media (prefers-reduced-motion: reduce) {",
+    `  ${[...names.values()].map((name) => `.${name}`).join(", ")} { animation: none; }`,
+    "}",
+  ].join("\n");
 }

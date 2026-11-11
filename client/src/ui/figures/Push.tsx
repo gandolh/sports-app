@@ -1,4 +1,4 @@
-import type { FigureDefinition, Rig } from './types.ts'
+import type { FigureDefinition, Rig } from "./types.ts";
 
 /**
  * Push-up, side view, head left and feet right: top (arms straight) to bottom
@@ -40,43 +40,43 @@ export const PUSH_RIG: Rig = {
   neck: { length: 20, angleDeg: { start: -143.13, end: -164.16 } },
   limbs: {
     armL: {
-      kind: 'ik',
-      root: 'shoulder',
+      kind: "ik",
+      root: "shoulder",
       upper: 47.05,
       lower: 47.05,
       bend: -1,
       target: { start: { x: 58, y: 176 }, end: { x: 58, y: 176 } },
     },
     armR: {
-      kind: 'ik',
-      root: 'shoulder',
+      kind: "ik",
+      root: "shoulder",
       upper: 47.05,
       lower: 47.05,
       bend: -1,
       target: { start: { x: 66, y: 176 }, end: { x: 66, y: 176 } },
     },
     legL: {
-      kind: 'ik',
-      root: 'hip',
+      kind: "ik",
+      root: "hip",
       upper: 33.61,
       lower: 33.61,
       bend: -1,
       target: { start: { x: 172, y: 150 }, end: { x: 172, y: 150 } },
     },
     legR: {
-      kind: 'ik',
-      root: 'hip',
+      kind: "ik",
+      root: "hip",
       upper: 38.31,
       lower: 38.31,
       bend: -1,
       target: { start: { x: 177, y: 158 }, end: { x: 177, y: 158 } },
     },
   },
-}
+};
 
 /** Points down, above the back at mid-body: the chest's descent. Clear of the
  * torso at its highest (y≈90 here at the top of the rep). */
 export const PUSH_FIGURE: FigureDefinition = {
   rig: PUSH_RIG,
   arrow: { x: 100, y1: 36, y2: 74 },
-}
+};

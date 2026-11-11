@@ -68,9 +68,9 @@
  * The latch is per username because one person's broken file must not lock
  * everybody else out of a shared browser.
  */
-import type { IsoTimestamp, StateDoc } from '@sports-app/shared/types.ts'
-import type { ParseResult } from './codec.ts'
-import { emptyDoc as buildEmptyDoc, parse, serialise } from './codec.ts'
+import type { IsoTimestamp, StateDoc } from "@sports-app/shared/types.ts";
+import type { ParseResult } from "./codec.ts";
+import { emptyDoc as buildEmptyDoc, parse, serialise } from "./codec.ts";
 
 // ─── Keys ───────────────────────────────────────────────────────────────────
 
@@ -97,11 +97,10 @@ export const STORAGE_KEYS = {
   /** The live document for one user. The only copy that matters. */
   live: (username: string): string => `sports-app.state.v3.${encodeUsernameForKey(username)}`,
   /** Written and verified before that user's live key is touched. */
-  shadow: (username: string): string =>
-    `sports-app.state.shadow.v3.${encodeUsernameForKey(username)}`,
+  shadow: (username: string): string => `sports-app.state.shadow.v3.${encodeUsernameForKey(username)}`,
   /** Advisory only — last save time. Losing it costs nothing. */
   meta: (username: string): string => `sports-app.meta.v3.${encodeUsernameForKey(username)}`,
-} as const
+} as const;
 
 /**
  * The single-document keys used up to v2, **read and never written**.
@@ -120,9 +119,9 @@ export const STORAGE_KEYS = {
  * `status: 'migrated'` so the UI can ask whose it is rather than assuming.
  */
 export const LEGACY_STORAGE_KEYS = {
-  live: 'sports-app.state.v1',
-  shadow: 'sports-app.state.shadow.v1',
-} as const
+  live: "sports-app.state.v1",
+  shadow: "sports-app.state.shadow.v1",
+} as const;
 
 /**
  * The characters a username may contribute to a storage key directly. Anything
@@ -137,7 +136,7 @@ export const LEGACY_STORAGE_KEYS = {
  * number of segments in a key fixed, and the encoded username therefore
  * unambiguously the whole final segment.
  */
-const KEY_SAFE_CHARACTER = /^[a-z0-9_-]$/
+const KEY_SAFE_CHARACTER = /^[a-z0-9_-]$/;
 
 /**
  * Injective, and deliberately not reversible in code.
@@ -155,35 +154,35 @@ const KEY_SAFE_CHARACTER = /^[a-z0-9_-]$/
  * failure than throwing inside a storage helper.
  */
 function encodeUsernameForKey(username: string): string {
-  let out = ''
+  let out = "";
   // Iterating the string yields whole code points, so an astral character is
   // encoded as one UTF-8 sequence rather than two broken halves.
   for (const character of username) {
-    out += KEY_SAFE_CHARACTER.test(character) ? character : percentEncode(character)
+    out += KEY_SAFE_CHARACTER.test(character) ? character : percentEncode(character);
   }
-  return out
+  return out;
 }
 
 function percentEncode(character: string): string {
-  let out = ''
+  let out = "";
   for (const byte of new TextEncoder().encode(character)) {
-    out += `%${byte.toString(16).toUpperCase().padStart(2, '0')}`
+    out += `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
   }
-  return out
+  return out;
 }
 
 // ─── Storage plumbing ───────────────────────────────────────────────────────
 
 /** The three methods this module uses. A test fake implements exactly this. */
 export interface StorageLike {
-  getItem(key: string): string | null
-  setItem(key: string, value: string): void
-  removeItem(key: string): void
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
 }
 
 export interface StoreOptions {
   /** Defaults to `localStorage`. Injected in tests. */
-  readonly storage?: StorageLike | undefined
+  readonly storage?: StorageLike | undefined;
 }
 
 /**
@@ -195,12 +194,12 @@ export interface StoreOptions {
  * guard; a second copy of this `try` is a second place to get it wrong.
  */
 export function resolveStorage(options: StoreOptions): StorageLike | null {
-  if (options.storage) return options.storage
+  if (options.storage) return options.storage;
   try {
-    const candidate = globalThis.localStorage
-    return candidate ?? null
+    const candidate = globalThis.localStorage;
+    return candidate ?? null;
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -210,7 +209,7 @@ export function resolveStorage(options: StoreOptions): StorageLike | null {
  * Keyed by username: one person's unreadable document must not stop anybody else
  * from saving. Absent means "will write".
  */
-const readOnlyReasons = new Map<string, string>()
+const readOnlyReasons = new Map<string, string>();
 
 /**
  * True when this module will refuse to write `username`'s document. Set when
@@ -219,11 +218,11 @@ const readOnlyReasons = new Map<string, string>()
  * visible read-only mode.
  */
 export function isReadOnly(username: string): boolean {
-  return readOnlyReasons.has(username)
+  return readOnlyReasons.has(username);
 }
 
 export function readOnlyReason(username: string): string | null {
-  return readOnlyReasons.get(username) ?? null
+  return readOnlyReasons.get(username) ?? null;
 }
 
 /**
@@ -237,20 +236,20 @@ export function readOnlyReason(username: string): string | null {
  * one refused save.
  */
 export function clearReadOnly(username?: string): void {
-  if (username === undefined) readOnlyReasons.clear()
-  else readOnlyReasons.delete(username)
+  if (username === undefined) readOnlyReasons.clear();
+  else readOnlyReasons.delete(username);
 }
 
 // ─── load ───────────────────────────────────────────────────────────────────
 
 export type LoadResult =
   /** Normal path. */
-  | { readonly status: 'loaded'; readonly doc: StateDoc }
+  | { readonly status: "loaded"; readonly doc: StateDoc }
   /**
    * The live key was absent but a complete shadow copy was there: a save was
    * interrupted between writing the shadow and promoting it.
    */
-  | { readonly status: 'recovered'; readonly doc: StateDoc }
+  | { readonly status: "recovered"; readonly doc: StateDoc }
   /**
    * This user has no document under the current keys, but the browser holds the
    * single pre-v3 document from before the app had accounts. It has been migrated
@@ -260,40 +259,40 @@ export type LoadResult =
    * should save, and may want to confirm with the user first, because on a shared
    * browser the document may not be theirs.
    */
-  | { readonly status: 'migrated'; readonly doc: StateDoc }
+  | { readonly status: "migrated"; readonly doc: StateDoc }
   /** Nothing stored for this user. First run, or storage was cleared. */
-  | { readonly status: 'empty' }
+  | { readonly status: "empty" }
   /**
    * The stored text is present and unreadable — or readable and belongs to
    * somebody else. `rawText` is the stored bytes, unmodified — hand it to the
    * user for repair or export. Nothing was written.
    */
-  | { readonly status: 'corrupt'; readonly error: string; readonly rawText: string }
+  | { readonly status: "corrupt"; readonly error: string; readonly rawText: string }
   /** Storage itself is unreachable. The app runs, in memory, read-only. */
-  | { readonly status: 'unavailable'; readonly error: string }
+  | { readonly status: "unavailable"; readonly error: string };
 
 /** Reads one user's live document. Never throws. Never writes. */
 export function load(username: string, options: StoreOptions = {}): LoadResult {
-  const storage = resolveStorage(options)
+  const storage = resolveStorage(options);
   if (!storage) {
     const reason =
-      'Browser storage is unavailable, so nothing can be saved. ' +
-      'Private browsing or blocked cookies are the usual cause. Export before you close the tab.'
-    readOnlyReasons.set(username, reason)
-    return { status: 'unavailable', error: reason }
+      "Browser storage is unavailable, so nothing can be saved. " +
+      "Private browsing or blocked cookies are the usual cause. Export before you close the tab.";
+    readOnlyReasons.set(username, reason);
+    return { status: "unavailable", error: reason };
   }
 
-  let liveText: string | null
+  let liveText: string | null;
   try {
-    liveText = storage.getItem(STORAGE_KEYS.live(username))
+    liveText = storage.getItem(STORAGE_KEYS.live(username));
   } catch (cause) {
-    const reason = `Browser storage could not be read: ${messageOf(cause)}`
-    readOnlyReasons.set(username, reason)
-    return { status: 'unavailable', error: reason }
+    const reason = `Browser storage could not be read: ${messageOf(cause)}`;
+    readOnlyReasons.set(username, reason);
+    return { status: "unavailable", error: reason };
   }
 
   if (liveText !== null) {
-    return acceptLive(username, liveText)
+    return acceptLive(username, liveText);
   }
 
   // No live document. A parseable shadow means a save was interrupted after the
@@ -301,28 +300,28 @@ export function load(username: string, options: StoreOptions = {}): LoadResult {
   // it rather than starting from zero. A shadow that does *not* parse is ignored
   // rather than reported: it is a staging copy the live key never took, so it is
   // not evidence that anybody's history is broken.
-  const shadow = readAndParse(storage, STORAGE_KEYS.shadow(username), username)
+  const shadow = readAndParse(storage, STORAGE_KEYS.shadow(username), username);
   if (shadow?.ok === true && shadow.doc.username === username) {
-    clearReadOnly(username)
-    return { status: 'recovered', doc: shadow.doc }
+    clearReadOnly(username);
+    return { status: "recovered", doc: shadow.doc };
   }
 
   // Nothing of this user's under the v3 keys. The pre-v3 single-document keys are
   // the last place a real history can be, and the one place the v2→v3 migration
   // gets to run for real.
   for (const legacyKey of [LEGACY_STORAGE_KEYS.live, LEGACY_STORAGE_KEYS.shadow]) {
-    const legacyText = read(storage, legacyKey)
-    if (legacyText === null) continue
-    const parsed = parseDoc(legacyText, username)
+    const legacyText = read(storage, legacyKey);
+    if (legacyText === null) continue;
+    const parsed = parseDoc(legacyText, username);
     if (parsed.ok) {
       // A genuinely pre-v3 document carries no owner, so the migration attributed
       // it to this user and this comparison is automatic. It can only fail if
       // somebody pasted a *v3* document into the old key — in which case it is
       // somebody else's, and skipping it is right: it is not evidence that this
       // user's history is broken.
-      if (parsed.doc.username !== username) continue
-      clearReadOnly(username)
-      return { status: 'migrated', doc: parsed.doc }
+      if (parsed.doc.username !== username) continue;
+      clearReadOnly(username);
+      return { status: "migrated", doc: parsed.doc };
     }
     if (legacyKey === LEGACY_STORAGE_KEYS.live) {
       // Loud, not silent. This text is somebody's entire training history in a
@@ -331,14 +330,14 @@ export function load(username: string, options: StoreOptions = {}): LoadResult {
       const reason =
         `A training history saved before this app had accounts could not be read, ` +
         `so the app is read-only to avoid writing over it. The stored file is ` +
-        `untouched.\n\n${parsed.error}`
-      readOnlyReasons.set(username, reason)
-      return { status: 'corrupt', error: parsed.error, rawText: legacyText }
+        `untouched.\n\n${parsed.error}`;
+      readOnlyReasons.set(username, reason);
+      return { status: "corrupt", error: parsed.error, rawText: legacyText };
     }
   }
 
-  clearReadOnly(username)
-  return { status: 'empty' }
+  clearReadOnly(username);
+  return { status: "empty" };
 }
 
 /**
@@ -351,22 +350,20 @@ export function load(username: string, options: StoreOptions = {}): LoadResult {
  * user's session into that key would overwrite whoever it does belong to.
  */
 function acceptLive(username: string, text: string): LoadResult {
-  const result = parseDoc(text, username)
+  const result = parseDoc(text, username);
   if (result.ok && result.doc.username === username) {
-    clearReadOnly(username)
-    return { status: 'loaded', doc: result.doc }
+    clearReadOnly(username);
+    return { status: "loaded", doc: result.doc };
   }
 
   if (result.ok) {
     const error =
-      `The stored document says it belongs to "${result.doc.username}", not ` +
-      `"${username}". Nothing was changed.`
+      `The stored document says it belongs to "${result.doc.username}", not ` + `"${username}". Nothing was changed.`;
     readOnlyReasons.set(
       username,
-      `${error} The app is read-only rather than overwriting a document that may ` +
-        `be somebody else's only copy.`,
-    )
-    return { status: 'corrupt', error, rawText: text }
+      `${error} The app is read-only rather than overwriting a document that may ` + `be somebody else's only copy.`,
+    );
+    return { status: "corrupt", error, rawText: text };
   }
 
   // Do not touch the stored key. Not to repair it, not to move it aside, not to
@@ -376,22 +373,22 @@ function acceptLive(username: string, text: string): LoadResult {
     username,
     `The saved training history could not be read, so the app is read-only to ` +
       `avoid overwriting it. The stored file is untouched.\n\n${result.error}`,
-  )
-  return { status: 'corrupt', error: result.error, rawText: text }
+  );
+  return { status: "corrupt", error: result.error, rawText: text };
 }
 
 function read(storage: StorageLike, key: string): string | null {
   try {
-    return storage.getItem(key)
+    return storage.getItem(key);
   } catch {
-    return null
+    return null;
   }
 }
 
 function readAndParse(storage: StorageLike, key: string, username: string): ParseResult | null {
-  const text = read(storage, key)
-  if (text === null) return null
-  return parseDoc(text, username)
+  const text = read(storage, key);
+  if (text === null) return null;
+  return parseDoc(text, username);
 }
 
 /**
@@ -399,7 +396,7 @@ function readAndParse(storage: StorageLike, key: string, username: string): Pars
  * recorded in it. A v3 document carries its own, and `accept` compares the two.
  */
 function parseDoc(text: string, username: string): ParseResult {
-  return parse(text, { username })
+  return parse(text, { username });
 }
 
 /**
@@ -410,23 +407,23 @@ function parseDoc(text: string, username: string): ParseResult {
  * `codec.emptyDoc` no longer needs any, because v3 stores nothing derived.
  */
 export function emptyDoc(username: string): StateDoc {
-  return buildEmptyDoc(username)
+  return buildEmptyDoc(username);
 }
 
 // ─── save ───────────────────────────────────────────────────────────────────
 
 export type SaveResult =
   | { readonly ok: true; readonly savedAt: IsoTimestamp; readonly bytes: number }
-  | { readonly ok: false; readonly error: string }
+  | { readonly ok: false; readonly error: string };
 
 export interface SaveOptions extends StoreOptions {
   /**
    * Overwrite a live document that fails to parse. Only the import flow passes
    * this, and only after the user has confirmed a summary of what replaces it.
    */
-  readonly allowOverwriteCorrupt?: boolean | undefined
+  readonly allowOverwriteCorrupt?: boolean | undefined;
   /** Injected in tests; defaults to the wall clock. */
-  readonly now?: IsoTimestamp | undefined
+  readonly now?: IsoTimestamp | undefined;
 }
 
 /**
@@ -446,64 +443,64 @@ export interface SaveOptions extends StoreOptions {
  * failure at 6 leaves the shadow in place, and `load()` will recover from it.
  */
 export function save(doc: StateDoc, options: SaveOptions = {}): SaveResult {
-  const storage = resolveStorage(options)
+  const storage = resolveStorage(options);
   if (!storage) {
     return {
       ok: false,
       error:
-        'Browser storage is unavailable, so this could not be saved. ' +
-        'Export the document to a file before closing the tab.',
-    }
+        "Browser storage is unavailable, so this could not be saved. " +
+        "Export the document to a file before closing the tab.",
+    };
   }
 
-  const username = doc.username
-  const liveKey = STORAGE_KEYS.live(username)
-  const shadowKey = STORAGE_KEYS.shadow(username)
+  const username = doc.username;
+  const liveKey = STORAGE_KEYS.live(username);
+  const shadowKey = STORAGE_KEYS.shadow(username);
 
   // 1 — serialise
-  let text: string
+  let text: string;
   try {
-    text = serialise(doc)
+    text = serialise(doc);
   } catch (cause) {
-    return { ok: false, error: `Could not serialise the document: ${messageOf(cause)}` }
+    return { ok: false, error: `Could not serialise the document: ${messageOf(cause)}` };
   }
 
   // 2 — verify the text reads back as the same shape before it goes anywhere
   // near storage. This is the step that catches a NaN counter or a username the
   // sync service would refuse, while the previous good document is still intact.
-  const verified = parseDoc(text, username)
+  const verified = parseDoc(text, username);
   if (!verified.ok) {
     return {
       ok: false,
       error:
         `Refusing to save: the document did not read back correctly, so it was ` +
         `not written and the previously saved history is untouched.\n\n${verified.error}`,
-    }
+    };
   }
 
   // 3 — never write over something we could not read, unless told to.
   if (options.allowOverwriteCorrupt !== true) {
-    const latched = readOnlyReasons.get(username)
+    const latched = readOnlyReasons.get(username);
     if (latched !== undefined) {
-      return { ok: false, error: `Refusing to save while read-only.\n\n${latched}` }
+      return { ok: false, error: `Refusing to save while read-only.\n\n${latched}` };
     }
-    const existing = readAndParse(storage, liveKey, username)
+    const existing = readAndParse(storage, liveKey, username);
     if (existing !== null && existing.ok === false) {
       readOnlyReasons.set(
         username,
         `The saved training history could not be read, so the app is read-only to ` +
           `avoid overwriting it. The stored file is untouched.\n\n${existing.error}`,
-      )
+      );
       return {
         ok: false,
         error: `Refusing to save over a document that could not be read.\n\n${existing.error}`,
-      }
+      };
     }
   }
 
   // 4 — shadow write
   try {
-    storage.setItem(shadowKey, text)
+    storage.setItem(shadowKey, text);
   } catch (cause) {
     return {
       ok: false,
@@ -511,50 +508,50 @@ export function save(doc: StateDoc, options: SaveOptions = {}): SaveResult {
         `Could not write to browser storage: ${messageOf(cause)}. ` +
         `Nothing was changed — the previously saved history is intact. ` +
         `If storage is full, export and then clear other site data.`,
-    }
+    };
   }
 
   // 5 — read the shadow back. A storage layer that quietly truncated or dropped
   // the value must not be trusted with the live key.
-  let shadowText: string | null
+  let shadowText: string | null;
   try {
-    shadowText = storage.getItem(shadowKey)
+    shadowText = storage.getItem(shadowKey);
   } catch (cause) {
-    return { ok: false, error: `Could not read back the staged save: ${messageOf(cause)}` }
+    return { ok: false, error: `Could not read back the staged save: ${messageOf(cause)}` };
   }
   if (shadowText !== text) {
     return {
       ok: false,
       error:
         `Refusing to save: the staged copy read back different from what was ` +
-        `written (${text.length} bytes out, ${shadowText === null ? 'nothing' : `${shadowText.length} bytes`} back). ` +
+        `written (${text.length} bytes out, ${shadowText === null ? "nothing" : `${shadowText.length} bytes`} back). ` +
         `The previously saved history is untouched.`,
-    }
+    };
   }
-  const shadowParsed = parseDoc(shadowText, username)
+  const shadowParsed = parseDoc(shadowText, username);
   if (!shadowParsed.ok) {
     return {
       ok: false,
       error: `Refusing to save: the staged copy did not parse.\n\n${shadowParsed.error}`,
-    }
+    };
   }
 
   // 6 — promote, then verify the promotion actually took.
   try {
-    storage.setItem(liveKey, shadowText)
+    storage.setItem(liveKey, shadowText);
   } catch (cause) {
     return {
       ok: false,
       error:
         `Could not promote the staged save: ${messageOf(cause)}. ` +
         `A complete copy is staged and will be recovered on next load.`,
-    }
+    };
   }
-  let liveText: string | null
+  let liveText: string | null;
   try {
-    liveText = storage.getItem(liveKey)
+    liveText = storage.getItem(liveKey);
   } catch (cause) {
-    return { ok: false, error: `Could not verify the save: ${messageOf(cause)}` }
+    return { ok: false, error: `Could not verify the save: ${messageOf(cause)}` };
   }
   if (liveText !== text) {
     return {
@@ -562,27 +559,27 @@ export function save(doc: StateDoc, options: SaveOptions = {}): SaveResult {
       error:
         `The save did not verify: storage returned different content than was ` +
         `written. A complete copy is staged and will be recovered on next load.`,
-    }
+    };
   }
 
   // 7 — the shadow has served its purpose. Removing it last means there is never
   // a moment where neither key holds a complete document.
   try {
-    storage.removeItem(shadowKey)
+    storage.removeItem(shadowKey);
   } catch {
     // Harmless: a stale shadow is only ever read when the live key is missing.
   }
 
-  const savedAt = options.now ?? new Date().toISOString()
-  writeMeta(storage, username, { lastSavedAt: savedAt })
-  clearReadOnly(username)
-  return { ok: true, savedAt, bytes: text.length }
+  const savedAt = options.now ?? new Date().toISOString();
+  writeMeta(storage, username, { lastSavedAt: savedAt });
+  clearReadOnly(username);
+  return { ok: true, savedAt, bytes: text.length };
 }
 
 // ─── Advisory metadata ──────────────────────────────────────────────────────
 
 export interface StoreMeta {
-  readonly lastSavedAt: IsoTimestamp | null
+  readonly lastSavedAt: IsoTimestamp | null;
 }
 
 /**
@@ -592,25 +589,25 @@ export interface StoreMeta {
  * carry another device's save time.
  */
 export function readMeta(username: string, options: StoreOptions = {}): StoreMeta {
-  const storage = resolveStorage(options)
-  if (!storage) return { lastSavedAt: null }
+  const storage = resolveStorage(options);
+  if (!storage) return { lastSavedAt: null };
   try {
-    const text = storage.getItem(STORAGE_KEYS.meta(username))
-    if (text === null) return { lastSavedAt: null }
-    const raw: unknown = JSON.parse(text)
-    if (typeof raw === 'object' && raw !== null && 'lastSavedAt' in raw) {
-      const value = (raw as { lastSavedAt: unknown }).lastSavedAt
-      if (typeof value === 'string') return { lastSavedAt: value }
+    const text = storage.getItem(STORAGE_KEYS.meta(username));
+    if (text === null) return { lastSavedAt: null };
+    const raw: unknown = JSON.parse(text);
+    if (typeof raw === "object" && raw !== null && "lastSavedAt" in raw) {
+      const value = (raw as { lastSavedAt: unknown }).lastSavedAt;
+      if (typeof value === "string") return { lastSavedAt: value };
     }
   } catch {
     // Advisory only. An unreadable meta key must never block a load.
   }
-  return { lastSavedAt: null }
+  return { lastSavedAt: null };
 }
 
 function writeMeta(storage: StorageLike, username: string, meta: StoreMeta): void {
   try {
-    storage.setItem(STORAGE_KEYS.meta(username), JSON.stringify(meta))
+    storage.setItem(STORAGE_KEYS.meta(username), JSON.stringify(meta));
   } catch {
     // Never fail a good save because the advisory metadata would not fit.
   }
@@ -620,11 +617,11 @@ function writeMeta(storage: StorageLike, username: string, meta: StoreMeta): voi
 
 export interface PersistenceOutcome {
   /** `null` means the browser has no Storage Manager — nothing was requested. */
-  readonly granted: boolean | null
+  readonly granted: boolean | null;
   /** True when `doc` differs from the input and should be saved. */
-  readonly changed: boolean
-  readonly doc: StateDoc
-  readonly note: string
+  readonly changed: boolean;
+  readonly doc: StateDoc;
+  readonly note: string;
 }
 
 /**
@@ -652,31 +649,31 @@ export async function requestPersistentStorage(doc: StateDoc): Promise<Persisten
       changed: false,
       doc,
       note: doc.settings.persistGranted
-        ? 'Storage is marked persistent; the browser should not evict it.'
-        : 'The browser previously declined persistent storage. Export or sync regularly.',
-    }
+        ? "Storage is marked persistent; the browser should not evict it."
+        : "The browser previously declined persistent storage. Export or sync regularly.",
+    };
   }
 
-  const manager = readStorageManager()
+  const manager = readStorageManager();
   if (!manager) {
     return {
       granted: null,
       changed: false,
       doc,
-      note: 'This browser has no persistent-storage API, so eviction cannot be ruled out. Export or sync regularly.',
-    }
+      note: "This browser has no persistent-storage API, so eviction cannot be ruled out. Export or sync regularly.",
+    };
   }
 
-  let granted: boolean
+  let granted: boolean;
   try {
-    granted = (await manager.persisted?.()) === true ? true : (await manager.persist()) === true
+    granted = (await manager.persisted?.()) === true ? true : (await manager.persist()) === true;
   } catch {
     return {
       granted: null,
       changed: false,
       doc,
-      note: 'The persistent-storage request failed. Export or sync regularly.',
-    }
+      note: "The persistent-storage request failed. Export or sync regularly.",
+    };
   }
 
   return {
@@ -684,29 +681,29 @@ export async function requestPersistentStorage(doc: StateDoc): Promise<Persisten
     changed: true,
     doc: { ...doc, settings: { ...doc.settings, persistGranted: granted } },
     note: granted
-      ? 'Storage is now marked persistent; the browser should not evict it.'
-      : 'The browser declined persistent storage. Your history can be evicted — export or sync regularly.',
-  }
+      ? "Storage is now marked persistent; the browser should not evict it."
+      : "The browser declined persistent storage. Your history can be evicted — export or sync regularly.",
+  };
 }
 
 interface StorageManagerLike {
-  persist(): Promise<boolean>
-  persisted?: () => Promise<boolean>
+  persist(): Promise<boolean>;
+  persisted?: () => Promise<boolean>;
 }
 
 function readStorageManager(): StorageManagerLike | null {
   try {
-    const nav = globalThis.navigator as Navigator | undefined
-    const storage = nav?.storage as StorageManagerLike | undefined
-    if (!storage || typeof storage.persist !== 'function') return null
-    return storage
+    const nav = globalThis.navigator as Navigator | undefined;
+    const storage = nav?.storage as StorageManagerLike | undefined;
+    if (!storage || typeof storage.persist !== "function") return null;
+    return storage;
   } catch {
-    return null
+    return null;
   }
 }
 
 // ─── Shared ─────────────────────────────────────────────────────────────────
 
 function messageOf(cause: unknown): string {
-  return cause instanceof Error ? cause.message : String(cause)
+  return cause instanceof Error ? cause.message : String(cause);
 }

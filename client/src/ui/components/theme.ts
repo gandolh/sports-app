@@ -33,36 +33,27 @@
  * changes, and the two must agree on the key names.
  */
 
-export type Theme = 'light' | 'dark'
+export type Theme = "light" | "dark";
 
 /** `null` = follow the OS. See the header: this is a third state, not a default. */
-export type ThemeChoice = Theme | null
+export type ThemeChoice = Theme | null;
 
-export const ACCENTS = [
-  'mint',
-  'azure',
-  'violet',
-  'magenta',
-  'coral',
-  'amber',
-  'lime',
-  'slate',
-] as const
+export const ACCENTS = ["mint", "azure", "violet", "magenta", "coral", "amber", "lime", "slate"] as const;
 
-export type Accent = (typeof ACCENTS)[number]
+export type Accent = (typeof ACCENTS)[number];
 
 /** Unstamped. Repeated in `tokens.css` as the bare `:root` accent block. */
-export const DEFAULT_ACCENT: Accent = 'mint'
+export const DEFAULT_ACCENT: Accent = "mint";
 
-export const THEME_KEY = 'sports-app.theme'
-export const ACCENT_KEY = 'sports-app.accent'
+export const THEME_KEY = "sports-app.theme";
+export const ACCENT_KEY = "sports-app.accent";
 
 export function isTheme(value: unknown): value is Theme {
-  return value === 'light' || value === 'dark'
+  return value === "light" || value === "dark";
 }
 
 export function isAccent(value: unknown): value is Accent {
-  return typeof value === 'string' && (ACCENTS as readonly string[]).includes(value)
+  return typeof value === "string" && (ACCENTS as readonly string[]).includes(value);
 }
 
 /**
@@ -74,29 +65,29 @@ export function isAccent(value: unknown): value is Accent {
  */
 function read(key: string): string | null {
   try {
-    return localStorage.getItem(key)
+    return localStorage.getItem(key);
   } catch {
-    return null
+    return null;
   }
 }
 
 function write(key: string, value: string | null): void {
   try {
-    if (value === null) localStorage.removeItem(key)
-    else localStorage.setItem(key, value)
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
   } catch {
     /* Unstorable. The stamp below still applies for this session. */
   }
 }
 
 export function readTheme(): ThemeChoice {
-  const stored = read(THEME_KEY)
-  return isTheme(stored) ? stored : null
+  const stored = read(THEME_KEY);
+  return isTheme(stored) ? stored : null;
 }
 
 export function readAccent(): Accent {
-  const stored = read(ACCENT_KEY)
-  return isAccent(stored) ? stored : DEFAULT_ACCENT
+  const stored = read(ACCENT_KEY);
+  return isAccent(stored) ? stored : DEFAULT_ACCENT;
 }
 
 /**
@@ -104,19 +95,18 @@ export function readAccent(): Accent {
  * `'light'` — is what returns the page to following the OS.
  */
 export function setTheme(choice: ThemeChoice): void {
-  const root = document.documentElement
-  if (choice === null) root.removeAttribute('data-theme')
-  else root.setAttribute('data-theme', choice)
-  write(THEME_KEY, choice)
+  const root = document.documentElement;
+  if (choice === null) root.removeAttribute("data-theme");
+  else root.setAttribute("data-theme", choice);
+  write(THEME_KEY, choice);
 }
 
 export function setAccent(accent: Accent): void {
-  const root = document.documentElement
+  const root = document.documentElement;
   // Mint is what an unstamped root already resolves to, so it is stored as the
   // absence of a choice. That keeps "I never picked one" and "I picked the
   // default" the same state, which is the honest reading of both.
-  if (accent === DEFAULT_ACCENT) root.removeAttribute('data-accent')
-  else root.setAttribute('data-accent', accent)
-  write(ACCENT_KEY, accent === DEFAULT_ACCENT ? null : accent)
+  if (accent === DEFAULT_ACCENT) root.removeAttribute("data-accent");
+  else root.setAttribute("data-accent", accent);
+  write(ACCENT_KEY, accent === DEFAULT_ACCENT ? null : accent);
 }
-

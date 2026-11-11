@@ -1,4 +1,4 @@
-import { configureAuth } from '../../vendor/ward/ward-auth-react.js'
+import { configureAuth } from "../../vendor/ward/ward-auth-react.js";
 
 /**
  * Where the sign-in routes are, as the **browser** reaches them.
@@ -14,9 +14,9 @@ import { configureAuth } from '../../vendor/ward/ward-auth-react.js'
  * work before any document exists and always talks to the origin that served the
  * app, because the cookie is `SameSite=Lax` and rides no further.
  */
-export const API_PREFIX: string = __SPORTS_APP_API_PREFIX__
+export const API_PREFIX: string = __SPORTS_APP_API_PREFIX__;
 
-export const AUTH_BASE_PATH = `${API_PREFIX}/api/auth`
+export const AUTH_BASE_PATH = `${API_PREFIX}/api/auth`;
 
 /**
  * Point the vendored hooks at the service. Called once, at module load of the
@@ -27,5 +27,5 @@ export const AUTH_BASE_PATH = `${API_PREFIX}/api/auth`
  * Tests call `configureAuth` themselves with a fake `fetch`, which replaces this.
  */
 export function configureSessionAuth(): void {
-  configureAuth({ basePath: AUTH_BASE_PATH })
+  configureAuth({ basePath: AUTH_BASE_PATH });
 }

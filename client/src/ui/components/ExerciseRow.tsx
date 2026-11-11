@@ -1,7 +1,7 @@
-import type { PrescribedItem } from '../../domain/schedule.ts'
-import { PatternIcon } from './icons.tsx'
-import { PosturalNote } from './HonestNote.tsx'
-import { itemName, rungSummary, targetLabel, targetText } from './format.ts'
+import type { PrescribedItem } from "../../domain/schedule.ts";
+import { PatternIcon } from "./icons.tsx";
+import { PosturalNote } from "./HonestNote.tsx";
+import { itemName, rungSummary, targetLabel, targetText } from "./format.ts";
 
 /**
  * One line of the plan: what the movement is, how much of it, and — on the pull
@@ -34,10 +34,10 @@ import { itemName, rungSummary, targetLabel, targetText } from './format.ts'
  */
 
 export function ExerciseRow({ item }: { readonly item: PrescribedItem }) {
-  const cardio = item.type === 'cardio'
-  const postural = item.type === 'exercise' && item.ladderKind === 'postural'
-  const rung = rungSummary(item)
-  const unit = cardio ? 'rounds' : item.unit
+  const cardio = item.type === "cardio";
+  const postural = item.type === "exercise" && item.ladderKind === "postural";
+  const rung = rungSummary(item);
+  const unit = cardio ? "rounds" : item.unit;
 
   return (
     <li className="mt-[var(--sp-2)]">
@@ -47,13 +47,9 @@ export function ExerciseRow({ item }: { readonly item: PrescribedItem }) {
         </span>
 
         <span className="min-w-0">
-          <span className="block truncate text-body font-semibold tracking-[-0.012em]">
-            {itemName(item)}
-          </span>
+          <span className="block truncate text-body font-semibold tracking-[-0.012em]">{itemName(item)}</span>
           <span className="block text-meta text-tx2">
-            {cardio
-              ? `${item.rounds} rounds · no ladder`
-              : `${item.sets} sets${rung === null ? '' : ` · ${rung}`}`}
+            {cardio ? `${item.rounds} rounds · no ladder` : `${item.sets} sets${rung === null ? "" : ` · ${rung}`}`}
           </span>
         </span>
 
@@ -76,12 +72,10 @@ export function ExerciseRow({ item }: { readonly item: PrescribedItem }) {
           are what somebody standing on a mat actually wants from this line, and
           they are the protocol's own words. */}
       {cardio ? (
-        <p className="mt-[var(--sp-1)] px-[var(--sp-1)] text-meta text-tx2">
-          {item.protocol.movements.join('  ·  ')}
-        </p>
+        <p className="mt-[var(--sp-1)] px-[var(--sp-1)] text-meta text-tx2">{item.protocol.movements.join("  ·  ")}</p>
       ) : null}
 
       {postural ? <PosturalNote inset /> : null}
     </li>
-  )
+  );
 }

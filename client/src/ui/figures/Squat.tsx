@@ -1,4 +1,4 @@
-import type { FigureDefinition, Rig } from './types.ts'
+import type { FigureDefinition, Rig } from "./types.ts";
 
 /**
  * Squat, side view, facing right: standing to the bottom (hips back and down,
@@ -35,29 +35,29 @@ export const SQUAT_RIG: Rig = {
   torso: { length: 42, angleDeg: { start: 90, end: 122 } },
   neck: { length: 18, angleDeg: { start: -90, end: -62 } },
   limbs: {
-    armL: { kind: 'fk', root: 'shoulder', length: 64, angleDeg: { start: 68, end: -4 } },
-    armR: { kind: 'fk', root: 'shoulder', length: 64, angleDeg: { start: 62, end: 2 } },
+    armL: { kind: "fk", root: "shoulder", length: 64, angleDeg: { start: 68, end: -4 } },
+    armR: { kind: "fk", root: "shoulder", length: 64, angleDeg: { start: 62, end: 2 } },
     legL: {
-      kind: 'ik',
-      root: 'hip',
+      kind: "ik",
+      root: "hip",
       upper: 39.06,
       lower: 39.06,
       bend: -1,
       target: { start: { x: 104, y: 178 }, end: { x: 104, y: 178 } },
     },
     legR: {
-      kind: 'ik',
-      root: 'hip',
+      kind: "ik",
+      root: "hip",
       upper: 39.06,
       lower: 39.06,
       bend: -1,
       target: { start: { x: 97, y: 178 }, end: { x: 97, y: 178 } },
     },
   },
-}
+};
 
 /** Points down, in front of the head and above the reaching arms: the descent. */
 export const SQUAT_FIGURE: FigureDefinition = {
   rig: SQUAT_RIG,
   arrow: { x: 156, y1: 34, y2: 80 },
-}
+};

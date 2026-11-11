@@ -1,4 +1,4 @@
-import type { ExerciseRecord, Pattern, SessionResult } from '@sports-app/shared/types.ts'
+import type { ExerciseRecord, Pattern, SessionResult } from "@sports-app/shared/types.ts";
 
 /**
  * Everything the interface derives from `history` — the streak, the heatmap,
@@ -48,7 +48,7 @@ import type { ExerciseRecord, Pattern, SessionResult } from '@sports-app/shared/
  *  (`domain/types.ts`). 42 / 6 = 7. So the weekly goal is not a target somebody
  *  picked to make a ring look good — it is the cadence the whole progression
  *  arithmetic is already built on, read back out. */
-export const WEEKLY_GOAL = 7
+export const WEEKLY_GOAL = 7;
 
 /**
  * A local calendar day as `YYYY-MM-DD`.
@@ -59,9 +59,9 @@ export const WEEKLY_GOAL = 7
  * option along produces a locale-dependent string.
  */
 export function dayKey(date: Date): string {
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${date.getFullYear()}-${month}-${day}`
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 /** Midnight local, `offset` days from `from`. Negative goes back. */
@@ -69,7 +69,7 @@ export function addDays(from: Date, offset: number): Date {
   // Constructed from the calendar fields rather than by adding milliseconds:
   // a day is not always 86,400,000ms across a DST boundary, and a heatmap that
   // skips or repeats a square twice a year is a bug nobody reproduces.
-  return new Date(from.getFullYear(), from.getMonth(), from.getDate() + offset)
+  return new Date(from.getFullYear(), from.getMonth(), from.getDate() + offset);
 }
 
 /**
@@ -82,14 +82,14 @@ export function addDays(from: Date, offset: number): Date {
  * screen.
  */
 export function sessionsByDay(history: readonly SessionResult[]): ReadonlyMap<string, number> {
-  const byDay = new Map<string, number>()
+  const byDay = new Map<string, number>();
   for (const session of history) {
-    const at = new Date(session.completedAt)
-    if (Number.isNaN(at.getTime())) continue
-    const key = dayKey(at)
-    byDay.set(key, (byDay.get(key) ?? 0) + 1)
+    const at = new Date(session.completedAt);
+    if (Number.isNaN(at.getTime())) continue;
+    const key = dayKey(at);
+    byDay.set(key, (byDay.get(key) ?? 0) + 1);
   }
-  return byDay
+  return byDay;
 }
 
 /**
@@ -103,24 +103,24 @@ export function sessionsByDay(history: readonly SessionResult[]): ReadonlyMap<st
  * train is worse than no streak at all.
  */
 export function currentStreak(byDay: ReadonlyMap<string, number>, now: Date): number {
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  let cursor = (byDay.get(dayKey(today)) ?? 0) > 0 ? today : addDays(today, -1)
-  let streak = 0
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let cursor = (byDay.get(dayKey(today)) ?? 0) > 0 ? today : addDays(today, -1);
+  let streak = 0;
   // Bounded rather than `while (true)`: history is finite, but the loop's
   // termination should not depend on the data being well-formed.
   for (let step = 0; step < 3650; step += 1) {
-    if ((byDay.get(dayKey(cursor)) ?? 0) === 0) break
-    streak += 1
-    cursor = addDays(cursor, -1)
+    if ((byDay.get(dayKey(cursor)) ?? 0) === 0) break;
+    streak += 1;
+    cursor = addDays(cursor, -1);
   }
-  return streak
+  return streak;
 }
 
 export interface HeatCell {
   /** The local day, `YYYY-MM-DD`. Stable, so it doubles as the React key. */
-  readonly key: string
+  readonly key: string;
   /** 0 nothing · 1 one session · 2 two or more. Three steps, not a gradient. */
-  readonly level: 0 | 1 | 2
+  readonly level: 0 | 1 | 2;
 }
 
 /**
@@ -131,25 +131,21 @@ export interface HeatCell {
  * trained twice. A five-step green ramp over a two-valued dataset is a chart
  * implying precision it does not have.
  */
-export function heatmap(
-  byDay: ReadonlyMap<string, number>,
-  now: Date,
-  days: number = 42,
-): readonly HeatCell[] {
-  const cells: HeatCell[] = []
+export function heatmap(byDay: ReadonlyMap<string, number>, now: Date, days: number = 42): readonly HeatCell[] {
+  const cells: HeatCell[] = [];
   for (let offset = days - 1; offset >= 0; offset -= 1) {
-    const key = dayKey(addDays(now, -offset))
-    const count = byDay.get(key) ?? 0
-    cells.push({ key, level: count === 0 ? 0 : count === 1 ? 1 : 2 })
+    const key = dayKey(addDays(now, -offset));
+    const count = byDay.get(key) ?? 0;
+    cells.push({ key, level: count === 0 ? 0 : count === 1 ? 1 : 2 });
   }
-  return cells
+  return cells;
 }
 
 export interface WeekProgress {
-  readonly done: number
-  readonly goal: number
+  readonly done: number;
+  readonly goal: number;
   /** `0 .. 1`, clamped. Past the goal it stays at 1 — see below. */
-  readonly fraction: number
+  readonly fraction: number;
 }
 
 /**
@@ -163,16 +159,16 @@ export interface WeekProgress {
  */
 export function weekProgress(byDay: ReadonlyMap<string, number>, now: Date): WeekProgress {
   // `getDay()` is 0 for Sunday, so Monday is 1 and Sunday has to wrap to 6.
-  const backToMonday = (now.getDay() + 6) % 7
-  let done = 0
+  const backToMonday = (now.getDay() + 6) % 7;
+  let done = 0;
   for (let offset = 0; offset <= backToMonday; offset += 1) {
-    done += byDay.get(dayKey(addDays(now, -(backToMonday - offset)))) ?? 0
+    done += byDay.get(dayKey(addDays(now, -(backToMonday - offset)))) ?? 0;
   }
   return {
     done,
     goal: WEEKLY_GOAL,
     fraction: Math.min(done / WEEKLY_GOAL, 1),
-  }
+  };
 }
 
 /**
@@ -182,15 +178,12 @@ export function weekProgress(byDay: ReadonlyMap<string, number>, now: Date): Wee
  * first: `history` is append-ordered, and the pull exercise appears in every
  * session while push appears in one of three.
  */
-export function lastRecordFor(
-  history: readonly SessionResult[],
-  pattern: Pattern,
-): ExerciseRecord | null {
+export function lastRecordFor(history: readonly SessionResult[], pattern: Pattern): ExerciseRecord | null {
   for (let index = history.length - 1; index >= 0; index -= 1) {
-    const record = history[index]?.exercises.find((exercise) => exercise.pattern === pattern)
-    if (record !== undefined) return record
+    const record = history[index]?.exercises.find((exercise) => exercise.pattern === pattern);
+    if (record !== undefined) return record;
   }
-  return null
+  return null;
 }
 
 /**
@@ -204,20 +197,17 @@ export function lastRecordFor(
  * simply never used the log button, which is the default path through the
  * player.
  */
-export function bestLoggedFor(
-  history: readonly SessionResult[],
-  pattern: Pattern,
-): number | null {
-  let best: number | null = null
+export function bestLoggedFor(history: readonly SessionResult[], pattern: Pattern): number | null {
+  let best: number | null = null;
   for (const session of history) {
     for (const exercise of session.exercises) {
-      if (exercise.pattern !== pattern) continue
+      if (exercise.pattern !== pattern) continue;
       for (const value of exercise.logged ?? []) {
-        if (best === null || value > best) best = value
+        if (best === null || value > best) best = value;
       }
     }
   }
-  return best
+  return best;
 }
 
 /**
@@ -236,5 +226,5 @@ export function sanitiseLog(values: readonly number[], sets: number): readonly n
   return values
     .filter((value) => Number.isFinite(value))
     .map((value) => Math.max(0, Math.round(value)))
-    .slice(0, Math.max(0, sets))
+    .slice(0, Math.max(0, sets));
 }

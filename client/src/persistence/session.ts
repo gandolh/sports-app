@@ -38,20 +38,19 @@
  * browser, and putting it inside the document would mean importing somebody
  * else's export silently switched who you were.
  */
-import { USERNAME_RULE, isValidUsername } from '@sports-app/shared/username.ts'
-import type { StoreOptions } from './store.ts'
-import { resolveStorage } from './store.ts'
+import { USERNAME_RULE, isValidUsername } from "@sports-app/shared/username.ts";
+import type { StoreOptions } from "./store.ts";
+import { resolveStorage } from "./store.ts";
 
 /**
  * Versioned with the schema generation, like the document keys, so a build that
  * changes what this holds cannot misread what the previous one wrote.
  */
-export const SESSION_KEY = 'sports-app.session.v3'
+export const SESSION_KEY = "sports-app.session.v3";
 
 export type SetUsernameResult =
   /** `username` is the stored (trimmed) form — use it, do not re-derive it. */
-  | { readonly ok: true; readonly username: string }
-  | { readonly ok: false; readonly error: string }
+  { readonly ok: true; readonly username: string } | { readonly ok: false; readonly error: string };
 
 /**
  * Who this browser is acting as, or `null` when nobody is logged in.
@@ -63,15 +62,15 @@ export type SetUsernameResult =
  * unreadable *document* — that one is irreplaceable.)
  */
 export function currentUsername(options: StoreOptions = {}): string | null {
-  const storage = resolveStorage(options)
-  if (!storage) return null
-  let text: string | null
+  const storage = resolveStorage(options);
+  if (!storage) return null;
+  let text: string | null;
   try {
-    text = storage.getItem(SESSION_KEY)
+    text = storage.getItem(SESSION_KEY);
   } catch {
-    return null
+    return null;
   }
-  return isValidUsername(text) ? text : null
+  return isValidUsername(text) ? text : null;
 }
 
 /**
@@ -86,12 +85,12 @@ export function currentUsername(options: StoreOptions = {}): string | null {
  * document.
  */
 export function setCurrentUsername(username: string, options: StoreOptions = {}): SetUsernameResult {
-  const trimmed = typeof username === 'string' ? username.trim() : ''
+  const trimmed = typeof username === "string" ? username.trim() : "";
   if (!isValidUsername(trimmed)) {
-    return { ok: false, error: `That username will not work: expected ${USERNAME_RULE}.` }
+    return { ok: false, error: `That username will not work: expected ${USERNAME_RULE}.` };
   }
 
-  const storage = resolveStorage(options)
+  const storage = resolveStorage(options);
   if (!storage) {
     // Not fatal, and not silent either. The app can run for this tab — every
     // other function takes the username as a parameter — but it will be forgotten
@@ -99,20 +98,20 @@ export function setCurrentUsername(username: string, options: StoreOptions = {})
     return {
       ok: false,
       error:
-        'Browser storage is unavailable, so this browser cannot remember who you are. ' +
-        'Private browsing or blocked cookies are the usual cause.',
-    }
+        "Browser storage is unavailable, so this browser cannot remember who you are. " +
+        "Private browsing or blocked cookies are the usual cause.",
+    };
   }
 
   try {
-    storage.setItem(SESSION_KEY, trimmed)
+    storage.setItem(SESSION_KEY, trimmed);
   } catch (cause) {
     return {
       ok: false,
       error: `Could not remember the username: ${cause instanceof Error ? cause.message : String(cause)}`,
-    }
+    };
   }
-  return { ok: true, username: trimmed }
+  return { ok: true, username: trimmed };
 }
 
 /**
@@ -121,10 +120,10 @@ export function setCurrentUsername(username: string, options: StoreOptions = {})
  * history, and the same person will log back in.
  */
 export function clearCurrentUsername(options: StoreOptions = {}): void {
-  const storage = resolveStorage(options)
-  if (!storage) return
+  const storage = resolveStorage(options);
+  if (!storage) return;
   try {
-    storage.removeItem(SESSION_KEY)
+    storage.removeItem(SESSION_KEY);
   } catch {
     // Nothing to do and nothing worth reporting: the caller is on its way to the
     // login screen either way, and the next successful write replaces this value.

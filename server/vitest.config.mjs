@@ -13,13 +13,13 @@
 // (it is typechecked by JSDoc in an editor, never by `tsc`), and a `.ts` config
 // file here would be the only TypeScript in the workspace and the only file `tsc`
 // was silently not checking.
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
     // No DOM, ever. Nothing here has a browser to run in.
-    environment: 'node',
+    environment: "node",
     globals: true,
-    include: ['**/*.{test,spec}.mjs'],
+    include: ["**/*.{test,spec}.mjs"],
   },
-})
+});

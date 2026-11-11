@@ -7,7 +7,7 @@
 //
 // `defineConfig` comes from `vitest/config` for the same reason it does in
 // `client/vite.config.ts`: it is what types the `test` block.
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
@@ -24,6 +24,6 @@ export default defineConfig({
     // already covered from the side that consumes it — the codec's suite for the
     // client, `state-server.test.mjs` for the service. A third project collecting
     // zero files would be a config entry pretending to be coverage.
-    projects: ['client', 'server'],
+    projects: ["client", "server"],
   },
-})
+});

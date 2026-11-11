@@ -22,10 +22,10 @@
  */
 
 export interface DotsProps {
-  readonly filled: number
-  readonly total: number
+  readonly filled: number;
+  readonly total: number;
   /** What the dots are counting, for the screen-reader sentence: `sets`, `rounds`. */
-  readonly noun: string
+  readonly noun: string;
 }
 
 export function Dots({ filled, total, noun }: DotsProps) {
@@ -43,12 +43,12 @@ export function Dots({ filled, total, noun }: DotsProps) {
           key={index}
           data-filled={index < filled}
           className={
-            'block h-[6px] w-[2.1rem] rounded-full transition-colors ' +
-            'duration-[var(--dur-base)] ease-[var(--ease-spring)] ' +
-            (index < filled ? 'bg-accent' : 'bg-s3')
+            "block h-[6px] w-[2.1rem] rounded-full transition-colors " +
+            "duration-[var(--dur-base)] ease-[var(--ease-spring)] " +
+            (index < filled ? "bg-accent" : "bg-s3")
           }
         />
       ))}
     </div>
-  )
+  );
 }

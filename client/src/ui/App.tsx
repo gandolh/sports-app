@@ -1,14 +1,14 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { RouterProvider, createRouter } from '@tanstack/react-router'
-import type { RouterHistory } from '@tanstack/react-router'
-import { rootRoute } from './routes/__root.tsx'
-import { indexRoute } from './routes/index.tsx'
-import { planRoute } from './routes/plan.tsx'
-import { progressRoute } from './routes/progress.tsx'
-import { accountRoute } from './routes/account.tsx'
-import { libraryRoute } from './routes/library.tsx'
-import { loginRoute } from './routes/login.tsx'
-import { configureSessionAuth } from '../persistence/auth.ts'
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RouterProvider, createRouter } from "@tanstack/react-router";
+import type { RouterHistory } from "@tanstack/react-router";
+import { rootRoute } from "./routes/__root.tsx";
+import { indexRoute } from "./routes/index.tsx";
+import { planRoute } from "./routes/plan.tsx";
+import { progressRoute } from "./routes/progress.tsx";
+import { accountRoute } from "./routes/account.tsx";
+import { libraryRoute } from "./routes/library.tsx";
+import { loginRoute } from "./routes/login.tsx";
+import { configureSessionAuth } from "../persistence/auth.ts";
 
 /**
  * Router and query wiring, and nothing else. Every screen owns its own layout —
@@ -33,16 +33,9 @@ import { configureSessionAuth } from '../persistence/auth.ts'
 // Before the router exists: the vendored sign-in client reads (and removes) the
 // outcome of a Ward round trip from the address bar as it is configured, and the
 // router must not have read that address first. See `persistence/auth.ts`.
-configureSessionAuth()
+configureSessionAuth();
 
-const routeTree = rootRoute.addChildren([
-  indexRoute,
-  planRoute,
-  progressRoute,
-  accountRoute,
-  libraryRoute,
-  loginRoute,
-])
+const routeTree = rootRoute.addChildren([indexRoute, planRoute, progressRoute, accountRoute, libraryRoute, loginRoute]);
 
 /**
  * The sub-path the app is served from, without its trailing slash, or `undefined`
@@ -57,7 +50,7 @@ const routeTree = rootRoute.addChildren([
  * location as `/sports-app/`, matches no route, and renders the 404 on every
  * screen while the assets around it load perfectly.
  */
-const basepath = import.meta.env.BASE_URL.replace(/\/+$/, '') || undefined
+const basepath = import.meta.env.BASE_URL.replace(/\/+$/, "") || undefined;
 
 export function createAppRouter(history?: RouterHistory) {
   return createRouter({
@@ -67,14 +60,14 @@ export function createAppRouter(history?: RouterHistory) {
     // Nothing to preload: every route reads the same synchronous local document,
     // so a preload would be work with no latency to hide.
     defaultPreload: false,
-  })
+  });
 }
 
-export const router = createAppRouter()
+export const router = createAppRouter();
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface Register {
-    router: typeof router
+    router: typeof router;
   }
 }
 
@@ -97,25 +90,25 @@ export function createAppQueryClient(): QueryClient {
       },
       mutations: { retry: false },
     },
-  })
+  });
 }
 
 export function AppRoot({
   router: appRouter,
   queryClient,
 }: {
-  readonly router: ReturnType<typeof createAppRouter>
-  readonly queryClient: QueryClient
+  readonly router: ReturnType<typeof createAppRouter>;
+  readonly queryClient: QueryClient;
 }) {
   return (
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={appRouter} />
     </QueryClientProvider>
-  )
+  );
 }
 
-const queryClient = createAppQueryClient()
+const queryClient = createAppQueryClient();
 
 export function App() {
-  return <AppRoot router={router} queryClient={queryClient} />
+  return <AppRoot router={router} queryClient={queryClient} />;
 }

@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
-import { Field } from '@base-ui/react/field'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import { Field } from "@base-ui/react/field";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   useChangePassword,
   useLogout,
@@ -11,14 +11,14 @@ import {
   useWardResult,
   useWardSignOut,
   useWardUnlink,
-} from '../../../vendor/ward/ward-auth-react.js'
-import type { AuthError } from '../../../vendor/ward/ward-auth-react.js'
-import { clearCurrentUsername } from '../../persistence/session.ts'
-import { AlertBanner } from './AlertBanner.tsx'
-import { QuietButton, SecondaryButton } from './Buttons.tsx'
-import { describeAuthIssue } from './authMessages.ts'
-import { FIELD_DESCRIPTION, FIELD_INPUT, FIELD_LABEL } from './fields.ts'
-import { Eyebrow, SectionHeading } from './Shell.tsx'
+} from "../../../vendor/ward/ward-auth-react.js";
+import type { AuthError } from "../../../vendor/ward/ward-auth-react.js";
+import { clearCurrentUsername } from "../../persistence/session.ts";
+import { AlertBanner } from "./AlertBanner.tsx";
+import { QuietButton, SecondaryButton } from "./Buttons.tsx";
+import { describeAuthIssue } from "./authMessages.ts";
+import { FIELD_DESCRIPTION, FIELD_INPUT, FIELD_LABEL } from "./fields.ts";
+import { Eyebrow, SectionHeading } from "./Shell.tsx";
 
 /**
  * The account's sign-in settings: who the service thinks you are, the Ward link,
@@ -52,46 +52,43 @@ import { Eyebrow, SectionHeading } from './Shell.tsx'
  * session that is still live.
  */
 export function SignInSettings() {
-  const session = useSession()
-  const navigate = useNavigate()
-  const logout = useLogout()
-  const wardOut = useWardSignOut()
-  const wardResult = useWardResult()
+  const session = useSession();
+  const navigate = useNavigate();
+  const logout = useLogout();
+  const wardOut = useWardSignOut();
+  const wardResult = useWardResult();
 
   async function logOut(): Promise<void> {
-    if (!(await logout.logout())) return
-    clearCurrentUsername()
-    void navigate({ to: '/login' })
+    if (!(await logout.logout())) return;
+    clearCurrentUsername();
+    void navigate({ to: "/login" });
   }
 
   async function logOutOfWard(): Promise<void> {
-    if (!(await wardOut.signOut())) return
+    if (!(await wardOut.signOut())) return;
     // The browser is on its way to Ward, which returns to the app's own page. The
     // cached name has to be gone by then or that page would open the app over a
     // session that no longer exists.
-    clearCurrentUsername()
+    clearCurrentUsername();
   }
 
   return (
     <>
       <SectionHeading>Sign-in</SectionHeading>
 
-      {session.status === 'loading' ? (
-        <p className="text-body text-tx2">Checking your session…</p>
-      ) : null}
+      {session.status === "loading" ? <p className="text-body text-tx2">Checking your session…</p> : null}
 
-      {session.status === 'error' ? (
+      {session.status === "error" ? (
         <p className="text-body text-tx2">
           {describeAuthIssue(session.error)} Training and the saved history are not affected.
         </p>
       ) : null}
 
-      {session.status === 'signed_out' ? (
+      {session.status === "signed_out" ? (
         <>
           <p className="text-body text-tx2">
-            You are not signed in to the service, so nothing is backed up or synced. Training
-            still works.
-            {session.reason === undefined ? '' : ` ${describeAuthIssue({ code: session.reason })}`}
+            You are not signed in to the service, so nothing is backed up or synced. Training still works.
+            {session.reason === undefined ? "" : ` ${describeAuthIssue({ code: session.reason })}`}
           </p>
           <div className="mt-[var(--sp-2)]">
             <Link
@@ -104,18 +101,14 @@ export function SignInSettings() {
         </>
       ) : null}
 
-      {wardResult.result === 'linked' ? (
-        <p className="mt-[var(--sp-2)] text-body text-tx2">Ward is linked.</p>
-      ) : null}
-      {wardResult.error === undefined ? null : (
-        <AlertBanner label="Ward" text={describeAuthIssue(wardResult.error)} />
-      )}
+      {wardResult.result === "linked" ? <p className="mt-[var(--sp-2)] text-body text-tx2">Ward is linked.</p> : null}
+      {wardResult.error === undefined ? null : <AlertBanner label="Ward" text={describeAuthIssue(wardResult.error)} />}
 
-      {session.status === 'signed_in' ? (
+      {session.status === "signed_in" ? (
         <>
           <p className="text-body text-tx2">
-            Signed in as <span className="font-semibold text-tx">{session.user.username}</span>,{' '}
-            {session.session.origin === 'ward' ? 'with Ward' : 'with your password'}.
+            Signed in as <span className="font-semibold text-tx">{session.user.username}</span>,{" "}
+            {session.session.origin === "ward" ? "with Ward" : "with your password"}.
           </p>
 
           {session.ward.enabled ? (
@@ -124,41 +117,33 @@ export function SignInSettings() {
 
           <PasswordSection hasPassword={session.user.hasPassword} />
 
-          {logout.error === null ? null : (
-            <AlertBanner label="Not logged out" text={describeAuthIssue(logout.error)} />
-          )}
+          {logout.error === null ? null : <AlertBanner label="Not logged out" text={describeAuthIssue(logout.error)} />}
           {wardOut.error === null ? null : (
             <AlertBanner label="Not logged out" text={describeAuthIssue(wardOut.error)} />
           )}
           <SectionHeading>Session</SectionHeading>
           <p className="text-body text-tx2">
-            Logging out ends your session on the service and forgets which account this browser is
-            showing. Every training history stays exactly where it is.
+            Logging out ends your session on the service and forgets which account this browser is showing. Every
+            training history stays exactly where it is.
           </p>
           <div className="mt-[var(--sp-2)] flex items-center gap-[var(--sp-2)]">
             <SecondaryButton onClick={() => void logOut()}>
-              {logout.pending ? 'Logging out…' : 'Log out'}
+              {logout.pending ? "Logging out…" : "Log out"}
             </SecondaryButton>
-            {session.session.origin === 'ward' ? (
+            {session.session.origin === "ward" ? (
               <QuietButton onClick={() => void logOutOfWard()}>Log out of Ward too</QuietButton>
             ) : null}
           </div>
         </>
       ) : null}
     </>
-  )
+  );
 }
 
-function WardSection({
-  linked,
-  hasPassword,
-}: {
-  readonly linked: boolean
-  readonly hasPassword: boolean
-}) {
-  const link = useWardLink()
-  const unlink = useWardUnlink()
-  const error: AuthError | null = link.error ?? unlink.error
+function WardSection({ linked, hasPassword }: { readonly linked: boolean; readonly hasPassword: boolean }) {
+  const link = useWardLink();
+  const unlink = useWardUnlink();
+  const error: AuthError | null = link.error ?? unlink.error;
 
   return (
     <>
@@ -169,32 +154,30 @@ function WardSection({
         <>
           <p className="mt-[var(--sp-1)] text-body text-tx2">
             A Ward account is linked, so you can sign in with it.
-            {hasPassword
-              ? ''
-              : ' You have no password here yet: set one below before you can unlink it.'}
+            {hasPassword ? "" : " You have no password here yet: set one below before you can unlink it."}
           </p>
           <div className="mt-[var(--sp-2)]">
             <SecondaryButton onClick={() => void unlink.unlink()}>
-              {unlink.pending ? 'Unlinking…' : 'Unlink Ward'}
+              {unlink.pending ? "Unlinking…" : "Unlink Ward"}
             </SecondaryButton>
           </div>
         </>
       ) : (
         <>
           <p className="mt-[var(--sp-1)] text-body text-tx2">
-            Link a Ward account to sign in with it here. Ward asks for its own password and brings
-            you back with the two joined. Nothing is matched by name.
+            Link a Ward account to sign in with it here. Ward asks for its own password and brings you back with the two
+            joined. Nothing is matched by name.
           </p>
           <div className="mt-[var(--sp-2)]">
             <SecondaryButton onClick={() => void link.link()}>
-              {link.pending ? 'Opening Ward…' : 'Link Ward'}
+              {link.pending ? "Opening Ward…" : "Link Ward"}
             </SecondaryButton>
           </div>
         </>
       )}
       {error === null ? null : <AlertBanner label="Ward" text={describeAuthIssue(error)} />}
     </>
-  )
+  );
 }
 
 /** A labelled password field. Controlled, because nothing else reads the value. */
@@ -205,11 +188,11 @@ function PasswordField({
   autoComplete,
   description,
 }: {
-  readonly label: string
-  readonly value: string
-  readonly onChange: (value: string) => void
-  readonly autoComplete: 'current-password' | 'new-password'
-  readonly description?: ReactNode
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly autoComplete: "current-password" | "new-password";
+  readonly description?: ReactNode;
 }) {
   return (
     <Field.Root>
@@ -223,23 +206,23 @@ function PasswordField({
       />
       {description === undefined ? null : <p className={FIELD_DESCRIPTION}>{description}</p>}
     </Field.Root>
-  )
+  );
 }
 
 function PasswordSection({ hasPassword }: { readonly hasPassword: boolean }) {
-  return hasPassword ? <ChangePassword /> : <SetFirstPassword />
+  return hasPassword ? <ChangePassword /> : <SetFirstPassword />;
 }
 
 function ChangePassword() {
-  const change = useChangePassword()
-  const [current, setCurrent] = useState('')
-  const [next, setNext] = useState('')
+  const change = useChangePassword();
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
 
   async function submit(event: FormEvent): Promise<void> {
-    event.preventDefault()
+    event.preventDefault();
     if (await change.changePassword(current, next)) {
-      setCurrent('')
-      setNext('')
+      setCurrent("");
+      setNext("");
     }
   }
 
@@ -249,46 +232,30 @@ function ChangePassword() {
         <Eyebrow>Password</Eyebrow>
       </div>
       <div className="mt-[var(--sp-2)] flex flex-col gap-[var(--sp-3)]">
-        <PasswordField
-          label="Current password"
-          value={current}
-          onChange={setCurrent}
-          autoComplete="current-password"
-        />
-        <PasswordField
-          label="New password"
-          value={next}
-          onChange={setNext}
-          autoComplete="new-password"
-        />
+        <PasswordField label="Current password" value={current} onChange={setCurrent} autoComplete="current-password" />
+        <PasswordField label="New password" value={next} onChange={setNext} autoComplete="new-password" />
       </div>
-      {change.error === null ? null : (
-        <AlertBanner label="Not changed" text={describeAuthIssue(change.error)} />
-      )}
+      {change.error === null ? null : <AlertBanner label="Not changed" text={describeAuthIssue(change.error)} />}
       {change.done ? (
-        <p className="mt-[var(--sp-2)] text-body text-tx2">
-          Password changed. Your other sessions were signed out.
-        </p>
+        <p className="mt-[var(--sp-2)] text-body text-tx2">Password changed. Your other sessions were signed out.</p>
       ) : null}
       <div className="mt-[var(--sp-2)]">
-        <SecondaryButton type="submit">
-          {change.pending ? 'Changing…' : 'Change password'}
-        </SecondaryButton>
+        <SecondaryButton type="submit">{change.pending ? "Changing…" : "Change password"}</SecondaryButton>
       </div>
     </form>
-  )
+  );
 }
 
 function SetFirstPassword() {
-  const local = useSetLocalPassword()
-  const [next, setNext] = useState('')
+  const local = useSetLocalPassword();
+  const [next, setNext] = useState("");
 
   async function submit(event: FormEvent): Promise<void> {
-    event.preventDefault()
-    if (await local.setPassword(next)) setNext('')
+    event.preventDefault();
+    if (await local.setPassword(next)) setNext("");
   }
 
-  const needsWard = local.error?.code === 'reauthentication_required'
+  const needsWard = local.error?.code === "reauthentication_required";
 
   return (
     <form onSubmit={(event) => void submit(event)} noValidate>
@@ -296,34 +263,20 @@ function SetFirstPassword() {
         <Eyebrow>Password</Eyebrow>
       </div>
       <p className="mt-[var(--sp-1)] text-body text-tx2">
-        This account has no password, so Ward is the only way in. Set one to keep signing in while
-        Ward is unreachable.
+        This account has no password, so Ward is the only way in. Set one to keep signing in while Ward is unreachable.
       </p>
       <div className="mt-[var(--sp-2)]">
-        <PasswordField
-          label="New password"
-          value={next}
-          onChange={setNext}
-          autoComplete="new-password"
-        />
+        <PasswordField label="New password" value={next} onChange={setNext} autoComplete="new-password" />
       </div>
       {local.reauthenticated && !needsWard ? (
-        <p className="mt-[var(--sp-2)] text-body text-tx2">
-          Confirmed with Ward. You can set the password now.
-        </p>
+        <p className="mt-[var(--sp-2)] text-body text-tx2">Confirmed with Ward. You can set the password now.</p>
       ) : null}
-      {local.error === null ? null : (
-        <AlertBanner label="Not set" text={describeAuthIssue(local.error)} />
-      )}
+      {local.error === null ? null : <AlertBanner label="Not set" text={describeAuthIssue(local.error)} />}
       {local.done ? (
-        <p className="mt-[var(--sp-2)] text-body text-tx2">
-          Password set. You can sign in with it when Ward is down.
-        </p>
+        <p className="mt-[var(--sp-2)] text-body text-tx2">Password set. You can sign in with it when Ward is down.</p>
       ) : null}
       <div className="mt-[var(--sp-2)] flex items-center gap-[var(--sp-2)]">
-        <SecondaryButton type="submit">
-          {local.pending ? 'Setting…' : 'Set password'}
-        </SecondaryButton>
+        <SecondaryButton type="submit">{local.pending ? "Setting…" : "Set password"}</SecondaryButton>
         {needsWard ? (
           <QuietButton type="button" onClick={() => void local.reauthenticate()}>
             Confirm with Ward
@@ -331,5 +284,5 @@ function SetFirstPassword() {
         ) : null}
       </div>
     </form>
-  )
+  );
 }

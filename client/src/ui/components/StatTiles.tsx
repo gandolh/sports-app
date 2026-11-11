@@ -1,4 +1,4 @@
-import { Eyebrow } from './Shell.tsx'
+import { Eyebrow } from "./Shell.tsx";
 
 /**
  * Three numbers in a row, and the rule that keeps them from becoming six.
@@ -22,11 +22,11 @@ import { Eyebrow } from './Shell.tsx'
 
 export interface Stat {
   /** Already formatted. `4,218`, `18`, `R5`. */
-  readonly value: string
-  readonly label: string
-  readonly note?: string
+  readonly value: string;
+  readonly label: string;
+  readonly note?: string;
   /** The tile as one sentence. Without it the row reads as "142 18 4,218". */
-  readonly srLabel: string
+  readonly srLabel: string;
 }
 
 export function StatTiles({ stats }: { readonly stats: readonly Stat[] }) {
@@ -38,25 +38,19 @@ export function StatTiles({ stats }: { readonly stats: readonly Stat[] }) {
           className="rounded border border-line bg-s1 px-[var(--sp-2)] py-[var(--sp-2)] text-center shadow-1"
         >
           <span className="sr-only">{stat.srLabel}</span>
-          <span
-            aria-hidden="true"
-            className="block text-h leading-none font-bold tracking-[-0.03em] tabular-nums"
-          >
+          <span aria-hidden="true" className="block text-h leading-none font-bold tracking-[-0.03em] tabular-nums">
             {stat.value}
           </span>
           <span aria-hidden="true" className="mt-[var(--sp-1)] block">
             <Eyebrow>{stat.label}</Eyebrow>
           </span>
           {stat.note === undefined ? null : (
-            <span
-              aria-hidden="true"
-              className="mt-[1px] block text-label font-semibold text-accent tabular-nums"
-            >
+            <span aria-hidden="true" className="mt-[1px] block text-label font-semibold text-accent tabular-nums">
               {stat.note}
             </span>
           )}
         </li>
       ))}
     </ul>
-  )
+  );
 }

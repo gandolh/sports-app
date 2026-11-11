@@ -1,29 +1,23 @@
-import { useState } from 'react'
-import type { ReactNode } from 'react'
-import { Link, createRoute } from '@tanstack/react-router'
-import { LADDERS, getRung, topRungIndex } from '../../domain/ladders.ts'
-import { rangeAt, rungIndexAt } from '../../domain/schedule.ts'
-import { milestonesReached, totalWork } from '../../domain/milestones.ts'
-import { PATTERNS } from '@sports-app/shared/types.ts'
-import type { Pattern, StateDoc } from '@sports-app/shared/types.ts'
-import { rootRoute } from './__root.tsx'
-import { toLogin } from './next.ts'
-import { useDocument, useStartFresh } from '../document.ts'
-import { AlertBanner } from '../components/AlertBanner.tsx'
-import { QuietButton, SecondaryButton } from '../components/Buttons.tsx'
-import { SignInSettings } from '../components/SignInSettings.tsx'
-import { SyncSettings } from '../components/SyncSettings.tsx'
-import { TabBar } from '../components/TabBar.tsx'
-import { Eyebrow, SectionHeading, Shell, ShellBody, ShellRail, ShellTitle } from '../components/Shell.tsx'
-import {
-  ACCENTS,
-  readAccent,
-  readTheme,
-  setAccent,
-  setTheme,
-} from '../components/theme.ts'
-import type { Accent, ThemeChoice } from '../components/theme.ts'
-import { PATTERN_LABEL, formatHoldTime, groupDigits } from '../components/format.ts'
+import { useState } from "react";
+import type { ReactNode } from "react";
+import { Link, createRoute } from "@tanstack/react-router";
+import { LADDERS, getRung, topRungIndex } from "../../domain/ladders.ts";
+import { rangeAt, rungIndexAt } from "../../domain/schedule.ts";
+import { milestonesReached, totalWork } from "../../domain/milestones.ts";
+import { PATTERNS } from "@sports-app/shared/types.ts";
+import type { Pattern, StateDoc } from "@sports-app/shared/types.ts";
+import { rootRoute } from "./__root.tsx";
+import { toLogin } from "./next.ts";
+import { useDocument, useStartFresh } from "../document.ts";
+import { AlertBanner } from "../components/AlertBanner.tsx";
+import { QuietButton, SecondaryButton } from "../components/Buttons.tsx";
+import { SignInSettings } from "../components/SignInSettings.tsx";
+import { SyncSettings } from "../components/SyncSettings.tsx";
+import { TabBar } from "../components/TabBar.tsx";
+import { Eyebrow, SectionHeading, Shell, ShellBody, ShellRail, ShellTitle } from "../components/Shell.tsx";
+import { ACCENTS, readAccent, readTheme, setAccent, setTheme } from "../components/theme.ts";
+import type { Accent, ThemeChoice } from "../components/theme.ts";
+import { PATTERN_LABEL, formatHoldTime, groupDigits } from "../components/format.ts";
 
 /**
  * `/account` — who you are, what you have reached, and how much you have done.
@@ -59,26 +53,24 @@ import { PATTERN_LABEL, formatHoldTime, groupDigits } from '../components/format
 
 export const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/account',
+  path: "/account",
   beforeLoad: ({ context, location }) => {
-    if (context.username === null) throw toLogin(location)
-    return { username: context.username }
+    if (context.username === null) throw toLogin(location);
+    return { username: context.username };
   },
   component: AccountRoute,
-})
+});
 
 function AccountRoute() {
-  const { username } = accountRoute.useRouteContext()
-  const { data: snapshot } = useDocument(username)
+  const { username } = accountRoute.useRouteContext();
+  const { data: snapshot } = useDocument(username);
 
   return (
     <Shell>
       <ShellRail>Account</ShellRail>
       <ShellTitle title={username} />
       <ShellBody>
-        {snapshot.readOnly === null ? null : (
-          <AlertBanner label="Read-only" text={snapshot.readOnly} />
-        )}
+        {snapshot.readOnly === null ? null : <AlertBanner label="Read-only" text={snapshot.readOnly} />}
 
         {snapshot.doc === null ? (
           <>
@@ -95,9 +87,8 @@ function AccountRoute() {
 
         <SectionHeading>Reference</SectionHeading>
         <p className="text-body text-tx2">
-          A bodyweight exercise reference — 325 movements with instructions, for looking
-          something up. Nothing in it is scheduled, and reading it changes nothing about
-          what you are asked to do next.
+          A bodyweight exercise reference — 325 movements with instructions, for looking something up. Nothing in it is
+          scheduled, and reading it changes nothing about what you are asked to do next.
         </p>
         <div className="mt-[var(--sp-2)]">
           <Link
@@ -114,15 +105,15 @@ function AccountRoute() {
       </ShellBody>
       <TabBar active="you" />
     </Shell>
-  )
+  );
 }
 
 function AccountBody({ doc }: { readonly doc: StateDoc }) {
-  const work = totalWork(doc)
-  const milestones = milestonesReached(doc)
+  const work = totalWork(doc);
+  const milestones = milestonesReached(doc);
   const ceilings = PATTERNS.filter(
     (pattern) => rungIndexAt(pattern, doc.sessionsDone[pattern]) === topRungIndex(pattern),
-  )
+  );
 
   return (
     <>
@@ -131,7 +122,7 @@ function AccountBody({ doc }: { readonly doc: StateDoc }) {
           {groupDigits(work.sessions)}
         </span>
         <span className="mt-[var(--sp-2)] block">
-          <Eyebrow>{work.sessions === 1 ? 'session completed' : 'sessions completed'}</Eyebrow>
+          <Eyebrow>{work.sessions === 1 ? "session completed" : "sessions completed"}</Eyebrow>
         </span>
       </div>
 
@@ -144,9 +135,8 @@ function AccountBody({ doc }: { readonly doc: StateDoc }) {
         ))}
       </TotalsCard>
       <p className="mt-[var(--sp-2)] text-meta text-tx2">
-        This is work the schedule asked for, added up. Sets you log are not counted here, so a
-        session you didn&rsquo;t log adds the same as one you did. The player shows what you logged
-        the next time you do that exercise.
+        This is work the schedule asked for, added up. Sets you log are not counted here, so a session you didn&rsquo;t
+        log adds the same as one you did. The player shows what you logged the next time you do that exercise.
       </p>
 
       {ceilings.length === 0 ? null : (
@@ -163,8 +153,8 @@ function AccountBody({ doc }: { readonly doc: StateDoc }) {
       <SectionHeading>Milestones</SectionHeading>
       {milestones.length === 0 ? (
         <p className="text-body text-tx2">
-          Nothing yet — the first one lands the first time a ladder moves up a rung, about six
-          weeks in. Start a session from the home screen.
+          Nothing yet — the first one lands the first time a ladder moves up a rung, about six weeks in. Start a session
+          from the home screen.
         </p>
       ) : (
         <ol>
@@ -183,7 +173,7 @@ function AccountBody({ doc }: { readonly doc: StateDoc }) {
         </ol>
       )}
     </>
-  )
+  );
 }
 
 /** A bordered card of hairline-separated rows — the one repeated shape on this page. */
@@ -209,24 +199,24 @@ function AccountBody({ doc }: { readonly doc: StateDoc }) {
  * flickering to it on mount.
  */
 function Appearance() {
-  const [theme, setThemeState] = useState<ThemeChoice>(() => readTheme())
-  const [accent, setAccentState] = useState<Accent>(() => readAccent())
+  const [theme, setThemeState] = useState<ThemeChoice>(() => readTheme());
+  const [accent, setAccentState] = useState<Accent>(() => readAccent());
 
   function chooseTheme(choice: ThemeChoice): void {
-    setTheme(choice)
-    setThemeState(choice)
+    setTheme(choice);
+    setThemeState(choice);
   }
 
   function chooseAccent(choice: Accent): void {
-    setAccent(choice)
-    setAccentState(choice)
+    setAccent(choice);
+    setAccentState(choice);
   }
 
   const themes: readonly { readonly value: ThemeChoice; readonly label: string }[] = [
-    { value: null, label: 'System' },
-    { value: 'light', label: 'Light' },
-    { value: 'dark', label: 'Dark' },
-  ]
+    { value: null, label: "System" },
+    { value: "light", label: "Light" },
+    { value: "dark", label: "Dark" },
+  ];
 
   return (
     <>
@@ -242,7 +232,7 @@ function Appearance() {
             aria-checked={theme === value}
             onClick={() => chooseTheme(value)}
             className={`min-h-[var(--tap-row)] flex-1 rounded border text-btn font-semibold ${
-              theme === value ? 'border-accent text-accent' : 'border-line2 text-tx2'
+              theme === value ? "border-accent text-accent" : "border-line2 text-tx2"
             }`}
           >
             {label}
@@ -272,11 +262,7 @@ function Appearance() {
         larger and more honest sample than a swatch, and it cannot drift from
         `tokens.css` the way a duplicated hex would.
       */}
-      <div
-        role="radiogroup"
-        aria-label="Accent colour"
-        className="mt-[var(--sp-2)] grid grid-cols-4 gap-[var(--sp-2)]"
-      >
+      <div role="radiogroup" aria-label="Accent colour" className="mt-[var(--sp-2)] grid grid-cols-4 gap-[var(--sp-2)]">
         {ACCENTS.map((name) => (
           <button
             key={name}
@@ -285,7 +271,7 @@ function Appearance() {
             aria-checked={accent === name}
             onClick={() => chooseAccent(name)}
             className={`min-h-[var(--tap-row)] rounded border text-meta font-semibold capitalize ${
-              accent === name ? 'border-accent text-accent' : 'border-line2 text-tx2'
+              accent === name ? "border-accent text-accent" : "border-line2 text-tx2"
             }`}
           >
             {name}
@@ -293,11 +279,11 @@ function Appearance() {
         ))}
       </div>
     </>
-  )
+  );
 }
 
 function TotalsCard({ children }: { readonly children: ReactNode }) {
-  return <div className="mt-[var(--sp-2)] rounded border border-line bg-s1 shadow-1">{children}</div>
+  return <div className="mt-[var(--sp-2)] rounded border border-line bg-s1 shadow-1">{children}</div>;
 }
 
 function Row({ label, value }: { readonly label: string; readonly value: string }) {
@@ -306,7 +292,7 @@ function Row({ label, value }: { readonly label: string; readonly value: string 
       <span className="text-body text-tx2">{label}</span>
       <span className="text-body font-semibold tabular-nums">{value}</span>
     </div>
-  )
+  );
 }
 
 /**
@@ -325,23 +311,17 @@ function Row({ label, value }: { readonly label: string; readonly value: string 
  * this app and a second tap on a button that has changed its own label says the
  * same thing with less machinery.
  */
-function Recovery({
-  username,
-  rawText,
-}: {
-  readonly username: string
-  readonly rawText: string | null
-}) {
-  const startFresh = useStartFresh(username)
-  const [confirming, setConfirming] = useState(false)
+function Recovery({ username, rawText }: { readonly username: string; readonly rawText: string | null }) {
+  const startFresh = useStartFresh(username);
+  const [confirming, setConfirming] = useState(false);
 
   return (
     <>
       <SectionHeading>Recovery</SectionHeading>
       <p className="text-body text-tx2">
-        Nothing has been written and nothing will be until you say so. Take a copy of the file
-        first: it is plain JSON, the problem is often one character, and a text editor is a better
-        repair tool than anything this app could offer.
+        Nothing has been written and nothing will be until you say so. Take a copy of the file first: it is plain JSON,
+        the problem is often one character, and a text editor is a better repair tool than anything this app could
+        offer.
       </p>
 
       <div className="mt-[var(--sp-2)]">
@@ -350,39 +330,33 @@ function Recovery({
             The stored text could not be read back either, so there is nothing to download.
           </p>
         ) : (
-          <SecondaryButton
-            onClick={() => downloadText(`${username}-training-history.json`, rawText)}
-          >
+          <SecondaryButton onClick={() => downloadText(`${username}-training-history.json`, rawText)}>
             Download the file
           </SecondaryButton>
         )}
       </div>
 
       <p className="mt-[var(--sp-2)] text-meta text-tx2">
-        Replacing it starts every ladder at the bottom rung and every counter at zero. The
-        downloaded copy is then the only one that exists.
+        Replacing it starts every ladder at the bottom rung and every counter at zero. The downloaded copy is then the
+        only one that exists.
       </p>
 
-      {startFresh.error === null ? null : (
-        <AlertBanner label="Not replaced" text={startFresh.error.message} />
-      )}
+      {startFresh.error === null ? null : <AlertBanner label="Not replaced" text={startFresh.error.message} />}
 
       <div className="mt-[var(--sp-2)] flex items-center gap-[var(--sp-2)]">
         {confirming ? (
           <>
             <SecondaryButton onClick={() => setConfirming(false)}>Keep it</SecondaryButton>
             <QuietButton onClick={() => startFresh.mutate()}>
-              {startFresh.isPending ? 'Replacing…' : 'Yes, replace it'}
+              {startFresh.isPending ? "Replacing…" : "Yes, replace it"}
             </QuietButton>
           </>
         ) : (
-          <QuietButton onClick={() => setConfirming(true)}>
-            Replace it with an empty history
-          </QuietButton>
+          <QuietButton onClick={() => setConfirming(true)}>Replace it with an empty history</QuietButton>
         )}
       </div>
     </>
-  )
+  );
 }
 
 /**
@@ -395,22 +369,19 @@ function Recovery({
  * download cancels it in WebKit.
  */
 function downloadText(filename: string, text: string): void {
-  if (typeof URL.createObjectURL !== 'function') return
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  anchor.click()
-  setTimeout(() => URL.revokeObjectURL(url), 0)
+  if (typeof URL.createObjectURL !== "function") return;
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /** One line per pattern, in that ladder's own unit — reps and seconds do not add. */
-function patternTotal(
-  totals: { readonly reps: number; readonly holdSeconds: number },
-  pattern: Pattern,
-): string {
-  if (LADDERS[pattern].unit === 'seconds') return formatHoldTime(totals.holdSeconds)
-  return `${groupDigits(totals.reps)} reps`
+function patternTotal(totals: { readonly reps: number; readonly holdSeconds: number }, pattern: Pattern): string {
+  if (LADDERS[pattern].unit === "seconds") return formatHoldTime(totals.holdSeconds);
+  return `${groupDigits(totals.reps)} reps`;
 }
 
 /**
@@ -419,14 +390,14 @@ function patternTotal(
  * which is the honest ceiling of what floor-only training offers.
  */
 function ceilingSentence(pattern: Pattern): string {
-  const top = topRungIndex(pattern)
-  const rung = getRung(pattern, top)
-  const range = rangeAt(pattern, top)
-  const unit = LADDERS[pattern].unit === 'reps' ? 'reps' : 'seconds'
+  const top = topRungIndex(pattern);
+  const rung = getRung(pattern, top);
+  const range = rangeAt(pattern, top);
+  const unit = LADDERS[pattern].unit === "reps" ? "reps" : "seconds";
   return (
     `${PATTERN_LABEL[pattern]} has reached the top of its ladder — ${rung.name}. ` +
     `There is no rung above it, so the target now cycles between ${range.min} and ` +
     `${range.max} ${unit} and keeps cycling. That is the ceiling of what floor-only ` +
     `training offers, and reaching it is a finish.`
-  )
+  );
 }

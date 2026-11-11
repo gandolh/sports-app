@@ -1,19 +1,19 @@
-import { useMemo } from 'react'
-import { createRoute } from '@tanstack/react-router'
-import type { StateDoc } from '@sports-app/shared/types.ts'
-import { PATTERNS } from '@sports-app/shared/types.ts'
-import { LADDERS, SESSIONS_PER_RUNG_ROTATING, topRungIndex } from '../../domain/ladders.ts'
-import { rangeAt, rungIndexAt, targetAt } from '../../domain/schedule.ts'
-import { milestonesReached, totalWork } from '../../domain/milestones.ts'
-import { rootRoute } from './__root.tsx'
-import { toLogin } from './next.ts'
-import { useDocument } from '../document.ts'
-import { AlertBanner } from '../components/AlertBanner.tsx'
-import { HonestNote } from '../components/HonestNote.tsx'
-import { StatTiles } from '../components/StatTiles.tsx'
-import { TabBar } from '../components/TabBar.tsx'
-import { Eyebrow, SectionHeading, Shell, ShellBody, ShellRail, ShellTitle } from '../components/Shell.tsx'
-import { groupDigits } from '../components/format.ts'
+import { useMemo } from "react";
+import { createRoute } from "@tanstack/react-router";
+import type { StateDoc } from "@sports-app/shared/types.ts";
+import { PATTERNS } from "@sports-app/shared/types.ts";
+import { LADDERS, SESSIONS_PER_RUNG_ROTATING, topRungIndex } from "../../domain/ladders.ts";
+import { rangeAt, rungIndexAt, targetAt } from "../../domain/schedule.ts";
+import { milestonesReached, totalWork } from "../../domain/milestones.ts";
+import { rootRoute } from "./__root.tsx";
+import { toLogin } from "./next.ts";
+import { useDocument } from "../document.ts";
+import { AlertBanner } from "../components/AlertBanner.tsx";
+import { HonestNote } from "../components/HonestNote.tsx";
+import { StatTiles } from "../components/StatTiles.tsx";
+import { TabBar } from "../components/TabBar.tsx";
+import { Eyebrow, SectionHeading, Shell, ShellBody, ShellRail, ShellTitle } from "../components/Shell.tsx";
+import { groupDigits } from "../components/format.ts";
 
 /**
  * `/progress` — the one chart this app draws, and the disclosure that says what
@@ -55,32 +55,32 @@ import { groupDigits } from '../components/format.ts'
 
 // ─── The push-target step chart ─────────────────────────────────────────────
 
-const PUSH_RUNG_COUNT = LADDERS.push.rungs.length
+const PUSH_RUNG_COUNT = LADDERS.push.rungs.length;
 
 /** The push ladder's actual span. Read off every rung rather than hard-coded,
  *  because a future rung could in principle declare its own `range` the way a
  *  `seconds` rung already does — nothing here should have to change if one ever
  *  does. */
 function pushSpan(): { readonly min: number; readonly max: number } {
-  let min = Infinity
-  let max = -Infinity
+  let min = Infinity;
+  let max = -Infinity;
   for (let index = 0; index < PUSH_RUNG_COUNT; index += 1) {
-    const range = rangeAt('push', index)
-    min = Math.min(min, range.min)
-    max = Math.max(max, range.max)
+    const range = rangeAt("push", index);
+    min = Math.min(min, range.min);
+    max = Math.max(max, range.max);
   }
-  return { min, max }
+  return { min, max };
 }
 
 interface PushChart {
-  readonly domainEnd: number
-  readonly points: string
-  readonly ticks: readonly number[]
-  readonly yMin: number
-  readonly yMax: number
-  readonly currentSession: number
-  readonly currentTarget: number
-  readonly currentRung: number
+  readonly domainEnd: number;
+  readonly points: string;
+  readonly ticks: readonly number[];
+  readonly yMin: number;
+  readonly yMax: number;
+  readonly currentSession: number;
+  readonly currentTarget: number;
+  readonly currentRung: number;
 }
 
 /**
@@ -91,37 +91,37 @@ interface PushChart {
  * cleared the ladder still shows the cycling tail rather than stopping short.
  */
 function buildPushChart(sessionsDone: number): PushChart {
-  const perRung = SESSIONS_PER_RUNG_ROTATING
-  const fullClimb = PUSH_RUNG_COUNT * perRung
-  const horizon = Math.max(fullClimb, sessionsDone + perRung)
-  const domainEnd = Math.ceil(horizon / perRung) * perRung
-  const { min: yMin, max: yMax } = pushSpan()
+  const perRung = SESSIONS_PER_RUNG_ROTATING;
+  const fullClimb = PUSH_RUNG_COUNT * perRung;
+  const horizon = Math.max(fullClimb, sessionsDone + perRung);
+  const domainEnd = Math.ceil(horizon / perRung) * perRung;
+  const { min: yMin, max: yMax } = pushSpan();
 
-  const points: string[] = []
+  const points: string[] = [];
   for (let s = 0; s <= domainEnd; s += 1) {
-    points.push(`${s},${yMax - targetAt('push', s)}`)
+    points.push(`${s},${yMax - targetAt("push", s)}`);
   }
 
-  const ticks: number[] = []
-  for (let boundary = perRung; boundary < domainEnd; boundary += perRung) ticks.push(boundary)
+  const ticks: number[] = [];
+  for (let boundary = perRung; boundary < domainEnd; boundary += perRung) ticks.push(boundary);
 
   return {
     domainEnd,
-    points: points.join(' '),
+    points: points.join(" "),
     ticks,
     yMin,
     yMax,
     currentSession: sessionsDone,
-    currentTarget: targetAt('push', sessionsDone),
-    currentRung: rungIndexAt('push', sessionsDone),
-  }
+    currentTarget: targetAt("push", sessionsDone),
+    currentRung: rungIndexAt("push", sessionsDone),
+  };
 }
 
 function PushChart({ chart }: { readonly chart: PushChart }) {
-  const { domainEnd, points, ticks, yMin, yMax, currentSession, currentTarget, currentRung } = chart
-  const height = yMax - yMin
-  const leftPct = (currentSession / domainEnd) * 100
-  const topPct = ((yMax - currentTarget) / height) * 100
+  const { domainEnd, points, ticks, yMin, yMax, currentSession, currentTarget, currentRung } = chart;
+  const height = yMax - yMin;
+  const leftPct = (currentSession / domainEnd) * 100;
+  const topPct = ((yMax - currentTarget) / height) * 100;
 
   return (
     <div className="mt-[var(--sp-2)]">
@@ -189,25 +189,25 @@ function PushChart({ chart }: { readonly chart: PushChart }) {
         <span className="tabular-nums">{yMax} reps</span>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── The route ──────────────────────────────────────────────────────────────
 
 export const progressRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/progress',
+  path: "/progress",
   beforeLoad: ({ context, location }) => {
-    if (context.username === null) throw toLogin(location)
-    return { username: context.username }
+    if (context.username === null) throw toLogin(location);
+    return { username: context.username };
   },
   component: ProgressRoute,
-})
+});
 
 function ProgressRoute() {
-  const { username } = progressRoute.useRouteContext()
-  const { data: snapshot } = useDocument(username)
-  const doc = snapshot.doc
+  const { username } = progressRoute.useRouteContext();
+  const { data: snapshot } = useDocument(username);
+  const doc = snapshot.doc;
 
   if (doc === null) {
     return (
@@ -216,12 +216,12 @@ function ProgressRoute() {
         <ShellBody>
           <AlertBanner
             label="Read-only"
-            text={snapshot.readOnly ?? snapshot.error ?? 'The document could not be read.'}
+            text={snapshot.readOnly ?? snapshot.error ?? "The document could not be read."}
           />
         </ShellBody>
         <TabBar active="progress" />
       </Shell>
-    )
+    );
   }
 
   return (
@@ -229,25 +229,23 @@ function ProgressRoute() {
       <ShellRail>Progress</ShellRail>
       <ShellTitle title="Progress" size="movement" />
       <ShellBody>
-        {snapshot.readOnly === null ? null : (
-          <AlertBanner label="Read-only" text={snapshot.readOnly} />
-        )}
+        {snapshot.readOnly === null ? null : <AlertBanner label="Read-only" text={snapshot.readOnly} />}
 
         <ProgressBody doc={doc} />
       </ShellBody>
       <TabBar active="progress" />
     </Shell>
-  )
+  );
 }
 
 function ProgressBody({ doc }: { readonly doc: StateDoc }) {
-  const work = useMemo(() => totalWork(doc), [doc])
-  const milestones = useMemo(() => milestonesReached(doc), [doc])
+  const work = useMemo(() => totalWork(doc), [doc]);
+  const milestones = useMemo(() => milestonesReached(doc), [doc]);
   const ladders = useMemo(
     () => PATTERNS.filter((pattern) => rungIndexAt(pattern, doc.sessionsDone[pattern]) === topRungIndex(pattern)),
     [doc],
-  )
-  const chart = useMemo(() => buildPushChart(doc.sessionsDone.push), [doc.sessionsDone.push])
+  );
+  const chart = useMemo(() => buildPushChart(doc.sessionsDone.push), [doc.sessionsDone.push]);
 
   return (
     <>
@@ -255,17 +253,17 @@ function ProgressBody({ doc }: { readonly doc: StateDoc }) {
         stats={[
           {
             value: groupDigits(work.sessions),
-            label: 'Sessions',
+            label: "Sessions",
             srLabel: `${work.sessions} sessions completed.`,
           },
           {
             value: groupDigits(milestones.length),
-            label: 'Milestones',
+            label: "Milestones",
             srLabel: `${milestones.length} milestones reached.`,
           },
           {
             value: groupDigits(ladders.length),
-            label: 'Ladders finished',
+            label: "Ladders finished",
             srLabel: `${ladders.length} ladders reached their top rung.`,
           },
         ]}
@@ -273,16 +271,15 @@ function ProgressBody({ doc }: { readonly doc: StateDoc }) {
 
       <PushChart chart={chart} />
       <HonestNote label="What this chart plots">
-        The schedule, not your capability. The app prescribes on a fixed six-week
-        clock and never adapts to what you log — this line was knowable on day
-        one.
+        The schedule, not your capability. The app prescribes on a fixed six-week clock and never adapts to what you log
+        — this line was knowable on day one.
       </HonestNote>
 
       <SectionHeading>Milestones</SectionHeading>
       {milestones.length === 0 ? (
         <p className="text-body text-tx2">
-          Nothing yet — the first one lands the first time a ladder moves up a
-          rung, about six weeks in. Start a session from Today.
+          Nothing yet — the first one lands the first time a ladder moves up a rung, about six weeks in. Start a session
+          from Today.
         </p>
       ) : (
         <ol>
@@ -301,5 +298,5 @@ function ProgressBody({ doc }: { readonly doc: StateDoc }) {
         </ol>
       )}
     </>
-  )
+  );
 }

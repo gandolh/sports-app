@@ -9,12 +9,12 @@
 /** Every figure is drawn to this exact viewBox, and the overlay layer in
  * `ExerciseFigure.tsx` is stacked on the figure absolutely, so the two
  * must agree on coordinates pixel-for-pixel. */
-export const FIGURE_VIEWBOX = '0 0 200 200'
+export const FIGURE_VIEWBOX = "0 0 200 200";
 
 /** The one stroke weight used everywhere — body, ground line, and overlays
  * alike. Varying it is the difference between a design system and a sketch. */
-export const STROKE_WIDTH = 6
+export const STROKE_WIDTH = 6;
 
-export const HEAD_RADIUS = 14
+export const HEAD_RADIUS = 14;
 
-export const GROUND_Y = 182
+export const GROUND_Y = 182;

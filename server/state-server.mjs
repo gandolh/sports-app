@@ -121,10 +121,10 @@
  * `127.0.0.1` by default, so running it cannot accidentally expose anyone's
  * training history to a network. Host and port are environment variables.
  */
-import Fastify from 'fastify'
-import { pathToFileURL } from 'node:url'
-import { TypeCompiler } from '@sinclair/typebox/compiler'
-import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from './db.mjs'
+import Fastify from "fastify";
+import { pathToFileURL } from "node:url";
+import { TypeCompiler } from "@sinclair/typebox/compiler";
+import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from "./db.mjs";
 import {
   ALLOW_RENAME,
   ROUTE_PREFIX,
@@ -134,28 +134,28 @@ import {
   orphanStreamNames,
   readAuthConfig,
   requireSupportedUsername,
-} from './ward.mjs'
-import { wardAuth } from './vendor/ward/ward-auth.js'
+} from "./ward.mjs";
+import { wardAuth } from "./vendor/ward/ward-auth.js";
 // The wire contract, from the one place it is declared. `shared/` may not import
 // `node:` anything, so nothing in here can drag a Node-only module into the client
 // bundle or a browser-only one into this process. Node ≥22.18 strips the types at
 // load; there is no build step.
-import { LEGACY_USERNAME, USERNAME_RULE } from '@sports-app/shared/username.ts'
+import { LEGACY_USERNAME, USERNAME_RULE } from "@sports-app/shared/username.ts";
 import {
   HEALTH_PATH,
   HealthResponse,
   STATE_PATH,
   SnapshotReceipt,
   StateDocumentEnvelope,
-} from '@sports-app/shared/api.ts'
+} from "@sports-app/shared/api.ts";
 
 // Re-exported rather than redeclared: the routes are part of the wire contract, so
 // they are declared beside the schemas that describe them. Callers keep naming
 // them through this module, which is the module they are talking to.
-export { HEALTH_PATH, STATE_PATH }
+export { HEALTH_PATH, STATE_PATH };
 
-export const DEFAULT_HOST = '127.0.0.1'
-export const DEFAULT_PORT = 8787
+export const DEFAULT_HOST = "127.0.0.1";
+export const DEFAULT_PORT = 8787;
 
 /**
  * Body cap. A snapshot at three years of daily training is roughly a megabyte
@@ -163,10 +163,10 @@ export const DEFAULT_PORT = 8787
  * for the document this service exists to hold and small enough that a stray
  * upload cannot fill a disk.
  */
-export const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024
+export const DEFAULT_MAX_BODY_BYTES = 4 * 1024 * 1024;
 
-const JSON_CONTENT_TYPE = 'application/json'
-const JSON_CONTENT_TYPE_UTF8 = `${JSON_CONTENT_TYPE}; charset=utf-8`
+const JSON_CONTENT_TYPE = "application/json";
+const JSON_CONTENT_TYPE_UTF8 = `${JSON_CONTENT_TYPE}; charset=utf-8`;
 
 // ─── Compiled validators ────────────────────────────────────────────────────
 //
@@ -179,7 +179,7 @@ const JSON_CONTENT_TYPE_UTF8 = `${JSON_CONTENT_TYPE}; charset=utf-8`
 // entry points into one schema, because a raw-string body cannot be handed to a
 // body schema — see the file header.
 
-const checkStateDocument = TypeCompiler.Compile(StateDocumentEnvelope)
+const checkStateDocument = TypeCompiler.Compile(StateDocumentEnvelope);
 
 // ─── Small helpers ──────────────────────────────────────────────────────────
 
@@ -194,11 +194,11 @@ const checkStateDocument = TypeCompiler.Compile(StateDocumentEnvelope)
  * @returns {string}
  */
 function pathOf(url) {
-  return (url ?? '').split('?')[0]
+  return (url ?? "").split("?")[0];
 }
 
 function messageOf(cause) {
-  return cause instanceof Error ? cause.message : String(cause)
+  return cause instanceof Error ? cause.message : String(cause);
 }
 
 // ─── Usernames ──────────────────────────────────────────────────────────────
@@ -222,40 +222,40 @@ function messageOf(cause) {
  * the envelope without a message here is visible rather than silent.
  */
 const DOCUMENT_ERRORS = {
-  '/schemaVersion':
-    'schemaVersion: expected a number. Every state document carries one; ' +
-    'a body without it is probably not a state document at all.',
-  '/username': `username: expected ${USERNAME_RULE}`,
+  "/schemaVersion":
+    "schemaVersion: expected a number. Every state document carries one; " +
+    "a body without it is probably not a state document at all.",
+  "/username": `username: expected ${USERNAME_RULE}`,
   // Checked because `history.length` is what the `sessions_completed` column
   // holds — not because the server has an opinion about what is *in* the array.
   // It never looks inside.
-  '/history': 'history: expected an array',
-}
+  "/history": "history: expected an array",
+};
 
 /**
  * @param {string} text
  * @returns {{ok: true, schemaVersion: number, username: string, historyLength: number} | {ok: false, error: string}}
  */
 export function checkDocument(text) {
-  let raw
+  let raw;
   try {
-    raw = JSON.parse(text)
+    raw = JSON.parse(text);
   } catch (cause) {
-    return { ok: false, error: `not valid JSON — ${messageOf(cause)}` }
+    return { ok: false, error: `not valid JSON — ${messageOf(cause)}` };
   }
   // Ahead of the schema so that `null`, `[]` and `"a string"` get an answer about
   // the *document* rather than a pointer into a shape they do not have.
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    return { ok: false, error: 'expected a JSON object at the top level' }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: "expected a JSON object at the top level" };
   }
 
   if (!checkStateDocument.Check(raw)) {
     // The *first* error, so the answer is about one field rather than a list —
     // and schema property order is what decides which one that is.
-    const [first] = checkStateDocument.Errors(raw)
-    const pointer = first === undefined ? '' : first.path
-    const fallback = `${pointer}: ${first === undefined ? 'invalid' : first.message}`
-    return { ok: false, error: DOCUMENT_ERRORS[pointer] ?? fallback }
+    const [first] = checkStateDocument.Errors(raw);
+    const pointer = first === undefined ? "" : first.path;
+    const fallback = `${pointer}: ${first === undefined ? "invalid" : first.message}`;
+    return { ok: false, error: DOCUMENT_ERRORS[pointer] ?? fallback };
   }
 
   return {
@@ -263,7 +263,7 @@ export function checkDocument(text) {
     schemaVersion: raw.schemaVersion,
     username: raw.username,
     historyLength: raw.history.length,
-  }
+  };
 }
 
 // ─── The service ────────────────────────────────────────────────────────────
@@ -295,15 +295,15 @@ export function checkDocument(text) {
  * @returns {StateService}
  */
 export function createStateServer(config) {
-  const { store, accounts, auth, wardClient } = config
-  const maxBodyBytes = config.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES
-  const log = config.log ?? (() => {})
+  const { store, accounts, auth, wardClient } = config;
+  const maxBodyBytes = config.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+  const log = config.log ?? (() => {});
 
   if (accounts === undefined || auth === undefined) {
     // Refusing here rather than defaulting is the point, and it is the same
     // point the shared secret used to make: a service with no way to identify
     // its callers looks authenticated and is not.
-    throw new Error('createStateServer requires accounts and an auth config')
+    throw new Error("createStateServer requires accounts and an auth config");
   }
 
   const app = Fastify({
@@ -316,7 +316,7 @@ export function createStateServer(config) {
     // turn today's `HEAD /api/state` 405 into a 200 with the document's headers.
     exposeHeadRoutes: false,
     bodyLimit: maxBodyBytes,
-  })
+  });
 
   // ── Headers every response carries ────────────────────────────────────────
   //
@@ -328,15 +328,15 @@ export function createStateServer(config) {
   // ever sent ended with one, so a `curl` of it does not run into the next shell
   // prompt. A `Buffer` payload — which is only ever a stored document — is left
   // exactly as it is, which is the point.
-  app.addHook('onSend', (_request, reply, payload, done) => {
-    reply.header('Cache-Control', 'no-store')
-    reply.header('X-Content-Type-Options', 'nosniff')
-    if (typeof payload === 'string' && !payload.endsWith('\n')) {
-      done(null, `${payload}\n`)
-      return
+  app.addHook("onSend", (_request, reply, payload, done) => {
+    reply.header("Cache-Control", "no-store");
+    reply.header("X-Content-Type-Options", "nosniff");
+    if (typeof payload === "string" && !payload.endsWith("\n")) {
+      done(null, `${payload}\n`);
+      return;
     }
-    done(null, payload)
-  })
+    done(null, payload);
+  });
 
   // ── Accounts, and the guard ───────────────────────────────────────────────
   //
@@ -371,17 +371,17 @@ export function createStateServer(config) {
             afterSignInPath: auth.afterSignInPath,
           },
         }),
-  })
+  });
 
   function methodNotAllowed(reply, allow) {
     return reply
-      .header('Allow', allow)
+      .header("Allow", allow)
       .code(405)
-      .send({ error: `method not allowed; try ${allow}` })
+      .send({ error: `method not allowed; try ${allow}` });
   }
 
   function unsupportedMediaType(reply) {
-    return reply.code(415).send({ error: `expected Content-Type: ${JSON_CONTENT_TYPE}` })
+    return reply.code(415).send({ error: `expected Content-Type: ${JSON_CONTENT_TYPE}` });
   }
 
   // ── 404, and the 405 that has to be told apart from it ────────────────────
@@ -394,16 +394,16 @@ export function createStateServer(config) {
   // `405` to learn that a route exists. Only a signed-in caller gets to tell the
   // two apart.
   app.setNotFoundHandler(async (request, reply) => {
-    const path = pathOf(request.url)
+    const path = pathOf(request.url);
 
-    if (path === HEALTH_PATH) return methodNotAllowed(reply, 'GET, HEAD')
+    if (path === HEALTH_PATH) return methodNotAllowed(reply, "GET, HEAD");
 
     if (path !== STATE_PATH) {
-      return reply.code(404).send({ error: 'not found' })
+      return reply.code(404).send({ error: "not found" });
     }
 
-    return methodNotAllowed(reply, 'GET, PUT')
-  })
+    return methodNotAllowed(reply, "GET, PUT");
+  });
 
   // ── Framework errors, in the contract's words ─────────────────────────────
   //
@@ -411,16 +411,14 @@ export function createStateServer(config) {
   // client reads `error` and nothing else, so each of the three reachable
   // framework failures is restated in the shape the contract has always used.
   app.setErrorHandler((error, request, reply) => {
-    if (error.code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE') return unsupportedMediaType(reply)
+    if (error.code === "FST_ERR_CTP_INVALID_MEDIA_TYPE") return unsupportedMediaType(reply);
 
-    if (error.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+    if (error.code === "FST_ERR_CTP_BODY_TOO_LARGE") {
       // Close the connection after answering: the rest of an oversized body is
       // not going to be read, and leaving it half-consumed would stall the socket
       // until it timed out.
-      reply.header('Connection', 'close')
-      return reply
-        .code(413)
-        .send({ error: `body exceeds the ${maxBodyBytes} byte limit`, limit: maxBodyBytes })
+      reply.header("Connection", "close");
+      return reply.code(413).send({ error: `body exceeds the ${maxBodyBytes} byte limit`, limit: maxBodyBytes });
     }
 
     /*
@@ -434,17 +432,17 @@ export function createStateServer(config) {
      * a future route added a schema and forgot to word its own errors.
      */
 
-    const status = error.statusCode ?? 500
-    if (typeof error.code === 'string' && error.code.startsWith('FST_') && status < 500) {
+    const status = error.statusCode ?? 500;
+    if (typeof error.code === "string" && error.code.startsWith("FST_") && status < 500) {
       // A framework rejection with no contract wording of its own — a malformed
       // request line, say. Fastify's message is about the request's syntax and
       // never quotes its body.
-      return reply.code(status).send({ error: error.message })
+      return reply.code(status).send({ error: error.message });
     }
 
-    log(`unhandled error: ${messageOf(error)}`)
-    return reply.code(500).send({ error: 'internal error' })
-  })
+    log(`unhandled error: ${messageOf(error)}`);
+    return reply.code(500).send({ error: "internal error" });
+  });
 
   // ── GET /api/health ───────────────────────────────────────────────────────
   //
@@ -454,11 +452,11 @@ export function createStateServer(config) {
   // schema pins the body to one fixed field, so it cannot become an existence
   // oracle for an account or a leak of how much history is stored.
   app.route({
-    method: ['GET', 'HEAD'],
+    method: ["GET", "HEAD"],
     url: HEALTH_PATH,
     schema: { response: { 200: HealthResponse } },
-    handler: () => ({ status: 'ok' }),
-  })
+    handler: () => ({ status: "ok" }),
+  });
 
   // ── The state routes, in a scope of their own ─────────────────────────────
   //
@@ -478,14 +476,14 @@ export function createStateServer(config) {
   // ordinary JSON parsing and would answer `invalid_request` to a raw string.
   // The scope is created after the guard was registered, so it inherits it.
   app.register(async (scope) => {
-    scope.removeAllContentTypeParsers()
+    scope.removeAllContentTypeParsers();
     scope.addContentTypeParser(
       JSON_CONTENT_TYPE,
-      { parseAs: 'string', bodyLimit: maxBodyBytes },
+      { parseAs: "string", bodyLimit: maxBodyBytes },
       (_request, body, done) => {
-        done(null, body)
+        done(null, body);
       },
-    )
+    );
 
     // ── GET /api/state ────────────────────────────────────────────────────────
     //
@@ -493,9 +491,9 @@ export function createStateServer(config) {
     // fast-json-stringify, which is exactly the re-serialisation this route exists
     // not to do.
     scope.route({
-      method: 'GET',
+      method: "GET",
       url: STATE_PATH,
-        handler: (request, reply) => {
+      handler: (request, reply) => {
         /*
          * The stream key is the SESSION's username, not a query parameter.
          *
@@ -509,14 +507,14 @@ export function createStateServer(config) {
          * and was suffixed because their Ward name was taken is `alice-2` here, and
          * that is the stream they get; it never follows the Ward name.
          */
-        const username = request.auth.user.username
+        const username = request.auth.user.username;
 
-        const snapshot = store.latest(username)
+        const snapshot = store.latest(username);
         if (snapshot === null) {
           // 404 rather than an empty document: "nothing has ever been stored for
           // this user" is exactly the new-device case the client needs to
           // distinguish from "the remote holds a document with zero sessions".
-          return reply.code(404).send({ error: 'no state has been stored yet for this user' })
+          return reply.code(404).send({ error: "no state has been stored yet for this user" });
         }
 
         // `Buffer.from(text, 'utf8')` plus Fastify's own `Content-Length` is what
@@ -529,30 +527,30 @@ export function createStateServer(config) {
         // document, and a header would be a second place for it to disagree.
         return reply
           .code(200)
-          .header('Content-Type', JSON_CONTENT_TYPE_UTF8)
-          .header('X-Snapshot-Id', String(snapshot.id))
-          .header('X-Snapshot-Created-At', snapshot.createdAt)
-          .send(Buffer.from(snapshot.docJson, 'utf8'))
+          .header("Content-Type", JSON_CONTENT_TYPE_UTF8)
+          .header("X-Snapshot-Id", String(snapshot.id))
+          .header("X-Snapshot-Created-At", snapshot.createdAt)
+          .send(Buffer.from(snapshot.docJson, "utf8"));
       },
-    })
+    });
 
     // ── PUT /api/state ────────────────────────────────────────────────────────
     scope.route({
-      method: 'PUT',
+      method: "PUT",
       url: STATE_PATH,
-        schema: { response: { 200: SnapshotReceipt } },
+      schema: { response: { 200: SnapshotReceipt } },
       handler: (request, reply) => {
         // The session's username, for the reason `GET` gives above.
-        const username = request.auth.user.username
+        const username = request.auth.user.username;
 
-        const text = request.body
-        if (text === undefined) return unsupportedMediaType(reply)
+        const text = request.body;
+        if (text === undefined) return unsupportedMediaType(reply);
 
-        const checked = checkDocument(text)
+        const checked = checkDocument(text);
         if (!checked.ok) {
-          log(`400 PUT ${STATE_PATH}: ${checked.error}`)
+          log(`400 PUT ${STATE_PATH}: ${checked.error}`);
           // Nothing has been written. The newest snapshot is untouched.
-          return reply.code(400).send({ error: checked.error })
+          return reply.code(400).send({ error: checked.error });
         }
 
         if (checked.username !== username) {
@@ -569,9 +567,9 @@ export function createStateServer(config) {
            */
           const error =
             `username mismatch: the session is ${username} but the document says ` +
-            `${checked.username}. Nothing was stored.`
-          log(`400 PUT ${STATE_PATH}: ${error}`)
-          return reply.code(400).send({ error })
+            `${checked.username}. Nothing was stored.`;
+          log(`400 PUT ${STATE_PATH}: ${error}`);
+          return reply.code(400).send({ error });
         }
 
         // `text`, not a re-serialisation of a parsed object — there is no parsed
@@ -581,12 +579,12 @@ export function createStateServer(config) {
           docJson: text,
           historyLength: checked.historyLength,
           schemaVersion: checked.schemaVersion,
-        })
+        });
 
         log(
           `stored snapshot ${written.id} for ${username} (${checked.historyLength} sessions, ` +
             `${text.length} bytes, pruned ${written.pruned})`,
-        )
+        );
 
         return reply.code(200).send({
           id: written.id,
@@ -599,34 +597,34 @@ export function createStateServer(config) {
           // This user's rows, not the table's. A count of everybody's would tell
           // each user how much other people train.
           retained: store.count(username),
-        })
+        });
       },
-    })
-  })
+    });
+  });
 
   return {
     listen(port, host, onListening) {
       app
         .listen({ port, host })
         .then(() => {
-          if (onListening !== undefined) onListening()
+          if (onListening !== undefined) onListening();
         })
         .catch((cause) => {
           // `node:http` reports a failed bind by emitting `error` on the server,
           // and an unhandled one takes the process down. Re-emitting keeps that
           // behaviour: a service that cannot bind its port must not look started.
-          app.server.emit('error', cause)
-        })
+          app.server.emit("error", cause);
+        });
     },
     address() {
-      return app.server.address()
+      return app.server.address();
     },
     close(done) {
       void app.close().then(() => {
-        if (done !== undefined) done()
-      })
+        if (done !== undefined) done();
+      });
     },
-  }
+  };
 }
 
 // ─── Configuration ──────────────────────────────────────────────────────────
@@ -635,18 +633,18 @@ export function createStateServer(config) {
  * @param {Record<string, string | undefined>} env
  */
 export function readConfig(env) {
-  const rawPort = env.SPORTS_APP_PORT
-  const port = rawPort === undefined || rawPort === '' ? DEFAULT_PORT : Number(rawPort)
-  const rawMax = env.SPORTS_APP_MAX_BODY_BYTES
-  const maxBodyBytes = rawMax === undefined || rawMax === '' ? DEFAULT_MAX_BODY_BYTES : Number(rawMax)
+  const rawPort = env.SPORTS_APP_PORT;
+  const port = rawPort === undefined || rawPort === "" ? DEFAULT_PORT : Number(rawPort);
+  const rawMax = env.SPORTS_APP_MAX_BODY_BYTES;
+  const maxBodyBytes = rawMax === undefined || rawMax === "" ? DEFAULT_MAX_BODY_BYTES : Number(rawMax);
 
   return {
     host: env.SPORTS_APP_HOST ?? DEFAULT_HOST,
     port,
     dbFile: env.SPORTS_APP_DB ?? DEFAULT_DB_FILE,
     maxBodyBytes,
-    quiet: env.SPORTS_APP_QUIET === '1',
-  }
+    quiet: env.SPORTS_APP_QUIET === "1",
+  };
 }
 
 // ─── Entry point ────────────────────────────────────────────────────────────
@@ -656,11 +654,11 @@ export function readConfig(env) {
  * @param {{error: (m: string) => void, log: (m: string) => void}} out
  */
 export async function main(env, out = console) {
-  const config = readConfig(env)
+  const config = readConfig(env);
 
   if (!Number.isInteger(config.port) || config.port < 0 || config.port > 65535) {
-    out.error(`SPORTS_APP_PORT must be a port number, got ${String(config.port)}`)
-    return null
+    out.error(`SPORTS_APP_PORT must be a port number, got ${String(config.port)}`);
+    return null;
   }
 
   /*
@@ -669,39 +667,39 @@ export async function main(env, out = console) {
    * Secure or not sent back; a half-set Ward configuration is always a deploy
    * mistake, and `readAuthConfig` names what is missing.
    */
-  let auth
+  let auth;
   try {
-    auth = readAuthConfig(env)
+    auth = readAuthConfig(env);
   } catch (error) {
-    out.error(`${messageOf(error)}\n\nSee server/README.md, "Configuration".`)
-    return null
+    out.error(`${messageOf(error)}\n\nSee server/README.md, "Configuration".`);
+    return null;
   }
 
-  const store = openSnapshotStore({ file: config.dbFile })
-  const log = config.quiet ? () => {} : (message) => out.log(`[state] ${message}`)
+  const store = openSnapshotStore({ file: config.dbFile });
+  const log = config.quiet ? () => {} : (message) => out.log(`[state] ${message}`);
 
-  const accounts = openAccounts(store.db)
-  let wardClient
+  const accounts = openAccounts(store.db);
+  let wardClient;
   try {
     // Validates the values and imports the key now, so a bad key fails here.
     // It does not contact Ward: discovery is lazy, and the service starts while
     // Ward is down.
-    wardClient = await openWardClient(auth)
+    wardClient = await openWardClient(auth);
   } catch (error) {
-    store.close()
-    out.error(`Ward sign-in is misconfigured: ${messageOf(error)}`)
-    return null
+    store.close();
+    out.error(`Ward sign-in is misconfigured: ${messageOf(error)}`);
+    return null;
   }
 
   // Before anything listens: a Ward sign-in must find the account that owns an
   // existing stream the moment it can arrive.
-  let linkedStreams
+  let linkedStreams;
   try {
-    linkedStreams = await linkWardStreams(store, accounts)
+    linkedStreams = await linkWardStreams(store, accounts);
   } catch (error) {
-    store.close()
-    out.error(`Could not link existing Ward streams to accounts: ${messageOf(error)}`)
-    return null
+    store.close();
+    out.error(`Could not link existing Ward streams to accounts: ${messageOf(error)}`);
+    return null;
   }
 
   const server = createStateServer({
@@ -711,32 +709,32 @@ export async function main(env, out = console) {
     wardClient,
     maxBodyBytes: config.maxBodyBytes,
     log,
-  })
+  });
 
   server.listen(config.port, config.host, () => {
-    const address = server.address()
-    const shown = typeof address === 'object' && address !== null ? address.port : config.port
-    log(`listening on http://${config.host}:${shown}`)
-    log(`database ${store.file} (keeping the newest ${RETENTION} snapshots per user)`)
+    const address = server.address();
+    const shown = typeof address === "object" && address !== null ? address.port : config.port;
+    log(`listening on http://${config.host}:${shown}`);
+    log(`database ${store.file} (keeping the newest ${RETENTION} snapshots per user)`);
     log(
       `sessions: cookie ${auth.cookieName} on Path=${auth.cookiePath}; ` +
-        (wardClient === undefined ? 'Sign in with Ward is off' : 'Sign in with Ward is on'),
-    )
+        (wardClient === undefined ? "Sign in with Ward is off" : "Sign in with Ward is on"),
+    );
     if (linkedStreams.length > 0) {
       log(
         `linked ${linkedStreams.length} stream(s) keyed by a Ward subject to accounts of the same ` +
-          'name, so their next Ward sign-in finds their history',
-      )
+          "name, so their next Ward sign-in finds their history",
+      );
     }
     // The secret is never logged, here or anywhere else.
     void orphanStreamNames(store, accounts).then((orphans) => {
-      if (orphans.length === 0) return
+      if (orphans.length === 0) return;
       log(
-        `${orphans.length} snapshot stream(s) have no account yet: ${orphans.slice(0, 10).join(', ')}` +
-          `${orphans.length > 10 ? ', …' : ''}. Create one with the same username (npm run seed) ` +
-          'and its history is read again.',
-      )
-    })
+        `${orphans.length} snapshot stream(s) have no account yet: ${orphans.slice(0, 10).join(", ")}` +
+          `${orphans.length > 10 ? ", …" : ""}. Create one with the same username (npm run seed) ` +
+          "and its history is read again.",
+      );
+    });
     if (store.migrated) {
       // Worth one line at startup, once: somebody upgrading a real deployment
       // needs to know where their existing history went and how to rename it.
@@ -744,30 +742,29 @@ export async function main(env, out = console) {
         `migrated the single-stream schema: existing snapshots are now attributed to ` +
           `"${LEGACY_USERNAME}". Reattribute with: sqlite3 ${store.file} ` +
           `"UPDATE snapshots SET username = 'yourname' WHERE username = '${LEGACY_USERNAME}'"`,
-      )
+      );
     }
-  })
+  });
 
   // A `synchronous = FULL` database has nothing in flight to lose, but closing
   // it explicitly releases the WAL cleanly instead of leaving recovery to the
   // next open.
   const shutdown = () => {
     server.close(() => {
-      store.close()
-    })
-  }
-  process.once('SIGINT', shutdown)
-  process.once('SIGTERM', shutdown)
+      store.close();
+    });
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
 
-  return { server, store, accounts }
+  return { server, store, accounts };
 }
 
-const invokedDirectly =
-  process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url
+const invokedDirectly = process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url;
 
 if (invokedDirectly) {
   main(process.env).catch((cause) => {
-    console.error(messageOf(cause))
-    process.exitCode = 1
-  })
+    console.error(messageOf(cause));
+    process.exitCode = 1;
+  });
 }

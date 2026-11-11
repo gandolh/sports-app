@@ -3,40 +3,25 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "sports-app — the client, the state service, and sign-in",
-    "viewBox": [
-      1120,
-      760
-    ],
+    "viewBox": [1120, 760],
     "quality_profile": "showcase",
     "views": [
       {
         "id": "offline",
         "label": "Offline is the normal case",
-        "focus": [
-          "phone",
-          "client",
-          "local"
-        ],
+        "focus": ["phone", "client", "local"],
         "note": "Everything the app does happens against local state; the service is somewhere to put a copy."
       },
       {
         "id": "sync",
         "label": "Sync, when there is a network",
-        "focus": [
-          "client",
-          "caddy",
-          "service",
-          "db"
-        ],
+        "focus": ["client", "caddy", "service", "db"],
         "note": "One document per user, stored verbatim, pruned to a fixed cap."
       },
       {
         "id": "identity",
         "label": "Who the caller is",
-        "focus": [
-          "ward",
-          "service"
-        ],
+        "focus": ["ward", "service"],
         "note": "The session's username is the document key, so ?user= stopped being a target a caller picks."
       }
     ]
@@ -47,14 +32,8 @@
       "type": "external",
       "label": "Phone on the floor",
       "sublabel": "installed PWA",
-      "pos": [
-        20,
-        350
-      ],
-      "size": [
-        150,
-        60
-      ]
+      "pos": [20, 350],
+      "size": [150, 60]
     },
     {
       "id": "client",
@@ -62,42 +41,24 @@
       "label": "client/",
       "sublabel": "React + Vite",
       "tag": "works offline",
-      "pos": [
-        300,
-        350
-      ],
-      "size": [
-        160,
-        60
-      ]
+      "pos": [300, 350],
+      "size": [160, 60]
     },
     {
       "id": "local",
       "type": "database",
       "label": "Local state",
       "sublabel": "the authoritative copy",
-      "pos": [
-        300,
-        590
-      ],
-      "size": [
-        160,
-        60
-      ]
+      "pos": [300, 590],
+      "size": [160, 60]
     },
     {
       "id": "caddy",
       "type": "cloud",
       "label": "Caddy",
       "sublabel": "one domain :443",
-      "pos": [
-        600,
-        350
-      ],
-      "size": [
-        140,
-        60
-      ]
+      "pos": [600, 350],
+      "size": [140, 60]
     },
     {
       "id": "service",
@@ -105,28 +66,16 @@
       "label": "server/",
       "sublabel": "accounts + three routes",
       "tag": "logger: false",
-      "pos": [
-        880,
-        350
-      ],
-      "size": [
-        170,
-        60
-      ]
+      "pos": [880, 350],
+      "size": [170, 60]
     },
     {
       "id": "ward",
       "type": "security",
       "label": "Ward",
       "sublabel": "optional second way in",
-      "pos": [
-        880,
-        130
-      ],
-      "size": [
-        170,
-        60
-      ]
+      "pos": [880, 130],
+      "size": [170, 60]
     },
     {
       "id": "db",
@@ -134,34 +83,20 @@
       "label": "SQLite",
       "sublabel": "whole-document snapshots",
       "tag": "capped per user",
-      "pos": [
-        880,
-        590
-      ],
-      "size": [
-        170,
-        60
-      ]
+      "pos": [880, 590],
+      "size": [170, 60]
     }
   ],
   "boundaries": [
     {
       "kind": "region",
       "label": "One origin — sub-paths, no subdomains",
-      "wraps": [
-        "caddy",
-        "service",
-        "ward",
-        "db"
-      ]
+      "wraps": ["caddy", "service", "ward", "db"]
     },
     {
       "kind": "security-group",
       "label": "the device — fully usable alone",
-      "wraps": [
-        "client",
-        "local"
-      ]
+      "wraps": ["client", "local"]
     }
   ],
   "connections": [
@@ -180,10 +115,7 @@
       "variant": "emphasis",
       "fromSide": "bottom",
       "toSide": "top",
-      "labelAt": [
-        380,
-        470
-      ]
+      "labelAt": [380, 470]
     },
     {
       "id": "c-caddy",
@@ -214,10 +146,7 @@
       "label": "store verbatim, prune",
       "fromSide": "bottom",
       "toSide": "top",
-      "labelAt": [
-        965,
-        470
-      ]
+      "labelAt": [965, 470]
     }
   ],
   "cards": [

@@ -1,5 +1,5 @@
-import type { Config } from '@docusaurus/types'
-import type * as Preset from '@docusaurus/preset-classic'
+import type { Config } from "@docusaurus/types";
+import type * as Preset from "@docusaurus/preset-classic";
 
 /**
  * sports-app's documentation site.
@@ -25,58 +25,58 @@ import type * as Preset from '@docusaurus/preset-classic'
 // shipping a page whose every asset 404s.
 //
 // DOCS_BASE still overrides it, for building a copy to serve from somewhere else.
-const baseUrl = process.env.DOCS_BASE ?? '/sports-app/docs/'
+const baseUrl = process.env.DOCS_BASE ?? "/sports-app/docs/";
 
 const config: Config = {
-  title: 'sports-app',
+  title: "sports-app",
   tagline:
-    'A zero-equipment calisthenics trainer, installed as an offline-first PWA. Its schedule never adapts to what you log, and that is the governing design decision.',
-  url: 'https://gandolh.ro',
+    "A zero-equipment calisthenics trainer, installed as an offline-first PWA. Its schedule never adapts to what you log, and that is the governing design decision.",
+  url: "https://gandolh.ro",
   baseUrl,
   // Directory-style URLs (/wiki/overview/ → wiki/overview/index.html): what the
   // Starlight site published, so every existing link keeps working.
   trailingSlash: true,
   future: { v4: true },
-  onBrokenLinks: 'throw',
-  onBrokenAnchors: 'warn',
+  onBrokenLinks: "throw",
+  onBrokenAnchors: "warn",
   markdown: {
     // .md (the synced corpus) parses as CommonMark, .mdx (the three authored
     // pages) as MDX. As MDX the corpus does not compile: a bare `<` or `{` in
     // prose is JSX.
-    format: 'detect',
-    hooks: { onBrokenMarkdownLinks: 'throw' },
+    format: "detect",
+    hooks: { onBrokenMarkdownLinks: "throw" },
   },
-  i18n: { defaultLocale: 'en', locales: ['en'] },
+  i18n: { defaultLocale: "en", locales: ["en"] },
   presets: [
     [
-      'classic',
+      "classic",
       {
         docs: {
-          routeBasePath: '/',
-          sidebarPath: './sidebars.ts',
+          routeBasePath: "/",
+          sidebarPath: "./sidebars.ts",
         },
         blog: false,
-        theme: { customCss: './src/css/custom.css' },
+        theme: { customCss: "./src/css/custom.css" },
       } satisfies Preset.Options,
     ],
   ],
   // Local, offline search. Starlight shipped Pagefind; Docusaurus ships nothing.
   themes: [
     [
-      '@easyops-cn/docusaurus-search-local',
-      { hashed: true, docsRouteBasePath: '/', indexBlog: false, indexPages: false },
+      "@easyops-cn/docusaurus-search-local",
+      { hashed: true, docsRouteBasePath: "/", indexBlog: false, indexPages: false },
     ],
   ],
   themeConfig: {
     // One theme, and it is light — design-system.md doctrine 4. With
     // disableSwitch the inline script hard-codes the mode: no toggle renders,
     // and a stored preference is never read.
-    colorMode: { defaultMode: 'light', disableSwitch: true, respectPrefersColorScheme: false },
+    colorMode: { defaultMode: "light", disableSwitch: true, respectPrefersColorScheme: false },
     navbar: {
-      title: 'sports-app',
-      items: [{ href: 'https://github.com/gandolh/sports-app', label: 'GitHub', position: 'right' }],
+      title: "sports-app",
+      items: [{ href: "https://github.com/gandolh/sports-app", label: "GitHub", position: "right" }],
     },
   } satisfies Preset.ThemeConfig,
-}
+};
 
-export default config
+export default config;

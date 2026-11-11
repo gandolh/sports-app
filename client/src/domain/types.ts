@@ -49,7 +49,7 @@
  * timestamps arrive as parameters. `shared/` is the only thing it may import from
  * outside itself. Enforced by eslint.config.js, not by convention.
  */
-import type { Pattern, Range, RungId, TargetUnit } from '@sports-app/shared/types.ts'
+import type { Pattern, Range, RungId, TargetUnit } from "@sports-app/shared/types.ts";
 
 // ─── Content ────────────────────────────────────────────────────────────────
 
@@ -64,18 +64,18 @@ import type { Pattern, Range, RungId, TargetUnit } from '@sports-app/shared/type
  */
 export interface Modifier {
   /** Seconds spent on the lowering phase. Absent means normal tempo. */
-  readonly eccentricSeconds?: number
-  readonly pauseSeconds?: number
-  readonly pauseAt?: 'bottom' | 'top' | 'mid'
+  readonly eccentricSeconds?: number;
+  readonly pauseSeconds?: number;
+  readonly pauseAt?: "bottom" | "top" | "mid";
   /** One limb takes most or all of the load. */
-  readonly unilateral?: boolean
+  readonly unilateral?: boolean;
   /** What is raised off the floor to change leverage or range. */
-  readonly elevation?: 'hands' | 'feet' | 'heels' | 'none'
+  readonly elevation?: "hands" | "feet" | "heels" | "none";
 }
 
 export interface Rung {
-  readonly id: RungId
-  readonly name: string
+  readonly id: RungId;
+  readonly name: string;
   /**
    * Short imperative cues covering setup, the movement standard, and where the
    * modifier applies. The fourth — the failure signal that says stop the set —
@@ -85,7 +85,7 @@ export interface Rung {
    * Load-bearing: a figure cannot distinguish rung 3 from rung 4 when they share
    * a pose and differ only in tempo. Only these can.
    */
-  readonly cues: readonly string[]
+  readonly cues: readonly string[];
   /**
    * The one line that tells the user when to END a set — "stop the clock when
    * your hips sag toward the floor", never "do eight of these".
@@ -105,17 +105,17 @@ export interface Rung {
    * content — do not rewrite, shorten or normalise the wording of an existing
    * one, and do not invent one for a rung that never had it.
    */
-  readonly stopRule: string
-  readonly modifier?: Modifier
+  readonly stopRule: string;
+  readonly modifier?: Modifier;
   /** Key into the figure registry. Unknown ids render a placeholder. */
-  readonly figureId?: string
+  readonly figureId?: string;
   /**
    * Overrides the ladder default. **REQUIRED on every `seconds` rung** — the
    * evidence-based ceilings genuinely differ per exercise (front plank 60s,
    * tuck L-sit 30s), and the interpolation absorbs differing spans for free
    * (corpus/wiki/programme.md#hold-caps-per-rung).
    */
-  readonly range?: Range
+  readonly range?: Range;
   /**
    * Failing this rung is **injurious, not merely unsuccessful** — the schedule
    * reaches these on a clock rather than on readiness, and there is no mechanism
@@ -129,12 +129,12 @@ export interface Rung {
    * separated** — as the safety check it is, not as item one of four. The four-screen shell
    * implements that; this flag is how it knows which rungs.
    */
-  readonly safetyCritical?: boolean
+  readonly safetyCritical?: boolean;
 }
 
 export interface Ladder {
-  readonly pattern: Pattern
-  readonly unit: TargetUnit
+  readonly pattern: Pattern;
+  readonly unit: TargetUnit;
   /**
    * `postural` means this ladder does NOT train the strength quality its pattern
    * name implies, and the UI must say so. Required rather than optional so it
@@ -142,7 +142,7 @@ export interface Ladder {
    * scapular retraction and upper-back endurance only. Presenting it as pull
    * strength would be a safety misrepresentation.
    */
-  readonly kind: 'strength' | 'postural'
+  readonly kind: "strength" | "postural";
   /**
    * Where every document starts this ladder. **Not rung 0.**
    *
@@ -151,9 +151,9 @@ export interface Ladder {
    * per-ladder reasoning is written next to the value in `ladders.ts`. Raising
    * one is a safety change, not a tuning tweak.
    */
-  readonly startRungIndex: number
+  readonly startRungIndex: number;
   /** Default target span, used only by rungs that declare no `range` of their own. */
-  readonly range: Range
+  readonly range: Range;
   /**
    * How many sessions of this pattern one rung takes. **This is the law**, not a
    * tuning knob: a rung takes about six weeks on every ladder, so the number is
@@ -167,8 +167,8 @@ export interface Ladder {
    * over 42 is +1s per 2 sessions — exactly the three steps the user specified
    * independently before the law was derived (corpus/wiki/progression-engine.md).
    */
-  readonly sessionsPerRung: number
-  readonly rungs: readonly Rung[]
+  readonly sessionsPerRung: number;
+  readonly rungs: readonly Rung[];
 }
 
 /**
@@ -183,36 +183,36 @@ export interface Ladder {
  * purpose — the absence is the guarantee.
  */
 export interface CardioProtocol {
-  readonly label: string
-  readonly rounds: number
+  readonly label: string;
+  readonly rounds: number;
   /** Seconds of hard work per round. 60, not 20 — see the note in `ladders.ts`. */
-  readonly hardSeconds: number
+  readonly hardSeconds: number;
   /** Lower-body only: the push day is upper-body and the daily block is daily. */
-  readonly movements: readonly string[]
+  readonly movements: readonly string[];
   /** Literal, not a string: no future edit may quietly switch this to a count. */
-  readonly prescribedBy: 'breathlessness'
-  readonly cues: readonly string[]
+  readonly prescribedBy: "breathlessness";
+  readonly cues: readonly string[];
   /** The honest limit the app must state, not hide. */
-  readonly notice: string
+  readonly notice: string;
 }
 
 // ─── The rotation ───────────────────────────────────────────────────────────
 
 export interface RotationSlot {
-  readonly label: string
+  readonly label: string;
   /** The slot's own strength work. Empty on the cardio slot. */
-  readonly patterns: readonly Pattern[]
+  readonly patterns: readonly Pattern[];
   /**
    * Stated rather than inferred from `patterns.length === 0`. "This slot trains
    * no ladder" is a fact about the programme; an empty array is an accident
    * waiting to be read as a content bug.
    */
-  readonly cardio: boolean
+  readonly cardio: boolean;
 }
 
-const PUSH_SLOT: RotationSlot = { label: 'Push', patterns: ['push'], cardio: false }
-const LEGS_SLOT: RotationSlot = { label: 'Legs', patterns: ['squat', 'hinge'], cardio: false }
-const CARDIO_SLOT: RotationSlot = { label: 'Cardio', patterns: [], cardio: true }
+const PUSH_SLOT: RotationSlot = { label: "Push", patterns: ["push"], cardio: false };
+const LEGS_SLOT: RotationSlot = { label: "Legs", patterns: ["squat", "hinge"], cardio: false };
+const CARDIO_SLOT: RotationSlot = { label: "Cardio", patterns: [], cardio: true };
 
 /**
  * Push · Legs · Cardio. **Cardio always FOLLOWS legs and never precedes it** —
@@ -226,11 +226,7 @@ const CARDIO_SLOT: RotationSlot = { label: 'Cardio', patterns: [], cardio: true 
  * Position is an integer counter into this array. There is no date arithmetic
  * anywhere in the domain, so "a missed day" is not an expressible concept.
  */
-export const ROTATION: readonly [RotationSlot, RotationSlot, RotationSlot] = [
-  PUSH_SLOT,
-  LEGS_SLOT,
-  CARDIO_SLOT,
-]
+export const ROTATION: readonly [RotationSlot, RotationSlot, RotationSlot] = [PUSH_SLOT, LEGS_SLOT, CARDIO_SLOT];
 
 /**
  * Trained in EVERY session, on top of the slot's own patterns.
@@ -239,7 +235,7 @@ export const ROTATION: readonly [RotationSlot, RotationSlot, RotationSlot] = [
  * of the goal set a desk job actively damages. It also equalises pacing: at one
  * session per rotation, core rungs took twice as long as push rungs to clear.
  */
-export const DAILY_BLOCK: readonly Pattern[] = ['core', 'pull']
+export const DAILY_BLOCK: readonly Pattern[] = ["core", "pull"];
 
 /**
  * The slot at `position`, wrapping.
@@ -249,10 +245,10 @@ export const DAILY_BLOCK: readonly Pattern[] = ['core', 'pull']
  * rather than breaking the only screen that matters.
  */
 export function slotAt(position: number): RotationSlot {
-  const length = ROTATION.length
+  const length = ROTATION.length;
   // Positive modulo, so -1 → 2 rather than -1.
-  const index = ((position % length) + length) % length
+  const index = ((position % length) + length) % length;
   // `index` is NaN for a NaN position and fractional for a fractional one; both
   // miss the array, and the first slot is a better answer than a thrown error.
-  return ROTATION[index] ?? ROTATION[0]
+  return ROTATION[index] ?? ROTATION[0];
 }

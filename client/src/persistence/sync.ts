@@ -66,16 +66,16 @@
  * exactly like import — the corrupt text may be the only copy of something
  * hand-repairable.
  */
-import type { StateDoc, SyncSettings } from '@sports-app/shared/types.ts'
-import { API_PREFIX } from './auth.ts'
-import { parse, serialise } from './codec.ts'
-import type { SaveResult, StoreOptions } from './store.ts'
-import { isReadOnly, save } from './store.ts'
+import type { StateDoc, SyncSettings } from "@sports-app/shared/types.ts";
+import { API_PREFIX } from "./auth.ts";
+import { parse, serialise } from "./codec.ts";
+import type { SaveResult, StoreOptions } from "./store.ts";
+import { isReadOnly, save } from "./store.ts";
 
 // ─── Wire contract (mirrors server/state-server.mjs) ────────────────────────
 
-export const STATE_PATH = '/api/state'
-export const HEALTH_PATH = '/api/health'
+export const STATE_PATH = "/api/state";
+export const HEALTH_PATH = "/api/health";
 
 /**
  * Long enough for a slow phone on a slow connection, short enough that a
@@ -83,14 +83,14 @@ export const HEALTH_PATH = '/api/health'
  * push that times out is simply retried by the next completed session; there is
  * no queue and no timer, on purpose.
  */
-export const DEFAULT_TIMEOUT_MS = 10_000
+export const DEFAULT_TIMEOUT_MS = 10_000;
 
 export interface SyncOptions {
   /** Injected in tests. Defaults to the global `fetch`. */
-  readonly fetchImpl?: typeof fetch | undefined
-  readonly timeoutMs?: number | undefined
+  readonly fetchImpl?: typeof fetch | undefined;
+  readonly timeoutMs?: number | undefined;
   /** Injected in tests. Defaults to `console.warn`. */
-  readonly log?: ((message: string, cause?: unknown) => void) | undefined
+  readonly log?: ((message: string, cause?: unknown) => void) | undefined;
 }
 
 /**
@@ -101,7 +101,7 @@ export interface SyncOptions {
  * behave identically.
  */
 export function endpoint(baseUrl: string, path: string): string {
-  return `${baseUrl.trim().replace(/\/+$/, '')}${path}`
+  return `${baseUrl.trim().replace(/\/+$/, "")}${path}`;
 }
 
 /**
@@ -122,27 +122,27 @@ export function stateEndpoint(baseUrl: string, apiPrefix: string = API_PREFIX): 
   // `/api/state` is outside the session cookie's Path and has no route, so it would
   // fail without a word. An explicit address names the service itself, which has
   // its own routes, so it is used as typed.
-  const own = endpoint(baseUrl, '') === ''
-  return endpoint(baseUrl, own ? `${apiPrefix}${STATE_PATH}` : STATE_PATH)
+  const own = endpoint(baseUrl, "") === "";
+  return endpoint(baseUrl, own ? `${apiPrefix}${STATE_PATH}` : STATE_PATH);
 }
 
 // ─── push ───────────────────────────────────────────────────────────────────
 
 export type PushFailure =
   /** `settings.sync` is null. Not an error — sync is optional. */
-  | 'not-configured'
+  | "not-configured"
   /** The local document could not be parsed, so it must not be uploaded. */
-  | 'read-only'
+  | "read-only"
   /** `serialise` threw. Should be impossible; a silent skip would not be. */
-  | 'serialise-failed'
+  | "serialise-failed"
   /** Request never completed: offline, DNS, timeout, TLS, CORS. */
-  | 'network'
+  | "network"
   /** The service answered, and said no. */
-  | 'rejected'
+  | "rejected";
 
 export type PushOutcome =
   | { readonly ok: true; readonly status: number; readonly bytes: number }
-  | { readonly ok: false; readonly reason: PushFailure; readonly error: string }
+  | { readonly ok: false; readonly reason: PushFailure; readonly error: string };
 
 /**
  * Upload the document. Fire-and-forget: never throws, never rejects.
@@ -156,77 +156,76 @@ export type PushOutcome =
  * `void push(doc)` and move on.
  */
 export async function push(doc: StateDoc, options: SyncOptions = {}): Promise<PushOutcome> {
-  const log = options.log ?? warn
-  const target = doc.settings.sync
+  const log = options.log ?? warn;
+  const target = doc.settings.sync;
 
   if (target === null) {
     // Silent: an unconfigured optional feature is not a failure to report.
-    return { ok: false, reason: 'not-configured', error: 'Sync is not configured.' }
+    return { ok: false, reason: "not-configured", error: "Sync is not configured." };
   }
 
   if (isReadOnly(doc.username)) {
     log(
-      'Sync push skipped: the app is read-only because the stored document could not be read. ' +
-        'Refusing to upload a document that was never validated.',
-    )
+      "Sync push skipped: the app is read-only because the stored document could not be read. " +
+        "Refusing to upload a document that was never validated.",
+    );
     return {
       ok: false,
-      reason: 'read-only',
-      error:
-        'The app is read-only because the saved document could not be read, so nothing was uploaded.',
-    }
+      reason: "read-only",
+      error: "The app is read-only because the saved document could not be read, so nothing was uploaded.",
+    };
   }
 
-  let text: string
+  let text: string;
   try {
-    text = serialise(doc)
+    text = serialise(doc);
   } catch (cause) {
-    log('Sync push skipped: the document could not be serialised.', cause)
-    return { ok: false, reason: 'serialise-failed', error: messageOf(cause) }
+    log("Sync push skipped: the document could not be serialised.", cause);
+    return { ok: false, reason: "serialise-failed", error: messageOf(cause) };
   }
 
-  let response: Response
+  let response: Response;
   try {
     // No onLine check. See the header.
     response = await send(target, stateEndpoint(target.baseUrl), options, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: text,
-    })
+    });
   } catch (cause) {
     // The session is already saved locally. This is a log line, not an error
     // the user has to acknowledge.
-    log('Sync push failed; the session is saved locally and will sync later.', cause)
-    return { ok: false, reason: 'network', error: messageOf(cause) }
+    log("Sync push failed; the session is saved locally and will sync later.", cause);
+    return { ok: false, reason: "network", error: messageOf(cause) };
   }
 
   if (!response.ok) {
-    log(`Sync push refused by the service with status ${response.status}.`)
+    log(`Sync push refused by the service with status ${response.status}.`);
     return {
       ok: false,
-      reason: 'rejected',
+      reason: "rejected",
       error: describeStatus(response.status),
-    }
+    };
   }
 
-  return { ok: true, status: response.status, bytes: text.length }
+  return { ok: true, status: response.status, bytes: text.length };
 }
 
 // ─── pull ───────────────────────────────────────────────────────────────────
 
 export type PullFailure =
   /** This user has no snapshot on the service. The new-device case. */
-  | 'empty'
+  | "empty"
   /** No live session, or an account the service does not allow. */
-  | 'unauthorized'
-  | 'network'
+  | "unauthorized"
+  | "network"
   /** Answered, but the body is not a document this build understands. */
-  | 'invalid'
-  | 'rejected'
+  | "invalid"
+  | "rejected";
 
 export type PullOutcome =
   | { readonly ok: true; readonly doc: StateDoc; readonly text: string }
-  | { readonly ok: false; readonly reason: PullFailure; readonly error: string }
+  | { readonly ok: false; readonly reason: PullFailure; readonly error: string };
 
 /**
  * Download and validate `username`'s remote document. Never throws.
@@ -240,71 +239,67 @@ export type PullOutcome =
  * Writes nothing. Applying a pulled document is a separate, explicit step
  * (`applyRemote`) because it is destructive.
  */
-export async function pull(
-  target: SyncSettings,
-  username: string,
-  options: SyncOptions = {},
-): Promise<PullOutcome> {
-  const log = options.log ?? warn
+export async function pull(target: SyncSettings, username: string, options: SyncOptions = {}): Promise<PullOutcome> {
+  const log = options.log ?? warn;
 
-  let response: Response
+  let response: Response;
   try {
     response = await send(target, stateEndpoint(target.baseUrl), options, {
-      method: 'GET',
-    })
+      method: "GET",
+    });
   } catch (cause) {
-    log('Sync pull failed.', cause)
-    return { ok: false, reason: 'network', error: messageOf(cause) }
+    log("Sync pull failed.", cause);
+    return { ok: false, reason: "network", error: messageOf(cause) };
   }
 
   if (response.status === 404) {
     return {
       ok: false,
-      reason: 'empty',
-      error: 'The sync service has no document stored yet for this user.',
-    }
+      reason: "empty",
+      error: "The sync service has no document stored yet for this user.",
+    };
   }
   if (response.status === 401 || response.status === 403) {
     return {
       ok: false,
-      reason: 'unauthorized',
-      error: 'You are not signed in to the sync service. Sign in again to sync.',
-    }
+      reason: "unauthorized",
+      error: "You are not signed in to the sync service. Sign in again to sync.",
+    };
   }
   if (!response.ok) {
-    return { ok: false, reason: 'rejected', error: describeStatus(response.status) }
+    return { ok: false, reason: "rejected", error: describeStatus(response.status) };
   }
 
-  let text: string
+  let text: string;
   try {
-    text = await response.text()
+    text = await response.text();
   } catch (cause) {
-    log('Sync pull failed while reading the response body.', cause)
-    return { ok: false, reason: 'network', error: messageOf(cause) }
+    log("Sync pull failed while reading the response body.", cause);
+    return { ok: false, reason: "network", error: messageOf(cause) };
   }
 
-  const parsed = parse(text, { username })
+  const parsed = parse(text, { username });
   if (!parsed.ok) {
     // The codec's message, verbatim — it names the JSON path that is wrong,
     // which is the only useful thing to show for a document that came from
     // another build or a proxy that returned a login page.
     return {
       ok: false,
-      reason: 'invalid',
+      reason: "invalid",
       error: `The document from the sync service could not be read, so nothing was changed.\n\n${parsed.error}`,
-    }
+    };
   }
   if (parsed.doc.username !== username) {
     return {
       ok: false,
-      reason: 'invalid',
+      reason: "invalid",
       error:
         `The sync service returned a document belonging to "${parsed.doc.username}" ` +
         `when "${username}" was requested, so nothing was changed.`,
-    }
+    };
   }
 
-  return { ok: true, doc: parsed.doc, text }
+  return { ok: true, doc: parsed.doc, text };
 }
 
 // ─── checkSession ───────────────────────────────────────────────────────────
@@ -321,10 +316,10 @@ export async function pull(
 export type SessionCheckOutcome =
   | { readonly ok: true }
   | {
-      readonly ok: false
-      readonly reason: 'not-configured' | 'network' | 'unauthorized' | 'rejected'
-      readonly error: string
-    }
+      readonly ok: false;
+      readonly reason: "not-configured" | "network" | "unauthorized" | "rejected";
+      readonly error: string;
+    };
 
 /**
  * Check that the service is reachable and that this browser holds a session it
@@ -350,23 +345,23 @@ export async function checkSession(
   options: SyncOptions = {},
 ): Promise<SessionCheckOutcome> {
   if (target === null) {
-    return { ok: false, reason: 'not-configured', error: 'Sync is not configured.' }
+    return { ok: false, reason: "not-configured", error: "Sync is not configured." };
   }
 
-  let response: Response
+  let response: Response;
   try {
     // `GET /api/state` rather than a dedicated probe: it is the route sync
     // actually uses, so this exercises the same gate, the same cookie and the
     // same origin. A dedicated endpoint would be a second answer to "will sync
     // work", free to disagree with the first.
-    response = await send(target, stateEndpoint(target.baseUrl), options, { method: 'GET' })
+    response = await send(target, stateEndpoint(target.baseUrl), options, { method: "GET" });
   } catch (cause) {
-    ;(options.log ?? warn)('Session check failed; the app works offline regardless.', cause)
-    return { ok: false, reason: 'network', error: messageOf(cause) }
+    (options.log ?? warn)("Session check failed; the app works offline regardless.", cause);
+    return { ok: false, reason: "network", error: messageOf(cause) };
   }
 
   if (response.status === 401 || response.status === 403) {
-    return { ok: false, reason: 'unauthorized', error: describeStatus(response.status) }
+    return { ok: false, reason: "unauthorized", error: describeStatus(response.status) };
   }
 
   /*
@@ -375,38 +370,38 @@ export async function checkSession(
    * new device is in, and the state somebody checking their settings for the
    * first time will most often see.
    */
-  if (response.status === 404 || response.ok) return { ok: true }
+  if (response.status === 404 || response.ok) return { ok: true };
 
-  return { ok: false, reason: 'rejected', error: describeStatus(response.status) }
+  return { ok: false, reason: "rejected", error: describeStatus(response.status) };
 }
 
 // ─── Comparison and the conflict prompt ─────────────────────────────────────
 
-export type Comparison = 'local-ahead' | 'equal' | 'remote-ahead'
+export type Comparison = "local-ahead" | "equal" | "remote-ahead";
 
 /** Two session counts, compared. See the header for which count and why. */
 export function compareSessions(localSessions: number, remoteSessions: number): Comparison {
-  if (localSessions > remoteSessions) return 'local-ahead'
-  if (localSessions < remoteSessions) return 'remote-ahead'
-  return 'equal'
+  if (localSessions > remoteSessions) return "local-ahead";
+  if (localSessions < remoteSessions) return "remote-ahead";
+  return "equal";
 }
 
 export type SyncStatus =
-  | { readonly kind: 'not-configured' }
-  | { readonly kind: 'failed'; readonly reason: PullFailure; readonly error: string }
+  | { readonly kind: "not-configured" }
+  | { readonly kind: "failed"; readonly reason: PullFailure; readonly error: string }
   /** Nothing stored remotely for this user yet — pushing is safe and loses nothing. */
-  | { readonly kind: 'remote-empty'; readonly localSessions: number | null }
+  | { readonly kind: "remote-empty"; readonly localSessions: number | null }
   /**
    * No readable local document but a good remote one: the new-device case, and
    * the only case where adopting the remote copy discards nothing.
    */
-  | { readonly kind: 'adopt-remote'; readonly remote: StateDoc; readonly remoteSessions: number }
-  | { readonly kind: 'in-sync'; readonly sessions: number }
+  | { readonly kind: "adopt-remote"; readonly remote: StateDoc; readonly remoteSessions: number }
+  | { readonly kind: "in-sync"; readonly sessions: number }
   /** Safe to push: the remote holds a prefix of what this device has. */
   | {
-      readonly kind: 'local-ahead'
-      readonly localSessions: number
-      readonly remoteSessions: number
+      readonly kind: "local-ahead";
+      readonly localSessions: number;
+      readonly remoteSessions: number;
     }
   /**
    * **Prompt, do not resolve.** The remote holds sessions this device has never
@@ -414,11 +409,11 @@ export type SyncStatus =
    * and `remote` is here so accepting it needs no second request.
    */
   | {
-      readonly kind: 'conflict'
-      readonly localSessions: number
-      readonly remoteSessions: number
-      readonly remote: StateDoc
-    }
+      readonly kind: "conflict";
+      readonly localSessions: number;
+      readonly remoteSessions: number;
+      readonly remote: StateDoc;
+    };
 
 /**
  * Compare one user's local and remote documents and return what should happen.
@@ -439,31 +434,31 @@ export async function checkSync(
   target: SyncSettings | null,
   options: SyncOptions = {},
 ): Promise<SyncStatus> {
-  if (target === null) return { kind: 'not-configured' }
+  if (target === null) return { kind: "not-configured" };
 
-  const remote = await pull(target, username, options)
+  const remote = await pull(target, username, options);
 
   if (!remote.ok) {
-    if (remote.reason === 'empty') {
-      return { kind: 'remote-empty', localSessions: local?.history.length ?? null }
+    if (remote.reason === "empty") {
+      return { kind: "remote-empty", localSessions: local?.history.length ?? null };
     }
-    return { kind: 'failed', reason: remote.reason, error: remote.error }
+    return { kind: "failed", reason: remote.reason, error: remote.error };
   }
 
-  const remoteSessions = remote.doc.history.length
+  const remoteSessions = remote.doc.history.length;
 
   if (local === null) {
-    return { kind: 'adopt-remote', remote: remote.doc, remoteSessions }
+    return { kind: "adopt-remote", remote: remote.doc, remoteSessions };
   }
 
-  const localSessions = local.history.length
+  const localSessions = local.history.length;
   switch (compareSessions(localSessions, remoteSessions)) {
-    case 'equal':
-      return { kind: 'in-sync', sessions: localSessions }
-    case 'local-ahead':
-      return { kind: 'local-ahead', localSessions, remoteSessions }
-    case 'remote-ahead':
-      return { kind: 'conflict', localSessions, remoteSessions, remote: remote.doc }
+    case "equal":
+      return { kind: "in-sync", sessions: localSessions };
+    case "local-ahead":
+      return { kind: "local-ahead", localSessions, remoteSessions };
+    case "remote-ahead":
+      return { kind: "conflict", localSessions, remoteSessions, remote: remote.doc };
   }
 }
 
@@ -475,7 +470,7 @@ export interface ApplyOptions extends StoreOptions {
    * after the user has confirmed, exactly like import — the unreadable text may
    * be the only copy of a hand-repairable history.
    */
-  readonly allowOverwriteCorrupt?: boolean | undefined
+  readonly allowOverwriteCorrupt?: boolean | undefined;
   /**
    * The sync settings to keep, overriding whatever the pulled document carried.
    *
@@ -488,7 +483,7 @@ export interface ApplyOptions extends StoreOptions {
    *
    * Omit to keep whatever the remote document contained.
    */
-  readonly preserveSync?: SyncSettings | null | undefined
+  readonly preserveSync?: SyncSettings | null | undefined;
 }
 
 /**
@@ -502,10 +497,8 @@ export interface ApplyOptions extends StoreOptions {
  */
 export function applyRemote(doc: StateDoc, options: ApplyOptions = {}): SaveResult {
   const outgoing =
-    options.preserveSync === undefined
-      ? doc
-      : { ...doc, settings: { ...doc.settings, sync: options.preserveSync } }
-  return save(outgoing, options)
+    options.preserveSync === undefined ? doc : { ...doc, settings: { ...doc.settings, sync: options.preserveSync } };
+  return save(outgoing, options);
 }
 
 // ─── The session-path call site ─────────────────────────────────────────────
@@ -529,17 +522,17 @@ export function applyRemote(doc: StateDoc, options: ApplyOptions = {}): SaveResu
  * upload worked is not part of it.
  */
 export function saveAndPush(doc: StateDoc, options: ApplyOptions & SyncOptions = {}): SaveResult {
-  const result = save(doc, options)
-  if (result.ok) void push(doc, options)
-  return result
+  const result = save(doc, options);
+  if (result.ok) void push(doc, options);
+  return result;
 }
 
 // ─── Transport ──────────────────────────────────────────────────────────────
 
 interface SendInit {
-  readonly method: 'GET' | 'PUT' | 'POST'
-  readonly headers?: Readonly<Record<string, string>>
-  readonly body?: string
+  readonly method: "GET" | "PUT" | "POST";
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly body?: string;
 }
 
 /**
@@ -551,23 +544,18 @@ interface SendInit {
  * naturally passing it, and a future per-target concern — a header, a timeout
  * override — belongs here rather than being threaded back in.
  */
-async function send(
-  _target: SyncSettings,
-  url: string,
-  options: SyncOptions,
-  init: SendInit,
-): Promise<Response> {
-  const doFetch = options.fetchImpl ?? globalThis.fetch
-  if (typeof doFetch !== 'function') {
-    throw new Error('This environment has no fetch(), so sync is unavailable.')
+async function send(_target: SyncSettings, url: string, options: SyncOptions, init: SendInit): Promise<Response> {
+  const doFetch = options.fetchImpl ?? globalThis.fetch;
+  if (typeof doFetch !== "function") {
+    throw new Error("This environment has no fetch(), so sync is unavailable.");
   }
 
-  const signal = timeoutSignal(options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  const signal = timeoutSignal(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
   const request: RequestInit = {
     method: init.method,
     headers: { ...init.headers },
-    cache: 'no-store',
+    cache: "no-store",
     /*
      * `include`, where this used to be `omit`.
      *
@@ -577,12 +565,12 @@ async function send(
      * while a same-origin build works perfectly: the worst kind of split to
      * debug.
      */
-    credentials: 'include',
+    credentials: "include",
     ...(init.body === undefined ? {} : { body: init.body }),
     ...(signal === null ? {} : { signal }),
-  }
+  };
 
-  return doFetch(url, request)
+  return doFetch(url, request);
 }
 
 /**
@@ -591,10 +579,10 @@ async function send(
  */
 function timeoutSignal(timeoutMs: number): AbortSignal | null {
   try {
-    const factory = AbortSignal as { timeout?: (ms: number) => AbortSignal }
-    return typeof factory.timeout === 'function' ? factory.timeout(timeoutMs) : null
+    const factory = AbortSignal as { timeout?: (ms: number) => AbortSignal };
+    return typeof factory.timeout === "function" ? factory.timeout(timeoutMs) : null;
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -603,33 +591,33 @@ function describeStatus(status: number): string {
     // No live session. That includes a session that began with Ward while Ward
     // cannot answer (`reason: ward_unavailable`), which signing in with a password
     // fixes — the sign-in page says so; this line only needs to point there.
-    return 'You are not signed in, or your session has ended. Sign in again to sync.'
+    return "You are not signed in, or your session has ended. Sign in again to sync.";
   }
   if (status === 403) {
     // The service understood the request and refused it: a role check, or a
     // browser that said the request came from another origin.
-    return 'The service refused this request (403).'
+    return "The service refused this request (403).";
   }
   if (status === 503) {
-    return 'The service is temporarily unavailable. Sync will retry.'
+    return "The service is temporarily unavailable. Sync will retry.";
   }
   if (status === 413) {
-    return `The sync service refused the document as too large (${status}).`
+    return `The sync service refused the document as too large (${status}).`;
   }
   if (status === 415) {
-    return `The sync service refused the request's content type (${status}).`
+    return `The sync service refused the request's content type (${status}).`;
   }
   if (status === 400) {
-    return `The sync service rejected the document (${status}).`
+    return `The sync service rejected the document (${status}).`;
   }
-  return `The sync service answered with status ${status}.`
+  return `The sync service answered with status ${status}.`;
 }
 
 function messageOf(cause: unknown): string {
-  return cause instanceof Error ? cause.message : String(cause)
+  return cause instanceof Error ? cause.message : String(cause);
 }
 
 function warn(message: string, cause?: unknown): void {
-  if (cause === undefined) console.warn(message)
-  else console.warn(message, cause)
+  if (cause === undefined) console.warn(message);
+  else console.warn(message, cause);
 }

@@ -1,11 +1,11 @@
 /** A figure never knows which rung it is drawing — only which half of the
  * movement it is showing. See `figures/index.ts` for the full contract. */
-export type FigurePhase = 'start' | 'end'
+export type FigurePhase = "start" | "end";
 
 /** A point in the 200×200 figure coordinate space. */
 export interface Joint {
-  readonly x: number
-  readonly y: number
+  readonly x: number;
+  readonly y: number;
 }
 
 // ─── The rig: what a figure author writes ───────────────────────────────────
@@ -26,7 +26,7 @@ export interface Joint {
 
 /** A value that differs between the two drawn phases. `{ start, end }` is the
  * literal shape of the brief's canonical-skeleton table, one row per bone. */
-export type PhasePair<T> = Readonly<Record<FigurePhase, T>>
+export type PhasePair<T> = Readonly<Record<FigurePhase, T>>;
 
 /**
  * Which side of the root→tip line a two-bone chain's mid joint sits on, in
@@ -47,11 +47,11 @@ export type PhasePair<T> = Readonly<Record<FigurePhase, T>>
  * through an animation. With one sign for the whole limb the inversion is
  * unrepresentable.
  */
-export type BendSign = 1 | -1
+export type BendSign = 1 | -1;
 
 /** Which axial joint a limb hangs from. Arms hang from the shoulder, legs from
  * the hip; both are derived from the spine, never authored. */
-export type LimbRoot = 'shoulder' | 'hip'
+export type LimbRoot = "shoulder" | "hip";
 
 /**
  * One rigid segment: a length declared once, a direction declared per phase.
@@ -65,9 +65,9 @@ export type LimbRoot = 'shoulder' | 'hip'
  * side.
  */
 export interface RigBone {
-  readonly length: number
+  readonly length: number;
   /** Absolute direction from the bone's root to its tip, degrees, y-down. */
-  readonly angleDeg: PhasePair<number>
+  readonly angleDeg: PhasePair<number>;
 }
 
 /**
@@ -84,8 +84,8 @@ export interface RigBone {
  * home, sweeping down through the torso instead of up past the head.
  */
 export interface FkLimb extends RigBone {
-  readonly kind: 'fk'
-  readonly root: LimbRoot
+  readonly kind: "fk";
+  readonly root: LimbRoot;
 }
 
 /**
@@ -106,31 +106,26 @@ export interface FkLimb extends RigBone {
  * relative to a moving root is by definition not planted.
  */
 export interface IkLimb {
-  readonly kind: 'ik'
-  readonly root: LimbRoot
+  readonly kind: "ik";
+  readonly root: LimbRoot;
   /** Root → mid (upper arm, femur). */
-  readonly upper: number
+  readonly upper: number;
   /** Mid → tip (forearm, shank). */
-  readonly lower: number
-  readonly bend: BendSign
-  readonly target: PhasePair<Joint>
+  readonly lower: number;
+  readonly bend: BendSign;
+  readonly target: PhasePair<Joint>;
 }
 
-export type RigLimb = FkLimb | IkLimb
+export type RigLimb = FkLimb | IkLimb;
 
 /** The four limbs every figure has. Fixed, because `StickFigure` draws exactly
  * two arms and two legs and a figure is a pose, not a new anatomy. */
-export type RigLimbId = 'armL' | 'armR' | 'legL' | 'legR'
+export type RigLimbId = "armL" | "armR" | "legL" | "legR";
 
 /** Bone identity for keyframe generation. A one-bone limb is named for the limb
  * itself; a two-bone limb splits. Wave 2 turns each of these into one
  * `@keyframes` block, so they double as CSS identifier fragments. */
-export type RigBoneId =
-  | 'neck'
-  | 'torso'
-  | RigLimbId
-  | `${RigLimbId}-upper`
-  | `${RigLimbId}-lower`
+export type RigBoneId = "neck" | "torso" | RigLimbId | `${RigLimbId}-upper` | `${RigLimbId}-lower`;
 
 /**
  * A figure's whole skeleton and both its poses.
@@ -146,22 +141,22 @@ export type RigBoneId =
  * stays put while the hip rises. The hip follows from `torso`.
  */
 export interface Rig {
-  readonly shoulder: PhasePair<Joint>
+  readonly shoulder: PhasePair<Joint>;
   /** Shoulder → hip. */
-  readonly torso: RigBone
+  readonly torso: RigBone;
   /** Shoulder → head centre. Short, but a bone: without it the head drifts off
    * the neck when the torso pitches. */
-  readonly neck: RigBone
-  readonly limbs: Readonly<Record<RigLimbId, RigLimb>>
+  readonly neck: RigBone;
+  readonly limbs: Readonly<Record<RigLimbId, RigLimb>>;
 }
 
 /** The one accent element: a vertical arrow beside the body, pointing the way
  * the movement's main phase goes. Fixed coordinates — an annotation, not part of
  * the skeleton, so it stays still while the body moves under it. */
 export interface MovementArrowSpec {
-  readonly x: number
-  readonly y1: number
-  readonly y2: number
+  readonly x: number;
+  readonly y1: number;
+  readonly y2: number;
 }
 
 /**
@@ -171,6 +166,6 @@ export interface MovementArrowSpec {
  * drift from another figure's drawing rules.
  */
 export interface FigureDefinition {
-  readonly rig: Rig
-  readonly arrow: MovementArrowSpec
+  readonly rig: Rig;
+  readonly arrow: MovementArrowSpec;
 }

@@ -1,6 +1,6 @@
-import { Link, Outlet, createRootRoute } from '@tanstack/react-router'
-import { currentUsername } from '../../persistence/session.ts'
-import { Shell, ShellBody, ShellRail, ShellTitle } from '../components/Shell.tsx'
+import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
+import { currentUsername } from "../../persistence/session.ts";
+import { Shell, ShellBody, ShellRail, ShellTitle } from "../components/Shell.tsx";
 
 /**
  * The root route. It does two things and deliberately renders no chrome of its
@@ -40,4 +40,4 @@ export const rootRoute = createRootRoute({
       </ShellBody>
     </Shell>
   ),
-})
+});

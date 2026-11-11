@@ -26,12 +26,12 @@
  * `true` while offline and a reflex to "improve" this module by gating on it
  * would be a regression.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RungId, StateDoc, SyncSettings } from '@sports-app/shared/types.ts'
-import { CURRENT_SCHEMA_VERSION } from '@sports-app/shared/types.ts'
-import { parse, serialise } from '../codec.ts'
-import { STORAGE_KEYS, clearReadOnly, emptyDoc, isReadOnly, load, readOnlyReason } from '../store.ts'
-import type { StorageLike } from '../store.ts'
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { RungId, StateDoc, SyncSettings } from "@sports-app/shared/types.ts";
+import { CURRENT_SCHEMA_VERSION } from "@sports-app/shared/types.ts";
+import { parse, serialise } from "../codec.ts";
+import { STORAGE_KEYS, clearReadOnly, emptyDoc, isReadOnly, load, readOnlyReason } from "../store.ts";
+import type { StorageLike } from "../store.ts";
 import {
   DEFAULT_TIMEOUT_MS,
   applyRemote,
@@ -43,8 +43,8 @@ import {
   push,
   saveAndPush,
   stateEndpoint,
-} from '../sync.ts'
-import { API_PREFIX } from '../auth.ts'
+} from "../sync.ts";
+import { API_PREFIX } from "../auth.ts";
 
 /*
  * `secret` is still in `SyncSettings` because it is still in the document
@@ -52,16 +52,16 @@ import { API_PREFIX } from '../auth.ts'
  * own schema version bump, which is deliberately not folded into an auth
  * change. Nothing reads it; the assertions below prove it never leaves.
  */
-const TARGET: SyncSettings = { baseUrl: 'http://127.0.0.1:8787', secret: 'no-longer-used' }
-const ALICE = 'alice'
-const BOB = 'bob'
+const TARGET: SyncSettings = { baseUrl: "http://127.0.0.1:8787", secret: "no-longer-used" };
+const ALICE = "alice";
+const BOB = "bob";
 
 // ─── Fakes ──────────────────────────────────────────────────────────────────
 
 interface Fake extends StorageLike {
-  readonly map: Map<string, string>
+  readonly map: Map<string, string>;
   /** Every mutating call, in order. An empty list proves nothing was written. */
-  readonly ops: string[]
+  readonly ops: string[];
 }
 
 function fakeStorage(initial: Record<string, string> = {}): Fake {
@@ -69,40 +69,40 @@ function fakeStorage(initial: Record<string, string> = {}): Fake {
     map: new Map(Object.entries(initial)),
     ops: [],
     getItem(key) {
-      return fake.map.get(key) ?? null
+      return fake.map.get(key) ?? null;
     },
     setItem(key, value) {
-      fake.ops.push(`set ${key}`)
-      fake.map.set(key, value)
+      fake.ops.push(`set ${key}`);
+      fake.map.set(key, value);
     },
     removeItem(key) {
-      fake.ops.push(`remove ${key}`)
-      fake.map.delete(key)
+      fake.ops.push(`remove ${key}`);
+      fake.map.delete(key);
     },
-  }
-  return fake
+  };
+  return fake;
 }
 
-let storage: Fake
-let logged: { message: string; cause?: unknown }[]
+let storage: Fake;
+let logged: { message: string; cause?: unknown }[];
 
 function log(message: string, cause?: unknown): void {
-  logged.push(cause === undefined ? { message } : { message, cause })
+  logged.push(cause === undefined ? { message } : { message, cause });
 }
 
 beforeEach(() => {
-  clearReadOnly()
-  logged = []
-  storage = fakeStorage()
+  clearReadOnly();
+  logged = [];
+  storage = fakeStorage();
   // Installed as the ambient storage so "nothing was written" can be asserted
   // against `storage.ops` even for functions that take no storage argument.
-  vi.stubGlobal('localStorage', storage)
-})
+  vi.stubGlobal("localStorage", storage);
+});
 
 afterEach(() => {
-  vi.unstubAllGlobals()
-  clearReadOnly()
-})
+  vi.unstubAllGlobals();
+  clearReadOnly();
+});
 
 /**
  * A document with `sessions` recorded sessions.
@@ -113,76 +113,76 @@ afterEach(() => {
  * `recordSession` would have moved it.
  */
 function docWith(sessions: number, sync: SyncSettings | null = TARGET, username = ALICE): StateDoc {
-  const base = emptyDoc(username)
+  const base = emptyDoc(username);
   const history = Array.from({ length: sessions }, (_, i) => ({
     completedAt: new Date(Date.UTC(2026, 5, 1 + i, 7, 5)).toISOString(),
     position: i % 3,
-    variant: 'medium' as const,
+    variant: "medium" as const,
     exercises: [
       {
-        pattern: 'core' as const,
-        rungId: 'core-03-front-plank' as RungId,
+        pattern: "core" as const,
+        rungId: "core-03-front-plank" as RungId,
         sets: 2,
         targetValue: 30,
       },
     ],
-  }))
+  }));
   return {
     ...base,
     cyclePosition: sessions,
     sessionsDone: { ...base.sessionsDone, core: sessions },
     history,
     settings: { ...base.settings, sync },
-  }
+  };
 }
 
-type FetchFake = ReturnType<typeof vi.fn> & typeof fetch
+type FetchFake = ReturnType<typeof vi.fn> & typeof fetch;
 
 /** A `fetch` that answers every call with the same response. */
 function responder(body: string, init: ResponseInit = { status: 200 }): FetchFake {
-  return vi.fn(() => Promise.resolve(new Response(body, init))) as unknown as FetchFake
+  return vi.fn(() => Promise.resolve(new Response(body, init))) as unknown as FetchFake;
 }
 
 function failer(cause: unknown): FetchFake {
-  return vi.fn(() => Promise.reject(cause)) as unknown as FetchFake
+  return vi.fn(() => Promise.reject(cause)) as unknown as FetchFake;
 }
 
 function callsWithMethod(fetchImpl: FetchFake, method: string): unknown[] {
-  const mock = fetchImpl as unknown as { mock: { calls: [string, RequestInit][] } }
-  return mock.mock.calls.filter(([, init]) => init.method === method)
+  const mock = fetchImpl as unknown as { mock: { calls: [string, RequestInit][] } };
+  return mock.mock.calls.filter(([, init]) => init.method === method);
 }
 
 function initOf(fetchImpl: FetchFake, index = 0): RequestInit | undefined {
-  const mock = fetchImpl as unknown as { mock: { calls: [string, RequestInit][] } }
-  return mock.mock.calls[index]?.[1]
+  const mock = fetchImpl as unknown as { mock: { calls: [string, RequestInit][] } };
+  return mock.mock.calls[index]?.[1];
 }
 
 function headersOf(fetchImpl: FetchFake, index = 0): Record<string, string> {
-  return (initOf(fetchImpl, index)?.headers ?? {}) as Record<string, string>
+  return (initOf(fetchImpl, index)?.headers ?? {}) as Record<string, string>;
 }
 
 function urlOf(fetchImpl: FetchFake, index = 0): string {
-  const mock = fetchImpl as unknown as { mock: { calls: [string, RequestInit][] } }
-  return mock.mock.calls[index]?.[0] ?? ''
+  const mock = fetchImpl as unknown as { mock: { calls: [string, RequestInit][] } };
+  return mock.mock.calls[index]?.[0] ?? "";
 }
 
 // ─── URL building ───────────────────────────────────────────────────────────
 
-describe('endpoint', () => {
-  it('joins a base URL and a path without doubling the slash', () => {
-    expect(endpoint('http://host:8787', '/api/state')).toBe('http://host:8787/api/state')
-    expect(endpoint('http://host:8787/', '/api/state')).toBe('http://host:8787/api/state')
-    expect(endpoint('http://host:8787///', '/api/state')).toBe('http://host:8787/api/state')
-    expect(endpoint('  http://host:8787  ', '/api/state')).toBe('http://host:8787/api/state')
-  })
+describe("endpoint", () => {
+  it("joins a base URL and a path without doubling the slash", () => {
+    expect(endpoint("http://host:8787", "/api/state")).toBe("http://host:8787/api/state");
+    expect(endpoint("http://host:8787/", "/api/state")).toBe("http://host:8787/api/state");
+    expect(endpoint("http://host:8787///", "/api/state")).toBe("http://host:8787/api/state");
+    expect(endpoint("  http://host:8787  ", "/api/state")).toBe("http://host:8787/api/state");
+  });
 
-  it('treats an empty base URL as same-origin, which is the dev-proxy case', () => {
-    expect(endpoint('', '/api/state')).toBe('/api/state')
-    expect(endpoint('/', '/api/state')).toBe('/api/state')
-  })
-})
+  it("treats an empty base URL as same-origin, which is the dev-proxy case", () => {
+    expect(endpoint("", "/api/state")).toBe("/api/state");
+    expect(endpoint("/", "/api/state")).toBe("/api/state");
+  });
+});
 
-describe('stateEndpoint', () => {
+describe("stateEndpoint", () => {
   /**
    * It names nobody, and that is the change.
    *
@@ -192,54 +192,54 @@ describe('stateEndpoint', () => {
    * defended against: the service reads the session's subject, so the URL
    * carries no target to corrupt.
    */
-  it('names no user — the service reads the session', () => {
-    expect(stateEndpoint('http://host:8787')).toBe('http://host:8787/api/state')
-    expect(stateEndpoint('')).toBe('/api/state')
-  })
+  it("names no user — the service reads the session", () => {
+    expect(stateEndpoint("http://host:8787")).toBe("http://host:8787/api/state");
+    expect(stateEndpoint("")).toBe("/api/state");
+  });
 
-  it('puts an empty address under the API prefix sign-in uses, and only then', () => {
+  it("puts an empty address under the API prefix sign-in uses, and only then", () => {
     // Same-origin in the deploy: the cookie's Path and the proxy route are both the prefix.
-    expect(stateEndpoint('', '/sports-app-api')).toBe('/sports-app-api/api/state')
-    expect(stateEndpoint('  / ', '/sports-app-api')).toBe('/sports-app-api/api/state')
+    expect(stateEndpoint("", "/sports-app-api")).toBe("/sports-app-api/api/state");
+    expect(stateEndpoint("  / ", "/sports-app-api")).toBe("/sports-app-api/api/state");
     // No prefix (dev proxy, co-hosted): unchanged.
-    expect(stateEndpoint('', '')).toBe('/api/state')
+    expect(stateEndpoint("", "")).toBe("/api/state");
     // An explicit address is used as typed, prefix or not.
-    expect(stateEndpoint('http://host:8787', '/sports-app-api')).toBe('http://host:8787/api/state')
-  })
+    expect(stateEndpoint("http://host:8787", "/sports-app-api")).toBe("http://host:8787/api/state");
+  });
 
-  it('defaults to the prefix baked into the build, the one the auth client uses', () => {
-    expect(stateEndpoint('')).toBe(`${API_PREFIX}/api/state`)
-  })
+  it("defaults to the prefix baked into the build, the one the auth client uses", () => {
+    expect(stateEndpoint("")).toBe(`${API_PREFIX}/api/state`);
+  });
 
-  it('cannot be made to address another stream, whatever the username contains', () => {
+  it("cannot be made to address another stream, whatever the username contains", () => {
     // The old failure mode, asserted as impossible: there is no parameter for a
     // crafted username to appear in.
-    expect(stateEndpoint('http://host:8787')).not.toContain('?')
-    expect(stateEndpoint('http://host:8787')).not.toContain('user')
-  })
-})
+    expect(stateEndpoint("http://host:8787")).not.toContain("?");
+    expect(stateEndpoint("http://host:8787")).not.toContain("user");
+  });
+});
 
 // ─── push ───────────────────────────────────────────────────────────────────
 
-describe('push', () => {
-  it('sends the serialised document to PUT /api/state, with the session cookie', async () => {
-    const fetchImpl = responder('{"id":1}')
-    const doc = docWith(5)
+describe("push", () => {
+  it("sends the serialised document to PUT /api/state, with the session cookie", async () => {
+    const fetchImpl = responder('{"id":1}');
+    const doc = docWith(5);
 
-    const outcome = await push(doc, { fetchImpl, log })
+    const outcome = await push(doc, { fetchImpl, log });
 
-    expect(outcome).toEqual({ ok: true, status: 200, bytes: serialise(doc).length })
-    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state')
+    expect(outcome).toEqual({ ok: true, status: 200, bytes: serialise(doc).length });
+    expect(urlOf(fetchImpl)).toBe("http://127.0.0.1:8787/api/state");
 
-    const init = initOf(fetchImpl)
-    expect(init?.method).toBe('PUT')
-    expect(init?.body).toBe(serialise(doc))
-    expect(headersOf(fetchImpl)['Content-Type']).toBe('application/json')
+    const init = initOf(fetchImpl);
+    expect(init?.method).toBe("PUT");
+    expect(init?.body).toBe(serialise(doc));
+    expect(headersOf(fetchImpl)["Content-Type"]).toBe("application/json");
     // The credential is Ward's cookie, which the browser attaches — so the
     // request must ask for it. `omit` here would 401 every cross-origin deploy
     // while a same-origin build worked perfectly.
-    expect(init?.credentials).toBe('include')
-  })
+    expect(init?.credentials).toBe("include");
+  });
 
   /**
    * The stored `secret` is vestigial and must stay that way until the schema
@@ -252,267 +252,264 @@ describe('push', () => {
    * from the schema, and it is recorded here rather than hidden by a narrower
    * assertion that looked stronger than it is.
    */
-  it('never sends the stored secret as a credential', async () => {
-    const fetchImpl = responder('{}')
-    await push(docWith(1), { fetchImpl, log })
+  it("never sends the stored secret as a credential", async () => {
+    const fetchImpl = responder("{}");
+    await push(docWith(1), { fetchImpl, log });
 
-    expect(urlOf(fetchImpl)).not.toContain(TARGET.secret)
-    expect(JSON.stringify(headersOf(fetchImpl))).not.toContain(TARGET.secret)
-  })
+    expect(urlOf(fetchImpl)).not.toContain(TARGET.secret);
+    expect(JSON.stringify(headersOf(fetchImpl))).not.toContain(TARGET.secret);
+  });
 
-  it('keeps the secret out of the URL', async () => {
-    const fetchImpl = responder('{}')
-    await push(docWith(1), { fetchImpl, log })
-    expect(urlOf(fetchImpl)).not.toContain(TARGET.secret)
-  })
+  it("keeps the secret out of the URL", async () => {
+    const fetchImpl = responder("{}");
+    await push(docWith(1), { fetchImpl, log });
+    expect(urlOf(fetchImpl)).not.toContain(TARGET.secret);
+  });
 
-  it('swallows a network failure: resolves, never rejects, never throws', async () => {
-    const fetchImpl = failer(new TypeError('Failed to fetch'))
+  it("swallows a network failure: resolves, never rejects, never throws", async () => {
+    const fetchImpl = failer(new TypeError("Failed to fetch"));
 
-    const outcome = await push(docWith(5), { fetchImpl, log })
+    const outcome = await push(docWith(5), { fetchImpl, log });
 
-    expect(outcome).toEqual({ ok: false, reason: 'network', error: 'Failed to fetch' })
-    expect(logged[0]?.message).toMatch(/saved locally/)
-  })
+    expect(outcome).toEqual({ ok: false, reason: "network", error: "Failed to fetch" });
+    expect(logged[0]?.message).toMatch(/saved locally/);
+  });
 
-  it('swallows a fetch that throws synchronously', async () => {
+  it("swallows a fetch that throws synchronously", async () => {
     const fetchImpl = vi.fn(() => {
-      throw new Error('boom')
-    }) as unknown as FetchFake
+      throw new Error("boom");
+    }) as unknown as FetchFake;
 
     await expect(push(docWith(5), { fetchImpl, log })).resolves.toEqual({
       ok: false,
-      reason: 'network',
-      error: 'boom',
-    })
-  })
+      reason: "network",
+      error: "boom",
+    });
+  });
 
-  it('produces no unhandled rejection when called as fire-and-forget', async () => {
-    const unhandled = vi.fn()
+  it("produces no unhandled rejection when called as fire-and-forget", async () => {
+    const unhandled = vi.fn();
     const scope = globalThis as unknown as {
-      addEventListener?: (t: string, l: () => void) => void
-      removeEventListener?: (t: string, l: () => void) => void
-    }
+      addEventListener?: (t: string, l: () => void) => void;
+      removeEventListener?: (t: string, l: () => void) => void;
+    };
     // Node reports these on `process`, browsers on `window`. Either way the
     // assertion below is really about `push` returning a settled promise.
-    scope.addEventListener?.('unhandledrejection', unhandled)
+    scope.addEventListener?.("unhandledrejection", unhandled);
 
-    void push(docWith(5), { fetchImpl: failer(new Error('offline')), log })
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    void push(docWith(5), { fetchImpl: failer(new Error("offline")), log });
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    scope.removeEventListener?.('unhandledrejection', unhandled)
-    expect(unhandled).not.toHaveBeenCalled()
-  })
+    scope.removeEventListener?.("unhandledrejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+  });
 
-  it('reports a service rejection without throwing', async () => {
-    const fetchImpl = responder('{"error":"unauthorized"}', { status: 401 })
-    const outcome = await push(docWith(5), { fetchImpl, log })
-    expect(outcome).toMatchObject({ ok: false, reason: 'rejected' })
+  it("reports a service rejection without throwing", async () => {
+    const fetchImpl = responder('{"error":"unauthorized"}', { status: 401 });
+    const outcome = await push(docWith(5), { fetchImpl, log });
+    expect(outcome).toMatchObject({ ok: false, reason: "rejected" });
     // The message names the thing a person can act on. It used to say "check
     // the secret in Settings"; there is no secret to check any more, and
     // signing in again is the whole remedy.
-    if (!outcome.ok) expect(outcome.error).toMatch(/signed in/)
-  })
+    if (!outcome.ok) expect(outcome.error).toMatch(/signed in/);
+  });
 
-  it('does nothing when sync is not configured', async () => {
-    const fetchImpl = responder('{}')
-    const outcome = await push(docWith(5, null), { fetchImpl, log })
-    expect(outcome).toMatchObject({ ok: false, reason: 'not-configured' })
-    expect(fetchImpl).not.toHaveBeenCalled()
+  it("does nothing when sync is not configured", async () => {
+    const fetchImpl = responder("{}");
+    const outcome = await push(docWith(5, null), { fetchImpl, log });
+    expect(outcome).toMatchObject({ ok: false, reason: "not-configured" });
+    expect(fetchImpl).not.toHaveBeenCalled();
     // Not a failure — an unconfigured optional feature is not worth a warning.
-    expect(logged).toEqual([])
-  })
+    expect(logged).toEqual([]);
+  });
 
-  it('refuses while that user’s store is read-only, and does not reach the network', async () => {
+  it("refuses while that user’s store is read-only, and does not reach the network", async () => {
     // The latch is set the real way: a live key holding text the codec cannot
     // read. Uploading it would replace the last good remote snapshot with a
     // document the app never validated.
-    const corrupt = fakeStorage({ [STORAGE_KEYS.live(ALICE)]: '{ "schemaVersion": 3,, }' })
-    expect(load(ALICE, { storage: corrupt }).status).toBe('corrupt')
-    expect(isReadOnly(ALICE)).toBe(true)
-    expect(readOnlyReason(ALICE)).toMatch(/read-only/)
+    const corrupt = fakeStorage({ [STORAGE_KEYS.live(ALICE)]: '{ "schemaVersion": 3,, }' });
+    expect(load(ALICE, { storage: corrupt }).status).toBe("corrupt");
+    expect(isReadOnly(ALICE)).toBe(true);
+    expect(readOnlyReason(ALICE)).toMatch(/read-only/);
 
-    const fetchImpl = responder('{}')
-    const outcome = await push(docWith(5), { fetchImpl, log })
+    const fetchImpl = responder("{}");
+    const outcome = await push(docWith(5), { fetchImpl, log });
 
-    expect(outcome).toMatchObject({ ok: false, reason: 'read-only' })
-    expect(fetchImpl).not.toHaveBeenCalled()
-    expect(logged[0]?.message).toMatch(/never validated/)
-  })
+    expect(outcome).toMatchObject({ ok: false, reason: "read-only" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(logged[0]?.message).toMatch(/never validated/);
+  });
 
-  it('still pushes for the other user, because the latch is per username', async () => {
-    const corrupt = fakeStorage({ [STORAGE_KEYS.live(ALICE)]: '{ "schemaVersion": 3,, }' })
-    load(ALICE, { storage: corrupt })
-    expect(isReadOnly(ALICE)).toBe(true)
+  it("still pushes for the other user, because the latch is per username", async () => {
+    const corrupt = fakeStorage({ [STORAGE_KEYS.live(ALICE)]: '{ "schemaVersion": 3,, }' });
+    load(ALICE, { storage: corrupt });
+    expect(isReadOnly(ALICE)).toBe(true);
 
-    const fetchImpl = responder('{}')
-    const outcome = await push(docWith(5, TARGET, BOB), { fetchImpl, log })
+    const fetchImpl = responder("{}");
+    const outcome = await push(docWith(5, TARGET, BOB), { fetchImpl, log });
 
-    expect(outcome.ok).toBe(true)
-    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state')
-  })
+    expect(outcome.ok).toBe(true);
+    expect(urlOf(fetchImpl)).toBe("http://127.0.0.1:8787/api/state");
+  });
 
-  it('never reads navigator.onLine — it lies', async () => {
-    let reads = 0
-    vi.stubGlobal('navigator', {
+  it("never reads navigator.onLine — it lies", async () => {
+    let reads = 0;
+    vi.stubGlobal("navigator", {
       get onLine() {
-        reads += 1
-        return false
+        reads += 1;
+        return false;
       },
-    })
+    });
 
-    const fetchImpl = responder('{}')
-    const outcome = await push(docWith(5), { fetchImpl, log })
+    const fetchImpl = responder("{}");
+    const outcome = await push(docWith(5), { fetchImpl, log });
 
     // An implementation that gated on onLine would have skipped the request.
-    expect(reads).toBe(0)
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
-    expect(outcome.ok).toBe(true)
-  })
+    expect(reads).toBe(0);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(outcome.ok).toBe(true);
+  });
 
-  it('writes nothing to local storage', async () => {
-    await push(docWith(5), { fetchImpl: responder('{}'), log })
-    expect(storage.ops).toEqual([])
-  })
+  it("writes nothing to local storage", async () => {
+    await push(docWith(5), { fetchImpl: responder("{}"), log });
+    expect(storage.ops).toEqual([]);
+  });
 
-  it('passes an abort signal so a black-holed connection cannot hang forever', async () => {
-    const fetchImpl = responder('{}')
-    await push(docWith(5), { fetchImpl, log, timeoutMs: DEFAULT_TIMEOUT_MS })
-    expect(initOf(fetchImpl)?.signal).toBeInstanceOf(AbortSignal)
-  })
-})
+  it("passes an abort signal so a black-holed connection cannot hang forever", async () => {
+    const fetchImpl = responder("{}");
+    await push(docWith(5), { fetchImpl, log, timeoutMs: DEFAULT_TIMEOUT_MS });
+    expect(initOf(fetchImpl)?.signal).toBeInstanceOf(AbortSignal);
+  });
+});
 
 // ─── pull ───────────────────────────────────────────────────────────────────
 
-describe('pull', () => {
-  it('round-trips a real serialised document through the codec', async () => {
-    const remote = docWith(11)
-    const fetchImpl = responder(serialise(remote))
+describe("pull", () => {
+  it("round-trips a real serialised document through the codec", async () => {
+    const remote = docWith(11);
+    const fetchImpl = responder(serialise(remote));
 
-    const outcome = await pull(TARGET, ALICE, { fetchImpl, log })
+    const outcome = await pull(TARGET, ALICE, { fetchImpl, log });
 
-    expect(outcome.ok).toBe(true)
+    expect(outcome.ok).toBe(true);
     if (outcome.ok) {
-      expect(outcome.doc).toEqual(remote)
-      expect(outcome.text).toBe(serialise(remote))
+      expect(outcome.doc).toEqual(remote);
+      expect(outcome.text).toBe(serialise(remote));
     }
-    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state')
-    expect(initOf(fetchImpl)?.method).toBe('GET')
-    expect(initOf(fetchImpl)?.credentials).toBe('include')
-  })
+    expect(urlOf(fetchImpl)).toBe("http://127.0.0.1:8787/api/state");
+    expect(initOf(fetchImpl)?.method).toBe("GET");
+    expect(initOf(fetchImpl)?.credentials).toBe("include");
+  });
 
-  it('refuses a document belonging to somebody else, so adopting cannot switch identity', async () => {
-    const fetchImpl = responder(serialise(docWith(11, TARGET, BOB)))
-    const outcome = await pull(TARGET, ALICE, { fetchImpl, log })
-    expect(outcome).toMatchObject({ ok: false, reason: 'invalid' })
+  it("refuses a document belonging to somebody else, so adopting cannot switch identity", async () => {
+    const fetchImpl = responder(serialise(docWith(11, TARGET, BOB)));
+    const outcome = await pull(TARGET, ALICE, { fetchImpl, log });
+    expect(outcome).toMatchObject({ ok: false, reason: "invalid" });
     if (!outcome.ok) {
-      expect(outcome.error).toContain('"bob"')
-      expect(outcome.error).toContain('nothing was changed')
+      expect(outcome.error).toContain('"bob"');
+      expect(outcome.error).toContain("nothing was changed");
     }
-    expect(storage.ops).toEqual([])
-  })
+    expect(storage.ops).toEqual([]);
+  });
 
-  it('rejects a malformed body via the codec, with the codec message', async () => {
+  it("rejects a malformed body via the codec, with the codec message", async () => {
     // Structurally a JSON object with a valid schemaVersion — the service's
     // shallow check would have let this through. The codec is what catches it.
-    const body = '{"schemaVersion": 3, "username": "alice", "history": []}'
-    const fetchImpl = responder(body)
+    const body = '{"schemaVersion": 3, "username": "alice", "history": []}';
+    const fetchImpl = responder(body);
 
-    const outcome = await pull(TARGET, ALICE, { fetchImpl, log })
+    const outcome = await pull(TARGET, ALICE, { fetchImpl, log });
 
-    expect(outcome).toMatchObject({ ok: false, reason: 'invalid' })
+    expect(outcome).toMatchObject({ ok: false, reason: "invalid" });
     if (!outcome.ok) {
-      expect(outcome.error).toContain('nothing was changed')
+      expect(outcome.error).toContain("nothing was changed");
       // The codec's own path-prefixed problems, not a rewritten summary.
-      const direct = parse(body)
-      expect(direct.ok).toBe(false)
-      if (!direct.ok) expect(outcome.error).toContain(direct.error)
+      const direct = parse(body);
+      expect(direct.ok).toBe(false);
+      if (!direct.ok) expect(outcome.error).toContain(direct.error);
     }
-    expect(storage.ops).toEqual([])
-  })
+    expect(storage.ops).toEqual([]);
+  });
 
-  it('rejects a body that is not JSON at all, such as a captive-portal page', async () => {
-    const fetchImpl = responder('<!doctype html><title>Sign in</title>')
-    const outcome = await pull(TARGET, ALICE, { fetchImpl, log })
-    expect(outcome).toMatchObject({ ok: false, reason: 'invalid' })
-    if (!outcome.ok) expect(outcome.error).toMatch(/not valid JSON/)
-  })
+  it("rejects a body that is not JSON at all, such as a captive-portal page", async () => {
+    const fetchImpl = responder("<!doctype html><title>Sign in</title>");
+    const outcome = await pull(TARGET, ALICE, { fetchImpl, log });
+    expect(outcome).toMatchObject({ ok: false, reason: "invalid" });
+    if (!outcome.ok) expect(outcome.error).toMatch(/not valid JSON/);
+  });
 
-  it('rejects a document from a build this one does not understand', async () => {
+  it("rejects a document from a build this one does not understand", async () => {
     // "The future" is `CURRENT_SCHEMA_VERSION + 1`, computed rather than written
     // out. This test used a literal 4 until v4 shipped, at which point it was
     // quietly asserting that the *current* version is refused — it still passed,
     // because the pull failed for a different reason. Deriving the number is what
     // makes the next schema bump move the goalposts instead of hollowing this out.
-    const future = CURRENT_SCHEMA_VERSION + 1
+    const future = CURRENT_SCHEMA_VERSION + 1;
     const fetchImpl = responder(
-      serialise(docWith(4)).replace(
-        `"schemaVersion": ${CURRENT_SCHEMA_VERSION}`,
-        `"schemaVersion": ${future}`,
-      ),
-    )
-    const outcome = await pull(TARGET, ALICE, { fetchImpl, log })
-    expect(outcome).toMatchObject({ ok: false, reason: 'invalid' })
-    if (!outcome.ok) expect(outcome.error).toContain('newer version of the app')
-  })
+      serialise(docWith(4)).replace(`"schemaVersion": ${CURRENT_SCHEMA_VERSION}`, `"schemaVersion": ${future}`),
+    );
+    const outcome = await pull(TARGET, ALICE, { fetchImpl, log });
+    expect(outcome).toMatchObject({ ok: false, reason: "invalid" });
+    if (!outcome.ok) expect(outcome.error).toContain("newer version of the app");
+  });
 
-  it('accepts a v3 document from an older build and migrates it on the way in', () => {
+  it("accepts a v3 document from an older build and migrates it on the way in", () => {
     // The other side of the same door. A phone that has not updated pushes v3; the
     // client that pulls it must not treat "older" as "unreadable", because the
     // whole point of the version being in the document is that migration handles
     // the gap. Synchronous by construction: the migration is `parse`'s business and
     // `pull` only hands it the bytes.
-    const v3 = serialise(docWith(4)).replace(
-      `"schemaVersion": ${CURRENT_SCHEMA_VERSION}`,
-      '"schemaVersion": 3',
-    )
-    const parsed = parse(v3)
-    expect(parsed.ok).toBe(true)
-    if (parsed.ok) expect(parsed.doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
-  })
+    const v3 = serialise(docWith(4)).replace(`"schemaVersion": ${CURRENT_SCHEMA_VERSION}`, '"schemaVersion": 3');
+    const parsed = parse(v3);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) expect(parsed.doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+  });
 
-  it('pulls a v4 document and hands back v5, on the same push rung', async () => {
+  it("pulls a v4 document and hands back v5, on the same push rung", async () => {
     // The in-between rungs. A phone still on the old build pushes v4, whose counters index the
     // ladders as they were before three rungs were inserted. The pull goes through
     // `parse`, so the v4 → v5 step runs on the way in: 14 push sessions was
     // `push-04-full` under v4 and is 28 on the new ladder, the same rung.
-    const v4 = serialise({ ...docWith(4), sessionsDone: { ...docWith(4).sessionsDone, push: 14 } })
-      .replace(`"schemaVersion": ${CURRENT_SCHEMA_VERSION}`, '"schemaVersion": 4')
-    const outcome = await pull(TARGET, ALICE, { fetchImpl: responder(v4), log })
-    expect(outcome.ok).toBe(true)
+    const v4 = serialise({ ...docWith(4), sessionsDone: { ...docWith(4).sessionsDone, push: 14 } }).replace(
+      `"schemaVersion": ${CURRENT_SCHEMA_VERSION}`,
+      '"schemaVersion": 4',
+    );
+    const outcome = await pull(TARGET, ALICE, { fetchImpl: responder(v4), log });
+    expect(outcome.ok).toBe(true);
     if (outcome.ok) {
-      expect(outcome.doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
-      expect(outcome.doc.sessionsDone.push).toBe(28)
+      expect(outcome.doc.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+      expect(outcome.doc.sessionsDone.push).toBe(28);
     }
-  })
+  });
 
-  it('maps 404 to the empty (new-device) case rather than an error', async () => {
+  it("maps 404 to the empty (new-device) case rather than an error", async () => {
     const outcome = await pull(TARGET, ALICE, {
       fetchImpl: responder('{"error":"no state"}', { status: 404 }),
       log,
-    })
-    expect(outcome).toMatchObject({ ok: false, reason: 'empty' })
-  })
+    });
+    expect(outcome).toMatchObject({ ok: false, reason: "empty" });
+  });
 
-  it('maps 401 to unauthorized', async () => {
+  it("maps 401 to unauthorized", async () => {
     const outcome = await pull(TARGET, ALICE, {
       fetchImpl: responder('{"error":"unauthorized"}', { status: 401 }),
       log,
-    })
-    expect(outcome).toMatchObject({ ok: false, reason: 'unauthorized' })
-  })
+    });
+    expect(outcome).toMatchObject({ ok: false, reason: "unauthorized" });
+  });
 
-  it('maps a transport failure to network without throwing', async () => {
-    await expect(
-      pull(TARGET, ALICE, { fetchImpl: failer(new TypeError('Load failed')), log }),
-    ).resolves.toMatchObject({ ok: false, reason: 'network' })
-  })
-})
+  it("maps a transport failure to network without throwing", async () => {
+    await expect(pull(TARGET, ALICE, { fetchImpl: failer(new TypeError("Load failed")), log })).resolves.toMatchObject({
+      ok: false,
+      reason: "network",
+    });
+  });
+});
 
 // ─── login ──────────────────────────────────────────────────────────────────
 // ─── checkSession ───────────────────────────────────────────────────────────
 
-describe('checkSession', () => {
+describe("checkSession", () => {
   /*
    * This block was `login`. That function posted a username and a password to
    * `/api/login`, which checked neither — the service validated the shape of
@@ -524,15 +521,15 @@ describe('checkSession', () => {
    * in. It is still advisory and still must never gate entry to the app.
    */
 
-  it('probes the real state route, so it exercises the gate sync actually uses', async () => {
-    const fetchImpl = responder('{}', { status: 404 })
-    const outcome = await checkSession(TARGET, { fetchImpl, log })
+  it("probes the real state route, so it exercises the gate sync actually uses", async () => {
+    const fetchImpl = responder("{}", { status: 404 });
+    const outcome = await checkSession(TARGET, { fetchImpl, log });
 
-    expect(outcome).toEqual({ ok: true })
-    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state')
-    expect(initOf(fetchImpl)?.method).toBe('GET')
-    expect(initOf(fetchImpl)?.credentials).toBe('include')
-  })
+    expect(outcome).toEqual({ ok: true });
+    expect(urlOf(fetchImpl)).toBe("http://127.0.0.1:8787/api/state");
+    expect(initOf(fetchImpl)?.method).toBe("GET");
+    expect(initOf(fetchImpl)?.credentials).toBe("include");
+  });
 
   /**
    * 404 is success. It means the service answered, accepted the session, and
@@ -543,277 +540,276 @@ describe('checkSession', () => {
     const outcome = await checkSession(TARGET, {
       fetchImpl: responder('{"error":"no state"}', { status: 404 }),
       log,
-    })
-    expect(outcome).toEqual({ ok: true })
-  })
+    });
+    expect(outcome).toEqual({ ok: true });
+  });
 
-  it('is advisory: a failure resolves rather than throwing, because the app works offline', async () => {
+  it("is advisory: a failure resolves rather than throwing, because the app works offline", async () => {
     const outcome = await checkSession(TARGET, {
-      fetchImpl: failer(new TypeError('Failed to fetch')),
+      fetchImpl: failer(new TypeError("Failed to fetch")),
       log,
-    })
-    expect(outcome).toMatchObject({ ok: false, reason: 'network' })
-    expect(logged[0]?.message).toMatch(/works offline/)
-  })
+    });
+    expect(outcome).toMatchObject({ ok: false, reason: "network" });
+    expect(logged[0]?.message).toMatch(/works offline/);
+  });
 
-  it('reports not being signed in, which is now the reason this call exists', async () => {
+  it("reports not being signed in, which is now the reason this call exists", async () => {
     const outcome = await checkSession(TARGET, {
       fetchImpl: responder('{"error":"unauthorized"}', { status: 401 }),
       log,
-    })
-    expect(outcome).toMatchObject({ ok: false, reason: 'unauthorized' })
-    if (!outcome.ok) expect(outcome.error).toMatch(/signed in/)
-  })
+    });
+    expect(outcome).toMatchObject({ ok: false, reason: "unauthorized" });
+    if (!outcome.ok) expect(outcome.error).toMatch(/signed in/);
+  });
 
   /**
    * A 403 is the service understanding the request and refusing it — a role check,
    * or a browser whose request came from another origin. Signing in again cannot
    * fix it, so the copy must not tell somebody to try.
    */
-  it('reports a refusal differently from a missing session', async () => {
+  it("reports a refusal differently from a missing session", async () => {
     const outcome = await checkSession(TARGET, {
       fetchImpl: responder('{"error":"forbidden"}', { status: 403 }),
       log,
-    })
-    expect(outcome).toMatchObject({ ok: false, reason: 'unauthorized' })
+    });
+    expect(outcome).toMatchObject({ ok: false, reason: "unauthorized" });
     if (!outcome.ok) {
-      expect(outcome.error).toMatch(/refused this request/)
-      expect(outcome.error).not.toMatch(/Sign in again/)
+      expect(outcome.error).toMatch(/refused this request/);
+      expect(outcome.error).not.toMatch(/Sign in again/);
     }
-  })
+  });
 
-  it('says a service that cannot answer is worth retrying, rather than saying you are signed out', async () => {
+  it("says a service that cannot answer is worth retrying, rather than saying you are signed out", async () => {
     const outcome = await checkSession(TARGET, {
       fetchImpl: responder('{"error":"unavailable"}', { status: 503 }),
       log,
-    })
-    expect(outcome).toMatchObject({ ok: false, reason: 'rejected' })
-    if (!outcome.ok) expect(outcome.error).toMatch(/temporarily unavailable/)
-  })
+    });
+    expect(outcome).toMatchObject({ ok: false, reason: "rejected" });
+    if (!outcome.ok) expect(outcome.error).toMatch(/temporarily unavailable/);
+  });
 
-  it('does not touch the network when sync is not configured', async () => {
-    const fetchImpl = responder('{}')
+  it("does not touch the network when sync is not configured", async () => {
+    const fetchImpl = responder("{}");
     expect(await checkSession(null, { fetchImpl, log })).toMatchObject({
       ok: false,
-      reason: 'not-configured',
-    })
-    expect(fetchImpl).not.toHaveBeenCalled()
-  })
-})
+      reason: "not-configured",
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
 
+describe("compareSessions", () => {
+  it("is a plain comparison of two session counts", () => {
+    expect(compareSessions(10, 9)).toBe("local-ahead");
+    expect(compareSessions(9, 9)).toBe("equal");
+    expect(compareSessions(9, 10)).toBe("remote-ahead");
+  });
+});
 
-describe('compareSessions', () => {
-  it('is a plain comparison of two session counts', () => {
-    expect(compareSessions(10, 9)).toBe('local-ahead')
-    expect(compareSessions(9, 9)).toBe('equal')
-    expect(compareSessions(9, 10)).toBe('remote-ahead')
-  })
-})
+describe("checkSync", () => {
+  it("prompts instead of overwriting when the remote is ahead", async () => {
+    const local = docWith(9);
+    const remote = docWith(12);
+    const fetchImpl = responder(serialise(remote));
 
-describe('checkSync', () => {
-  it('prompts instead of overwriting when the remote is ahead', async () => {
-    const local = docWith(9)
-    const remote = docWith(12)
-    const fetchImpl = responder(serialise(remote))
-
-    const status = await checkSync(ALICE, local, TARGET, { fetchImpl, log })
+    const status = await checkSync(ALICE, local, TARGET, { fetchImpl, log });
 
     // Both numbers, so the UI can state the choice plainly.
-    expect(status).toMatchObject({ kind: 'conflict', localSessions: 9, remoteSessions: 12 })
-    if (status.kind === 'conflict') expect(status.remote.history).toHaveLength(12)
+    expect(status).toMatchObject({ kind: "conflict", localSessions: 9, remoteSessions: 12 });
+    if (status.kind === "conflict") expect(status.remote.history).toHaveLength(12);
 
     // And no overwrite in either direction: no upload…
-    expect(callsWithMethod(fetchImpl, 'PUT')).toHaveLength(0)
+    expect(callsWithMethod(fetchImpl, "PUT")).toHaveLength(0);
     // …and nothing written locally.
-    expect(storage.ops).toEqual([])
-  })
+    expect(storage.ops).toEqual([]);
+  });
 
-  it('compares the number of recorded sessions, which is what the service records', async () => {
+  it("compares the number of recorded sessions, which is what the service records", async () => {
     // `history.length`, not `cyclePosition`: the service's `sessions_completed`
     // column and its `PUT` receipt both hold the same number, so there is one
     // answer to "how many sessions" rather than two.
-    const local: StateDoc = { ...docWith(9), cyclePosition: 999 }
+    const local: StateDoc = { ...docWith(9), cyclePosition: 999 };
     const status = await checkSync(ALICE, local, TARGET, {
       fetchImpl: responder(serialise(docWith(9))),
       log,
-    })
-    expect(status).toEqual({ kind: 'in-sync', sessions: 9 })
-  })
+    });
+    expect(status).toEqual({ kind: "in-sync", sessions: 9 });
+  });
 
-  it('is safe to push when local is ahead, and still writes nothing by itself', async () => {
+  it("is safe to push when local is ahead, and still writes nothing by itself", async () => {
     const status = await checkSync(ALICE, docWith(12), TARGET, {
       fetchImpl: responder(serialise(docWith(9))),
       log,
-    })
-    expect(status).toEqual({ kind: 'local-ahead', localSessions: 12, remoteSessions: 9 })
-    expect(storage.ops).toEqual([])
-  })
+    });
+    expect(status).toEqual({ kind: "local-ahead", localSessions: 12, remoteSessions: 9 });
+    expect(storage.ops).toEqual([]);
+  });
 
-  it('reports remote-empty when the service has never been written to for this user', async () => {
+  it("reports remote-empty when the service has never been written to for this user", async () => {
     const status = await checkSync(ALICE, docWith(3), TARGET, {
       fetchImpl: responder('{"error":"none"}', { status: 404 }),
       log,
-    })
-    expect(status).toEqual({ kind: 'remote-empty', localSessions: 3 })
-  })
+    });
+    expect(status).toEqual({ kind: "remote-empty", localSessions: 3 });
+  });
 
-  it('offers to adopt the remote copy when there is no local document', async () => {
-    const remote = docWith(7)
+  it("offers to adopt the remote copy when there is no local document", async () => {
+    const remote = docWith(7);
     const status = await checkSync(ALICE, null, TARGET, {
       fetchImpl: responder(serialise(remote)),
       log,
-    })
-    expect(status).toMatchObject({ kind: 'adopt-remote', remoteSessions: 7 })
+    });
+    expect(status).toMatchObject({ kind: "adopt-remote", remoteSessions: 7 });
     // Still no write — adopting is a separate, explicit step.
-    expect(storage.ops).toEqual([])
-  })
+    expect(storage.ops).toEqual([]);
+  });
 
-  it('asks about the username it was given, even with no local document', async () => {
-    const fetchImpl = responder(serialise(docWith(7, TARGET, BOB)))
-    await checkSync(BOB, null, TARGET, { fetchImpl, log })
-    expect(urlOf(fetchImpl)).toBe('http://127.0.0.1:8787/api/state')
-  })
+  it("asks about the username it was given, even with no local document", async () => {
+    const fetchImpl = responder(serialise(docWith(7, TARGET, BOB)));
+    await checkSync(BOB, null, TARGET, { fetchImpl, log });
+    expect(urlOf(fetchImpl)).toBe("http://127.0.0.1:8787/api/state");
+  });
 
-  it('reports not-configured without touching the network', async () => {
-    const fetchImpl = responder('{}')
+  it("reports not-configured without touching the network", async () => {
+    const fetchImpl = responder("{}");
     expect(await checkSync(ALICE, docWith(3), null, { fetchImpl, log })).toEqual({
-      kind: 'not-configured',
-    })
-    expect(fetchImpl).not.toHaveBeenCalled()
-  })
+      kind: "not-configured",
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 
-  it('surfaces a failure instead of guessing', async () => {
+  it("surfaces a failure instead of guessing", async () => {
     const status = await checkSync(ALICE, docWith(3), TARGET, {
-      fetchImpl: failer(new TypeError('Failed to fetch')),
+      fetchImpl: failer(new TypeError("Failed to fetch")),
       log,
-    })
-    expect(status).toMatchObject({ kind: 'failed', reason: 'network' })
-  })
-})
+    });
+    expect(status).toMatchObject({ kind: "failed", reason: "network" });
+  });
+});
 
 // ─── applyRemote ────────────────────────────────────────────────────────────
 
-describe('applyRemote', () => {
-  it('writes through store.save, so the document is verified before promotion', () => {
-    const remote = docWith(6)
-    const result = applyRemote(remote, { storage })
+describe("applyRemote", () => {
+  it("writes through store.save, so the document is verified before promotion", () => {
+    const remote = docWith(6);
+    const result = applyRemote(remote, { storage });
 
-    expect(result.ok).toBe(true)
+    expect(result.ok).toBe(true);
     // The shadow key was written and then removed: verify-before-promote.
     expect(storage.ops).toEqual([
       `set ${STORAGE_KEYS.shadow(ALICE)}`,
       `set ${STORAGE_KEYS.live(ALICE)}`,
       `remove ${STORAGE_KEYS.shadow(ALICE)}`,
       `set ${STORAGE_KEYS.meta(ALICE)}`,
-    ])
-    expect(storage.map.get(STORAGE_KEYS.live(ALICE))).toBe(serialise(remote))
+    ]);
+    expect(storage.map.get(STORAGE_KEYS.live(ALICE))).toBe(serialise(remote));
 
-    const reloaded = load(ALICE, { storage })
-    expect(reloaded.status).toBe('loaded')
-    if (reloaded.status === 'loaded') expect(reloaded.doc).toEqual(remote)
-  })
+    const reloaded = load(ALICE, { storage });
+    expect(reloaded.status).toBe("loaded");
+    if (reloaded.status === "loaded") expect(reloaded.doc).toEqual(remote);
+  });
 
-  it('refuses to overwrite a corrupt local document unless told to', () => {
+  it("refuses to overwrite a corrupt local document unless told to", () => {
     const corrupt = fakeStorage({
-      [STORAGE_KEYS.live(ALICE)]: 'this is not a state document',
-    })
-    expect(load(ALICE, { storage: corrupt }).status).toBe('corrupt')
-    const before = corrupt.map.get(STORAGE_KEYS.live(ALICE))
+      [STORAGE_KEYS.live(ALICE)]: "this is not a state document",
+    });
+    expect(load(ALICE, { storage: corrupt }).status).toBe("corrupt");
+    const before = corrupt.map.get(STORAGE_KEYS.live(ALICE));
 
-    const refused = applyRemote(docWith(6), { storage: corrupt })
-    expect(refused.ok).toBe(false)
+    const refused = applyRemote(docWith(6), { storage: corrupt });
+    expect(refused.ok).toBe(false);
     // Byte-for-byte untouched: it may be the only copy, and hand-repairable.
-    expect(corrupt.map.get(STORAGE_KEYS.live(ALICE))).toBe(before)
+    expect(corrupt.map.get(STORAGE_KEYS.live(ALICE))).toBe(before);
 
-    const forced = applyRemote(docWith(6), { storage: corrupt, allowOverwriteCorrupt: true })
-    expect(forced.ok).toBe(true)
-    expect(corrupt.map.get(STORAGE_KEYS.live(ALICE))).toBe(serialise(docWith(6)))
-  })
+    const forced = applyRemote(docWith(6), { storage: corrupt, allowOverwriteCorrupt: true });
+    expect(forced.ok).toBe(true);
+    expect(corrupt.map.get(STORAGE_KEYS.live(ALICE))).toBe(serialise(docWith(6)));
+  });
 
-  it('keeps this device’s sync settings rather than adopting the remote copy’s', () => {
-    const otherDevice: SyncSettings = { baseUrl: 'http://192.168.1.40:8787', secret: 'theirs' }
-    const remote = docWith(6, otherDevice)
+  it("keeps this device’s sync settings rather than adopting the remote copy’s", () => {
+    const otherDevice: SyncSettings = { baseUrl: "http://192.168.1.40:8787", secret: "theirs" };
+    const remote = docWith(6, otherDevice);
 
-    applyRemote(remote, { storage, preserveSync: TARGET })
+    applyRemote(remote, { storage, preserveSync: TARGET });
 
-    const reloaded = load(ALICE, { storage })
-    expect(reloaded.status).toBe('loaded')
-    if (reloaded.status === 'loaded') {
-      expect(reloaded.doc.settings.sync).toEqual(TARGET)
+    const reloaded = load(ALICE, { storage });
+    expect(reloaded.status).toBe("loaded");
+    if (reloaded.status === "loaded") {
+      expect(reloaded.doc.settings.sync).toEqual(TARGET);
       // Everything else came from the remote document.
-      expect(reloaded.doc.history).toHaveLength(6)
+      expect(reloaded.doc.history).toHaveLength(6);
     }
-  })
+  });
 
-  it('keeps the remote sync settings when no override is given', () => {
-    const otherDevice: SyncSettings = { baseUrl: 'http://192.168.1.40:8787', secret: 'theirs' }
-    applyRemote(docWith(6, otherDevice), { storage })
-    const reloaded = load(ALICE, { storage })
-    if (reloaded.status === 'loaded') expect(reloaded.doc.settings.sync).toEqual(otherDevice)
-  })
-})
+  it("keeps the remote sync settings when no override is given", () => {
+    const otherDevice: SyncSettings = { baseUrl: "http://192.168.1.40:8787", secret: "theirs" };
+    applyRemote(docWith(6, otherDevice), { storage });
+    const reloaded = load(ALICE, { storage });
+    if (reloaded.status === "loaded") expect(reloaded.doc.settings.sync).toEqual(otherDevice);
+  });
+});
 
 // ─── The session path ───────────────────────────────────────────────────────
 
-describe('saveAndPush', () => {
-  it('completes a session normally with the service unreachable, leaving local state intact', async () => {
+describe("saveAndPush", () => {
+  it("completes a session normally with the service unreachable, leaving local state intact", async () => {
     // Session 1 lands while the service is up.
-    expect(saveAndPush(docWith(1), { storage, fetchImpl: responder('{}'), log }).ok).toBe(true)
+    expect(saveAndPush(docWith(1), { storage, fetchImpl: responder("{}"), log }).ok).toBe(true);
 
     // Session 2 lands while the service is unreachable. From the caller's point
     // of view nothing is different: the save succeeds and no error surfaces.
-    const second = docWith(2)
+    const second = docWith(2);
     const result = saveAndPush(second, {
       storage,
-      fetchImpl: failer(new TypeError('Failed to fetch')),
+      fetchImpl: failer(new TypeError("Failed to fetch")),
       log,
-    })
+    });
 
-    expect(result.ok).toBe(true)
+    expect(result.ok).toBe(true);
     // Let the fire-and-forget push settle. It must not reject.
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     // Local state is the session that was just completed, byte-for-byte.
-    expect(storage.map.get(STORAGE_KEYS.live(ALICE))).toBe(serialise(second))
-    const reloaded = load(ALICE, { storage })
-    expect(reloaded.status).toBe('loaded')
-    if (reloaded.status === 'loaded') expect(reloaded.doc.history).toHaveLength(2)
+    expect(storage.map.get(STORAGE_KEYS.live(ALICE))).toBe(serialise(second));
+    const reloaded = load(ALICE, { storage });
+    expect(reloaded.status).toBe("loaded");
+    if (reloaded.status === "loaded") expect(reloaded.doc.history).toHaveLength(2);
 
     // The failure is a log line and nothing more.
     expect(logged.map((entry) => entry.message)).toContain(
-      'Sync push failed; the session is saved locally and will sync later.',
-    )
-  })
+      "Sync push failed; the session is saved locally and will sync later.",
+    );
+  });
 
-  it('does not upload a document the store refused to save', async () => {
-    const corrupt = fakeStorage({ [STORAGE_KEYS.live(ALICE)]: 'not a state document' })
-    expect(load(ALICE, { storage: corrupt }).status).toBe('corrupt')
+  it("does not upload a document the store refused to save", async () => {
+    const corrupt = fakeStorage({ [STORAGE_KEYS.live(ALICE)]: "not a state document" });
+    expect(load(ALICE, { storage: corrupt }).status).toBe("corrupt");
 
-    const fetchImpl = responder('{}')
-    const result = saveAndPush(docWith(3), { storage: corrupt, fetchImpl, log })
+    const fetchImpl = responder("{}");
+    const result = saveAndPush(docWith(3), { storage: corrupt, fetchImpl, log });
 
-    expect(result.ok).toBe(false)
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(fetchImpl).not.toHaveBeenCalled()
-  })
+    expect(result.ok).toBe(false);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
 
-  it('returns at local-save speed without awaiting the upload', () => {
-    let settled = false
+  it("returns at local-save speed without awaiting the upload", () => {
+    let settled = false;
     const fetchImpl = vi.fn(
       () =>
         new Promise<Response>((resolve) => {
           setTimeout(() => {
-            settled = true
-            resolve(new Response('{}'))
-          }, 50)
+            settled = true;
+            resolve(new Response("{}"));
+          }, 50);
         }),
-    ) as unknown as FetchFake
+    ) as unknown as FetchFake;
 
-    const result = saveAndPush(docWith(4), { storage, fetchImpl, log })
+    const result = saveAndPush(docWith(4), { storage, fetchImpl, log });
 
-    expect(result.ok).toBe(true)
+    expect(result.ok).toBe(true);
     // The save has already returned while the request is still in flight.
-    expect(settled).toBe(false)
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
-  })
-})
+    expect(settled).toBe(false);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+});

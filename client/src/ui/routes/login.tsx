@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
-import { Field } from '@base-ui/react/field'
-import { createRoute, useNavigate } from '@tanstack/react-router'
-import { rootRoute } from './__root.tsx'
-import { nextFromWardReturn, validateLoginSearch, wardReturnTo } from './next.ts'
-import { useLogin, useSession, useWardSignIn } from '../../../vendor/ward/ward-auth-react.js'
-import { setCurrentUsername } from '../../persistence/session.ts'
-import { AlertBanner } from '../components/AlertBanner.tsx'
-import { PrimaryButton, SecondaryButton } from '../components/Buttons.tsx'
-import { describeAuthIssue } from '../components/authMessages.ts'
-import { FIELD_INPUT, FIELD_LABEL } from '../components/fields.ts'
-import { Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from '../components/Shell.tsx'
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
+import { Field } from "@base-ui/react/field";
+import { createRoute, useNavigate } from "@tanstack/react-router";
+import { rootRoute } from "./__root.tsx";
+import { nextFromWardReturn, validateLoginSearch, wardReturnTo } from "./next.ts";
+import { useLogin, useSession, useWardSignIn } from "../../../vendor/ward/ward-auth-react.js";
+import { setCurrentUsername } from "../../persistence/session.ts";
+import { AlertBanner } from "../components/AlertBanner.tsx";
+import { PrimaryButton, SecondaryButton } from "../components/Buttons.tsx";
+import { describeAuthIssue } from "../components/authMessages.ts";
+import { FIELD_INPUT, FIELD_LABEL } from "../components/fields.ts";
+import { Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from "../components/Shell.tsx";
 
 /**
  * `/login` — this app's own sign-in, and the one place a session is noticed.
@@ -61,48 +61,47 @@ import { Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from '../compone
 
 export const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/login',
+  path: "/login",
   validateSearch: validateLoginSearch,
   component: LoginRoute,
-})
+});
 
 function LoginRoute() {
-  const session = useSession()
-  const { login, pending, error: loginError, reset: resetLogin } = useLogin()
-  const ward = useWardSignIn()
-  const navigate = useNavigate()
+  const session = useSession();
+  const { login, pending, error: loginError, reset: resetLogin } = useLogin();
+  const ward = useWardSignIn();
+  const navigate = useNavigate();
   // The address bar's `next`, or the one a refused Ward sign-in hands back.
-  const next = loginRoute.useSearch().next ?? nextFromWardReturn(ward.returnTo)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [rememberError, setRememberError] = useState<string | null>(null)
+  const next = loginRoute.useSearch().next ?? nextFromWardReturn(ward.returnTo);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberError, setRememberError] = useState<string | null>(null);
 
-  const signedInAs = session.status === 'signed_in' ? session.user.username : null
+  const signedInAs = session.status === "signed_in" ? session.user.username : null;
 
   useEffect(() => {
-    if (signedInAs === null) return
+    if (signedInAs === null) return;
     // The write the sign-in loop was missing.
-    const remembered = setCurrentUsername(signedInAs)
+    const remembered = setCurrentUsername(signedInAs);
     if (remembered.ok) {
       // Replace, so Back from the screen it lands on does not return to this page.
-      void navigate({ to: next ?? '/', replace: true })
-      return
+      void navigate({ to: next ?? "/", replace: true });
+      return;
     }
     // Browser storage is unavailable. Going on would send the person straight back
     // here, so say why instead of looping. Set from a callback rather than in the
     // effect body, which would render twice for one fact.
-    const timer = setTimeout(() => setRememberError(remembered.error), 0)
-    return () => clearTimeout(timer)
-  }, [signedInAs, next, navigate])
+    const timer = setTimeout(() => setRememberError(remembered.error), 0);
+    return () => clearTimeout(timer);
+  }, [signedInAs, next, navigate]);
 
   function submit(event: FormEvent): void {
-    event.preventDefault()
-    ward.reset()
-    void login(username.trim(), password)
+    event.preventDefault();
+    ward.reset();
+    void login(username.trim(), password);
   }
 
-  const wardEnabled =
-    (session.status === 'signed_in' || session.status === 'signed_out') && session.ward.enabled
+  const wardEnabled = (session.status === "signed_in" || session.status === "signed_out") && session.ward.enabled;
 
   // One banner at a time, the most specific first: a Ward round trip that came
   // back with a code, then why the last session ended, then a failed password.
@@ -111,9 +110,9 @@ function LoginRoute() {
       ? describeAuthIssue(ward.error)
       : loginError !== null
         ? describeAuthIssue(loginError)
-        : session.status === 'signed_out' && session.reason !== undefined
+        : session.status === "signed_out" && session.reason !== undefined
           ? describeAuthIssue({ code: session.reason })
-          : null
+          : null;
 
   return (
     <Shell>
@@ -134,8 +133,8 @@ function LoginRoute() {
                 className={FIELD_INPUT}
                 value={username}
                 onChange={(event) => {
-                  setUsername(event.target.value)
-                  resetLogin()
+                  setUsername(event.target.value);
+                  resetLogin();
                 }}
                 autoComplete="username"
                 autoCapitalize="none"
@@ -150,8 +149,8 @@ function LoginRoute() {
                 type="password"
                 value={password}
                 onChange={(event) => {
-                  setPassword(event.target.value)
-                  resetLogin()
+                  setPassword(event.target.value);
+                  resetLogin();
                 }}
                 autoComplete="current-password"
               />
@@ -172,9 +171,9 @@ function LoginRoute() {
         }
       >
         <PrimaryButton type="submit" form="login-form" disabled={pending}>
-          {pending ? 'Signing in…' : 'Sign in'}
+          {pending ? "Signing in…" : "Sign in"}
         </PrimaryButton>
       </ShellFooter>
     </Shell>
-  )
+  );
 }

@@ -43,42 +43,32 @@
 // the one file — which is why the "parsed the token file" case below is not
 // ceremony. (`css: true` in `vite.config.ts` is the other half; without it Vitest
 // stubs the module to an empty string and every assertion here passes on nothing.)
-const stylesheets = import.meta.glob('../*.css', {
+const stylesheets = import.meta.glob("../*.css", {
   eager: true,
-  query: '?raw',
-  import: 'default',
-}) as Record<string, string>
+  query: "?raw",
+  import: "default",
+}) as Record<string, string>;
 
-const source =
-  Object.entries(stylesheets).find(([path]) => path.endsWith('/tokens.css'))?.[1] ?? ''
+const source = Object.entries(stylesheets).find(([path]) => path.endsWith("/tokens.css"))?.[1] ?? "";
 
-type Rgb = readonly [number, number, number]
+type Rgb = readonly [number, number, number];
 
 /** The three states the token file actually distinguishes. */
-type ThemeState = 'light' | 'dark:preferred' | 'dark:stamped'
+type ThemeState = "light" | "dark:preferred" | "dark:stamped";
 
 /** Everything after `:root` in a token block's selector, decoded. */
 type Conditions = {
-  readonly theme: 'light' | 'dark' | null
-  readonly accent: string | null
-}
+  readonly theme: "light" | "dark" | null;
+  readonly accent: string | null;
+};
 
 type Rule = {
-  readonly media: 'dark' | null
-  readonly selector: string
-  readonly decls: ReadonlyMap<string, string>
-}
+  readonly media: "dark" | null;
+  readonly selector: string;
+  readonly decls: ReadonlyMap<string, string>;
+};
 
-const ACCENTS = [
-  'mint',
-  'azure',
-  'violet',
-  'magenta',
-  'coral',
-  'amber',
-  'lime',
-  'slate',
-] as const
+const ACCENTS = ["mint", "azure", "violet", "magenta", "coral", "amber", "lime", "slate"] as const;
 
 // ── Parsing ─────────────────────────────────────────────────────────────────
 
@@ -91,40 +81,40 @@ const ACCENTS = [
  * whatever block comes next.
  */
 function blocksOf(css: string): ReadonlyArray<{ prelude: string; body: string }> {
-  const out: Array<{ prelude: string; body: string }> = []
-  let depth = 0
-  let preludeStart = 0
-  let bodyStart = 0
-  let prelude = ''
+  const out: Array<{ prelude: string; body: string }> = [];
+  let depth = 0;
+  let preludeStart = 0;
+  let bodyStart = 0;
+  let prelude = "";
   for (let i = 0; i < css.length; i++) {
-    const ch = css[i]
-    if (ch === '{') {
+    const ch = css[i];
+    if (ch === "{") {
       if (depth === 0) {
-        prelude = css.slice(preludeStart, i).trim()
-        bodyStart = i + 1
+        prelude = css.slice(preludeStart, i).trim();
+        bodyStart = i + 1;
       }
-      depth++
-    } else if (ch === '}') {
-      depth--
+      depth++;
+    } else if (ch === "}") {
+      depth--;
       if (depth === 0) {
-        out.push({ prelude, body: css.slice(bodyStart, i) })
-        preludeStart = i + 1
+        out.push({ prelude, body: css.slice(bodyStart, i) });
+        preludeStart = i + 1;
       }
     }
   }
-  return out
+  return out;
 }
 
 /** Every `--name: value;` directly inside one block body. */
 function declsOf(body: string): ReadonlyMap<string, string> {
-  const decls = new Map<string, string>()
+  const decls = new Map<string, string>();
   // Nested blocks (a `@media` body) are stripped first so their declarations are
   // not attributed to the parent.
-  const flat = body.replace(/\{[^{}]*\}/g, '')
+  const flat = body.replace(/\{[^{}]*\}/g, "");
   for (const match of flat.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/gi)) {
-    decls.set(match[1]!, match[2]!.replace(/\s+/g, ' ').trim())
+    decls.set(match[1]!, match[2]!.replace(/\s+/g, " ").trim());
   }
-  return decls
+  return decls;
 }
 
 /**
@@ -135,70 +125,70 @@ function declsOf(body: string): ReadonlyMap<string, string> {
  * silently untested palette, which is the same class of bug as the empty glob.
  */
 function rulesOf(css: string): ReadonlyArray<Rule> {
-  const cleaned = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@import[^;]+;/g, '')
-  const rules: Rule[] = []
+  const cleaned = css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/@import[^;]+;/g, "");
+  const rules: Rule[] = [];
   for (const { prelude, body } of blocksOf(cleaned)) {
-    if (prelude.startsWith('@font-face') || prelude.startsWith('@theme')) continue
-    if (prelude.startsWith('@media')) {
-      if (/prefers-reduced-motion/.test(prelude)) continue
+    if (prelude.startsWith("@font-face") || prelude.startsWith("@theme")) continue;
+    if (prelude.startsWith("@media")) {
+      if (/prefers-reduced-motion/.test(prelude)) continue;
       if (!/prefers-color-scheme\s*:\s*dark/.test(prelude)) {
-        throw new Error(`tokens.css has an unmodelled media block: ${prelude}`)
+        throw new Error(`tokens.css has an unmodelled media block: ${prelude}`);
       }
       for (const nested of blocksOf(body)) {
         rules.push({
-          media: 'dark',
+          media: "dark",
           selector: nested.prelude,
           decls: declsOf(nested.body),
-        })
+        });
       }
-      continue
+      continue;
     }
-    if (prelude.startsWith('@')) {
-      throw new Error(`tokens.css has an unmodelled at-rule: ${prelude}`)
+    if (prelude.startsWith("@")) {
+      throw new Error(`tokens.css has an unmodelled at-rule: ${prelude}`);
     }
-    rules.push({ media: null, selector: prelude, decls: declsOf(body) })
+    rules.push({ media: null, selector: prelude, decls: declsOf(body) });
   }
-  return rules
+  return rules;
 }
 
 /** Decode `:root:not([data-theme='light'])[data-accent='lime']` and friends. */
 function conditionsOf(selector: string): Conditions {
-  let rest = selector.trim()
-  if (!rest.startsWith(':root')) {
-    throw new Error(`tokens.css has a palette block not rooted at :root — ${selector}`)
+  let rest = selector.trim();
+  if (!rest.startsWith(":root")) {
+    throw new Error(`tokens.css has a palette block not rooted at :root — ${selector}`);
   }
-  rest = rest.slice(':root'.length)
-  let theme: 'light' | 'dark' | null = null
-  let accent: string | null = null
+  rest = rest.slice(":root".length);
+  let theme: "light" | "dark" | null = null;
+  let accent: string | null = null;
   while (rest.length > 0) {
-    const notLight = /^:not\(\[data-theme=['"]light['"]\]\)/.exec(rest)
-    const stamped = /^\[data-theme=['"](light|dark)['"]\]/.exec(rest)
-    const onAccent = /^\[data-accent=['"]([a-z0-9-]+)['"]\]/.exec(rest)
+    const notLight = /^:not\(\[data-theme=['"]light['"]\]\)/.exec(rest);
+    const stamped = /^\[data-theme=['"](light|dark)['"]\]/.exec(rest);
+    const onAccent = /^\[data-accent=['"]([a-z0-9-]+)['"]\]/.exec(rest);
     if (notLight !== null) {
-      theme = 'dark'
-      rest = rest.slice(notLight[0].length)
+      theme = "dark";
+      rest = rest.slice(notLight[0].length);
     } else if (stamped !== null) {
-      theme = stamped[1] as 'light' | 'dark'
-      rest = rest.slice(stamped[0].length)
+      theme = stamped[1] as "light" | "dark";
+      rest = rest.slice(stamped[0].length);
     } else if (onAccent !== null) {
-      accent = onAccent[1]!
-      rest = rest.slice(onAccent[0].length)
+      accent = onAccent[1]!;
+      rest = rest.slice(onAccent[0].length);
     } else {
-      throw new Error(`tokens.css has an unmodelled selector fragment: ${selector}`)
+      throw new Error(`tokens.css has an unmodelled selector fragment: ${selector}`);
     }
   }
-  return { theme, accent }
+  return { theme, accent };
 }
 
-const RULES = rulesOf(source)
+const RULES = rulesOf(source);
 
 /** Whether one parsed rule is in force for a theme state. */
 function inForce(rule: Rule, state: ThemeState): boolean {
-  if (rule.media === 'dark') return state === 'dark:preferred'
-  const { theme } = conditionsOf(rule.selector)
-  if (theme === 'dark') return state === 'dark:stamped'
-  if (theme === 'light') return state === 'light'
-  return true
+  if (rule.media === "dark") return state === "dark:preferred";
+  const { theme } = conditionsOf(rule.selector);
+  if (theme === "dark") return state === "dark:stamped";
+  if (theme === "light") return state === "light";
+  return true;
 }
 
 /**
@@ -209,10 +199,10 @@ function inForce(rule: Rule, state: ThemeState): boolean {
  * block declares lime for stamped dark" has to mean the block written for it.
  */
 function declaredIn(rule: Rule, state: ThemeState): boolean {
-  const { theme } = conditionsOf(rule.selector)
-  if (state === 'dark:preferred') return rule.media === 'dark'
-  if (state === 'dark:stamped') return rule.media === null && theme === 'dark'
-  return rule.media === null && theme === null
+  const { theme } = conditionsOf(rule.selector);
+  if (state === "dark:preferred") return rule.media === "dark";
+  if (state === "dark:stamped") return rule.media === null && theme === "dark";
+  return rule.media === null && theme === null;
 }
 
 /**
@@ -223,29 +213,29 @@ function declaredIn(rule: Rule, state: ThemeState): boolean {
  * specific and later. `tokens.css` says so in its header and this relies on it.
  */
 function paletteFor(state: ThemeState, accent: string): ReadonlyMap<string, string> {
-  const merged = new Map<string, string>()
+  const merged = new Map<string, string>();
   for (const rule of RULES) {
-    if (!inForce(rule, state)) continue
-    const { accent: onAccent } = conditionsOf(rule.selector)
-    if (onAccent !== null && onAccent !== accent) continue
-    for (const [name, value] of rule.decls) merged.set(name, value)
+    if (!inForce(rule, state)) continue;
+    const { accent: onAccent } = conditionsOf(rule.selector);
+    if (onAccent !== null && onAccent !== accent) continue;
+    for (const [name, value] of rule.decls) merged.set(name, value);
   }
-  return merged
+  return merged;
 }
 
 // ── Colour ──────────────────────────────────────────────────────────────────
 
 function hexToRgb(hex: string): Rgb {
-  const raw = hex.replace('#', '')
+  const raw = hex.replace("#", "");
   const full =
     raw.length === 3
       ? raw
-          .split('')
+          .split("")
           .map((c) => c + c)
-          .join('')
-      : raw
-  const n = Number.parseInt(full, 16)
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+          .join("")
+      : raw;
+  const n = Number.parseInt(full, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
 /**
@@ -254,42 +244,38 @@ function hexToRgb(hex: string): Rgb {
  * its own — only the composite does, which is the step it is easy to skip and
  * then ship a 2:1 label on a tint.
  */
-function resolve(
-  palette: ReadonlyMap<string, string>,
-  token: string,
-  backdrop: Rgb,
-): Rgb {
-  const value = palette.get(token)
-  if (value === undefined) throw new Error(`this palette defines no ${token}`)
+function resolve(palette: ReadonlyMap<string, string>, token: string, backdrop: Rgb): Rgb {
+  const value = palette.get(token);
+  if (value === undefined) throw new Error(`this palette defines no ${token}`);
 
-  if (value.startsWith('#')) return hexToRgb(value)
+  if (value.startsWith("#")) return hexToRgb(value);
 
-  const rgba = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:[\s,/]+([\d.]+))?\s*\)$/.exec(value)
-  if (rgba === null) throw new Error(`${token} is neither a hex nor an rgba(): ${value}`)
+  const rgba = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:[\s,/]+([\d.]+))?\s*\)$/.exec(value);
+  if (rgba === null) throw new Error(`${token} is neither a hex nor an rgba(): ${value}`);
 
-  const alpha = rgba[4] === undefined ? 1 : Number(rgba[4])
-  const src: Rgb = [Number(rgba[1]), Number(rgba[2]), Number(rgba[3])]
-  return src.map((channel, i) => channel * alpha + backdrop[i]! * (1 - alpha)) as unknown as Rgb
+  const alpha = rgba[4] === undefined ? 1 : Number(rgba[4]);
+  const src: Rgb = [Number(rgba[1]), Number(rgba[2]), Number(rgba[3])];
+  return src.map((channel, i) => channel * alpha + backdrop[i]! * (1 - alpha)) as unknown as Rgb;
 }
 
 /** WCAG 2.x relative luminance. */
 function luminance([r, g, b]: Rgb): number {
   const channel = (c: number) => {
-    const s = c / 255
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
-  }
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 }
 
 function contrast(a: Rgb, b: Rgb): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number]
-  return (hi + 0.05) / (lo + 0.05)
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
 }
 
 // ── The matrix ──────────────────────────────────────────────────────────────
 
 /** `[foreground, background, minimum, where it occurs]`. */
-type Pair = readonly [string, string, number, string]
+type Pair = readonly [string, string, number, string];
 
 /**
  * 4.5:1 is AA for body text and this app takes no large-text discount — the
@@ -300,13 +286,13 @@ type Pair = readonly [string, string, number, string]
  * the same list is sixteen chances for one of them to lose a pair silently.
  */
 function pairsFor(): ReadonlyArray<Pair> {
-  const pairs: Pair[] = []
+  const pairs: Pair[] = [];
 
   // Body, prose and placeholder ink on each surface that actually carries text.
   // `--s3` is absent on purpose: it is the ring track and the unfilled set dot.
-  for (const ink of ['--tx', '--tx2', '--tx3'] as const) {
-    for (const surface of ['--bg', '--s1', '--s2'] as const) {
-      pairs.push([ink, surface, 4.5, 'body, prose and placeholder ink'])
+  for (const ink of ["--tx", "--tx2", "--tx3"] as const) {
+    for (const surface of ["--bg", "--s1", "--s2"] as const) {
+      pairs.push([ink, surface, 4.5, "body, prose and placeholder ink"]);
     }
   }
 
@@ -314,83 +300,73 @@ function pairsFor(): ReadonlyArray<Pair> {
   // label, the stat-tile delta and the safety eyebrow are all painted in it. That
   // is the constraint that forces a separate light-theme accent ramp — the
   // reference build's mint is 1.8:1 on white.
-  for (const surface of ['--bg', '--s1', '--s2'] as const) {
-    pairs.push(['--accent', surface, 4.5, 'tab label, tile delta, eyebrow'])
+  for (const surface of ["--bg", "--s1", "--s2"] as const) {
+    pairs.push(["--accent", surface, 4.5, "tab label, tile delta, eyebrow"]);
   }
 
   // Each accent's own ink, on both ends of the primary button's gradient. The
   // second pair is the one a single shared ink fails first.
-  pairs.push(['--on-accent', '--accent', 4.5, 'the primary button label, flat'])
-  pairs.push([
-    '--on-accent',
-    '--accent-2',
-    4.5,
-    'the same label over the gradient start',
-  ])
+  pairs.push(["--on-accent", "--accent", 4.5, "the primary button label, flat"]);
+  pairs.push(["--on-accent", "--accent-2", 4.5, "the same label over the gradient start"]);
 
   // Non-text. The ring arc has to read against its own track, not just the page.
-  pairs.push(['--accent-2', '--bg', 3, 'the gradient start of the progress ring'])
-  pairs.push(['--accent', '--grid0', 3, 'the filled arc against the unfilled track'])
+  pairs.push(["--accent-2", "--bg", 3, "the gradient start of the progress ring"]);
+  pairs.push(["--accent", "--grid0", 3, "the filled arc against the unfilled track"]);
 
   // Semantics, on the ground and on their own washes. The wash is translucent, so
   // `resolve` composites it over `--bg` before either is measured.
-  pairs.push(['--warn', '--bg', 4.5, 'the disclosure icon and label'])
-  pairs.push(['--dang', '--bg', 4.5, 'the stop-rule icon and label'])
-  pairs.push(['--warn', '--warn-bg', 4.5, 'the streak pill and the disclosure heading'])
-  pairs.push(['--tx', '--warn-bg', 4.5, 'the disclosure body copy on its tint'])
-  pairs.push(['--dang', '--dang-bg', 4.5, 'a missed day in the calendar'])
-  pairs.push(['--tx', '--dang-bg', 4.5, 'body copy on the danger tint'])
+  pairs.push(["--warn", "--bg", 4.5, "the disclosure icon and label"]);
+  pairs.push(["--dang", "--bg", 4.5, "the stop-rule icon and label"]);
+  pairs.push(["--warn", "--warn-bg", 4.5, "the streak pill and the disclosure heading"]);
+  pairs.push(["--tx", "--warn-bg", 4.5, "the disclosure body copy on its tint"]);
+  pairs.push(["--dang", "--dang-bg", 4.5, "a missed day in the calendar"]);
+  pairs.push(["--tx", "--dang-bg", 4.5, "body copy on the danger tint"]);
 
-  return pairs
+  return pairs;
 }
 
-const PAIRS = pairsFor()
+const PAIRS = pairsFor();
 
 /** Sixteen palettes. The two dark states are asserted identical further down. */
-const MEASURED: ReadonlyArray<ThemeState> = ['light', 'dark:stamped']
+const MEASURED: ReadonlyArray<ThemeState> = ["light", "dark:stamped"];
 
-describe('the token file was actually parsed', () => {
+describe("the token file was actually parsed", () => {
   // A test that greps a file it failed to open is green and worthless, and this
   // repo has shipped that bug three times.
-  it('found tokens.css and read a real cascade out of it', () => {
-    expect(source).toContain(':root')
-    expect(RULES.length).toBeGreaterThan(10)
-    expect(paletteFor('light', 'mint').size).toBeGreaterThan(20)
-  })
+  it("found tokens.css and read a real cascade out of it", () => {
+    expect(source).toContain(":root");
+    expect(RULES.length).toBeGreaterThan(10);
+    expect(paletteFor("light", "mint").size).toBeGreaterThan(20);
+  });
 
-  it('names every accent the file claims to ship', () => {
+  it("names every accent the file claims to ship", () => {
     const declared = new Set(
-      RULES.map((rule) => conditionsOf(rule.selector).accent).filter(
-        (accent): accent is string => accent !== null,
-      ),
-    )
-    expect([...declared].sort()).toEqual([...ACCENTS].sort())
-  })
-})
+      RULES.map((rule) => conditionsOf(rule.selector).accent).filter((accent): accent is string => accent !== null),
+    );
+    expect([...declared].sort()).toEqual([...ACCENTS].sort());
+  });
+});
 
-describe('the palette is legible', () => {
+describe("the palette is legible", () => {
   for (const state of MEASURED) {
     for (const accent of ACCENTS) {
       describe(`${state} · ${accent}`, () => {
-        const palette = paletteFor(state, accent)
-        const ground = resolve(palette, '--bg', [255, 255, 255])
+        const palette = paletteFor(state, accent);
+        const ground = resolve(palette, "--bg", [255, 255, 255]);
 
         for (const [fg, bg, min, where] of PAIRS) {
           it(`${fg} on ${bg} clears ${min}:1 — ${where}`, () => {
-            const backdrop = resolve(palette, bg, ground)
-            const ratio = contrast(resolve(palette, fg, backdrop), backdrop)
-            expect(
-              ratio,
-              `${state}/${accent}: ${fg} on ${bg} is ${ratio.toFixed(2)}:1`,
-            ).toBeGreaterThanOrEqual(min)
-          })
+            const backdrop = resolve(palette, bg, ground);
+            const ratio = contrast(resolve(palette, fg, backdrop), backdrop);
+            expect(ratio, `${state}/${accent}: ${fg} on ${bg} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(min);
+          });
         }
-      })
+      });
     }
   }
-})
+});
 
-describe('the documented exceptions stay exceptions', () => {
+describe("the documented exceptions stay exceptions", () => {
   // Asserting a *ceiling* rather than a floor, which is deliberate. Surfaces are
   // containers and the ring track is decorative — the numeral inside carries the
   // value — and `design-system.md` records that brightening either into a
@@ -398,85 +374,74 @@ describe('the documented exceptions stay exceptions', () => {
   // accessibility sweep "fixes" it and the ring starts shouting.
   for (const state of MEASURED) {
     describe(state, () => {
-      const palette = paletteFor(state, 'mint')
-      const ground = resolve(palette, '--bg', [255, 255, 255])
+      const palette = paletteFor(state, "mint");
+      const ground = resolve(palette, "--bg", [255, 255, 255]);
 
-      for (const token of ['--s1', '--s2', '--s3', '--grid0'] as const) {
+      for (const token of ["--s1", "--s2", "--s3", "--grid0"] as const) {
         it(`${token} stays below the 3:1 non-text floor, on purpose`, () => {
-          expect(contrast(resolve(palette, token, ground), ground)).toBeLessThan(3)
-        })
+          expect(contrast(resolve(palette, token, ground), ground)).toBeLessThan(3);
+        });
       }
 
-      it('the surface ramp ascends away from the canvas without becoming a line', () => {
-        const ratios = (['--s1', '--s2', '--s3'] as const).map((token) =>
+      it("the surface ramp ascends away from the canvas without becoming a line", () => {
+        const ratios = (["--s1", "--s2", "--s3"] as const).map((token) =>
           contrast(resolve(palette, token, ground), ground),
-        )
-        expect(ratios).toEqual([...ratios].sort((a, b) => a - b))
-        expect(ratios[0]).toBeGreaterThan(1)
-      })
-    })
+        );
+        expect(ratios).toEqual([...ratios].sort((a, b) => a - b));
+        expect(ratios[0]).toBeGreaterThan(1);
+      });
+    });
   }
-})
+});
 
-describe('the three theme states are wired the way the header claims', () => {
+describe("the three theme states are wired the way the header claims", () => {
   // The whole reason the file is ordered the way it is. A colour whose only
   // definition lives inside a media or `[data-theme]` block is simply unset in the
   // unstamped light state, and `var(--x)` then resolves to nothing — a failure
   // that looks like "the text vanished", not like "the text is the wrong grey".
-  it('declares every token in bare :root before any block overrides it', () => {
+  it("declares every token in bare :root before any block overrides it", () => {
     // The union of the *unconditional* blocks — the main `:root` and the brief-27
     // alias shim. Compared against what the conditional blocks declare, not
     // against a resolved palette: a resolved dark palette contains the bare
     // declarations by construction, so comparing those would assert nothing.
     const unconditional = new Set(
-      RULES.filter((rule) => declaredIn(rule, 'light')).flatMap((rule) => [
-        ...rule.decls.keys(),
-      ]),
-    )
-    const conditional = RULES.filter((rule) => !declaredIn(rule, 'light'))
-    expect(conditional.length).toBeGreaterThan(0)
+      RULES.filter((rule) => declaredIn(rule, "light")).flatMap((rule) => [...rule.decls.keys()]),
+    );
+    const conditional = RULES.filter((rule) => !declaredIn(rule, "light"));
+    expect(conditional.length).toBeGreaterThan(0);
     for (const rule of conditional) {
       for (const token of rule.decls.keys()) {
-        expect(
-          unconditional.has(token),
-          `${token} is declared only under "${rule.selector}"`,
-        ).toBe(true)
+        expect(unconditional.has(token), `${token} is declared only under "${rule.selector}"`).toBe(true);
       }
     }
-  })
+  });
 
   // Two spellings of one condition, because CSS offers no way to say "these two
   // produce the same declarations". Nothing but this stops them drifting.
-  it('resolves the media-query dark and the stamped dark to the same palette', () => {
+  it("resolves the media-query dark and the stamped dark to the same palette", () => {
     for (const accent of ACCENTS) {
-      const preferred = paletteFor('dark:preferred', accent)
-      const stamped = paletteFor('dark:stamped', accent)
+      const preferred = paletteFor("dark:preferred", accent);
+      const stamped = paletteFor("dark:stamped", accent);
       expect(
         Object.fromEntries(preferred),
         `${accent} differs between prefers-color-scheme and [data-theme="dark"]`,
-      ).toEqual(Object.fromEntries(stamped))
+      ).toEqual(Object.fromEntries(stamped));
     }
-  })
+  });
 
   // Each accent block must replace the whole triple. One that set only `--accent`
   // would leave the previous accent's ink behind — and because the ink it leaves
   // behind is a real, legible colour, the contrast matrix would happily declare
   // the result safe.
-  it('gives every accent a complete triple in every theme state', () => {
-    for (const state of ['light', 'dark:preferred', 'dark:stamped'] as const) {
+  it("gives every accent a complete triple in every theme state", () => {
+    for (const state of ["light", "dark:preferred", "dark:stamped"] as const) {
       for (const accent of ACCENTS) {
         const rule = RULES.find(
-          (candidate) =>
-            conditionsOf(candidate.selector).accent === accent &&
-            declaredIn(candidate, state),
-        )
-        expect(rule, `${state} has no block for ${accent}`).toBeDefined()
-        expect([...rule!.decls.keys()].sort()).toEqual([
-          '--accent',
-          '--accent-2',
-          '--on-accent',
-        ])
+          (candidate) => conditionsOf(candidate.selector).accent === accent && declaredIn(candidate, state),
+        );
+        expect(rule, `${state} has no block for ${accent}`).toBeDefined();
+        expect([...rule!.decls.keys()].sort()).toEqual(["--accent", "--accent-2", "--on-accent"]);
       }
     }
-  })
-})
+  });
+});

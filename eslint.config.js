@@ -1,7 +1,7 @@
 // @ts-check
-import js from '@eslint/js'
-import tseslint from 'typescript-eslint'
-import reactHooks from 'eslint-plugin-react-hooks'
+import js from "@eslint/js";
+import tseslint from "typescript-eslint";
+import reactHooks from "eslint-plugin-react-hooks";
 
 /**
  * One flat config at the workspace root, covering all three workspaces.
@@ -38,18 +38,18 @@ export default tseslint.config(
   // rules below, the scripts in the build-scripts block.
   {
     ignores: [
-      '**/dist/',
-      '**/dev-dist/',
-      '**/coverage/',
-      '**/node_modules/',
+      "**/dist/",
+      "**/dev-dist/",
+      "**/coverage/",
+      "**/node_modules/",
       // Vendored, built copies of the shared auth library: generated, never edited
       // here, and a few hundred KB of bundled third-party code.
-      '**/vendor/',
-      'docs/.docusaurus/',
-      'docs/dist/',
-      'docs/docs/wiki/',
-      'docs/static/reference/',
-      'docs/static/diagrams/',
+      "**/vendor/",
+      "docs/.docusaurus/",
+      "docs/dist/",
+      "docs/docs/wiki/",
+      "docs/static/reference/",
+      "docs/static/diagrams/",
     ],
   },
 
@@ -57,15 +57,12 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
 
   {
-    files: ['client/src/**/*.{ts,tsx}', 'shared/**/*.ts'],
-    plugins: { 'react-hooks': reactHooks },
+    files: ["client/src/**/*.{ts,tsx}", "shared/**/*.ts"],
+    plugins: { "react-hooks": reactHooks },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      '@typescript-eslint/consistent-type-imports': 'error',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-      ],
+      "@typescript-eslint/consistent-type-imports": "error",
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
     },
   },
 
@@ -77,35 +74,35 @@ export default tseslint.config(
   // shared/". A comment saying "don't" is exactly the thing that stops being true.
   // ---------------------------------------------------------------------------
   {
-    files: ['shared/**/*.ts'],
+    files: ["shared/**/*.ts"],
     rules: {
-      'no-restricted-imports': [
-        'error',
+      "no-restricted-imports": [
+        "error",
         {
           patterns: [
             {
               // `node:*` catches the prefixed form, which is the only form this
               // repo uses. The bare names are listed too, because `import 'fs'`
               // still resolves under Node and would be just as fatal in a browser.
-              group: ['node:*', 'fs', 'path', 'url', 'crypto', 'sqlite', 'http', 'os'],
+              group: ["node:*", "fs", "path", "url", "crypto", "sqlite", "http", "os"],
               message:
-                'shared/ may not import from node:. It is a dependency of a browser bundle ' +
-                'and of a Node service at the same time, so anything node-only breaks the ' +
-                'client build. It belongs in server/. See corpus/wiki/architecture.md.',
+                "shared/ may not import from node:. It is a dependency of a browser bundle " +
+                "and of a Node service at the same time, so anything node-only breaks the " +
+                "client build. It belongs in server/. See corpus/wiki/architecture.md.",
             },
             {
               group: [
-                '@sports-app/client',
-                '@sports-app/client/**',
-                '@sports-app/server',
-                '@sports-app/server/**',
-                '**/client/**',
-                '**/server/**',
+                "@sports-app/client",
+                "@sports-app/client/**",
+                "@sports-app/server",
+                "@sports-app/server/**",
+                "**/client/**",
+                "**/server/**",
               ],
               message:
-                'shared/ may not import from client/ or server/. It is the bottom of the ' +
-                'dependency graph and depends on nothing — both runtimes point at it, never ' +
-                'the other way round. See corpus/wiki/architecture.md.',
+                "shared/ may not import from client/ or server/. It is the bottom of the " +
+                "dependency graph and depends on nothing — both runtimes point at it, never " +
+                "the other way round. See corpus/wiki/architecture.md.",
             },
           ],
         },
@@ -116,52 +113,51 @@ export default tseslint.config(
       // message that states the reason is worth more than "cannot find name", and
       // the tsconfig cannot speak for `process` at all (there are no `@types/node`
       // in this repo, so it was never a name to begin with).
-      'no-restricted-globals': [
-        'error',
+      "no-restricted-globals": [
+        "error",
         ...[
-          'window',
-          'document',
-          'localStorage',
-          'sessionStorage',
-          'navigator',
-          'fetch',
+          "window",
+          "document",
+          "localStorage",
+          "sessionStorage",
+          "navigator",
+          "fetch",
           // `globalThis` is the back door: it is legal in both runtimes and would
           // let `globalThis.document` walk straight past every name above.
-          'globalThis',
-          'process',
-          'Buffer',
-          'require',
-          '__dirname',
-          '__filename',
+          "globalThis",
+          "process",
+          "Buffer",
+          "require",
+          "__dirname",
+          "__filename",
         ].map((name) => ({
           name,
           message:
             `shared/ may not touch a runtime global (${name}). It has to behave identically ` +
-            'in a browser and in Node, so it may assume neither.',
+            "in a browser and in Node, so it may assume neither.",
         })),
       ],
 
       // Data shapes and validation, never behaviour — and a clock or a random
       // number is behaviour. A contract that answers differently on two reads is
       // not a contract.
-      'no-restricted-syntax': [
-        'error',
+      "no-restricted-syntax": [
+        "error",
         {
           selector: "NewExpression[callee.name='Date']",
           message:
-            'shared/ holds data shapes and validation, never behaviour. Reading the clock is ' +
-            'behaviour — a timestamp is a parameter of whichever runtime supplies it.',
+            "shared/ holds data shapes and validation, never behaviour. Reading the clock is " +
+            "behaviour — a timestamp is a parameter of whichever runtime supplies it.",
         },
         {
           selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
           message:
-            'shared/ holds data shapes and validation, never behaviour. Reading the clock is ' +
-            'behaviour — a timestamp is a parameter of whichever runtime supplies it.',
+            "shared/ holds data shapes and validation, never behaviour. Reading the clock is " +
+            "behaviour — a timestamp is a parameter of whichever runtime supplies it.",
         },
         {
           selector: "CallExpression[callee.object.name='Math'][callee.property.name='random']",
-          message:
-            'shared/ must be deterministic. Randomness belongs to a runtime, not to a contract.',
+          message: "shared/ must be deterministic. Randomness belongs to a runtime, not to a contract.",
         },
       ],
     },
@@ -171,65 +167,61 @@ export default tseslint.config(
   // The pure core. See corpus/wiki/architecture.md for the dependency direction.
   // ---------------------------------------------------------------------------
   {
-    files: ['client/src/domain/**/*.ts'],
+    files: ["client/src/domain/**/*.ts"],
     rules: {
-      'no-restricted-imports': [
-        'error',
+      "no-restricted-imports": [
+        "error",
         {
           patterns: [
             {
-              group: ['**/persistence/**', '**/session/**', '**/ui/**'],
+              group: ["**/persistence/**", "**/session/**", "**/ui/**"],
               message:
-                'client/src/domain/ is the pure core and may not depend on the shell. ' +
-                'Dependencies point ui → session → domain → shared, never back. ' +
-                'See corpus/wiki/architecture.md.',
+                "client/src/domain/ is the pure core and may not depend on the shell. " +
+                "Dependencies point ui → session → domain → shared, never back. " +
+                "See corpus/wiki/architecture.md.",
             },
             {
               // The core may import `shared/` — that is the whole point of it —
               // but the service is on the far side of an HTTP boundary.
-              group: ['@sports-app/server', '@sports-app/server/**'],
+              group: ["@sports-app/server", "@sports-app/server/**"],
               message:
-                'client/src/domain/ may not import the service. The client reaches it over ' +
-                'HTTP, from persistence/sync.ts. See corpus/wiki/architecture.md.',
+                "client/src/domain/ may not import the service. The client reaches it over " +
+                "HTTP, from persistence/sync.ts. See corpus/wiki/architecture.md.",
             },
           ],
         },
       ],
 
       // No browser APIs in the pure core.
-      'no-restricted-globals': [
-        'error',
-        ...['window', 'document', 'localStorage', 'sessionStorage', 'navigator', 'fetch'].map(
-          (name) => ({
-            name,
-            message:
-              `client/src/domain/ may not touch browser APIs (${name}). ` +
-              'Move this to the shell.',
-          }),
-        ),
+      "no-restricted-globals": [
+        "error",
+        ...["window", "document", "localStorage", "sessionStorage", "navigator", "fetch"].map((name) => ({
+          name,
+          message: `client/src/domain/ may not touch browser APIs (${name}). ` + "Move this to the shell.",
+        })),
       ],
 
       // No clock. Every timestamp is passed in by the caller — that is what
       // makes the engine deterministic and its simulation reproducible.
-      'no-restricted-syntax': [
-        'error',
+      "no-restricted-syntax": [
+        "error",
         {
           selector: "NewExpression[callee.name='Date']",
           message:
-            'client/src/domain/ may not read the clock. Timestamps are parameters, not ambient ' +
-            'state — the simulation harness depends on it.',
+            "client/src/domain/ may not read the clock. Timestamps are parameters, not ambient " +
+            "state — the simulation harness depends on it.",
         },
         {
           selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
           message:
-            'client/src/domain/ may not read the clock. Timestamps are parameters, not ambient ' +
-            'state — the simulation harness depends on it.',
+            "client/src/domain/ may not read the clock. Timestamps are parameters, not ambient " +
+            "state — the simulation harness depends on it.",
         },
         {
           selector: "CallExpression[callee.object.name='Math'][callee.property.name='random']",
           message:
-            'client/src/domain/ must be deterministic. Randomness belongs in a test harness, ' +
-            'passed in explicitly.',
+            "client/src/domain/ must be deterministic. Randomness belongs in a test harness, " +
+            "passed in explicitly.",
         },
       ],
     },
@@ -239,11 +231,11 @@ export default tseslint.config(
   // because they now live inside workspaces (client/vite.config.ts,
   // server/vitest.config.mjs) as well as at the root (vitest.config.ts).
   {
-    files: ['**/*.config.{js,mjs,ts}', 'scripts/**/*.{js,mjs,ts}'],
+    files: ["**/*.config.{js,mjs,ts}", "scripts/**/*.{js,mjs,ts}"],
     rules: {
-      'no-restricted-imports': 'off',
-      'no-restricted-globals': 'off',
-      'no-restricted-syntax': 'off',
+      "no-restricted-imports": "off",
+      "no-restricted-globals": "off",
+      "no-restricted-syntax": "off",
     },
   },
 
@@ -276,35 +268,35 @@ export default tseslint.config(
   // and components (`src/**/*.tsx`) are TypeScript, so the shared TypeScript
   // rules lint them and `npm run typecheck -w @sports-app/docs-site` checks them.
   {
-    files: ['scripts/**/*.mjs', 'docs/scripts/**/*.mjs'],
+    files: ["scripts/**/*.mjs", "docs/scripts/**/*.mjs"],
     languageOptions: {
-      globals: { process: 'readonly', console: 'readonly' },
+      globals: { process: "readonly", console: "readonly" },
     },
   },
 
   {
-    files: ['server/**/*.mjs'],
+    files: ["server/**/*.mjs"],
     languageOptions: {
       globals: {
-        process: 'readonly',
-        console: 'readonly',
-        Buffer: 'readonly',
-        fetch: 'readonly',
-        Response: 'readonly',
-        Request: 'readonly',
-        Headers: 'readonly',
-        AbortController: 'readonly',
-        AbortSignal: 'readonly',
-        URL: 'readonly',
-        URLSearchParams: 'readonly',
-        TextEncoder: 'readonly',
-        TextDecoder: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        setInterval: 'readonly',
-        clearInterval: 'readonly',
-        queueMicrotask: 'readonly',
+        process: "readonly",
+        console: "readonly",
+        Buffer: "readonly",
+        fetch: "readonly",
+        Response: "readonly",
+        Request: "readonly",
+        Headers: "readonly",
+        AbortController: "readonly",
+        AbortSignal: "readonly",
+        URL: "readonly",
+        URLSearchParams: "readonly",
+        TextEncoder: "readonly",
+        TextDecoder: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        queueMicrotask: "readonly",
       },
     },
   },
-)
+);

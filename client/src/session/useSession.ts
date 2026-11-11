@@ -23,18 +23,18 @@
  * and not a bug: it degrades to the last exercise. Throwing, or rendering blank,
  * would break the only screen that matters over a typo.
  */
-import type { IsoTimestamp } from '@sports-app/shared/types.ts'
-import type { PrescribedItem, Prescription } from '../domain/schedule.ts'
-import { useScreenAwake } from './wakeLock.ts'
+import type { IsoTimestamp } from "@sports-app/shared/types.ts";
+import type { PrescribedItem, Prescription } from "../domain/schedule.ts";
+import { useScreenAwake } from "./wakeLock.ts";
 
 export interface PlayerPosition {
   /** Index into `Prescription.items`. */
-  readonly itemIndex: number
+  readonly itemIndex: number;
   /** How many of this item's dots are filled, `0 .. dotCount`. */
-  readonly dotsFilled: number
+  readonly dotsFilled: number;
 }
 
-export const SESSION_START: PlayerPosition = { itemIndex: 0, dotsFilled: 0 }
+export const SESSION_START: PlayerPosition = { itemIndex: 0, dotsFilled: 0 };
 
 /**
  * How many dots an item shows: its sets, or its rounds on the cardio slot.
@@ -45,7 +45,7 @@ export const SESSION_START: PlayerPosition = { itemIndex: 0, dotsFilled: 0 }
  * schedule about how much work there is.
  */
 export function dotsFor(item: PrescribedItem): number {
-  return item.type === 'cardio' ? item.rounds : item.sets
+  return item.type === "cardio" ? item.rounds : item.sets;
 }
 
 /**
@@ -57,28 +57,25 @@ export function dotsFor(item: PrescribedItem): number {
  * protocol's hard interval, which is 60s and not the round count.
  */
 export function timedSecondsFor(item: PrescribedItem): number | null {
-  if (item.type === 'cardio') return item.protocol.hardSeconds
-  return item.unit === 'seconds' ? item.targetValue : null
+  if (item.type === "cardio") return item.protocol.hardSeconds;
+  return item.unit === "seconds" ? item.targetValue : null;
 }
 
 function clampInteger(value: number, max: number): number {
-  if (!Number.isFinite(value)) return 0
-  return Math.min(Math.max(Math.trunc(value), 0), max)
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(Math.max(Math.trunc(value), 0), max);
 }
 
 /** The nearest real position to whatever the URL said. Never throws. */
-export function clampPosition(
-  prescription: Prescription,
-  position: Partial<PlayerPosition>,
-): PlayerPosition {
-  const lastItem = Math.max(prescription.items.length - 1, 0)
-  const itemIndex = clampInteger(position.itemIndex ?? 0, lastItem)
-  const item = prescription.items[itemIndex]
+export function clampPosition(prescription: Prescription, position: Partial<PlayerPosition>): PlayerPosition {
+  const lastItem = Math.max(prescription.items.length - 1, 0);
+  const itemIndex = clampInteger(position.itemIndex ?? 0, lastItem);
+  const item = prescription.items[itemIndex];
   // `dotCount` and not `dotCount - 1`: "every dot filled" is a real, momentary
   // position — it is what the last tap of an exercise produces before the tap
   // that moves on. Only `advance` collapses it.
-  const dotCount = item === undefined ? 0 : dotsFor(item)
-  return { itemIndex, dotsFilled: clampInteger(position.dotsFilled ?? 0, dotCount) }
+  const dotCount = item === undefined ? 0 : dotsFor(item);
+  return { itemIndex, dotsFilled: clampInteger(position.dotsFilled ?? 0, dotCount) };
 }
 
 /**
@@ -89,17 +86,14 @@ export function clampPosition(
  * happened before this call — there is no rest timer, because a rest timer would
  * be the app measuring something.
  */
-export function advance(
-  prescription: Prescription,
-  position: PlayerPosition,
-): PlayerPosition | 'finished' {
-  const item = prescription.items[position.itemIndex]
-  if (item === undefined) return 'finished'
-  const filled = position.dotsFilled + 1
-  if (filled < dotsFor(item)) return { itemIndex: position.itemIndex, dotsFilled: filled }
-  const nextIndex = position.itemIndex + 1
-  if (nextIndex >= prescription.items.length) return 'finished'
-  return { itemIndex: nextIndex, dotsFilled: 0 }
+export function advance(prescription: Prescription, position: PlayerPosition): PlayerPosition | "finished" {
+  const item = prescription.items[position.itemIndex];
+  if (item === undefined) return "finished";
+  const filled = position.dotsFilled + 1;
+  if (filled < dotsFor(item)) return { itemIndex: position.itemIndex, dotsFilled: filled };
+  const nextIndex = position.itemIndex + 1;
+  if (nextIndex >= prescription.items.length) return "finished";
+  return { itemIndex: nextIndex, dotsFilled: 0 };
 }
 
 /**
@@ -112,19 +106,19 @@ export function advance(
  * hand to `toSessionResult` and it gets it from here.
  */
 export function nowIso(): IsoTimestamp {
-  return new Date().toISOString()
+  return new Date().toISOString();
 }
 
 export interface SessionView {
-  readonly item: PrescribedItem
-  readonly position: PlayerPosition
-  readonly itemNumber: number
-  readonly itemCount: number
-  readonly dotCount: number
-  readonly secondsOnTheClock: number | null
-  readonly isLastItem: boolean
+  readonly item: PrescribedItem;
+  readonly position: PlayerPosition;
+  readonly itemNumber: number;
+  readonly itemCount: number;
+  readonly dotCount: number;
+  readonly secondsOnTheClock: number | null;
+  readonly isLastItem: boolean;
   /** Where the next tap lands. Precomputed so the route only navigates. */
-  readonly nextPosition: PlayerPosition | 'finished'
+  readonly nextPosition: PlayerPosition | "finished";
 }
 
 /**
@@ -135,15 +129,12 @@ export interface SessionView {
  * produces — handled rather than asserted because the alternative is a thrown
  * error on the training screen.
  */
-export function useSession(
-  prescription: Prescription,
-  rawPosition: Partial<PlayerPosition>,
-): SessionView | null {
-  useScreenAwake(true)
+export function useSession(prescription: Prescription, rawPosition: Partial<PlayerPosition>): SessionView | null {
+  useScreenAwake(true);
 
-  const position = clampPosition(prescription, rawPosition)
-  const item = prescription.items[position.itemIndex]
-  if (item === undefined) return null
+  const position = clampPosition(prescription, rawPosition);
+  const item = prescription.items[position.itemIndex];
+  if (item === undefined) return null;
 
   return {
     item,
@@ -154,5 +145,5 @@ export function useSession(
     secondsOnTheClock: timedSecondsFor(item),
     isLastItem: position.itemIndex === prescription.items.length - 1,
     nextPosition: advance(prescription, position),
-  }
+  };
 }

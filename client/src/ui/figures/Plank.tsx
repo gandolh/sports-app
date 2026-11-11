@@ -1,4 +1,4 @@
-import type { FigureDefinition, Rig } from './types.ts'
+import type { FigureDefinition, Rig } from "./types.ts";
 
 /**
  * Plank/core: a flat plank to a hollow, hips-lifted shape — a subtle rock
@@ -24,16 +24,16 @@ export const PLANK_RIG: Rig = {
   torso: { length: 68.1, angleDeg: { start: 3.37, end: -8.44 } },
   neck: { length: 21.63, angleDeg: { start: -146, end: -143 } },
   limbs: {
-    armL: { kind: 'fk', root: 'shoulder', length: 53.3, angleDeg: { start: 95, end: 96 } },
-    armR: { kind: 'fk', root: 'shoulder', length: 58, angleDeg: { start: 88, end: 90 } },
-    legL: { kind: 'fk', root: 'hip', length: 56.6, angleDeg: { start: 40, end: 42 } },
-    legR: { kind: 'fk', root: 'hip', length: 65.1, angleDeg: { start: 41, end: 43 } },
+    armL: { kind: "fk", root: "shoulder", length: 53.3, angleDeg: { start: 95, end: 96 } },
+    armR: { kind: "fk", root: "shoulder", length: 58, angleDeg: { start: 88, end: 90 } },
+    legL: { kind: "fk", root: "hip", length: 56.6, angleDeg: { start: 40, end: 42 } },
+    legR: { kind: "fk", root: "hip", length: 65.1, angleDeg: { start: 41, end: 43 } },
   },
-}
+};
 
 /** Points up, above the hip: the hips lift into the hollow. The old arrow sat
  * on the legs. */
 export const PLANK_FIGURE: FigureDefinition = {
   rig: PLANK_RIG,
   arrow: { x: 130, y1: 70, y2: 44 },
-}
+};

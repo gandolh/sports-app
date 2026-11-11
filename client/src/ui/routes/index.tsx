@@ -1,34 +1,26 @@
-import { useMemo } from 'react'
-import { Link, createRoute, useNavigate } from '@tanstack/react-router'
-import { isVariant } from '@sports-app/shared/types.ts'
-import type { StateDoc, Variant } from '@sports-app/shared/types.ts'
-import { prescribe } from '../../domain/schedule.ts'
-import { totalWork } from '../../domain/milestones.ts'
-import type { PlayerPosition } from '../../session/useSession.ts'
-import { rootRoute } from './__root.tsx'
-import { toLogin } from './next.ts'
-import { useAdoptLegacy, useDocument, useRequestPersistence } from '../document.ts'
-import { AlertBanner } from '../components/AlertBanner.tsx'
-import { PrimaryButton, SecondaryButton } from '../components/Buttons.tsx'
-import { CountUp } from '../components/CountUp.tsx'
-import { ExerciseRow } from '../components/ExerciseRow.tsx'
-import { Heatmap } from '../components/Heatmap.tsx'
-import { Player } from '../components/Player.tsx'
-import { Ring } from '../components/Ring.tsx'
-import { StatTiles } from '../components/StatTiles.tsx'
-import { StreakPill } from '../components/StreakPill.tsx'
-import { TabBar } from '../components/TabBar.tsx'
-import {
-  Eyebrow,
-  SectionHeading,
-  Shell,
-  ShellBody,
-  ShellFooter,
-  ShellRail,
-  ShellTitle,
-} from '../components/Shell.tsx'
-import { currentStreak, heatmap, sessionsByDay, weekProgress } from '../components/history.ts'
-import { formatLongDate, groupDigits, sessionSummary } from '../components/format.ts'
+import { useMemo } from "react";
+import { Link, createRoute, useNavigate } from "@tanstack/react-router";
+import { isVariant } from "@sports-app/shared/types.ts";
+import type { StateDoc, Variant } from "@sports-app/shared/types.ts";
+import { prescribe } from "../../domain/schedule.ts";
+import { totalWork } from "../../domain/milestones.ts";
+import type { PlayerPosition } from "../../session/useSession.ts";
+import { rootRoute } from "./__root.tsx";
+import { toLogin } from "./next.ts";
+import { useAdoptLegacy, useDocument, useRequestPersistence } from "../document.ts";
+import { AlertBanner } from "../components/AlertBanner.tsx";
+import { PrimaryButton, SecondaryButton } from "../components/Buttons.tsx";
+import { CountUp } from "../components/CountUp.tsx";
+import { ExerciseRow } from "../components/ExerciseRow.tsx";
+import { Heatmap } from "../components/Heatmap.tsx";
+import { Player } from "../components/Player.tsx";
+import { Ring } from "../components/Ring.tsx";
+import { StatTiles } from "../components/StatTiles.tsx";
+import { StreakPill } from "../components/StreakPill.tsx";
+import { TabBar } from "../components/TabBar.tsx";
+import { Eyebrow, SectionHeading, Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from "../components/Shell.tsx";
+import { currentStreak, heatmap, sessionsByDay, weekProgress } from "../components/history.ts";
+import { formatLongDate, groupDigits, sessionSummary } from "../components/format.ts";
 
 /**
  * `/` — today's session, then the player, then done. The only route on the path
@@ -66,16 +58,16 @@ import { formatLongDate, groupDigits, sessionSummary } from '../components/forma
  */
 
 export interface PlayerSearch {
-  readonly v?: Variant
-  readonly i?: number
-  readonly d?: number
-  readonly done?: true
+  readonly v?: Variant;
+  readonly i?: number;
+  readonly d?: number;
+  readonly done?: true;
 }
 
 function toIndex(value: unknown): number | null {
-  const asNumber = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(asNumber) || asNumber < 0) return null
-  return Math.trunc(asNumber)
+  const asNumber = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(asNumber) || asNumber < 0) return null;
+  return Math.trunc(asNumber);
 }
 
 /**
@@ -86,56 +78,56 @@ function toIndex(value: unknown): number | null {
  * an explicit `undefined` would still serialise into the URL.
  */
 function validatePlayerSearch(raw: Record<string, unknown>): PlayerSearch {
-  const search: { v?: Variant; i?: number; d?: number; done?: true } = {}
-  if (isVariant(raw['v'])) search.v = raw['v']
-  const item = toIndex(raw['i'])
-  if (item !== null) search.i = item
-  const dots = toIndex(raw['d'])
-  if (dots !== null) search.d = dots
-  if (raw['done'] === true || raw['done'] === 1 || raw['done'] === '1') search.done = true
-  return search
+  const search: { v?: Variant; i?: number; d?: number; done?: true } = {};
+  if (isVariant(raw["v"])) search.v = raw["v"];
+  const item = toIndex(raw["i"]);
+  if (item !== null) search.i = item;
+  const dots = toIndex(raw["d"]);
+  if (dots !== null) search.d = dots;
+  if (raw["done"] === true || raw["done"] === 1 || raw["done"] === "1") search.done = true;
+  return search;
 }
 
 export const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/',
+  path: "/",
   validateSearch: validatePlayerSearch,
   beforeLoad: ({ context, location }) => {
-    if (context.username === null) throw toLogin(location)
-    return { username: context.username }
+    if (context.username === null) throw toLogin(location);
+    return { username: context.username };
   },
   component: TodayRoute,
-})
+});
 
 function TodayRoute() {
-  const { username } = indexRoute.useRouteContext()
-  const search = indexRoute.useSearch()
-  const navigate = useNavigate()
-  const { data: snapshot } = useDocument(username)
-  useRequestPersistence(username, snapshot.doc)
+  const { username } = indexRoute.useRouteContext();
+  const search = indexRoute.useSearch();
+  const navigate = useNavigate();
+  const { data: snapshot } = useDocument(username);
+  useRequestPersistence(username, snapshot.doc);
 
   // A pre-accounts document was found and converted, and nothing has been
   // written. Ask before adopting it: v2 had one user and recorded no owner, so on
   // a shared browser this may be somebody else's history.
   if (snapshot.pendingLegacy !== null) {
-    return <LegacyPrompt username={username} legacy={snapshot.pendingLegacy} />
+    return <LegacyPrompt username={username} legacy={snapshot.pendingLegacy} />;
   }
 
   // Unreadable, not empty. Deliberately no training path: presenting a fresh
   // document here would show a reset ladder as this person's history and they
   // would train against it.
   if (snapshot.doc === null) {
-    return <Unreadable message={snapshot.readOnly ?? snapshot.error ?? 'Unknown error.'} />
+    return <Unreadable message={snapshot.readOnly ?? snapshot.error ?? "Unknown error."} />;
   }
 
   if (search.v === undefined) {
-    return <Home doc={snapshot.doc} readOnly={snapshot.readOnly} />
+    return <Home doc={snapshot.doc} readOnly={snapshot.readOnly} />;
   }
   if (search.done === true) {
-    return <Finish doc={snapshot.doc} />
+    return <Finish doc={snapshot.doc} />;
   }
 
-  const variant = search.v
+  const variant = search.v;
   return (
     <PlayerRoute
       doc={snapshot.doc}
@@ -145,30 +137,27 @@ function TodayRoute() {
       rawPosition={{ itemIndex: search.i ?? 0, dotsFilled: search.d ?? 0 }}
       onMove={(position: PlayerPosition) => {
         void navigate({
-          to: '/',
+          to: "/",
           search: { v: variant, i: position.itemIndex, d: position.dotsFilled },
-        })
+        });
       }}
-      onFinished={() => void navigate({ to: '/', search: { v: variant, done: true } })}
-      onStop={() => void navigate({ to: '/', search: {} })}
+      onFinished={() => void navigate({ to: "/", search: { v: variant, done: true } })}
+      onStop={() => void navigate({ to: "/", search: {} })}
     />
-  )
+  );
 }
 
 function PlayerRoute(props: {
-  readonly doc: StateDoc
-  readonly username: string
-  readonly variant: Variant
-  readonly readOnly: string | null
-  readonly rawPosition: PlayerPosition
-  readonly onMove: (position: PlayerPosition) => void
-  readonly onFinished: () => void
-  readonly onStop: () => void
+  readonly doc: StateDoc;
+  readonly username: string;
+  readonly variant: Variant;
+  readonly readOnly: string | null;
+  readonly rawPosition: PlayerPosition;
+  readonly onMove: (position: PlayerPosition) => void;
+  readonly onFinished: () => void;
+  readonly onStop: () => void;
 }) {
-  const prescription = useMemo(
-    () => prescribe(props.doc, props.variant),
-    [props.doc, props.variant],
-  )
+  const prescription = useMemo(() => prescribe(props.doc, props.variant), [props.doc, props.variant]);
   return (
     <Player
       doc={props.doc}
@@ -180,7 +169,7 @@ function PlayerRoute(props: {
       onFinished={props.onFinished}
       onStop={props.onStop}
     />
-  )
+  );
 }
 
 // ─── Home ───────────────────────────────────────────────────────────────────
@@ -220,8 +209,8 @@ function PlayerRoute(props: {
  * that is what the primary will do.
  */
 function Home({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: string | null }) {
-  const navigate = useNavigate()
-  const prescription = useMemo(() => prescribe(doc, 'medium'), [doc])
+  const navigate = useNavigate();
+  const prescription = useMemo(() => prescribe(doc, "medium"), [doc]);
 
   /**
    * The one clock read on this screen, taken once per mount.
@@ -233,32 +222,29 @@ function Home({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: st
    * everything in `components/history.ts` takes it as a parameter, exactly as
    * `client/src/domain/` is required to.
    */
-  const now = useMemo(() => new Date(), [])
+  const now = useMemo(() => new Date(), []);
 
   const stats = useMemo(() => {
-    const byDay = sessionsByDay(doc.history)
+    const byDay = sessionsByDay(doc.history);
     return {
       week: weekProgress(byDay, now),
       streak: currentStreak(byDay, now),
       cells: heatmap(byDay, now),
       reps: totalWork(doc).reps,
-    }
-  }, [doc, now])
+    };
+  }, [doc, now]);
 
   function start(variant: Variant): void {
-    void navigate({ to: '/', search: { v: variant, i: 0, d: 0 } })
+    void navigate({ to: "/", search: { v: variant, i: 0, d: 0 } });
   }
 
-  const percent = Math.round(stats.week.fraction * 100)
+  const percent = Math.round(stats.week.fraction * 100);
 
   return (
     <Shell>
       <ShellRail trailing={<StreakPill days={stats.streak} />}>{formatLongDate(now)}</ShellRail>
 
-      <ShellTitle
-        title={`${prescription.label} day`}
-        subtitle={sessionSummary(prescription, doc.history.length + 1)}
-      />
+      <ShellTitle title={`${prescription.label} day`} subtitle={sessionSummary(prescription, doc.history.length + 1)} />
 
       <ShellBody>
         {readOnly === null ? null : <AlertBanner label="Read-only" text={readOnly} />}
@@ -283,17 +269,17 @@ function Home({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: st
           stats={[
             {
               value: groupDigits(doc.history.length),
-              label: 'Sessions',
+              label: "Sessions",
               srLabel: `${doc.history.length} sessions completed.`,
             },
             {
               value: groupDigits(stats.streak),
-              label: 'Day streak',
+              label: "Day streak",
               srLabel: `${stats.streak} days in a row.`,
             },
             {
               value: groupDigits(stats.reps),
-              label: 'Reps ever',
+              label: "Reps ever",
               srLabel: `${stats.reps} reps prescribed and completed, all time.`,
             },
           ]}
@@ -306,32 +292,26 @@ function Home({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: st
         above={
           <>
             <p className="text-center text-label text-tx3">
-              Easier and harder shift today&rsquo;s numbers by two reps or five seconds. Neither
-              changes what comes next.
+              Easier and harder shift today&rsquo;s numbers by two reps or five seconds. Neither changes what comes
+              next.
             </p>
             <div className="flex gap-[var(--sp-2)]">
-              <SecondaryButton
-                onClick={() => start('easy')}
-                aria-label="Start today's session, easier"
-              >
+              <SecondaryButton onClick={() => start("easy")} aria-label="Start today's session, easier">
                 Easier
               </SecondaryButton>
-              <SecondaryButton
-                onClick={() => start('hard')}
-                aria-label="Start today's session, harder"
-              >
+              <SecondaryButton onClick={() => start("hard")} aria-label="Start today's session, harder">
                 Harder
               </SecondaryButton>
             </div>
           </>
         }
       >
-        <PrimaryButton onClick={() => start('medium')}>Start workout</PrimaryButton>
+        <PrimaryButton onClick={() => start("medium")}>Start workout</PrimaryButton>
       </ShellFooter>
 
       <TabBar active="today" />
     </Shell>
-  )
+  );
 }
 
 // ─── Finish ─────────────────────────────────────────────────────────────────
@@ -350,7 +330,7 @@ function Home({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: st
  * confetti, no badge, no personal record.
  */
 function Finish({ doc }: { readonly doc: StateDoc }) {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   return (
     <Shell>
       <ShellRail>Done</ShellRail>
@@ -364,61 +344,47 @@ function Finish({ doc }: { readonly doc: StateDoc }) {
             className="mt-[var(--sp-6)] block text-mono leading-none font-extrabold tracking-[var(--ls-hero)] tabular-nums"
           />
           <span className="mt-[var(--sp-2)] block">
-            <Eyebrow>
-              {doc.history.length === 1 ? 'session completed' : 'sessions completed'}
-            </Eyebrow>
+            <Eyebrow>{doc.history.length === 1 ? "session completed" : "sessions completed"}</Eyebrow>
           </span>
         </div>
       </ShellBody>
       <ShellFooter>
-        <PrimaryButton onClick={() => void navigate({ to: '/', search: {} })}>Done</PrimaryButton>
+        <PrimaryButton onClick={() => void navigate({ to: "/", search: {} })}>Done</PrimaryButton>
       </ShellFooter>
       <TabBar active="today" />
     </Shell>
-  )
+  );
 }
 
 // ─── The two states that are not a session ──────────────────────────────────
 
-function LegacyPrompt({
-  username,
-  legacy,
-}: {
-  readonly username: string
-  readonly legacy: StateDoc
-}) {
-  const adopt = useAdoptLegacy(username)
-  const sessions = legacy.history.length
+function LegacyPrompt({ username, legacy }: { readonly username: string; readonly legacy: StateDoc }) {
+  const adopt = useAdoptLegacy(username);
+  const sessions = legacy.history.length;
   return (
     <Shell>
       <ShellRail>Existing history</ShellRail>
       <ShellTitle title="There is already a training history on this browser." size="movement" />
       <ShellBody>
         <p className="mt-[var(--sp-3)] text-body text-tx2">
-          It was saved before this app had accounts, so no owner is recorded in it —{' '}
-          {sessions === 1 ? '1 session' : `${sessions} sessions`}. Nothing has been written yet.
+          It was saved before this app had accounts, so no owner is recorded in it —{" "}
+          {sessions === 1 ? "1 session" : `${sessions} sessions`}. Nothing has been written yet.
         </p>
         <p className="mt-[var(--sp-3)] text-body text-tx2">
-          If you recorded it, keep it and it becomes {username}&rsquo;s. If this browser is shared,
-          start fresh: the old file stays exactly where it is either way.
+          If you recorded it, keep it and it becomes {username}&rsquo;s. If this browser is shared, start fresh: the old
+          file stays exactly where it is either way.
         </p>
-        {adopt.error === null ? null : (
-          <AlertBanner label="Not saved" text={adopt.error.message} />
-        )}
+        {adopt.error === null ? null : <AlertBanner label="Not saved" text={adopt.error.message} />}
       </ShellBody>
       <ShellFooter
         above={
-          <SecondaryButton onClick={() => adopt.mutate({ doc: legacy, keep: false })}>
-            Start fresh
-          </SecondaryButton>
+          <SecondaryButton onClick={() => adopt.mutate({ doc: legacy, keep: false })}>Start fresh</SecondaryButton>
         }
       >
-        <PrimaryButton onClick={() => adopt.mutate({ doc: legacy, keep: true })}>
-          Keep this history
-        </PrimaryButton>
+        <PrimaryButton onClick={() => adopt.mutate({ doc: legacy, keep: true })}>Keep this history</PrimaryButton>
       </ShellFooter>
     </Shell>
-  )
+  );
 }
 
 function Unreadable({ message }: { readonly message: string }) {
@@ -429,19 +395,18 @@ function Unreadable({ message }: { readonly message: string }) {
       <ShellBody>
         <AlertBanner label="Nothing was changed" text={message} />
         <p className="mt-[var(--sp-3)] text-body text-tx2">
-          The stored text is untouched and is usually repairable by hand — it is plain JSON in this
-          browser&rsquo;s local storage. Training is blocked rather than started from zero, because
-          starting from zero here would look exactly like months of work having never happened.
+          The stored text is untouched and is usually repairable by hand — it is plain JSON in this browser&rsquo;s
+          local storage. Training is blocked rather than started from zero, because starting from zero here would look
+          exactly like months of work having never happened.
         </p>
         <p className="mt-[var(--sp-3)] text-body text-tx2">
           <Link to="/account" className="text-accent underline">
             Account
-          </Link>{' '}
-          has the file to download, and the way to replace it if you decide it is not worth
-          repairing.
+          </Link>{" "}
+          has the file to download, and the way to replace it if you decide it is not worth repairing.
         </p>
       </ShellBody>
       <TabBar active="today" />
     </Shell>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode } from "react";
 
 /**
  * The countdown ring. **Orientative, and it gates nothing.**
@@ -29,49 +29,33 @@ import type { ReactNode } from 'react'
 
 // A 100×100 user-space box, so the ring scales with its CSS width and the
 // geometry below stays readable as plain numbers.
-const RADIUS = 45
-const STROKE = 6
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS
+const RADIUS = 45;
+const STROKE = 6;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export interface CountdownRingProps {
-  readonly total: number
-  readonly remaining: number
+  readonly total: number;
+  readonly remaining: number;
   /** False before the first tap of start. The ring is then empty, not full. */
-  readonly started: boolean
+  readonly started: boolean;
   /** The `role="timer"` label, e.g. `30 second hold`. */
-  readonly label: string
+  readonly label: string;
   /** The numeral, and its unit. Rendered inside the ring. */
-  readonly children: ReactNode
+  readonly children: ReactNode;
 }
 
 export function CountdownRing({ total, remaining, started, label, children }: CountdownRingProps) {
-  const announcement = announcementFor(started, remaining)
-  const fraction = total > 0 ? Math.min(Math.max(remaining / total, 0), 1) : 0
+  const announcement = announcementFor(started, remaining);
+  const fraction = total > 0 ? Math.min(Math.max(remaining / total, 0), 1) : 0;
   // Idle draws nothing, so the first tap of start winds the ring up to full and
   // it drains from there. A full accent ring while idle reads as "finished".
-  const offset = started ? CIRCUMFERENCE * (1 - fraction) : CIRCUMFERENCE
+  const offset = started ? CIRCUMFERENCE * (1 - fraction) : CIRCUMFERENCE;
 
   return (
     <>
-      <div
-        className="relative mt-[var(--sp-3)] grid place-items-center"
-        role="timer"
-        aria-label={label}
-      >
-        <svg
-          viewBox="0 0 100 100"
-          className="block h-[13rem] w-[13rem]"
-          aria-hidden="true"
-          focusable="false"
-        >
-          <circle
-            cx="50"
-            cy="50"
-            r={RADIUS}
-            fill="none"
-            stroke="var(--grid0)"
-            strokeWidth={STROKE}
-          />
+      <div className="relative mt-[var(--sp-3)] grid place-items-center" role="timer" aria-label={label}>
+        <svg viewBox="0 0 100 100" className="block h-[13rem] w-[13rem]" aria-hidden="true" focusable="false">
+          <circle cx="50" cy="50" r={RADIUS} fill="none" stroke="var(--grid0)" strokeWidth={STROKE} />
           <circle
             cx="50"
             cy="50"
@@ -84,7 +68,7 @@ export function CountdownRing({ total, remaining, started, label, children }: Co
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={offset}
             style={{
-              transition: 'stroke-dashoffset var(--dur-fast) var(--ease-out)',
+              transition: "stroke-dashoffset var(--dur-fast) var(--ease-out)",
             }}
           />
         </svg>
@@ -96,7 +80,7 @@ export function CountdownRing({ total, remaining, started, label, children }: Co
         {announcement}
       </p>
     </>
-  )
+  );
 }
 
 /**
@@ -113,8 +97,8 @@ export function CountdownRing({ total, remaining, started, label, children }: Co
  * from twelve to eight still announces.
  */
 function announcementFor(started: boolean, remaining: number): string {
-  if (!started) return ''
-  if (remaining === 0) return 'Time.'
-  if (remaining <= 10) return 'Ten seconds left.'
-  return ''
+  if (!started) return "";
+  if (remaining === 0) return "Time.";
+  if (remaining <= 10) return "Ten seconds left.";
+  return "";
 }

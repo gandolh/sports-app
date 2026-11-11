@@ -1,5 +1,5 @@
-import type { ButtonHTMLAttributes } from 'react'
-import { PressButton } from './PressButton.tsx'
+import type { ButtonHTMLAttributes } from "react";
+import { PressButton } from "./PressButton.tsx";
 
 /**
  * Three buttons, three heights, and the heights are the whole design.
@@ -33,25 +33,22 @@ import { PressButton } from './PressButton.tsx'
  * precisely so this choice is a visual one and never a legibility one.
  */
 
-type NativeButtonProps = ButtonHTMLAttributes<HTMLButtonElement>
+type NativeButtonProps = ButtonHTMLAttributes<HTMLButtonElement>;
 
 // `flex` with a gap, not `grid place-items-center`: several of these carry an
 // icon beside their label, and a single-cell grid stacks the two vertically —
 // which reads as a two-line button rather than as a labelled icon.
 const PRIMARY_BASE =
-  'flex w-full items-center justify-center gap-[var(--sp-2)] rounded text-btn ' +
-  'font-bold tracking-[-0.01em] text-on-accent shadow-2 h-[var(--tap-primary)]'
+  "flex w-full items-center justify-center gap-[var(--sp-2)] rounded text-btn " +
+  "font-bold tracking-[-0.01em] text-on-accent shadow-2 h-[var(--tap-primary)]";
 
 export function PrimaryButton({
-  tone = 'gradient',
+  tone = "gradient",
   className,
   ...rest
-}: NativeButtonProps & { readonly tone?: 'gradient' | 'flat' }) {
-  const fill =
-    tone === 'gradient'
-      ? 'bg-[linear-gradient(96deg,var(--accent-2),var(--accent))]'
-      : 'bg-accent'
-  return <PressButton className={`${PRIMARY_BASE} ${fill} ${className ?? ''}`} {...rest} />
+}: NativeButtonProps & { readonly tone?: "gradient" | "flat" }) {
+  const fill = tone === "gradient" ? "bg-[linear-gradient(96deg,var(--accent-2),var(--accent))]" : "bg-accent";
+  return <PressButton className={`${PRIMARY_BASE} ${fill} ${className ?? ""}`} {...rest} />;
 }
 
 /**
@@ -63,13 +60,13 @@ export function SecondaryButton({ className, ...rest }: NativeButtonProps) {
   return (
     <PressButton
       className={
-        'flex w-full items-center justify-center gap-[var(--sp-2)] rounded border ' +
-        'border-line2 bg-transparent text-meta font-semibold text-tx2 h-[var(--tap-row)] ' +
-        (className ?? '')
+        "flex w-full items-center justify-center gap-[var(--sp-2)] rounded border " +
+        "border-line2 bg-transparent text-meta font-semibold text-tx2 h-[var(--tap-row)] " +
+        (className ?? "")
       }
       {...rest}
     />
-  )
+  );
 }
 
 /**
@@ -83,11 +80,11 @@ export function QuietButton({ className, ...rest }: NativeButtonProps) {
   return (
     <PressButton
       className={
-        'inline-flex items-center gap-[var(--sp-1)] rounded-sm px-[var(--sp-2)] ' +
-        'text-meta font-semibold text-tx2 min-h-[var(--tap-min)] ' +
-        (className ?? '')
+        "inline-flex items-center gap-[var(--sp-1)] rounded-sm px-[var(--sp-2)] " +
+        "text-meta font-semibold text-tx2 min-h-[var(--tap-min)] " +
+        (className ?? "")
       }
       {...rest}
     />
-  )
+  );
 }

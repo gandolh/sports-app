@@ -37,45 +37,38 @@
  *       cookies). The app runs in memory so the session still works; the banner
  *       says nothing will be saved.
  */
-import { useEffect, useRef } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { SessionResult, StateDoc, SyncSettings } from '@sports-app/shared/types.ts'
-import type { Prescription } from '../domain/schedule.ts'
-import { recordSession, toSessionResult } from '../domain/schedule.ts'
-import {
-  emptyDoc,
-  isReadOnly,
-  load,
-  readOnlyReason,
-  requestPersistentStorage,
-  save,
-} from '../persistence/store.ts'
-import { checkSync, push, saveAndPush } from '../persistence/sync.ts'
-import type { SyncStatus } from '../persistence/sync.ts'
-import { nowIso } from '../session/useSession.ts'
+import { useEffect, useRef } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { SessionResult, StateDoc, SyncSettings } from "@sports-app/shared/types.ts";
+import type { Prescription } from "../domain/schedule.ts";
+import { recordSession, toSessionResult } from "../domain/schedule.ts";
+import { emptyDoc, isReadOnly, load, readOnlyReason, requestPersistentStorage, save } from "../persistence/store.ts";
+import { checkSync, push, saveAndPush } from "../persistence/sync.ts";
+import type { SyncStatus } from "../persistence/sync.ts";
+import { nowIso } from "../session/useSession.ts";
 
-export const DOCUMENT_QUERY_ROOT = 'state-document'
+export const DOCUMENT_QUERY_ROOT = "state-document";
 
 export function documentQueryKey(username: string): readonly [string, string] {
-  return [DOCUMENT_QUERY_ROOT, username]
+  return [DOCUMENT_QUERY_ROOT, username];
 }
 
 export interface DocumentSnapshot {
   /** `null` only when the stored text could not be read — see the header. */
-  readonly doc: StateDoc | null
+  readonly doc: StateDoc | null;
   /** A converted pre-accounts document awaiting the user's yes or no. */
-  readonly pendingLegacy: StateDoc | null
+  readonly pendingLegacy: StateDoc | null;
   /** `store.readOnlyReason`, verbatim, when the store will refuse to write. */
-  readonly readOnly: string | null
+  readonly readOnly: string | null;
   /** A one-off failure message, verbatim. */
-  readonly error: string | null
+  readonly error: string | null;
   /**
    * The unreadable stored bytes, exactly as they are on disk, and only in the
    * corrupt case. It is what makes the escape hatch on `/account` an export
    * rather than a shrug: the text is usually repairable by hand, so it must be
    * recoverable *before* anything offers to overwrite it.
    */
-  readonly rawText: string | null
+  readonly rawText: string | null;
 }
 
 function usable(username: string, doc: StateDoc, error: string | null = null): DocumentSnapshot {
@@ -85,49 +78,49 @@ function usable(username: string, doc: StateDoc, error: string | null = null): D
     readOnly: isReadOnly(username) ? readOnlyReason(username) : null,
     error,
     rawText: null,
-  }
+  };
 }
 
 /** Read one user's document and settle every recoverable case. Never throws. */
 export function readDocument(username: string): DocumentSnapshot {
-  const result = load(username)
+  const result = load(username);
   switch (result.status) {
-    case 'loaded':
-      return usable(username, result.doc)
+    case "loaded":
+      return usable(username, result.doc);
 
-    case 'recovered': {
+    case "recovered": {
       // A complete shadow copy with no live key: a save was interrupted between
       // staging and promotion. Promote it now so this is a one-time event rather
       // than a state the app keeps re-entering.
-      const saved = save(result.doc)
-      return usable(username, result.doc, saved.ok ? null : saved.error)
+      const saved = save(result.doc);
+      return usable(username, result.doc, saved.ok ? null : saved.error);
     }
 
-    case 'empty': {
-      const fresh = emptyDoc(username)
-      const saved = save(fresh)
-      return usable(username, fresh, saved.ok ? null : saved.error)
+    case "empty": {
+      const fresh = emptyDoc(username);
+      const saved = save(fresh);
+      return usable(username, fresh, saved.ok ? null : saved.error);
     }
 
-    case 'migrated':
+    case "migrated":
       return {
         doc: null,
         pendingLegacy: result.doc,
         readOnly: null,
         error: null,
         rawText: null,
-      }
+      };
 
-    case 'corrupt':
+    case "corrupt":
       return {
         doc: null,
         pendingLegacy: null,
         readOnly: readOnlyReason(username),
         error: result.error,
         rawText: result.rawText,
-      }
+      };
 
-    case 'unavailable':
+    case "unavailable":
       // In memory, for this tab only. Training works; saving does not, and the
       // banner is the honest version of that.
       return {
@@ -136,7 +129,7 @@ export function readDocument(username: string): DocumentSnapshot {
         readOnly: readOnlyReason(username) ?? result.error,
         error: result.error,
         rawText: null,
-      }
+      };
   }
 }
 
@@ -150,7 +143,7 @@ export function useDocument(username: string) {
     gcTime: Infinity,
     refetchOnWindowFocus: false,
     retry: false,
-  })
+  });
 }
 
 /**
@@ -161,13 +154,13 @@ export function useDocument(username: string) {
  * has: it walks `prescription.items`, and on a cardio slot the two lists are
  * different lengths. `attachLogs` below is what reconciles them, once.
  */
-export type SessionLogs = ReadonlyMap<number, readonly number[]>
+export type SessionLogs = ReadonlyMap<number, readonly number[]>;
 
 export interface CompleteSessionInput {
-  readonly doc: StateDoc
-  readonly prescription: Prescription
+  readonly doc: StateDoc;
+  readonly prescription: Prescription;
   /** Absent or empty is the normal case: logging is optional. See `attachLogs`. */
-  readonly logs?: SessionLogs
+  readonly logs?: SessionLogs;
 }
 
 /**
@@ -201,23 +194,17 @@ export interface CompleteSessionInput {
  * would silently mis-assign every log on a cardio day, where the slot's own work
  * is not an exercise.
  */
-export function attachLogs(
-  result: SessionResult,
-  prescription: Prescription,
-  logs: SessionLogs,
-): SessionResult {
-  if (logs.size === 0) return result
-  const exerciseItemIndices = prescription.items.flatMap((item, index) =>
-    item.type === 'exercise' ? [index] : [],
-  )
+export function attachLogs(result: SessionResult, prescription: Prescription, logs: SessionLogs): SessionResult {
+  if (logs.size === 0) return result;
+  const exerciseItemIndices = prescription.items.flatMap((item, index) => (item.type === "exercise" ? [index] : []));
   return {
     ...result,
     exercises: result.exercises.map((exercise, nth) => {
-      const itemIndex = exerciseItemIndices[nth]
-      const logged = itemIndex === undefined ? undefined : logs.get(itemIndex)
-      return logged === undefined ? exercise : { ...exercise, logged }
+      const itemIndex = exerciseItemIndices[nth];
+      const logged = itemIndex === undefined ? undefined : logs.get(itemIndex);
+      return logged === undefined ? exercise : { ...exercise, logged };
     }),
-  }
+  };
 }
 
 /**
@@ -235,26 +222,22 @@ export function attachLogs(
  * losing the session.
  */
 export function useCompleteSession(username: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ doc, prescription, logs }: CompleteSessionInput) => {
-      const result = attachLogs(
-        toSessionResult(prescription, nowIso()),
-        prescription,
-        logs ?? new Map(),
-      )
-      const next = recordSession(doc, result)
-      const saved = saveAndPush(next)
-      if (!saved.ok) throw new Error(saved.error)
-      return next
+      const result = attachLogs(toSessionResult(prescription, nowIso()), prescription, logs ?? new Map());
+      const next = recordSession(doc, result);
+      const saved = saveAndPush(next);
+      if (!saved.ok) throw new Error(saved.error);
+      return next;
     },
     onSuccess: (next) => {
-      queryClient.setQueryData(documentQueryKey(username), usable(username, next))
+      queryClient.setQueryData(documentQueryKey(username), usable(username, next));
       // What makes /account and /week correct without either of them knowing a
       // session just happened.
-      void queryClient.invalidateQueries({ queryKey: [DOCUMENT_QUERY_ROOT] })
+      void queryClient.invalidateQueries({ queryKey: [DOCUMENT_QUERY_ROOT] });
     },
-  })
+  });
 }
 
 /**
@@ -265,19 +248,19 @@ export function useCompleteSession(username: string) {
  * saying no here is not destructive to whoever it does belong to.
  */
 export function useAdoptLegacy(username: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ doc, keep }: { readonly doc: StateDoc; readonly keep: boolean }) => {
-      const target = keep ? doc : emptyDoc(username)
-      const saved = save(target)
-      if (!saved.ok) throw new Error(saved.error)
-      return target
+      const target = keep ? doc : emptyDoc(username);
+      const saved = save(target);
+      if (!saved.ok) throw new Error(saved.error);
+      return target;
     },
     onSuccess: (doc) => {
-      queryClient.setQueryData(documentQueryKey(username), usable(username, doc))
-      void queryClient.invalidateQueries({ queryKey: [DOCUMENT_QUERY_ROOT] })
+      queryClient.setQueryData(documentQueryKey(username), usable(username, doc));
+      void queryClient.invalidateQueries({ queryKey: [DOCUMENT_QUERY_ROOT] });
     },
-  })
+  });
 }
 
 /**
@@ -293,24 +276,18 @@ export function useAdoptLegacy(username: string) {
  * see the note on write-only secrets in `components/SyncSettings.tsx`.
  */
 export function useSaveSync(username: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      doc,
-      sync,
-    }: {
-      readonly doc: StateDoc
-      readonly sync: SyncSettings | null
-    }) => {
-      const next: StateDoc = { ...doc, settings: { ...doc.settings, sync } }
-      const saved = save(next)
-      if (!saved.ok) throw new Error(saved.error)
-      return next
+    mutationFn: async ({ doc, sync }: { readonly doc: StateDoc; readonly sync: SyncSettings | null }) => {
+      const next: StateDoc = { ...doc, settings: { ...doc.settings, sync } };
+      const saved = save(next);
+      if (!saved.ok) throw new Error(saved.error);
+      return next;
     },
     onSuccess: (next) => {
-      queryClient.setQueryData(documentQueryKey(username), usable(username, next))
+      queryClient.setQueryData(documentQueryKey(username), usable(username, next));
     },
-  })
+  });
 }
 
 /**
@@ -329,11 +306,11 @@ export function useSyncCheck() {
       doc,
       sync,
     }: {
-      readonly username: string
-      readonly doc: StateDoc | null
-      readonly sync: SyncSettings | null
+      readonly username: string;
+      readonly doc: StateDoc | null;
+      readonly sync: SyncSettings | null;
     }): Promise<SyncStatus> => checkSync(username, doc, sync),
-  })
+  });
 }
 
 /**
@@ -348,11 +325,11 @@ export function useSyncCheck() {
 export function useBackupNow() {
   return useMutation({
     mutationFn: async (doc: StateDoc) => {
-      const outcome = await push(doc)
-      if (!outcome.ok) throw new Error(outcome.error)
-      return outcome
+      const outcome = await push(doc);
+      if (!outcome.ok) throw new Error(outcome.error);
+      return outcome;
     },
-  })
+  });
 }
 
 /**
@@ -367,19 +344,19 @@ export function useBackupNow() {
  * `clearReadOnly`.
  */
 export function useStartFresh(username: string) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const fresh = emptyDoc(username)
-      const saved = save(fresh, { allowOverwriteCorrupt: true })
-      if (!saved.ok) throw new Error(saved.error)
-      return fresh
+      const fresh = emptyDoc(username);
+      const saved = save(fresh, { allowOverwriteCorrupt: true });
+      if (!saved.ok) throw new Error(saved.error);
+      return fresh;
     },
     onSuccess: (fresh) => {
-      queryClient.setQueryData(documentQueryKey(username), usable(username, fresh))
-      void queryClient.invalidateQueries({ queryKey: [DOCUMENT_QUERY_ROOT] })
+      queryClient.setQueryData(documentQueryKey(username), usable(username, fresh));
+      void queryClient.invalidateQueries({ queryKey: [DOCUMENT_QUERY_ROOT] });
     },
-  })
+  });
 }
 
 /**
@@ -392,18 +369,18 @@ export function useStartFresh(username: string) {
  * every launch.
  */
 export function useRequestPersistence(username: string, doc: StateDoc | null): void {
-  const queryClient = useQueryClient()
-  const asked = useRef(false)
+  const queryClient = useQueryClient();
+  const asked = useRef(false);
 
   useEffect(() => {
-    if (doc === null || doc.settings.persistGranted !== null || asked.current) return
-    asked.current = true
+    if (doc === null || doc.settings.persistGranted !== null || asked.current) return;
+    asked.current = true;
     void requestPersistentStorage(doc).then((outcome) => {
-      if (!outcome.changed) return
-      const saved = save(outcome.doc)
+      if (!outcome.changed) return;
+      const saved = save(outcome.doc);
       if (saved.ok) {
-        queryClient.setQueryData(documentQueryKey(username), usable(username, outcome.doc))
+        queryClient.setQueryData(documentQueryKey(username), usable(username, outcome.doc));
       }
-    })
-  }, [doc, queryClient, username])
+    });
+  }, [doc, queryClient, username]);
 }

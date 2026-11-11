@@ -1,5 +1,5 @@
-import { DatabaseSync } from 'node:sqlite'
-import { ROUTE_PREFIX, SESSION_COOKIE_NAME, DEFAULT_ROLE, openAccounts } from '../ward.mjs'
+import { DatabaseSync } from "node:sqlite";
+import { ROUTE_PREFIX, SESSION_COOKIE_NAME, DEFAULT_ROLE, openAccounts } from "../ward.mjs";
 
 /**
  * Real accounts and real sessions for the service tests.
@@ -19,25 +19,25 @@ import { ROUTE_PREFIX, SESSION_COOKIE_NAME, DEFAULT_ROLE, openAccounts } from '.
 /** The auth config as `readAuthConfig` would produce it for local development. */
 export function testAuthConfig(overrides = {}) {
   return {
-    publicOrigin: 'http://localhost:5173',
-    apiPrefix: '',
-    cookiePath: '/api',
+    publicOrigin: "http://localhost:5173",
+    apiPrefix: "",
+    cookiePath: "/api",
     cookieName: SESSION_COOKIE_NAME,
-    loginPath: '/sports-app/login',
-    settingsPath: '/sports-app/account',
-    afterSignInPath: '/sports-app/login',
+    loginPath: "/sports-app/login",
+    settingsPath: "/sports-app/account",
+    afterSignInPath: "/sports-app/login",
     wardOptions: undefined,
     ...overrides,
-  }
+  };
 }
 
 /**
  * @param {{ db?: import('node:sqlite').DatabaseSync }} store
  */
 export function createTestAuth(store) {
-  const accounts = openAccounts(store.db ?? new DatabaseSync(':memory:'))
+  const accounts = openAccounts(store.db ?? new DatabaseSync(":memory:"));
   /** @type {Map<string, string>} */
-  const cookies = new Map()
+  const cookies = new Map();
 
   return {
     accounts,
@@ -45,22 +45,22 @@ export function createTestAuth(store) {
 
     /** Create the user if it does not exist yet, with no password. */
     async ensureUser(username, { password = null, role = DEFAULT_ROLE } = {}) {
-      const existing = await accounts.findUserByUsername(username)
-      if (existing !== undefined) return existing
-      return accounts.createUser({ username, password, role })
+      const existing = await accounts.findUserByUsername(username);
+      if (existing !== undefined) return existing;
+      return accounts.createUser({ username, password, role });
     },
 
     /** A `Cookie` header for a live local session as `username`, minted once. */
     async cookieFor(username) {
-      const known = cookies.get(username)
-      if (known !== undefined) return known
-      const user = await this.ensureUser(username)
-      const { token } = await accounts.startSession(user.id)
-      const header = `${SESSION_COOKIE_NAME}=${token}`
-      cookies.set(username, header)
-      return header
+      const known = cookies.get(username);
+      if (known !== undefined) return known;
+      const user = await this.ensureUser(username);
+      const { token } = await accounts.startSession(user.id);
+      const header = `${SESSION_COOKIE_NAME}=${token}`;
+      cookies.set(username, header);
+      return header;
     },
-  }
+  };
 }
 
-export { ROUTE_PREFIX, SESSION_COOKIE_NAME }
+export { ROUTE_PREFIX, SESSION_COOKIE_NAME };

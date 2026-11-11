@@ -31,13 +31,7 @@
          — `archivo-latin-var.woff2` is still on disk but nothing references it.
          Offline-first means no font CDN, and preloading stops the first paint of
          a 132px numeral happening in the system stack and then reflowing. -->
-    <link
-      rel="preload"
-      href="/fonts/inter-latin-var.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
-    />
+    <link rel="preload" href="/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin />
     <!--
       Theme and accent, stamped before the first paint.
 
@@ -63,10 +57,10 @@
     -->
     <script>
       try {
-        var t = localStorage.getItem('sports-app.theme')
-        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t)
-        var a = localStorage.getItem('sports-app.accent')
-        if (a && /^[a-z]{4,8}$/.test(a)) document.documentElement.setAttribute('data-accent', a)
+        var t = localStorage.getItem("sports-app.theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        var a = localStorage.getItem("sports-app.accent");
+        if (a && /^[a-z]{4,8}$/.test(a)) document.documentElement.setAttribute("data-accent", a);
       } catch (_) {
         /* No stored preference is readable. The unstamped default is correct. */
       }

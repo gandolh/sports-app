@@ -1,4 +1,4 @@
-import type { FigureDefinition, MovementArrowSpec, Rig } from './types.ts'
+import type { FigureDefinition, MovementArrowSpec, Rig } from "./types.ts";
 
 /**
  * Prone: face-down, arms trailing by the hips, swinging overhead in a Y. Covers
@@ -74,28 +74,28 @@ export const PRONE_RIG: Rig = {
     // and it is the one number in this file most likely to get "corrected"
     // back to the wrong value by a reader who only checks the endpoint.
     armL: {
-      kind: 'fk',
-      root: 'shoulder',
+      kind: "fk",
+      root: "shoulder",
       length: 49.7,
       angleDeg: { start: 71, end: 220 },
     },
     // Same trap, mirrored: 233, not -127.
     armR: {
-      kind: 'fk',
-      root: 'shoulder',
+      kind: "fk",
+      root: "shoulder",
       length: 52.8,
       angleDeg: { start: 66, end: 233 },
     },
-    legL: { kind: 'fk', root: 'hip', length: 40.8, angleDeg: { start: 11, end: 11 } },
-    legR: { kind: 'fk', root: 'hip', length: 48.1, angleDeg: { start: 17, end: 17 } },
+    legL: { kind: "fk", root: "hip", length: 40.8, angleDeg: { start: 11, end: 11 } },
+    legR: { kind: "fk", root: "hip", length: 48.1, angleDeg: { start: 17, end: 17 } },
   },
-}
+};
 
 /**
  * Points up, above the middle of the back: the arms rise. It used to sit at
  * x=48, inside the head circle and across the arms' whole sweep; there is no
  * clear spot beside the head end, because the arms pass through all of it.
  */
-export const PRONE_MOVEMENT_ARROW: MovementArrowSpec = { x: 100, y1: 90, y2: 52 }
+export const PRONE_MOVEMENT_ARROW: MovementArrowSpec = { x: 100, y1: 90, y2: 52 };
 
-export const PRONE_FIGURE: FigureDefinition = { rig: PRONE_RIG, arrow: PRONE_MOVEMENT_ARROW }
+export const PRONE_FIGURE: FigureDefinition = { rig: PRONE_RIG, arrow: PRONE_MOVEMENT_ARROW };

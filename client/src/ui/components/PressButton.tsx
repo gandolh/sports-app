@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react'
-import type { ButtonHTMLAttributes, PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useState } from "react";
+import type { ButtonHTMLAttributes, PointerEvent as ReactPointerEvent } from "react";
 
 /**
  * A button whose press state is driven by `pointerdown`, exposed as
@@ -23,38 +23,38 @@ export function PressButton({
   onPointerUp,
   onPointerCancel,
   onPointerLeave,
-  type = 'button',
+  type = "button",
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  const [pressed, setPressed] = useState(false)
+  const [pressed, setPressed] = useState(false);
 
   const press = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
-      setPressed(true)
-      onPointerDown?.(event)
+      setPressed(true);
+      onPointerDown?.(event);
     },
     [onPointerDown],
-  )
+  );
   const release = useCallback(
     (
       event: ReactPointerEvent<HTMLButtonElement>,
       forward: ((event: ReactPointerEvent<HTMLButtonElement>) => void) | undefined,
     ) => {
-      setPressed(false)
-      forward?.(event)
+      setPressed(false);
+      forward?.(event);
     },
     [],
-  )
+  );
 
   return (
     <button
       type={type}
-      {...(pressed ? { 'data-pressed': '' } : {})}
+      {...(pressed ? { "data-pressed": "" } : {})}
       onPointerDown={press}
       onPointerUp={(event) => release(event, onPointerUp)}
       onPointerCancel={(event) => release(event, onPointerCancel)}
       onPointerLeave={(event) => release(event, onPointerLeave)}
       {...rest}
     />
-  )
+  );
 }

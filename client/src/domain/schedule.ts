@@ -44,9 +44,9 @@
  * `SessionResult`; nothing here reads a clock, a browser API or a random number.
  * Enforced by `eslint.config.js`.
  */
-import { CARDIO, LADDERS, getRung } from './ladders.ts'
-import { DAILY_BLOCK, slotAt } from './types.ts'
-import type { CardioProtocol, Rung } from './types.ts'
+import { CARDIO, LADDERS, getRung } from "./ladders.ts";
+import { DAILY_BLOCK, slotAt } from "./types.ts";
+import type { CardioProtocol, Rung } from "./types.ts";
 import type {
   IsoTimestamp,
   Pattern,
@@ -55,7 +55,7 @@ import type {
   StateDoc,
   TargetUnit,
   Variant,
-} from '@sports-app/shared/types.ts'
+} from "@sports-app/shared/types.ts";
 
 // ─── How much work ──────────────────────────────────────────────────────────
 
@@ -66,62 +66,62 @@ import type {
  * **set**, not a fourth session — at the cost of ~100s, which breaks the budget
  * (corpus/wiki/programme.md).
  */
-export const SETS_PER_STRENGTH = 3
-export const SETS_PER_DAILY_BLOCK = 2
+export const SETS_PER_STRENGTH = 3;
+export const SETS_PER_DAILY_BLOCK = 2;
 
 /** Rounds on a cardio slot. Sourced from `CARDIO` so there is one number, not two. */
-export const CARDIO_ROUNDS = CARDIO.rounds
+export const CARDIO_ROUNDS = CARDIO.rounds;
 
 /**
  * How far the variant moves today's target: ±2 reps, ±5 seconds. A dial, not a
  * signal — see `Variant`.
  */
-const VARIANT_STEP: Readonly<Record<TargetUnit, number>> = { reps: 2, seconds: 5 }
+const VARIANT_STEP: Readonly<Record<TargetUnit, number>> = { reps: 2, seconds: 5 };
 
 /**
  * `easy` never drops below this many reps whatever the range says. Three reps is
  * the point below which a set stops being training at all.
  */
-const ABSOLUTE_REP_FLOOR = 3
+const ABSOLUTE_REP_FLOOR = 3;
 
 // ─── The prescription ───────────────────────────────────────────────────────
 
 export interface PrescribedExercise {
-  readonly type: 'exercise'
-  readonly pattern: Pattern
+  readonly type: "exercise";
+  readonly pattern: Pattern;
   /** Carries the name, cues, figureId, modifier and the `safetyCritical` flag. */
-  readonly rung: Rung
-  readonly rungIndex: number
-  readonly unit: TargetUnit
+  readonly rung: Rung;
+  readonly rungIndex: number;
+  readonly unit: TargetUnit;
   /** `postural` obliges the UI to surface `POSTURAL_NOTICE`. */
-  readonly ladderKind: 'strength' | 'postural'
-  readonly sets: number
+  readonly ladderKind: "strength" | "postural";
+  readonly sets: number;
   /** Post-variant. This is the number on screen and the number recorded. */
-  readonly targetValue: number
+  readonly targetValue: number;
 }
 
 export interface PrescribedCardio {
-  readonly type: 'cardio'
-  readonly protocol: CardioProtocol
-  readonly rounds: number
+  readonly type: "cardio";
+  readonly protocol: CardioProtocol;
+  readonly rounds: number;
   /* No target, by design. See `CardioProtocol`. */
 }
 
-export type PrescribedItem = PrescribedExercise | PrescribedCardio
+export type PrescribedItem = PrescribedExercise | PrescribedCardio;
 
 export interface Prescription {
   /** The rotation position this was derived from — `state.cyclePosition`. */
-  readonly position: number
+  readonly position: number;
   /** 'Push' | 'Legs' | 'Cardio'. */
-  readonly label: string
-  readonly variant: Variant
+  readonly label: string;
+  readonly variant: Variant;
   /**
    * In the order the player walks through them: the slot's own work first (the
    * strength patterns, or cardio in their place), then the daily block. The daily
    * block is last because it is the same every session and the least
    * fatigue-sensitive thing in it.
    */
-  readonly items: readonly PrescribedItem[]
+  readonly items: readonly PrescribedItem[];
 }
 
 // ─── Derivation ─────────────────────────────────────────────────────────────
@@ -134,10 +134,10 @@ export interface Prescription {
  * counter is an expected input for a file people are told to edit.
  */
 export function rungIndexAt(pattern: Pattern, sessionsDone: number): number {
-  const ladder = LADDERS[pattern]
-  const climbed = Math.floor(sessionsDone / ladder.sessionsPerRung)
-  const raw = ladder.startRungIndex + climbed
-  return Math.min(Math.max(raw, 0), ladder.rungs.length - 1)
+  const ladder = LADDERS[pattern];
+  const climbed = Math.floor(sessionsDone / ladder.sessionsPerRung);
+  const raw = ladder.startRungIndex + climbed;
+  return Math.min(Math.max(raw, 0), ladder.rungs.length - 1);
 }
 
 /**
@@ -146,7 +146,7 @@ export function rungIndexAt(pattern: Pattern, sessionsDone: number): number {
  * ceilings differ per exercise.
  */
 export function rangeAt(pattern: Pattern, rungIndex: number): Range {
-  return getRung(pattern, rungIndex).range ?? LADDERS[pattern].range
+  return getRung(pattern, rungIndex).range ?? LADDERS[pattern].range;
 }
 
 /**
@@ -158,15 +158,15 @@ export function rangeAt(pattern: Pattern, rungIndex: number): Range {
  * inside the range.
  */
 export function targetAt(pattern: Pattern, sessionsDone: number): number {
-  const ladder = LADDERS[pattern]
-  const { min, max } = rangeAt(pattern, rungIndexAt(pattern, sessionsDone))
-  const per = ladder.sessionsPerRung
-  const sessionsIntoRung = ((sessionsDone % per) + per) % per
+  const ladder = LADDERS[pattern];
+  const { min, max } = rangeAt(pattern, rungIndexAt(pattern, sessionsDone));
+  const per = ladder.sessionsPerRung;
+  const sessionsIntoRung = ((sessionsDone % per) + per) % per;
   // `per − 1` so the last session of a rung lands exactly on `max`. Guarded
   // against a one-session rung, where `sessionsIntoRung` is always 0 and the
   // only sensible answer is `min`.
-  const fraction = sessionsIntoRung / Math.max(per - 1, 1)
-  return Math.round(min + fraction * (max - min))
+  const fraction = sessionsIntoRung / Math.max(per - 1, 1);
+  return Math.round(min + fraction * (max - min));
 }
 
 /**
@@ -181,37 +181,27 @@ export function targetAt(pattern: Pattern, sessionsDone: number): number {
  * `sessionsDone`, and nothing downstream may either — an easy day costs no
  * progress and banks no debt, which is the reason a bad day is free.
  */
-export function applyVariant(
-  target: number,
-  unit: TargetUnit,
-  variant: Variant,
-  range: Range,
-): number {
-  const step = VARIANT_STEP[unit]
-  const floor = unit === 'reps' ? Math.max(range.min, ABSOLUTE_REP_FLOOR) : range.min
+export function applyVariant(target: number, unit: TargetUnit, variant: Variant, range: Range): number {
+  const step = VARIANT_STEP[unit];
+  const floor = unit === "reps" ? Math.max(range.min, ABSOLUTE_REP_FLOOR) : range.min;
   switch (variant) {
-    case 'easy':
-      return Math.max(target - step, floor)
-    case 'medium':
-      return target
-    case 'hard':
-      return Math.min(target + step, range.max)
+    case "easy":
+      return Math.max(target - step, floor);
+    case "medium":
+      return target;
+    case "hard":
+      return Math.min(target + step, range.max);
   }
 }
 
-function prescribeExercise(
-  state: StateDoc,
-  pattern: Pattern,
-  sets: number,
-  variant: Variant,
-): PrescribedExercise {
-  const ladder = LADDERS[pattern]
-  const sessionsDone = state.sessionsDone[pattern]
-  const rungIndex = rungIndexAt(pattern, sessionsDone)
-  const range = rangeAt(pattern, rungIndex)
-  const target = targetAt(pattern, sessionsDone)
+function prescribeExercise(state: StateDoc, pattern: Pattern, sets: number, variant: Variant): PrescribedExercise {
+  const ladder = LADDERS[pattern];
+  const sessionsDone = state.sessionsDone[pattern];
+  const rungIndex = rungIndexAt(pattern, sessionsDone);
+  const range = rangeAt(pattern, rungIndex);
+  const target = targetAt(pattern, sessionsDone);
   return {
-    type: 'exercise',
+    type: "exercise",
     pattern,
     rung: getRung(pattern, rungIndex),
     rungIndex,
@@ -219,22 +209,22 @@ function prescribeExercise(
     ladderKind: ladder.kind,
     sets,
     targetValue: applyVariant(target, ladder.unit, variant, range),
-  }
+  };
 }
 
 /** What to do today. A pure function of `state.sessionsDone` and the variant. */
 export function prescribe(state: StateDoc, variant: Variant): Prescription {
-  const slot = slotAt(state.cyclePosition)
+  const slot = slotAt(state.cyclePosition);
   const own: readonly PrescribedItem[] = slot.cardio
-    ? [{ type: 'cardio', protocol: CARDIO, rounds: CARDIO_ROUNDS }]
-    : slot.patterns.map((p) => prescribeExercise(state, p, SETS_PER_STRENGTH, variant))
-  const daily = DAILY_BLOCK.map((p) => prescribeExercise(state, p, SETS_PER_DAILY_BLOCK, variant))
+    ? [{ type: "cardio", protocol: CARDIO, rounds: CARDIO_ROUNDS }]
+    : slot.patterns.map((p) => prescribeExercise(state, p, SETS_PER_STRENGTH, variant));
+  const daily = DAILY_BLOCK.map((p) => prescribeExercise(state, p, SETS_PER_DAILY_BLOCK, variant));
   return {
     position: state.cyclePosition,
     label: slot.label,
     variant,
     items: [...own, ...daily],
-  }
+  };
 }
 
 /**
@@ -257,14 +247,14 @@ export function toSessionResult(p: Prescription, completedAt: IsoTimestamp): Ses
     position: p.position,
     variant: p.variant,
     exercises: p.items
-      .filter((item): item is PrescribedExercise => item.type === 'exercise')
+      .filter((item): item is PrescribedExercise => item.type === "exercise")
       .map((e) => ({
         pattern: e.pattern,
         rungId: e.rung.id,
         sets: e.sets,
         targetValue: e.targetValue,
       })),
-  }
+  };
 }
 
 /**
@@ -282,13 +272,13 @@ export function toSessionResult(p: Prescription, completedAt: IsoTimestamp): Ses
  * are the same number.
  */
 export function recordSession(state: StateDoc, result: SessionResult): StateDoc {
-  const trained: readonly Pattern[] = [...slotAt(result.position).patterns, ...DAILY_BLOCK]
-  const sessionsDone = { ...state.sessionsDone }
-  for (const pattern of trained) sessionsDone[pattern] += 1
+  const trained: readonly Pattern[] = [...slotAt(result.position).patterns, ...DAILY_BLOCK];
+  const sessionsDone = { ...state.sessionsDone };
+  for (const pattern of trained) sessionsDone[pattern] += 1;
   return {
     ...state,
     cyclePosition: state.cyclePosition + 1,
     sessionsDone,
     history: [...state.history, result],
-  }
+  };
 }

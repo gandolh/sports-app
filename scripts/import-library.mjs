@@ -29,18 +29,18 @@
  *     the tree, and this app's own figures are the hand-authored SVG rigs in
  *     `client/src/ui/figures/`. No binary is copied by this script.
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from "node:fs";
 
-const input = process.argv[2]
+const input = process.argv[2];
 if (!input) {
-  console.error('usage: node scripts/import-library.mjs /path/to/exercises.json')
-  process.exit(2)
+  console.error("usage: node scripts/import-library.mjs /path/to/exercises.json");
+  process.exit(2);
 }
 
-const raw = JSON.parse(readFileSync(input, 'utf8'))
+const raw = JSON.parse(readFileSync(input, "utf8"));
 
 const bodyweight = raw
-  .filter((e) => e.equipment === 'body only' || e.equipment === null)
+  .filter((e) => e.equipment === "body only" || e.equipment === null)
   .filter((e) => Array.isArray(e.instructions) && e.instructions.length > 0)
   .map((e) => ({
     id: e.id,
@@ -53,9 +53,9 @@ const bodyweight = raw
     secondaryMuscles: e.secondaryMuscles ?? [],
     instructions: e.instructions ?? [],
   }))
-  .sort((a, b) => a.name.localeCompare(b.name, 'en'))
+  .sort((a, b) => a.name.localeCompare(b.name, "en"));
 
-const dropped = raw.length - bodyweight.length
+const dropped = raw.length - bodyweight.length;
 const header = `/**
  * A bodyweight exercise reference, derived from free-exercise-db.
  *
@@ -110,7 +110,7 @@ export interface LibraryExercise {
   readonly instructions: readonly string[]
 }
 
-export const LIBRARY: readonly LibraryExercise[] = `
+export const LIBRARY: readonly LibraryExercise[] = `;
 
-writeFileSync('client/src/domain/library.ts', `${header}${JSON.stringify(bodyweight, null, 2)} as const\n`)
-console.log(`kept ${bodyweight.length} bodyweight of ${raw.length}; dropped ${dropped}`)
+writeFileSync("client/src/domain/library.ts", `${header}${JSON.stringify(bodyweight, null, 2)} as const\n`);
+console.log(`kept ${bodyweight.length} bodyweight of ${raw.length}; dropped ${dropped}`);

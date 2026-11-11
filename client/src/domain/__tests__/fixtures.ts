@@ -14,7 +14,7 @@
  * **different** points, so a screen that renders the same rung for two patterns
  * fails instead of passing by coincidence.
  */
-import type { StateDoc } from '@sports-app/shared/types.ts'
+import type { StateDoc } from "@sports-app/shared/types.ts";
 
 /**
  * A document part-way through the programme, chosen so that every pattern is
@@ -40,42 +40,42 @@ import type { StateDoc } from '@sports-app/shared/types.ts'
  */
 export const midProgram: StateDoc = {
   schemaVersion: 5,
-  username: 'test',
+  username: "test",
   cyclePosition: 90,
   sessionsDone: { push: 44, squat: 31, hinge: 29, core: 90, pull: 90 },
   history: [
     {
-      completedAt: '2026-05-01T07:12:00.000Z',
+      completedAt: "2026-05-01T07:12:00.000Z",
       position: 87,
-      variant: 'medium',
+      variant: "medium",
       exercises: [
-        { pattern: 'push', rungId: 'push-05-full-3s-down', sets: 3, targetValue: 8 },
-        { pattern: 'core', rungId: 'core-04-hollow-hold', sets: 2, targetValue: 27 },
-        { pattern: 'pull', rungId: 'pull-04-reverse-snow-angel', sets: 2, targetValue: 32 },
+        { pattern: "push", rungId: "push-05-full-3s-down", sets: 3, targetValue: 8 },
+        { pattern: "core", rungId: "core-04-hollow-hold", sets: 2, targetValue: 27 },
+        { pattern: "pull", rungId: "pull-04-reverse-snow-angel", sets: 2, targetValue: 32 },
       ],
     },
     {
-      completedAt: '2026-05-02T06:58:00.000Z',
+      completedAt: "2026-05-02T06:58:00.000Z",
       position: 88,
-      variant: 'hard',
+      variant: "hard",
       exercises: [
-        { pattern: 'squat', rungId: 'squat-04-3s-down-2s-bottom-hold', sets: 3, targetValue: 9 },
-        { pattern: 'hinge', rungId: 'hinge-04-single-leg-heel-far', sets: 3, targetValue: 8 },
-        { pattern: 'core', rungId: 'core-04-hollow-hold', sets: 2, targetValue: 32 },
-        { pattern: 'pull', rungId: 'pull-04-reverse-snow-angel', sets: 2, targetValue: 37 },
+        { pattern: "squat", rungId: "squat-04-3s-down-2s-bottom-hold", sets: 3, targetValue: 9 },
+        { pattern: "hinge", rungId: "hinge-04-single-leg-heel-far", sets: 3, targetValue: 8 },
+        { pattern: "core", rungId: "core-04-hollow-hold", sets: 2, targetValue: 32 },
+        { pattern: "pull", rungId: "pull-04-reverse-snow-angel", sets: 2, targetValue: 37 },
       ],
     },
     {
       // A cardio slot. It trains no ladder, so it records only the daily block —
       // two entries rather than none.
-      completedAt: '2026-05-03T18:20:00.000Z',
+      completedAt: "2026-05-03T18:20:00.000Z",
       position: 89,
-      variant: 'easy',
+      variant: "easy",
       exercises: [
-        { pattern: 'core', rungId: 'core-04-hollow-hold', sets: 2, targetValue: 22 },
-        { pattern: 'pull', rungId: 'pull-04-reverse-snow-angel', sets: 2, targetValue: 27 },
+        { pattern: "core", rungId: "core-04-hollow-hold", sets: 2, targetValue: 22 },
+        { pattern: "pull", rungId: "pull-04-reverse-snow-angel", sets: 2, targetValue: 27 },
       ],
     },
   ],
   settings: { persistGranted: true, sync: null },
-}
+};

@@ -18,24 +18,24 @@
  * `completedAt` is never read either — milestones key off session NUMBER
  * (position in `history`), matching the no-dates invariant.
  */
-import { LADDERS, getRung, topRungIndex } from './ladders.ts'
-import { rungIndexAt } from './schedule.ts'
-import { PATTERNS } from '@sports-app/shared/types.ts'
-import type { Pattern, RungId, StateDoc } from '@sports-app/shared/types.ts'
+import { LADDERS, getRung, topRungIndex } from "./ladders.ts";
+import { rungIndexAt } from "./schedule.ts";
+import { PATTERNS } from "@sports-app/shared/types.ts";
+import type { Pattern, RungId, StateDoc } from "@sports-app/shared/types.ts";
 
 export interface Milestone {
   /** 1-based; the session at which this was reached. */
-  readonly sessionNumber: number
-  readonly pattern: Pattern
-  readonly kind: 'rung' | 'named'
-  readonly label: string
+  readonly sessionNumber: number;
+  readonly pattern: Pattern;
+  readonly kind: "rung" | "named";
+  readonly label: string;
 }
 
 export interface TotalWork {
-  readonly reps: number
-  readonly holdSeconds: number
-  readonly sessions: number
-  readonly perPattern: Readonly<Record<Pattern, { reps: number; holdSeconds: number }>>
+  readonly reps: number;
+  readonly holdSeconds: number;
+  readonly sessions: number;
+  readonly perPattern: Readonly<Record<Pattern, { reps: number; holdSeconds: number }>>;
 }
 
 // ─── Named milestones ───────────────────────────────────────────────────────
@@ -56,14 +56,14 @@ export interface TotalWork {
 // pattern's very first trained session instead; see the `firstSession` check.
 
 const NAMED_ON_ENTRY: ReadonlyMap<RungId, string> = new Map([
-  ['push-04-full', 'Reached the first full push-up.'],
-  ['squat-02-bodyweight', 'Reached the first unassisted bodyweight squat.'],
-])
+  ["push-04-full", "Reached the first full push-up."],
+  ["squat-02-bodyweight", "Reached the first unassisted bodyweight squat."],
+]);
 
 const NAMED_ON_COMPLETION: ReadonlyMap<RungId, string> = new Map([
-  ['core-02-plank', 'Held a 60-second front plank.'],
-  ['core-03-side-plank', 'Held 90 seconds of side plank, split across both sides — 45 on each.'],
-])
+  ["core-02-plank", "Held a 60-second front plank."],
+  ["core-03-side-plank", "Held 90 seconds of side plank, split across both sides — 45 on each."],
+]);
 
 /**
  * Reaching the top of a ladder is a milestone in its own right: the target
@@ -71,13 +71,13 @@ const NAMED_ON_COMPLETION: ReadonlyMap<RungId, string> = new Map([
  * training, not a failure — see schedule.ts's note on the top rung.
  */
 function topOfLadderLabel(pattern: Pattern): string {
-  const rung = getRung(pattern, topRungIndex(pattern))
-  const noun = LADDERS[pattern].unit === 'reps' ? 'reps' : 'seconds'
+  const rung = getRung(pattern, topRungIndex(pattern));
+  const noun = LADDERS[pattern].unit === "reps" ? "reps" : "seconds";
   return (
     `Reached the top of the ${pattern} ladder (${rung.name}) — there is no rung ` +
     `above it, so the ${noun} target now cycles between its floor and its ` +
-    'ceiling forever. That is the ceiling of floor-only training, not a setback.'
-  )
+    "ceiling forever. That is the ceiling of floor-only training, not a setback."
+  );
 }
 
 /**
@@ -99,76 +99,76 @@ function topOfLadderLabel(pattern: Pattern): string {
  *      again while it cycles.
  */
 export function milestonesReached(doc: StateDoc): readonly Milestone[] {
-  const sessionsDoneSoFar: Record<Pattern, number> = { push: 0, squat: 0, hinge: 0, core: 0, pull: 0 }
+  const sessionsDoneSoFar: Record<Pattern, number> = { push: 0, squat: 0, hinge: 0, core: 0, pull: 0 };
   const highestRungIndex: Record<Pattern, number> = {
-    push: rungIndexAt('push', 0),
-    squat: rungIndexAt('squat', 0),
-    hinge: rungIndexAt('hinge', 0),
-    core: rungIndexAt('core', 0),
-    pull: rungIndexAt('pull', 0),
-  }
+    push: rungIndexAt("push", 0),
+    squat: rungIndexAt("squat", 0),
+    hinge: rungIndexAt("hinge", 0),
+    core: rungIndexAt("core", 0),
+    pull: rungIndexAt("pull", 0),
+  };
   const firstSessionSeen: Record<Pattern, boolean> = {
     push: false,
     squat: false,
     hinge: false,
     core: false,
     pull: false,
-  }
+  };
 
-  const milestones: Milestone[] = []
+  const milestones: Milestone[] = [];
 
   doc.history.forEach((session, i) => {
-    const sessionNumber = i + 1
+    const sessionNumber = i + 1;
     // Which patterns this session trained is read off the recorded exercises,
     // not guessed from the rotation slot: a cardio session trains no ladder of
     // its own, but the daily block still records, and that is exactly what
     // should still count here.
-    const trainedPatterns = new Set(session.exercises.map((e) => e.pattern))
+    const trainedPatterns = new Set(session.exercises.map((e) => e.pattern));
 
     for (const pattern of trainedPatterns) {
-      const before = sessionsDoneSoFar[pattern]
-      const after = before + 1
-      sessionsDoneSoFar[pattern] = after
+      const before = sessionsDoneSoFar[pattern];
+      const after = before + 1;
+      sessionsDoneSoFar[pattern] = after;
 
       if (!firstSessionSeen[pattern]) {
-        firstSessionSeen[pattern] = true
-        const startRung = getRung(pattern, highestRungIndex[pattern])
-        const label = NAMED_ON_ENTRY.get(startRung.id)
+        firstSessionSeen[pattern] = true;
+        const startRung = getRung(pattern, highestRungIndex[pattern]);
+        const label = NAMED_ON_ENTRY.get(startRung.id);
         if (label !== undefined) {
-          milestones.push({ sessionNumber, pattern, kind: 'named', label })
+          milestones.push({ sessionNumber, pattern, kind: "named", label });
         }
       }
 
-      const newIndex = rungIndexAt(pattern, after)
+      const newIndex = rungIndexAt(pattern, after);
       if (newIndex > highestRungIndex[pattern]) {
-        const exitedRung = getRung(pattern, highestRungIndex[pattern])
-        const enteredRung = getRung(pattern, newIndex)
-        highestRungIndex[pattern] = newIndex
+        const exitedRung = getRung(pattern, highestRungIndex[pattern]);
+        const enteredRung = getRung(pattern, newIndex);
+        highestRungIndex[pattern] = newIndex;
 
         if (newIndex === topRungIndex(pattern)) {
-          milestones.push({ sessionNumber, pattern, kind: 'named', label: topOfLadderLabel(pattern) })
-          continue
+          milestones.push({ sessionNumber, pattern, kind: "named", label: topOfLadderLabel(pattern) });
+          continue;
         }
 
-        const enteredLabel = NAMED_ON_ENTRY.get(enteredRung.id)
-        const exitedLabel = NAMED_ON_COMPLETION.get(exitedRung.id)
+        const enteredLabel = NAMED_ON_ENTRY.get(enteredRung.id);
+        const exitedLabel = NAMED_ON_COMPLETION.get(exitedRung.id);
         if (enteredLabel !== undefined) {
-          milestones.push({ sessionNumber, pattern, kind: 'named', label: enteredLabel })
+          milestones.push({ sessionNumber, pattern, kind: "named", label: enteredLabel });
         } else if (exitedLabel !== undefined) {
-          milestones.push({ sessionNumber, pattern, kind: 'named', label: exitedLabel })
+          milestones.push({ sessionNumber, pattern, kind: "named", label: exitedLabel });
         } else {
           milestones.push({
             sessionNumber,
             pattern,
-            kind: 'rung',
+            kind: "rung",
             label: `Advanced to ${enteredRung.name}.`,
-          })
+          });
         }
       }
     }
-  })
+  });
 
-  return milestones.slice().reverse()
+  return milestones.slice().reverse();
 }
 
 /**
@@ -198,25 +198,25 @@ export function totalWork(doc: StateDoc): TotalWork {
     hinge: { reps: 0, holdSeconds: 0 },
     core: { reps: 0, holdSeconds: 0 },
     pull: { reps: 0, holdSeconds: 0 },
-  }
+  };
 
   for (const session of doc.history) {
     for (const exercise of session.exercises) {
-      const work = exercise.sets * exercise.targetValue
-      if (LADDERS[exercise.pattern].unit === 'seconds') {
-        perPattern[exercise.pattern].holdSeconds += work
+      const work = exercise.sets * exercise.targetValue;
+      if (LADDERS[exercise.pattern].unit === "seconds") {
+        perPattern[exercise.pattern].holdSeconds += work;
       } else {
-        perPattern[exercise.pattern].reps += work
+        perPattern[exercise.pattern].reps += work;
       }
     }
   }
 
-  let reps = 0
-  let holdSeconds = 0
+  let reps = 0;
+  let holdSeconds = 0;
   for (const pattern of PATTERNS) {
-    reps += perPattern[pattern].reps
-    holdSeconds += perPattern[pattern].holdSeconds
+    reps += perPattern[pattern].reps;
+    holdSeconds += perPattern[pattern].holdSeconds;
   }
 
-  return { reps, holdSeconds, sessions: doc.history.length, perPattern }
+  return { reps, holdSeconds, sessions: doc.history.length, perPattern };
 }

@@ -59,16 +59,16 @@
  * The five movement patterns. `pull` is postural-only — see `Ladder.kind` in
  * `client/src/domain/types.ts`.
  */
-export type Pattern = 'push' | 'squat' | 'hinge' | 'core' | 'pull'
+export type Pattern = "push" | "squat" | "hinge" | "core" | "pull";
 
-export const PATTERNS: readonly Pattern[] = ['push', 'squat', 'hinge', 'core', 'pull']
+export const PATTERNS: readonly Pattern[] = ["push", "squat", "hinge", "core", "pull"];
 
 /**
  * Rep-based ladders count reps; core and pull are held, not repped, and count
  * seconds. Both interpolate identically — only the unit, the variant step and the
  * display formatting differ.
  */
-export type TargetUnit = 'reps' | 'seconds'
+export type TargetUnit = "reps" | "seconds";
 
 /**
  * The per-session load dial, picked on the home page before training.
@@ -78,15 +78,15 @@ export type TargetUnit = 'reps' | 'seconds'
  * costs no progress and banks no debt (corpus/wiki/decisions.md). Anything that
  * read this to decide a *future* prescription would reintroduce adaptation.
  */
-export type Variant = 'easy' | 'medium' | 'hard'
+export type Variant = "easy" | "medium" | "hard";
 
-export const VARIANTS: readonly Variant[] = ['easy', 'medium', 'hard']
+export const VARIANTS: readonly Variant[] = ["easy", "medium", "hard"];
 
 /**
  * ISO-8601 instant, always supplied by the caller. `client/src/domain/` cannot
  * read the clock, which is what makes the schedule reproducible under test.
  */
-export type IsoTimestamp = string
+export type IsoTimestamp = string;
 
 /**
  * Stable rung identifier, e.g. `push-04-full`.
@@ -119,19 +119,19 @@ export type IsoTimestamp = string
  *
  * The short version: **ids cross the wire, content does not.**
  */
-export type RungId = `${Pattern}-${string}`
+export type RungId = `${Pattern}-${string}`;
 
 /** An inclusive target span, in the ladder's unit. */
 export interface Range {
-  readonly min: number
-  readonly max: number
+  readonly min: number;
+  readonly max: number;
 }
 
 // ─── Results ────────────────────────────────────────────────────────────────
 
 export interface ExerciseRecord {
-  readonly pattern: Pattern
-  readonly rungId: RungId
+  readonly pattern: Pattern;
+  readonly rungId: RungId;
   /**
    * A COUNT, not an array: how many sets were *asked for*.
    *
@@ -141,9 +141,9 @@ export interface ExerciseRecord {
    * point of `logged` below is that the two halves stay separate and only one of
    * them is allowed anywhere near the engine.
    */
-  readonly sets: number
+  readonly sets: number;
   /** What was prescribed, after the variant was applied. Never what was achieved. */
-  readonly targetValue: number
+  readonly targetValue: number;
   /**
    * What the user actually did, per set, when they chose to say. Length ≤ `sets`.
    * ABSENT is the normal case and means "not logged", never "did nothing" —
@@ -159,7 +159,7 @@ export interface ExerciseRecord {
    * logged value reaches `prescribe()` the fixed schedule stops being fixed and
    * every number in corpus/wiki/progression-engine.md becomes a lie.
    */
-  readonly logged?: readonly number[]
+  readonly logged?: readonly number[];
 }
 
 export interface SessionResult {
@@ -179,30 +179,30 @@ export interface SessionResult {
    * never on the calendar, so a fortnight's gap and a night's sleep prescribe the
    * same next session; the calendar reports, it does not decide.
    */
-  readonly completedAt: IsoTimestamp
+  readonly completedAt: IsoTimestamp;
   /**
    * Which rotation slot this session was. Index into `ROTATION`, via `slotAt` —
    * both of which live in the client, because the rotation is programme content.
    * A bare integer is all that crosses the wire.
    */
-  readonly position: number
-  readonly variant: Variant
+  readonly position: number;
+  readonly variant: Variant;
   /** Empty on a cardio slot's own work — the daily block still records. */
-  readonly exercises: readonly ExerciseRecord[]
+  readonly exercises: readonly ExerciseRecord[];
 }
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
 export interface SyncSettings {
-  readonly baseUrl: string
+  readonly baseUrl: string;
   /** Write-only in the UI: masked and replaceable, never displayed. */
-  readonly secret: string
+  readonly secret: string;
 }
 
 export interface Settings {
   /** Result of navigator.storage.persist(). `null` = not yet requested. */
-  readonly persistGranted: boolean | null
-  readonly sync: SyncSettings | null
+  readonly persistGranted: boolean | null;
+  readonly sync: SyncSettings | null;
 }
 
 /**
@@ -231,14 +231,14 @@ export interface Settings {
  * indexed column: `schema_version` on every snapshot row. Two runtimes agreeing
  * on the current version is exactly what a shared contract is for.
  */
-export const CURRENT_SCHEMA_VERSION = 5
+export const CURRENT_SCHEMA_VERSION = 5;
 
 export interface StateDoc {
-  readonly schemaVersion: 5
+  readonly schemaVersion: 5;
   /** Keys the document. A password is accepted and discarded, never stored. */
-  readonly username: string
+  readonly username: string;
   /** Integer index into ROTATION. Advances on training, never on a date. */
-  readonly cyclePosition: number
+  readonly cyclePosition: number;
   /**
    * **The whole of the mutable state.** Rung index, target, name and cues are all
    * derived from these five integers by `client/src/domain/schedule.ts`.
@@ -253,9 +253,9 @@ export interface StateDoc {
    * of sessions actually trained: it is a position on the current ladder, and
    * the v4 → v5 step moved it so the position names the same exercise.
    */
-  readonly sessionsDone: Readonly<Record<Pattern, number>>
-  readonly history: readonly SessionResult[]
-  readonly settings: Settings
+  readonly sessionsDone: Readonly<Record<Pattern, number>>;
+  readonly history: readonly SessionResult[];
+  readonly settings: Settings;
 }
 
 // ─── Guards ─────────────────────────────────────────────────────────────────
@@ -269,9 +269,9 @@ export interface StateDoc {
  * over a union declared here is validation, not behaviour.
  */
 export function isPattern(value: unknown): value is Pattern {
-  return typeof value === 'string' && (PATTERNS as readonly string[]).includes(value)
+  return typeof value === "string" && (PATTERNS as readonly string[]).includes(value);
 }
 
 export function isVariant(value: unknown): value is Variant {
-  return typeof value === 'string' && (VARIANTS as readonly string[]).includes(value)
+  return typeof value === "string" && (VARIANTS as readonly string[]).includes(value);
 }

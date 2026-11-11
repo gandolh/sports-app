@@ -1,25 +1,25 @@
-import { useCallback, useRef, useState } from 'react'
-import type { PrescribedExercise, Prescription } from '../../domain/schedule.ts'
-import type { StateDoc } from '@sports-app/shared/types.ts'
-import { useCountdown } from '../../session/timer.ts'
-import { useSession } from '../../session/useSession.ts'
-import type { PlayerPosition, SessionView } from '../../session/useSession.ts'
-import { ExerciseFigure } from '../ExerciseFigure.tsx'
-import { useCompleteSession } from '../document.ts'
-import type { SessionLogs } from '../document.ts'
-import { AlertBanner } from './AlertBanner.tsx'
-import { PrimaryButton, QuietButton, SecondaryButton } from './Buttons.tsx'
-import { Comparison } from './Comparison.tsx'
-import { CountdownRing } from './CountdownRing.tsx'
-import { CueList, SafetyCue } from './Cues.tsx'
-import { Dots } from './Dots.tsx'
-import { HonestNote, PosturalNote } from './HonestNote.tsx'
-import { LogControls } from './LogControls.tsx'
-import { Eyebrow, Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from './Shell.tsx'
-import { StopRule } from './StopRule.tsx'
-import { ExitIcon } from './icons.tsx'
-import { lastRecordFor, sanitiseLog } from './history.ts'
-import { rungSummary, targetLabel, unitWord } from './format.ts'
+import { useCallback, useRef, useState } from "react";
+import type { PrescribedExercise, Prescription } from "../../domain/schedule.ts";
+import type { StateDoc } from "@sports-app/shared/types.ts";
+import { useCountdown } from "../../session/timer.ts";
+import { useSession } from "../../session/useSession.ts";
+import type { PlayerPosition, SessionView } from "../../session/useSession.ts";
+import { ExerciseFigure } from "../ExerciseFigure.tsx";
+import { useCompleteSession } from "../document.ts";
+import type { SessionLogs } from "../document.ts";
+import { AlertBanner } from "./AlertBanner.tsx";
+import { PrimaryButton, QuietButton, SecondaryButton } from "./Buttons.tsx";
+import { Comparison } from "./Comparison.tsx";
+import { CountdownRing } from "./CountdownRing.tsx";
+import { CueList, SafetyCue } from "./Cues.tsx";
+import { Dots } from "./Dots.tsx";
+import { HonestNote, PosturalNote } from "./HonestNote.tsx";
+import { LogControls } from "./LogControls.tsx";
+import { Eyebrow, Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from "./Shell.tsx";
+import { StopRule } from "./StopRule.tsx";
+import { ExitIcon } from "./icons.tsx";
+import { lastRecordFor, sanitiseLog } from "./history.ts";
+import { rungSummary, targetLabel, unitWord } from "./format.ts";
 
 /**
  * The player: one page per exercise, and the heart of the app.
@@ -72,20 +72,20 @@ import { rungSummary, targetLabel, unitWord } from './format.ts'
  */
 
 export interface PlayerProps {
-  readonly doc: StateDoc
-  readonly username: string
-  readonly prescription: Prescription
-  readonly rawPosition: Partial<PlayerPosition>
+  readonly doc: StateDoc;
+  readonly username: string;
+  readonly prescription: Prescription;
+  readonly rawPosition: Partial<PlayerPosition>;
   /** `store.readOnlyReason`, verbatim, when the store will refuse to write. */
-  readonly readOnly: string | null
-  readonly onMove: (position: PlayerPosition) => void
-  readonly onFinished: () => void
+  readonly readOnly: string | null;
+  readonly onMove: (position: PlayerPosition) => void;
+  readonly onFinished: () => void;
   /** Leave without recording. Nothing was measured, so nothing is lost. */
-  readonly onStop: () => void
+  readonly onStop: () => void;
 }
 
 export function Player(props: PlayerProps) {
-  const view = useSession(props.prescription, props.rawPosition)
+  const view = useSession(props.prescription, props.rawPosition);
   // A prescription with no items is not producible by any rotation slot; handled
   // rather than asserted, because the alternative is a thrown error on the one
   // screen that matters.
@@ -94,17 +94,15 @@ export function Player(props: PlayerProps) {
       <Shell>
         <ShellRail>Session</ShellRail>
         <ShellBody>
-          <p className="text-body text-tx2">
-            This session has nothing in it. Go back and start again.
-          </p>
+          <p className="text-body text-tx2">This session has nothing in it. Go back and start again.</p>
         </ShellBody>
         <ShellFooter>
           <PrimaryButton onClick={props.onStop}>Back</PrimaryButton>
         </ShellFooter>
       </Shell>
-    )
+    );
   }
-  return <PlayerPage {...props} view={view} />
+  return <PlayerPage {...props} view={view} />;
 }
 
 /**
@@ -115,7 +113,7 @@ export function Player(props: PlayerProps) {
  * so set 2 can carry a value while set 1 does not. `finishLogs` below is where
  * the holes are resolved.
  */
-type ItemLogs = ReadonlyMap<number, readonly (number | null)[]>
+type ItemLogs = ReadonlyMap<number, readonly (number | null)[]>;
 
 /**
  * Collapse the in-memory logs into what the codec will store.
@@ -139,15 +137,15 @@ type ItemLogs = ReadonlyMap<number, readonly (number | null)[]>
  * and blocks the entire app behind the corrupt-document screen.
  */
 function finishLogs(logs: ItemLogs, prescription: Prescription): SessionLogs {
-  const out = new Map<number, readonly number[]>()
+  const out = new Map<number, readonly number[]>();
   for (const [itemIndex, sets] of logs) {
-    const item = prescription.items[itemIndex]
-    if (item === undefined || item.type !== 'exercise') continue
-    const values = sets.filter((value): value is number => value !== null)
-    if (values.length === 0) continue
-    out.set(itemIndex, sanitiseLog(values, item.sets))
+    const item = prescription.items[itemIndex];
+    if (item === undefined || item.type !== "exercise") continue;
+    const values = sets.filter((value): value is number => value !== null);
+    if (values.length === 0) continue;
+    out.set(itemIndex, sanitiseLog(values, item.sets));
   }
-  return out
+  return out;
 }
 
 function PlayerPage({
@@ -160,46 +158,43 @@ function PlayerPage({
   onFinished,
   onStop,
 }: PlayerProps & { readonly view: SessionView }) {
-  const complete = useCompleteSession(username)
+  const complete = useCompleteSession(username);
   // Two taps inside the same microtask would otherwise record the session twice
   // and advance every counter by two. Not a `disabled` — the button stays live;
   // the second tap is simply ignored.
-  const recorded = useRef(false)
-  const [logs, setLogs] = useState<ItemLogs>(() => new Map())
+  const recorded = useRef(false);
+  const [logs, setLogs] = useState<ItemLogs>(() => new Map());
 
-  const { item, position, dotCount, secondsOnTheClock } = view
-  const countdown = useCountdown(
-    secondsOnTheClock ?? 0,
-    `${position.itemIndex}:${position.dotsFilled}`,
-  )
+  const { item, position, dotCount, secondsOnTheClock } = view;
+  const countdown = useCountdown(secondsOnTheClock ?? 0, `${position.itemIndex}:${position.dotsFilled}`);
 
-  const finishing = view.nextPosition === 'finished'
-  const cardio = item.type === 'cardio'
+  const finishing = view.nextPosition === "finished";
+  const cardio = item.type === "cardio";
 
   const setLog = useCallback(
     (value: number | null) => {
       setLogs((previous) => {
-        const next = new Map(previous)
-        const sets = [...(next.get(position.itemIndex) ?? [])]
+        const next = new Map(previous);
+        const sets = [...(next.get(position.itemIndex) ?? [])];
         // The array is grown to the set being logged rather than pre-filled, so
         // its length is always "how far the user has logged to" and never a
         // claim about sets that have not happened.
-        while (sets.length <= position.dotsFilled) sets.push(null)
-        sets[position.dotsFilled] = value
-        next.set(position.itemIndex, sets)
-        return next
-      })
+        while (sets.length <= position.dotsFilled) sets.push(null);
+        sets[position.dotsFilled] = value;
+        next.set(position.itemIndex, sets);
+        return next;
+      });
     },
     [position.itemIndex, position.dotsFilled],
-  )
+  );
 
   function next(): void {
-    if (view.nextPosition !== 'finished') {
-      onMove(view.nextPosition)
-      return
+    if (view.nextPosition !== "finished") {
+      onMove(view.nextPosition);
+      return;
     }
-    if (recorded.current) return
-    recorded.current = true
+    if (recorded.current) return;
+    recorded.current = true;
     complete.mutate(
       { doc, prescription, logs: finishLogs(logs, prescription) },
       {
@@ -207,18 +202,18 @@ function PlayerPage({
         // A refused local save means the store is read-only. Let them try again
         // rather than swallowing it: the banner carries the store's own words.
         onError: () => {
-          recorded.current = false
+          recorded.current = false;
         },
       },
-    )
+    );
   }
 
-  const cues = cardio ? item.protocol.cues : item.rung.cues
-  const safety = !cardio && item.rung.safetyCritical === true ? cues[0] : undefined
-  const listedCues = safety === undefined ? cues : cues.slice(1)
+  const cues = cardio ? item.protocol.cues : item.rung.cues;
+  const safety = !cardio && item.rung.safetyCritical === true ? cues[0] : undefined;
+  const listedCues = safety === undefined ? cues : cues.slice(1);
 
-  const loggedHere = logs.get(position.itemIndex)?.[position.dotsFilled] ?? null
-  const previous = cardio ? null : lastRecordFor(doc.history, item.pattern)
+  const loggedHere = logs.get(position.itemIndex)?.[position.dotsFilled] ?? null;
+  const previous = cardio ? null : lastRecordFor(doc.history, item.pattern);
 
   return (
     <Shell>
@@ -258,9 +253,7 @@ function PlayerPage({
 
       <ShellBody>
         {readOnly === null ? null : <AlertBanner label="Read-only" text={readOnly} />}
-        {complete.error === null ? null : (
-          <AlertBanner label="Not saved" text={complete.error.message} />
-        )}
+        {complete.error === null ? null : <AlertBanner label="Not saved" text={complete.error.message} />}
 
         {cardio ? null : (
           <div className="mt-[var(--sp-2)] grid place-items-center rounded-lg border border-line bg-s1 py-[var(--sp-2)]">
@@ -275,7 +268,7 @@ function PlayerPage({
             is the only element in the app that outranks the number. */}
         {safety === undefined ? null : <SafetyCue text={safety} />}
 
-        {item.type === 'exercise' && item.unit === 'reps' ? (
+        {item.type === "exercise" && item.unit === "reps" ? (
           <RepTarget item={item} />
         ) : (
           <>
@@ -283,21 +276,17 @@ function PlayerPage({
               total={secondsOnTheClock ?? 0}
               remaining={countdown.remaining}
               started={countdown.running || countdown.finished}
-              label={
-                cardio
-                  ? `${secondsOnTheClock} second hard round`
-                  : `${secondsOnTheClock} second hold`
-              }
+              label={cardio ? `${secondsOnTheClock} second hard round` : `${secondsOnTheClock} second hold`}
             >
               <span className="block text-mono leading-none font-extrabold tracking-[var(--ls-hero)] tabular-nums">
                 {countdown.remaining}
               </span>
-              <Eyebrow>{unitWord('seconds', countdown.remaining)}</Eyebrow>
+              <Eyebrow>{unitWord("seconds", countdown.remaining)}</Eyebrow>
             </CountdownRing>
             <div className="mt-[var(--sp-3)]">
               <SecondaryButton onClick={countdown.running ? countdown.reset : countdown.start}>
                 {countdown.running
-                  ? 'Stop the clock'
+                  ? "Stop the clock"
                   : countdown.finished
                     ? `Run ${secondsOnTheClock}s again`
                     : `Start ${secondsOnTheClock}s`}
@@ -310,11 +299,7 @@ function PlayerPage({
         )}
 
         <div className="mt-[var(--sp-4)]">
-          <Dots
-            filled={position.dotsFilled}
-            total={dotCount}
-            noun={cardio ? 'rounds' : 'sets'}
-          />
+          <Dots filled={position.dotsFilled} total={dotCount} noun={cardio ? "rounds" : "sets"} />
         </div>
 
         {/* Above the cues AND above the comparison strip, which is a change made
@@ -335,7 +320,7 @@ function PlayerPage({
             because the exercise needs it. */}
         {cardio ? null : <StopRule text={item.rung.stopRule} />}
 
-        {cardio || item.type !== 'exercise' ? null : (
+        {cardio || item.type !== "exercise" ? null : (
           <Comparison
             unit={item.unit}
             lastTarget={previous?.targetValue ?? null}
@@ -346,10 +331,8 @@ function PlayerPage({
 
         <CueList cues={listedCues} />
 
-        {!cardio && item.ladderKind === 'postural' ? <PosturalNote /> : null}
-        {cardio ? (
-          <HonestNote label="What this dose reaches">{item.protocol.notice}</HonestNote>
-        ) : null}
+        {!cardio && item.ladderKind === "postural" ? <PosturalNote /> : null}
+        {cardio ? <HonestNote label="What this dose reaches">{item.protocol.notice}</HonestNote> : null}
       </ShellBody>
 
       <ShellFooter
@@ -369,22 +352,17 @@ function PlayerPage({
               <p className="text-center text-label text-tx3">
                 Log the set, or just tap next — nothing here is required.
               </p>
-              <LogControls
-                target={item.targetValue}
-                unit={item.unit}
-                logged={loggedHere}
-                onLog={setLog}
-              />
+              <LogControls target={item.targetValue} unit={item.unit} logged={loggedHere} onLog={setLog} />
             </>
           )
         }
       >
         <PrimaryButton tone="flat" data-testid="next" onClick={next}>
-          {finishing ? 'Finish' : cardio ? 'Next round' : 'Next set'}
+          {finishing ? "Finish" : cardio ? "Next round" : "Next set"}
         </PrimaryButton>
       </ShellFooter>
     </Shell>
-  )
+  );
 }
 
 /** A rep target has no clock, so it is the numeral alone. */
@@ -404,5 +382,5 @@ function RepTarget({ item }: { readonly item: PrescribedExercise }) {
           quantity. This is the same number as a sentence. */}
       <span className="sr-only">{targetLabel(item)}</span>
     </div>
-  )
+  );
 }

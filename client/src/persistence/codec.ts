@@ -110,28 +110,17 @@ import type {
   StateDoc,
   SyncSettings,
   Variant,
-} from '@sports-app/shared/types.ts'
-import {
-  CURRENT_SCHEMA_VERSION,
-  PATTERNS,
-  VARIANTS,
-  isPattern,
-  isVariant,
-} from '@sports-app/shared/types.ts'
-import {
-  LEGACY_USERNAME,
-  USERNAME_RULE,
-  isValidUsername,
-} from '@sports-app/shared/username.ts'
+} from "@sports-app/shared/types.ts";
+import { CURRENT_SCHEMA_VERSION, PATTERNS, VARIANTS, isPattern, isVariant } from "@sports-app/shared/types.ts";
+import { LEGACY_USERNAME, USERNAME_RULE, isValidUsername } from "@sports-app/shared/username.ts";
 // `ROTATION` is programme content, so it stays in the client — the v2→v3
 // migration needs its length to turn a session's index into a slot position.
-import { ROTATION } from '../domain/types.ts'
+import { ROTATION } from "../domain/types.ts";
 
 // ─── Public surface ─────────────────────────────────────────────────────────
 
 export type ParseResult =
-  | { readonly ok: true; readonly doc: StateDoc }
-  | { readonly ok: false; readonly error: string }
+  { readonly ok: true; readonly doc: StateDoc } | { readonly ok: false; readonly error: string };
 
 export interface ParseOptions {
   /**
@@ -142,23 +131,16 @@ export interface ParseOptions {
    * that chose the storage key knows which user it *meant* to read, so that
    * comparison lives in `store.load`.
    */
-  readonly username?: string | undefined
+  readonly username?: string | undefined;
 }
 
 /** More than this many problems and the list stops being useful. */
-const MAX_REPORTED_PROBLEMS = 20
+const MAX_REPORTED_PROBLEMS = 20;
 
 /** Loose ISO-8601 instant check. Exactness is not the point; NaN dates are. */
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/;
 
-const TOP_LEVEL_KEYS = [
-  'schemaVersion',
-  'username',
-  'cyclePosition',
-  'sessionsDone',
-  'settings',
-  'history',
-] as const
+const TOP_LEVEL_KEYS = ["schemaVersion", "username", "cyclePosition", "sessionsDone", "settings", "history"] as const;
 
 /**
  * No `soundEnabled`, `voiceEnabled` or `skipWarmupByDefault`. Audio and the
@@ -166,11 +148,11 @@ const TOP_LEVEL_KEYS = [
  * *before* validation runs — so by the time `checkKeys` sees one it is a
  * hand-typed key and correctly reported as unknown.
  */
-const SETTINGS_KEYS = ['persistGranted', 'sync'] as const
+const SETTINGS_KEYS = ["persistGranted", "sync"] as const;
 
-const SYNC_KEYS = ['baseUrl', 'secret'] as const
+const SYNC_KEYS = ["baseUrl", "secret"] as const;
 
-const SESSION_KEYS = ['completedAt', 'position', 'variant', 'exercises'] as const
+const SESSION_KEYS = ["completedAt", "position", "variant", "exercises"] as const;
 
 /**
  * No `effort` (v1) and no per-set array (v2). `sets` is still a count in v4,
@@ -180,7 +162,7 @@ const SESSION_KEYS = ['completedAt', 'position', 'variant', 'exercises'] as cons
  * here so `checkKeys` allows it; whether it is *present* is decided in
  * `validateExercise`, and absent is the normal case.
  */
-const EXERCISE_KEYS = ['pattern', 'rungId', 'sets', 'targetValue', 'logged'] as const
+const EXERCISE_KEYS = ["pattern", "rungId", "sets", "targetValue", "logged"] as const;
 
 // ─── Usernames ──────────────────────────────────────────────────────────────
 //
@@ -214,8 +196,8 @@ const EXERCISE_KEYS = ['pattern', 'rungId', 'sets', 'targetValue', 'logged'] as 
  * `store.save` runs it before anything reaches storage.
  */
 export function emptyDoc(username: string): StateDoc {
-  const sessionsDone = {} as Record<Pattern, number>
-  for (const pattern of PATTERNS) sessionsDone[pattern] = 0
+  const sessionsDone = {} as Record<Pattern, number>;
+  for (const pattern of PATTERNS) sessionsDone[pattern] = 0;
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     username,
@@ -227,18 +209,17 @@ export function emptyDoc(username: string): StateDoc {
       persistGranted: null,
       sync: null,
     },
-  }
+  };
 }
 
 // ─── Migration ──────────────────────────────────────────────────────────────
 
 export type MigrationResult =
-  | { readonly ok: true; readonly value: JsonObject }
-  | { readonly ok: false; readonly error: string }
+  { readonly ok: true; readonly value: JsonObject } | { readonly ok: false; readonly error: string };
 
 export interface MigrateOptions {
   /** Who a pre-v3 document belongs to. Defaults to `LEGACY_USERNAME`. */
-  readonly username?: string | undefined
+  readonly username?: string | undefined;
 }
 
 /**
@@ -249,7 +230,7 @@ export interface MigrateOptions {
  * there is exactly one validator, for the current shape, and each migration
  * only has to know how its own version differed.
  */
-type MigrationStep = (raw: JsonObject, options: MigrateOptions) => JsonObject
+type MigrationStep = (raw: JsonObject, options: MigrateOptions) => JsonObject;
 
 /**
  * v1 → v2: drop `ExerciseResult.effort`.
@@ -271,27 +252,27 @@ type MigrationStep = (raw: JsonObject, options: MigrateOptions) => JsonObject
  * place that decides the same thing.
  */
 function dropEffortFromExercises(raw: JsonObject): JsonObject {
-  const history = raw['history']
-  if (!Array.isArray(history)) return raw
+  const history = raw["history"];
+  if (!Array.isArray(history)) return raw;
 
   const migrated = history.map((session) => {
-    if (!isPlainObject(session)) return session
-    const exercises = session['exercises']
-    if (!Array.isArray(exercises)) return session
+    if (!isPlainObject(session)) return session;
+    const exercises = session["exercises"];
+    if (!Array.isArray(exercises)) return session;
     return {
       ...session,
       exercises: exercises.map((exercise) => {
-        if (!isPlainObject(exercise)) return exercise
-        if (!('effort' in exercise)) return exercise
+        if (!isPlainObject(exercise)) return exercise;
+        if (!("effort" in exercise)) return exercise;
         // Rebuilt without the key rather than deleted, because `exercise` is a
         // borrowed reference into the caller's parsed tree.
-        const { effort: _dropped, ...rest } = exercise
-        return rest
+        const { effort: _dropped, ...rest } = exercise;
+        return rest;
       }),
-    }
-  })
+    };
+  });
 
-  return { ...raw, history: migrated }
+  return { ...raw, history: migrated };
 }
 
 /**
@@ -350,11 +331,11 @@ function dropEffortFromExercises(raw: JsonObject): JsonObject {
  * through for the single validator to report.
  */
 function collapseAdaptiveState(raw: JsonObject, options: MigrateOptions): JsonObject {
-  const history = Array.isArray(raw['history']) ? raw['history'] : null
+  const history = Array.isArray(raw["history"]) ? raw["history"] : null;
 
   // `ladders` and `sessionsCompleted` are removed by omission: the first is the
   // adaptive state itself, the second is `history.length` in v3.
-  const { ladders: _ladders, sessionsCompleted: _sessionsCompleted, ...rest } = raw
+  const { ladders: _ladders, sessionsCompleted: _sessionsCompleted, ...rest } = raw;
 
   return {
     ...rest,
@@ -363,13 +344,11 @@ function collapseAdaptiveState(raw: JsonObject, options: MigrateOptions): JsonOb
     // rather than a repair of something the user meant. A v2 document written by
     // the app never has one — v2 had exactly one user, which is why the fallback
     // is "whoever is loading this".
-    username: isValidUsername(raw['username'])
-      ? raw['username']
-      : (options.username ?? LEGACY_USERNAME),
+    username: isValidUsername(raw["username"]) ? raw["username"] : (options.username ?? LEGACY_USERNAME),
     sessionsDone: countSessionsPerPattern(history),
-    settings: dropRetiredSettings(raw['settings']),
-    history: history === null ? raw['history'] : history.map(migrateSession),
-  }
+    settings: dropRetiredSettings(raw["settings"]),
+    history: history === null ? raw["history"] : history.map(migrateSession),
+  };
 }
 
 /**
@@ -381,58 +360,58 @@ function collapseAdaptiveState(raw: JsonObject, options: MigrateOptions): JsonOb
  * ladder for free.
  */
 function countSessionsPerPattern(history: readonly unknown[] | null): Record<Pattern, number> {
-  const counts = {} as Record<Pattern, number>
-  for (const pattern of PATTERNS) counts[pattern] = 0
-  if (history === null) return counts
+  const counts = {} as Record<Pattern, number>;
+  for (const pattern of PATTERNS) counts[pattern] = 0;
+  if (history === null) return counts;
 
   for (const session of history) {
-    if (!isPlainObject(session)) continue
-    const exercises = session['exercises']
-    if (!Array.isArray(exercises)) continue
-    const seen = new Set<Pattern>()
+    if (!isPlainObject(session)) continue;
+    const exercises = session["exercises"];
+    if (!Array.isArray(exercises)) continue;
+    const seen = new Set<Pattern>();
     for (const exercise of exercises) {
-      if (!isPlainObject(exercise)) continue
-      const pattern = exercise['pattern']
-      if (isPattern(pattern)) seen.add(pattern)
+      if (!isPlainObject(exercise)) continue;
+      const pattern = exercise["pattern"];
+      if (isPattern(pattern)) seen.add(pattern);
     }
-    for (const pattern of seen) counts[pattern] += 1
+    for (const pattern of seen) counts[pattern] += 1;
   }
-  return counts
+  return counts;
 }
 
 function migrateSession(session: unknown, index: number): unknown {
-  if (!isPlainObject(session)) return session
-  const { day: _day, ...rest } = session
-  const exercises = session['exercises']
+  if (!isPlainObject(session)) return session;
+  const { day: _day, ...rest } = session;
+  const exercises = session["exercises"];
   return {
     ...rest,
     // Display only. See the note about `day` above.
     position: index % ROTATION.length,
-    variant: isVariant(session['variant']) ? session['variant'] : 'medium',
+    variant: isVariant(session["variant"]) ? session["variant"] : "medium",
     exercises: Array.isArray(exercises) ? exercises.map(migrateExercise) : exercises,
-  }
+  };
 }
 
 function migrateExercise(exercise: unknown): unknown {
-  if (!isPlainObject(exercise)) return exercise
-  const sets = exercise['sets']
+  if (!isPlainObject(exercise)) return exercise;
+  const sets = exercise["sets"];
   // Not an array means this is not the v2 shape. Pass it through so the validator
   // reports what it actually is, rather than guessing a count.
-  if (!Array.isArray(sets)) return exercise
+  if (!Array.isArray(sets)) return exercise;
 
-  const { sets: _sets, ...rest } = exercise
+  const { sets: _sets, ...rest } = exercise;
   // Every set of one v2 exercise carried the same `targetValue` — the engine
   // prescribed one target per exercise and repeated it — so the first set's value
   // *is* the exercise's target. When it is missing the field is left out
   // entirely, so the validator says `targetValue: missing` instead of inventing 0.
-  const first = sets[0]
-  const targetValue = isPlainObject(first) ? first['targetValue'] : undefined
+  const first = sets[0];
+  const targetValue = isPlainObject(first) ? first["targetValue"] : undefined;
 
   return {
     ...rest,
     sets: sets.length,
     ...(targetValue === undefined ? {} : { targetValue }),
-  }
+  };
 }
 
 /**
@@ -466,7 +445,7 @@ function migrateExercise(exercise: unknown): unknown {
  * delete something a person typed on purpose.
  */
 function adoptLogging(raw: JsonObject): JsonObject {
-  return raw
+  return raw;
 }
 
 /**
@@ -483,21 +462,21 @@ function adoptLogging(raw: JsonObject): JsonObject {
  * against the live ladders, rung id by rung id.
  */
 interface V4Insertion {
-  readonly startRungIndex: number
-  readonly insertedAt: number
-  readonly sessionsPerRung: number
+  readonly startRungIndex: number;
+  readonly insertedAt: number;
+  readonly sessionsPerRung: number;
 }
 
 const V4_TO_V5_INSERTIONS: ReadonlyMap<Pattern, V4Insertion> = new Map<Pattern, V4Insertion>([
   // `push-03a-3s-down-knee-press`, between `push-03-knees` and `push-04-full`.
-  ['push', { startRungIndex: 2, insertedAt: 3, sessionsPerRung: 14 }],
+  ["push", { startRungIndex: 2, insertedAt: 3, sessionsPerRung: 14 }],
   // `hinge-04a-sliding-curl-half-range`, between `hinge-04-single-leg-heel-far`
   // and `hinge-05-sliding-leg-curl`.
-  ['hinge', { startRungIndex: 1, insertedAt: 4, sessionsPerRung: 14 }],
+  ["hinge", { startRungIndex: 1, insertedAt: 4, sessionsPerRung: 14 }],
   // `squat-05a-split-hand-on-wall`, between `squat-05-heels-elevated` and
   // `squat-06-split`.
-  ['squat', { startRungIndex: 1, insertedAt: 5, sessionsPerRung: 14 }],
-])
+  ["squat", { startRungIndex: 1, insertedAt: 5, sessionsPerRung: 14 }],
+]);
 
 /**
  * v4 → v5: the in-between rungs inserted a rung into the push, hinge and squat ladders, and
@@ -533,37 +512,32 @@ const V4_TO_V5_INSERTIONS: ReadonlyMap<Pattern, V4Insertion> = new Map<Pattern, 
  * validator to report.
  */
 function keepPlaceAcrossInsertedRungs(raw: JsonObject): JsonObject {
-  const counters = raw['sessionsDone']
-  if (!isPlainObject(counters)) return raw
+  const counters = raw["sessionsDone"];
+  if (!isPlainObject(counters)) return raw;
 
-  const moved: Record<string, unknown> = { ...counters }
-  let changed = false
+  const moved: Record<string, unknown> = { ...counters };
+  let changed = false;
   for (const [pattern, insertion] of V4_TO_V5_INSERTIONS) {
-    const count = counters[pattern]
-    if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) continue
-    const v4Index = insertion.startRungIndex + Math.floor(count / insertion.sessionsPerRung)
+    const count = counters[pattern];
+    if (typeof count !== "number" || !Number.isInteger(count) || count < 0) continue;
+    const v4Index = insertion.startRungIndex + Math.floor(count / insertion.sessionsPerRung);
     // The v4 top clamp is not needed here: every v4 ladder's top index was at
     // or above its `insertedAt`, so clamping could never move an index from
     // above k to below it.
     if (v4Index >= insertion.insertedAt) {
-      moved[pattern] = count + insertion.sessionsPerRung
-      changed = true
+      moved[pattern] = count + insertion.sessionsPerRung;
+      changed = true;
     }
   }
   // The same object back when nothing moved, so a document below every
   // insertion visibly passes through untouched.
-  return changed ? { ...raw, sessionsDone: moved } : raw
+  return changed ? { ...raw, sessionsDone: moved } : raw;
 }
 
 function dropRetiredSettings(value: unknown): unknown {
-  if (!isPlainObject(value)) return value
-  const {
-    soundEnabled: _sound,
-    voiceEnabled: _voice,
-    skipWarmupByDefault: _skipWarmup,
-    ...rest
-  } = value
-  return rest
+  if (!isPlainObject(value)) return value;
+  const { soundEnabled: _sound, voiceEnabled: _voice, skipWarmupByDefault: _skipWarmup, ...rest } = value;
+  return rest;
 }
 
 /**
@@ -583,7 +557,7 @@ const MIGRATIONS: ReadonlyMap<number, MigrationStep> = new Map<number, Migration
   [2, collapseAdaptiveState],
   [3, adoptLogging],
   [4, keepPlaceAcrossInsertedRungs],
-])
+]);
 
 /**
  * Applies every step from `fromVersion` up to the current one. Never throws.
@@ -592,16 +566,12 @@ const MIGRATIONS: ReadonlyMap<number, MigrationStep> = new Map<number, Migration
  * steps in order, so each step only has to know how its own version differed from
  * the next. A direct v1→v3 shortcut would be a third thing to keep correct.
  */
-export function migrate(
-  raw: JsonObject,
-  fromVersion: number,
-  options: MigrateOptions = {},
-): MigrationResult {
-  let current = raw
-  let version = fromVersion
+export function migrate(raw: JsonObject, fromVersion: number, options: MigrateOptions = {}): MigrationResult {
+  let current = raw;
+  let version = fromVersion;
 
   while (version < CURRENT_SCHEMA_VERSION) {
-    const step = MIGRATIONS.get(version)
+    const step = MIGRATIONS.get(version);
     if (!step) {
       return {
         ok: false,
@@ -609,20 +579,20 @@ export function migrate(
           `schemaVersion: no migration from version ${version} to ` +
           `${CURRENT_SCHEMA_VERSION}. This document was written by a build ` +
           `whose format this one no longer understands.`,
-      }
+      };
     }
     try {
-      current = step(current, options)
+      current = step(current, options);
     } catch (cause) {
       return {
         ok: false,
         error: `schemaVersion: migration from version ${version} failed: ${messageOf(cause)}`,
-      }
+      };
     }
-    version += 1
+    version += 1;
   }
 
-  return { ok: true, value: current }
+  return { ok: true, value: current };
 }
 
 // ─── parse ──────────────────────────────────────────────────────────────────
@@ -634,41 +604,41 @@ export function migrate(
  * every problem is prefixed with the JSON path that has it.
  */
 export function parse(text: unknown, options: ParseOptions = {}): ParseResult {
-  if (typeof text !== 'string') {
-    return { ok: false, error: `expected the document as text, got ${describe(text)}` }
+  if (typeof text !== "string") {
+    return { ok: false, error: `expected the document as text, got ${describe(text)}` };
   }
-  if (text.trim() === '') {
-    return { ok: false, error: 'the document is empty' }
+  if (text.trim() === "") {
+    return { ok: false, error: "the document is empty" };
   }
 
-  let raw: unknown
+  let raw: unknown;
   try {
-    raw = JSON.parse(text)
+    raw = JSON.parse(text);
   } catch (cause) {
     // The native message carries a character offset, which is the single most
     // useful thing to hand back after a bad hand-edit (a stray comma, usually).
-    return { ok: false, error: `not valid JSON — ${messageOf(cause)}` }
+    return { ok: false, error: `not valid JSON — ${messageOf(cause)}` };
   }
 
   if (!isPlainObject(raw)) {
     return {
       ok: false,
       error: `the document must be a JSON object, got ${describe(raw)}`,
-    }
+    };
   }
 
   // schemaVersion is read before anything else: a document from a future build
   // must be refused rather than misread, and one from a past build must be
   // migrated before it is measured against the current shape.
-  const version = raw['schemaVersion']
-  if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+  const version = raw["schemaVersion"];
+  if (typeof version !== "number" || !Number.isInteger(version) || version < 1) {
     return {
       ok: false,
       error:
         `schemaVersion: expected a whole number >= 1, got ${describe(version)}. ` +
         `Every state document carries a schemaVersion; a file without one is ` +
         `probably not a state document at all.`,
-    }
+    };
   }
   if (version > CURRENT_SCHEMA_VERSION) {
     return {
@@ -677,19 +647,19 @@ export function parse(text: unknown, options: ParseOptions = {}): ParseResult {
         `schemaVersion: this document is version ${version} but this build ` +
         `understands up to ${CURRENT_SCHEMA_VERSION}. It was written by a newer ` +
         `version of the app — update the app rather than editing the file down.`,
-    }
+    };
   }
 
-  const migrated = migrate(raw, version, { username: options.username })
-  if (!migrated.ok) return { ok: false, error: migrated.error }
+  const migrated = migrate(raw, version, { username: options.username });
+  if (!migrated.ok) return { ok: false, error: migrated.error };
 
-  const ctx: Ctx = { problems: [] }
-  const doc = validateDoc(ctx, migrated.value)
+  const ctx: Ctx = { problems: [] };
+  const doc = validateDoc(ctx, migrated.value);
 
   if (ctx.problems.length > 0 || !doc) {
-    return { ok: false, error: formatProblems(ctx.problems) }
+    return { ok: false, error: formatProblems(ctx.problems) };
   }
-  return { ok: true, doc }
+  return { ok: true, doc };
 }
 
 // ─── serialise ──────────────────────────────────────────────────────────────
@@ -705,97 +675,97 @@ export function parse(text: unknown, options: ParseOptions = {}): ParseResult {
  * `sessionsDone` is one you can actually fix something in.
  */
 export function serialise(doc: StateDoc): string {
-  const out: string[] = []
+  const out: string[] = [];
 
-  out.push('{')
-  out.push(`  ${key('schemaVersion')}${num(doc.schemaVersion)},`)
-  out.push(`  ${key('username')}${str(doc.username)},`)
-  out.push(`  ${key('cyclePosition')}${num(doc.cyclePosition)},`)
-  out.push('')
+  out.push("{");
+  out.push(`  ${key("schemaVersion")}${num(doc.schemaVersion)},`);
+  out.push(`  ${key("username")}${str(doc.username)},`);
+  out.push(`  ${key("cyclePosition")}${num(doc.cyclePosition)},`);
+  out.push("");
 
   // PATTERNS, not Object.keys — key order must not depend on how the object
   // happened to be built. One line: this is the entire mutable state, and seeing
   // all five numbers at once is the point.
-  const counters = PATTERNS.map((pattern) => `${key(pattern)}${num(doc.sessionsDone[pattern])}`)
-  out.push(`  ${key('sessionsDone')}{ ${counters.join(', ')} },`)
-  out.push('')
+  const counters = PATTERNS.map((pattern) => `${key(pattern)}${num(doc.sessionsDone[pattern])}`);
+  out.push(`  ${key("sessionsDone")}{ ${counters.join(", ")} },`);
+  out.push("");
 
-  out.push(`  ${key('settings')}{`)
+  out.push(`  ${key("settings")}{`);
   out.push(
-    `    ${key('persistGranted')}${doc.settings.persistGranted === null ? 'null' : bool(doc.settings.persistGranted)},`,
-  )
-  const sync = doc.settings.sync
+    `    ${key("persistGranted")}${doc.settings.persistGranted === null ? "null" : bool(doc.settings.persistGranted)},`,
+  );
+  const sync = doc.settings.sync;
   if (sync === null) {
-    out.push(`    ${key('sync')}null`)
+    out.push(`    ${key("sync")}null`);
   } else {
-    out.push(`    ${key('sync')}{`)
-    out.push(`      ${key('baseUrl')}${str(sync.baseUrl)},`)
-    out.push(`      ${key('secret')}${str(sync.secret)}`)
-    out.push('    }')
+    out.push(`    ${key("sync")}{`);
+    out.push(`      ${key("baseUrl")}${str(sync.baseUrl)},`);
+    out.push(`      ${key("secret")}${str(sync.secret)}`);
+    out.push("    }");
   }
-  out.push('  },')
-  out.push('')
+  out.push("  },");
+  out.push("");
 
   if (doc.history.length === 0) {
-    out.push(`  ${key('history')}[]`)
+    out.push(`  ${key("history")}[]`);
   } else {
-    out.push(`  ${key('history')}[`)
+    out.push(`  ${key("history")}[`);
     doc.history.forEach((session, si) => {
-      const sessionComma = si === doc.history.length - 1 ? '' : ','
-      out.push('    {')
-      out.push(`      ${key('completedAt')}${str(session.completedAt)},`)
-      out.push(`      ${key('position')}${num(session.position)},`)
-      out.push(`      ${key('variant')}${str(session.variant)},`)
+      const sessionComma = si === doc.history.length - 1 ? "" : ",";
+      out.push("    {");
+      out.push(`      ${key("completedAt")}${str(session.completedAt)},`);
+      out.push(`      ${key("position")}${num(session.position)},`);
+      out.push(`      ${key("variant")}${str(session.variant)},`);
       if (session.exercises.length === 0) {
         // A cardio slot records no exercises of its own; the daily block still
         // records, so a genuinely empty list only happens on a hand-edit.
-        out.push(`      ${key('exercises')}[]`)
+        out.push(`      ${key("exercises")}[]`);
       } else {
-        out.push(`      ${key('exercises')}[`)
+        out.push(`      ${key("exercises")}[`);
         session.exercises.forEach((exercise, ei) => {
-          const comma = ei === session.exercises.length - 1 ? '' : ','
+          const comma = ei === session.exercises.length - 1 ? "" : ",";
           // One line per exercise. In v4 a record is four scalars and at most a
           // short array, so a session is four lines plus its exercises and a year
           // of history stays scannable in an editor.
           const fields = [
-            `${key('pattern')}${str(exercise.pattern)}`,
-            `${key('rungId')}${str(exercise.rungId)}`,
-            `${key('sets')}${num(exercise.sets)}`,
-            `${key('targetValue')}${num(exercise.targetValue)}`,
-          ]
+            `${key("pattern")}${str(exercise.pattern)}`,
+            `${key("rungId")}${str(exercise.rungId)}`,
+            `${key("sets")}${num(exercise.sets)}`,
+            `${key("targetValue")}${num(exercise.targetValue)}`,
+          ];
           // Written only when it is there. Absent means "not logged" and `[]` means
           // "logged nothing" — two different facts (`ExerciseRecord`), so emitting
           // an empty array for an absent field would invent an answer, and the
           // round trip would stop being one. Last on the line, after the whole
           // prescription, so the eye reads "asked for / got" left to right.
           if (exercise.logged !== undefined) {
-            fields.push(`${key('logged')}[${exercise.logged.map(num).join(', ')}]`)
+            fields.push(`${key("logged")}[${exercise.logged.map(num).join(", ")}]`);
           }
-          out.push(`        { ${fields.join(', ')} }${comma}`)
-        })
-        out.push('      ]')
+          out.push(`        { ${fields.join(", ")} }${comma}`);
+        });
+        out.push("      ]");
       }
-      out.push(`    }${sessionComma}`)
-    })
-    out.push('  ]')
+      out.push(`    }${sessionComma}`);
+    });
+    out.push("  ]");
   }
 
-  out.push('}')
+  out.push("}");
   // Trailing newline: this file is opened in text editors, and editors that add
   // one on save would otherwise show a spurious diff.
-  return out.join('\n') + '\n'
+  return out.join("\n") + "\n";
 }
 
 function key(name: string): string {
-  return `${JSON.stringify(name)}: `
+  return `${JSON.stringify(name)}: `;
 }
 
 function str(value: string): string {
-  return JSON.stringify(value)
+  return JSON.stringify(value);
 }
 
 function bool(value: boolean): string {
-  return value ? 'true' : 'false'
+  return value ? "true" : "false";
 }
 
 /**
@@ -805,20 +775,20 @@ function bool(value: boolean): string {
  * `NaN` session counter never reaches the live key.
  */
 function num(value: number): string {
-  return JSON.stringify(value) ?? 'null'
+  return JSON.stringify(value) ?? "null";
 }
 
 // ─── Validation internals ───────────────────────────────────────────────────
 
-export type JsonObject = { readonly [key: string]: unknown }
+export type JsonObject = { readonly [key: string]: unknown };
 
 interface Ctx {
-  readonly problems: string[]
+  readonly problems: string[];
 }
 
 function bad(ctx: Ctx, path: string, message: string): void {
   if (ctx.problems.length < MAX_REPORTED_PROBLEMS) {
-    ctx.problems.push(`${path}: ${message}`)
+    ctx.problems.push(`${path}: ${message}`);
   }
 }
 
@@ -826,123 +796,116 @@ function formatProblems(problems: readonly string[]): string {
   if (problems.length === 0) {
     // Defensive: validateDoc returning undefined without a recorded problem
     // would be a bug in this file, and a silent success would be much worse.
-    return 'the document could not be read, but no specific problem was recorded'
+    return "the document could not be read, but no specific problem was recorded";
   }
-  if (problems.length === 1) return problems[0] ?? ''
-  const shown = problems.map((p) => `  - ${p}`).join('\n')
-  const overflow =
-    problems.length >= MAX_REPORTED_PROBLEMS ? '\n  - (further problems not listed)' : ''
-  return `${problems.length} problems in the state document:\n${shown}${overflow}`
+  if (problems.length === 1) return problems[0] ?? "";
+  const shown = problems.map((p) => `  - ${p}`).join("\n");
+  const overflow = problems.length >= MAX_REPORTED_PROBLEMS ? "\n  - (further problems not listed)" : "";
+  return `${problems.length} problems in the state document:\n${shown}${overflow}`;
 }
 
 function isPlainObject(value: unknown): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** Human-readable rendering of an unexpected value, for error messages. */
 function describe(value: unknown): string {
-  if (value === undefined) return 'missing'
-  if (value === null) return 'null'
-  if (Array.isArray(value)) return `an array of ${value.length}`
-  if (typeof value === 'object') return 'an object'
-  if (typeof value === 'string') return JSON.stringify(truncate(value, 40))
-  return String(value)
+  if (value === undefined) return "missing";
+  if (value === null) return "null";
+  if (Array.isArray(value)) return `an array of ${value.length}`;
+  if (typeof value === "object") return "an object";
+  if (typeof value === "string") return JSON.stringify(truncate(value, 40));
+  return String(value);
 }
 
 function truncate(value: string, max: number): string {
-  return value.length <= max ? value : `${value.slice(0, max)}…`
+  return value.length <= max ? value : `${value.slice(0, max)}…`;
 }
 
 function messageOf(cause: unknown): string {
-  return cause instanceof Error ? cause.message : String(cause)
+  return cause instanceof Error ? cause.message : String(cause);
 }
 
 /** Rejects any unrecognised key that does not start with `_`. */
 function checkKeys(ctx: Ctx, path: string, obj: JsonObject, allowed: readonly string[]): void {
   for (const found of Object.keys(obj)) {
-    if (allowed.includes(found) || found.startsWith('_')) continue
-    const suggestion = allowed.find((a) => a.toLowerCase() === found.toLowerCase())
+    if (allowed.includes(found) || found.startsWith("_")) continue;
+    const suggestion = allowed.find((a) => a.toLowerCase() === found.toLowerCase());
     bad(
       ctx,
-      path === '' ? found : `${path}.${found}`,
+      path === "" ? found : `${path}.${found}`,
       suggestion
         ? `unknown field — did you mean "${suggestion}"?`
-        : `unknown field. Allowed here: ${allowed.join(', ')}. ` +
+        : `unknown field. Allowed here: ${allowed.join(", ")}. ` +
             `(Keys starting with "_" are ignored, if you wanted a note.)`,
-    )
+    );
   }
 }
 
 function objectAt(ctx: Ctx, path: string, value: unknown): JsonObject | undefined {
   if (!isPlainObject(value)) {
-    bad(ctx, path, `expected an object, got ${describe(value)}`)
-    return undefined
+    bad(ctx, path, `expected an object, got ${describe(value)}`);
+    return undefined;
   }
-  return value
+  return value;
 }
 
 function arrayAt(ctx: Ctx, path: string, value: unknown): readonly unknown[] | undefined {
   if (!Array.isArray(value)) {
-    bad(ctx, path, `expected an array, got ${describe(value)}`)
-    return undefined
+    bad(ctx, path, `expected an array, got ${describe(value)}`);
+    return undefined;
   }
-  return value
+  return value;
 }
 
 function intAt(ctx: Ctx, path: string, value: unknown, min: number): number | undefined {
-  if (typeof value !== 'number' || !Number.isInteger(value)) {
-    bad(ctx, path, `expected a whole number, got ${describe(value)}`)
-    return undefined
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    bad(ctx, path, `expected a whole number, got ${describe(value)}`);
+    return undefined;
   }
   if (value < min) {
-    bad(ctx, path, `expected a whole number >= ${min}, got ${value}`)
-    return undefined
+    bad(ctx, path, `expected a whole number >= ${min}, got ${value}`);
+    return undefined;
   }
-  return value
+  return value;
 }
 
 function finiteAt(ctx: Ctx, path: string, value: unknown, min: number): number | undefined {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    bad(ctx, path, `expected a number, got ${describe(value)}`)
-    return undefined
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    bad(ctx, path, `expected a number, got ${describe(value)}`);
+    return undefined;
   }
   if (value < min) {
-    bad(ctx, path, `expected a number >= ${min}, got ${value}`)
-    return undefined
+    bad(ctx, path, `expected a number >= ${min}, got ${value}`);
+    return undefined;
   }
-  return value
+  return value;
 }
 
 function stringAt(ctx: Ctx, path: string, value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    bad(ctx, path, `expected a string, got ${describe(value)}`)
-    return undefined
+  if (typeof value !== "string") {
+    bad(ctx, path, `expected a string, got ${describe(value)}`);
+    return undefined;
   }
-  return value
+  return value;
 }
 
 function validateDoc(ctx: Ctx, raw: JsonObject): StateDoc | undefined {
-  checkKeys(ctx, '', raw, TOP_LEVEL_KEYS)
+  checkKeys(ctx, "", raw, TOP_LEVEL_KEYS);
 
   // Already range-checked in `parse` before migration ran.
-  const schemaVersion = CURRENT_SCHEMA_VERSION
+  const schemaVersion = CURRENT_SCHEMA_VERSION;
 
-  const username = validateUsername(ctx, raw['username'])
-  const cyclePosition = intAt(ctx, 'cyclePosition', raw['cyclePosition'], 0)
-  const sessionsDone = validateSessionsDone(ctx, raw['sessionsDone'])
-  const settings = validateSettings(ctx, raw['settings'])
-  const history = validateHistory(ctx, raw['history'])
+  const username = validateUsername(ctx, raw["username"]);
+  const cyclePosition = intAt(ctx, "cyclePosition", raw["cyclePosition"], 0);
+  const sessionsDone = validateSessionsDone(ctx, raw["sessionsDone"]);
+  const settings = validateSettings(ctx, raw["settings"]);
+  const history = validateHistory(ctx, raw["history"]);
 
-  if (
-    username === undefined ||
-    cyclePosition === undefined ||
-    !sessionsDone ||
-    !settings ||
-    !history
-  ) {
-    return undefined
+  if (username === undefined || cyclePosition === undefined || !sessionsDone || !settings || !history) {
+    return undefined;
   }
-  return { schemaVersion, username, cyclePosition, sessionsDone, history, settings }
+  return { schemaVersion, username, cyclePosition, sessionsDone, history, settings };
 }
 
 /**
@@ -952,13 +915,13 @@ function validateDoc(ctx: Ctx, raw: JsonObject): StateDoc | undefined {
  * `@sports-app/shared/username.ts`.
  */
 function validateUsername(ctx: Ctx, value: unknown): string | undefined {
-  const text = stringAt(ctx, 'username', value)
-  if (text === undefined) return undefined
+  const text = stringAt(ctx, "username", value);
+  if (text === undefined) return undefined;
   if (!isValidUsername(text)) {
-    bad(ctx, 'username', `expected ${USERNAME_RULE}, got ${describe(value)}`)
-    return undefined
+    bad(ctx, "username", `expected ${USERNAME_RULE}, got ${describe(value)}`);
+    return undefined;
   }
-  return text
+  return text;
 }
 
 /**
@@ -975,150 +938,134 @@ function validateUsername(ctx: Ctx, value: unknown): string | undefined {
  * reason to accept it here. A precise message about a negative counter, with the
  * file left untouched, beats silently training a wrong rung.
  */
-function validateSessionsDone(
-  ctx: Ctx,
-  value: unknown,
-): Readonly<Record<Pattern, number>> | undefined {
-  const obj = objectAt(ctx, 'sessionsDone', value)
-  if (!obj) return undefined
+function validateSessionsDone(ctx: Ctx, value: unknown): Readonly<Record<Pattern, number>> | undefined {
+  const obj = objectAt(ctx, "sessionsDone", value);
+  if (!obj) return undefined;
 
-  checkKeys(ctx, 'sessionsDone', obj, PATTERNS)
+  checkKeys(ctx, "sessionsDone", obj, PATTERNS);
 
-  const counts = {} as Record<Pattern, number>
-  let complete = true
+  const counts = {} as Record<Pattern, number>;
+  let complete = true;
 
   for (const pattern of PATTERNS) {
-    const path = `sessionsDone.${pattern}`
+    const path = `sessionsDone.${pattern}`;
     if (obj[pattern] === undefined) {
       bad(
         ctx,
         path,
-        `missing — all five counters (${PATTERNS.join(', ')}) must be present, ` +
+        `missing — all five counters (${PATTERNS.join(", ")}) must be present, ` +
           `even for a pattern you have never trained (use 0).`,
-      )
-      complete = false
-      continue
+      );
+      complete = false;
+      continue;
     }
-    const count = intAt(ctx, path, obj[pattern], 0)
+    const count = intAt(ctx, path, obj[pattern], 0);
     if (count === undefined) {
-      complete = false
-      continue
+      complete = false;
+      continue;
     }
-    counts[pattern] = count
+    counts[pattern] = count;
   }
 
-  return complete ? counts : undefined
+  return complete ? counts : undefined;
 }
 
 function validateSettings(ctx: Ctx, value: unknown): Settings | undefined {
-  const obj = objectAt(ctx, 'settings', value)
-  if (!obj) return undefined
-  checkKeys(ctx, 'settings', obj, SETTINGS_KEYS)
+  const obj = objectAt(ctx, "settings", value);
+  if (!obj) return undefined;
+  checkKeys(ctx, "settings", obj, SETTINGS_KEYS);
 
-  const rawPersist = obj['persistGranted']
-  let persistGranted: boolean | null | undefined
+  const rawPersist = obj["persistGranted"];
+  let persistGranted: boolean | null | undefined;
   if (rawPersist === null) {
-    persistGranted = null
-  } else if (typeof rawPersist === 'boolean') {
-    persistGranted = rawPersist
+    persistGranted = null;
+  } else if (typeof rawPersist === "boolean") {
+    persistGranted = rawPersist;
   } else {
     bad(
       ctx,
-      'settings.persistGranted',
+      "settings.persistGranted",
       `expected true, false, or null (meaning "not requested yet"), got ${describe(rawPersist)}`,
-    )
+    );
   }
 
-  const sync = validateSync(ctx, obj['sync'])
+  const sync = validateSync(ctx, obj["sync"]);
 
-  if (persistGranted === undefined || sync === undefined) return undefined
-  return { persistGranted, sync }
+  if (persistGranted === undefined || sync === undefined) return undefined;
+  return { persistGranted, sync };
 }
 
 /** `undefined` means invalid; `null` is the valid "sync not configured" value. */
 function validateSync(ctx: Ctx, value: unknown): SyncSettings | null | undefined {
-  if (value === null) return null
+  if (value === null) return null;
   if (value === undefined) {
-    bad(
-      ctx,
-      'settings.sync',
-      'missing — expected null (sync not configured) or { "baseUrl": …, "secret": … }',
-    )
-    return undefined
+    bad(ctx, "settings.sync", 'missing — expected null (sync not configured) or { "baseUrl": …, "secret": … }');
+    return undefined;
   }
-  const obj = objectAt(ctx, 'settings.sync', value)
-  if (!obj) return undefined
-  checkKeys(ctx, 'settings.sync', obj, SYNC_KEYS)
+  const obj = objectAt(ctx, "settings.sync", value);
+  if (!obj) return undefined;
+  checkKeys(ctx, "settings.sync", obj, SYNC_KEYS);
 
-  const baseUrl = stringAt(ctx, 'settings.sync.baseUrl', obj['baseUrl'])
-  const secret = stringAt(ctx, 'settings.sync.secret', obj['secret'])
-  if (baseUrl === undefined || secret === undefined) return undefined
-  return { baseUrl, secret }
+  const baseUrl = stringAt(ctx, "settings.sync.baseUrl", obj["baseUrl"]);
+  const secret = stringAt(ctx, "settings.sync.secret", obj["secret"]);
+  if (baseUrl === undefined || secret === undefined) return undefined;
+  return { baseUrl, secret };
 }
 
 function validateHistory(ctx: Ctx, value: unknown): readonly SessionResult[] | undefined {
-  const arr = arrayAt(ctx, 'history', value)
-  if (!arr) return undefined
+  const arr = arrayAt(ctx, "history", value);
+  if (!arr) return undefined;
 
-  const sessions: SessionResult[] = []
-  let complete = true
+  const sessions: SessionResult[] = [];
+  let complete = true;
 
   arr.forEach((entry, i) => {
-    const session = validateSession(ctx, `history[${i}]`, entry)
+    const session = validateSession(ctx, `history[${i}]`, entry);
     if (!session) {
-      complete = false
-      return
+      complete = false;
+      return;
     }
-    sessions.push(session)
-  })
+    sessions.push(session);
+  });
 
-  return complete ? sessions : undefined
+  return complete ? sessions : undefined;
 }
 
 function validateSession(ctx: Ctx, path: string, value: unknown): SessionResult | undefined {
-  const obj = objectAt(ctx, path, value)
-  if (!obj) return undefined
-  checkKeys(ctx, path, obj, SESSION_KEYS)
+  const obj = objectAt(ctx, path, value);
+  if (!obj) return undefined;
+  checkKeys(ctx, path, obj, SESSION_KEYS);
 
-  const completedAt = validateTimestamp(ctx, `${path}.completedAt`, obj['completedAt'])
-  const position = intAt(ctx, `${path}.position`, obj['position'], 0)
-  const variant = validateVariant(ctx, `${path}.variant`, obj['variant'])
+  const completedAt = validateTimestamp(ctx, `${path}.completedAt`, obj["completedAt"]);
+  const position = intAt(ctx, `${path}.position`, obj["position"], 0);
+  const variant = validateVariant(ctx, `${path}.variant`, obj["variant"]);
 
-  const rawExercises = arrayAt(ctx, `${path}.exercises`, obj['exercises'])
-  const exercises: ExerciseRecord[] = []
-  let exercisesComplete = rawExercises !== undefined
+  const rawExercises = arrayAt(ctx, `${path}.exercises`, obj["exercises"]);
+  const exercises: ExerciseRecord[] = [];
+  let exercisesComplete = rawExercises !== undefined;
   rawExercises?.forEach((entry, i) => {
-    const exercise = validateExercise(ctx, `${path}.exercises[${i}]`, entry)
+    const exercise = validateExercise(ctx, `${path}.exercises[${i}]`, entry);
     if (!exercise) {
-      exercisesComplete = false
-      return
+      exercisesComplete = false;
+      return;
     }
-    exercises.push(exercise)
-  })
+    exercises.push(exercise);
+  });
 
-  if (
-    completedAt === undefined ||
-    position === undefined ||
-    variant === undefined ||
-    !exercisesComplete
-  ) {
-    return undefined
+  if (completedAt === undefined || position === undefined || variant === undefined || !exercisesComplete) {
+    return undefined;
   }
-  return { completedAt, position, variant, exercises }
+  return { completedAt, position, variant, exercises };
 }
 
 function validateTimestamp(ctx: Ctx, path: string, value: unknown): string | undefined {
-  const text = stringAt(ctx, path, value)
-  if (text === undefined) return undefined
+  const text = stringAt(ctx, path, value);
+  if (text === undefined) return undefined;
   if (!ISO_INSTANT.test(text) || !Number.isFinite(Date.parse(text))) {
-    bad(
-      ctx,
-      path,
-      `expected an ISO-8601 instant like "2026-07-06T07:12:00.000Z", got ${describe(value)}`,
-    )
-    return undefined
+    bad(ctx, path, `expected an ISO-8601 instant like "2026-07-06T07:12:00.000Z", got ${describe(value)}`);
+    return undefined;
   }
-  return text
+  return text;
 }
 
 /**
@@ -1126,44 +1073,39 @@ function validateTimestamp(ctx: Ctx, path: string, value: unknown): string | und
  * reject a load dial the domain has added.
  */
 function validateVariant(ctx: Ctx, path: string, value: unknown): Variant | undefined {
-  if (isVariant(value)) return value
-  const quoted = VARIANTS.map((variant) => `"${variant}"`)
-  const list = `${quoted.slice(0, -1).join(', ')} or ${quoted[quoted.length - 1]}`
-  bad(ctx, path, `expected ${list}, got ${describe(value)}`)
-  return undefined
+  if (isVariant(value)) return value;
+  const quoted = VARIANTS.map((variant) => `"${variant}"`);
+  const list = `${quoted.slice(0, -1).join(", ")} or ${quoted[quoted.length - 1]}`;
+  bad(ctx, path, `expected ${list}, got ${describe(value)}`);
+  return undefined;
 }
 
 function validateExercise(ctx: Ctx, path: string, value: unknown): ExerciseRecord | undefined {
-  const obj = objectAt(ctx, path, value)
-  if (!obj) return undefined
-  checkKeys(ctx, path, obj, EXERCISE_KEYS)
+  const obj = objectAt(ctx, path, value);
+  if (!obj) return undefined;
+  checkKeys(ctx, path, obj, EXERCISE_KEYS);
 
-  const rawPattern = obj['pattern']
-  let pattern: Pattern | undefined
+  const rawPattern = obj["pattern"];
+  let pattern: Pattern | undefined;
   if (isPattern(rawPattern)) {
-    pattern = rawPattern
+    pattern = rawPattern;
   } else {
-    bad(
-      ctx,
-      `${path}.pattern`,
-      `expected one of ${PATTERNS.join(', ')}, got ${describe(rawPattern)}`,
-    )
+    bad(ctx, `${path}.pattern`, `expected one of ${PATTERNS.join(", ")}, got ${describe(rawPattern)}`);
   }
 
-  const rungId = validateRungId(ctx, `${path}.rungId`, obj['rungId'])
+  const rungId = validateRungId(ctx, `${path}.rungId`, obj["rungId"]);
   // At least one set: an exercise recorded as zero sets records nothing, which is
   // a hand-edit slip rather than a fact. (A *session* with no exercises is
   // different and perfectly legal — that is a cardio slot.)
-  const sets = intAt(ctx, `${path}.sets`, obj['sets'], 1)
-  const targetValue = finiteAt(ctx, `${path}.targetValue`, obj['targetValue'], 0)
+  const sets = intAt(ctx, `${path}.sets`, obj["sets"], 1);
+  const targetValue = finiteAt(ctx, `${path}.targetValue`, obj["targetValue"], 0);
 
   // The one optional field in the document. `undefined` here means the key is not
   // there at all — `JSON.parse` cannot produce an `undefined` *value*, so there is
   // no third state to disambiguate on the way in, and `exactOptionalPropertyTypes`
   // is what stops one being manufactured on the way out (see the spread below).
-  const rawLogged = obj['logged']
-  const logged =
-    rawLogged === undefined ? undefined : validateLogged(ctx, `${path}.logged`, rawLogged, sets)
+  const rawLogged = obj["logged"];
+  const logged = rawLogged === undefined ? undefined : validateLogged(ctx, `${path}.logged`, rawLogged, sets);
 
   if (
     pattern === undefined ||
@@ -1172,13 +1114,13 @@ function validateExercise(ctx: Ctx, path: string, value: unknown): ExerciseRecor
     targetValue === undefined ||
     (rawLogged !== undefined && logged === undefined)
   ) {
-    return undefined
+    return undefined;
   }
   // Spread rather than `logged` in the literal: with `exactOptionalPropertyTypes`
   // on, `{ logged: undefined }` and `{}` are different values, and only the second
   // is "not logged". Writing the key unconditionally would put a `logged` key on
   // every record in memory, which `serialise` would then have to re-decide about.
-  return { pattern, rungId, sets, targetValue, ...(logged === undefined ? {} : { logged }) }
+  return { pattern, rungId, sets, targetValue, ...(logged === undefined ? {} : { logged }) };
 }
 
 /**
@@ -1223,23 +1165,23 @@ function validateLogged(
   value: unknown,
   sets: number | undefined,
 ): readonly number[] | undefined {
-  const arr = arrayAt(ctx, path, value)
-  if (!arr) return undefined
+  const arr = arrayAt(ctx, path, value);
+  if (!arr) return undefined;
 
   if (sets !== undefined && arr.length > sets) {
     bad(
       ctx,
       path,
-      `expected at most ${sets} ${sets === 1 ? 'entry' : 'entries'} — one per set ` +
+      `expected at most ${sets} ${sets === 1 ? "entry" : "entries"} — one per set ` +
         `this exercise prescribed — got ${arr.length}. Fewer is fine: logging some ` +
         `of the sets and stopping is normal, and leaving the field out entirely ` +
         `means "not logged".`,
-    )
-    return undefined
+    );
+    return undefined;
   }
 
-  const values: number[] = []
-  let complete = true
+  const values: number[] = [];
+  let complete = true;
 
   // An index loop, not `forEach`, because `forEach` *skips* the holes of a sparse
   // array. Text input cannot produce one — `JSON.stringify([1, , 3])` writes
@@ -1249,15 +1191,15 @@ function validateLogged(
   for (let i = 0; i < arr.length; i += 1) {
     // Zero is legal and means it: "I attempted that set and managed none" is a
     // fact worth recording, and is not the same as not logging the set at all.
-    const entry = finiteAt(ctx, `${path}[${i}]`, arr[i], 0)
+    const entry = finiteAt(ctx, `${path}[${i}]`, arr[i], 0);
     if (entry === undefined) {
-      complete = false
-      continue
+      complete = false;
+      continue;
     }
-    values.push(entry)
+    values.push(entry);
   }
 
-  return complete ? values : undefined
+  return complete ? values : undefined;
 }
 
 /**
@@ -1265,30 +1207,30 @@ function validateLogged(
  * content — see the "deliberately NOT validated" note in the header.
  */
 function validateRungId(ctx: Ctx, path: string, value: unknown): RungId | undefined {
-  const text = stringAt(ctx, path, value)
-  if (text === undefined) return undefined
-  const dash = text.indexOf('-')
-  const prefix = dash === -1 ? '' : text.slice(0, dash)
+  const text = stringAt(ctx, path, value);
+  if (text === undefined) return undefined;
+  const dash = text.indexOf("-");
+  const prefix = dash === -1 ? "" : text.slice(0, dash);
   if (!isPattern(prefix) || text.length <= dash + 1) {
     bad(
       ctx,
       path,
-      `expected a rung id like "push-04-full" — one of ${PATTERNS.join(', ')} ` +
+      `expected a rung id like "push-04-full" — one of ${PATTERNS.join(", ")} ` +
         `followed by "-" and an identifier — got ${describe(value)}`,
-    )
-    return undefined
+    );
+    return undefined;
   }
-  return text as RungId
+  return text as RungId;
 }
 
 // ─── Summary, for the import confirmation dialog ────────────────────────────
 
 export interface DocSummary {
-  readonly username: string
-  readonly cyclePosition: number
-  readonly historyLength: number
-  readonly lastSessionAt: string | null
-  readonly sessionsDone: readonly { readonly pattern: Pattern; readonly sessions: number }[]
+  readonly username: string;
+  readonly cyclePosition: number;
+  readonly historyLength: number;
+  readonly lastSessionAt: string | null;
+  readonly sessionsDone: readonly { readonly pattern: Pattern; readonly sessions: number }[];
 }
 
 /**
@@ -1303,12 +1245,12 @@ export interface DocSummary {
  * `username` and the counters are the facts that identify the *document*.
  */
 export function summarise(doc: StateDoc): DocSummary {
-  const last = doc.history.length > 0 ? doc.history[doc.history.length - 1] : undefined
+  const last = doc.history.length > 0 ? doc.history[doc.history.length - 1] : undefined;
   return {
     username: doc.username,
     cyclePosition: doc.cyclePosition,
     historyLength: doc.history.length,
     lastSessionAt: last?.completedAt ?? null,
     sessionsDone: PATTERNS.map((pattern) => ({ pattern, sessions: doc.sessionsDone[pattern] })),
-  }
+  };
 }

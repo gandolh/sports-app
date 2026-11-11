@@ -14,12 +14,12 @@ no fallback handler.
 It is served behind `handle_path /sports-app-api/*`, which strips the prefix, so
 the service keeps serving its own bare `/api/*` paths.
 
-| Method | Path | What it does |
-|---|---|---|
-| `GET` | `/api/health` | Liveness. No auth, no database read, no information. |
-| `GET` | `/api/state` | The caller's newest snapshot bytes, or `404`. |
-| `PUT` | `/api/state` | Validate shallowly, store verbatim, prune to the cap. |
-| `GET` | `/api/auth/session` | Who the cookie belongs to (`user: null` for nobody), and whether Ward is on. The library's. |
+| Method | Path                                              | What it does                                                                                      |
+| ------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `GET`  | `/api/health`                                     | Liveness. No auth, no database read, no information.                                              |
+| `GET`  | `/api/state`                                      | The caller's newest snapshot bytes, or `404`.                                                     |
+| `PUT`  | `/api/state`                                      | Validate shallowly, store verbatim, prune to the cap.                                             |
+| `GET`  | `/api/auth/session`                               | Who the cookie belongs to (`user: null` for nobody), and whether Ward is on. The library's.       |
 | `POST` | `/api/auth/login`, `logout`, `password`, `ward/*` | Sign in, sign out, change a password, the Ward round trip. The library's; there is no `register`. |
 
 ## Who the caller is
@@ -31,11 +31,11 @@ with Ward, an optional second way in that the service reaches through OpenID
 Connect. Local sign-in never calls Ward, so the service works while Ward is
 down. The signed-in account's **username is the stream key**.
 
-| Situation | Answer |
-|---|---|
-| No session, or an expired one | `401` |
-| A session that began with Ward, while Ward cannot answer | `401`, `reason: "ward_unavailable"` |
-| A session that began with Ward, which Ward has ended | `401`, `reason: "ward_session_ended"` |
+| Situation                                                | Answer                                |
+| -------------------------------------------------------- | ------------------------------------- |
+| No session, or an expired one                            | `401`                                 |
+| A session that began with Ward, while Ward cannot answer | `401`, `reason: "ward_unavailable"`   |
+| A session that began with Ward, which Ward has ended     | `401`, `reason: "ward_session_ended"` |
 
 A Ward-originated session is checked against Ward at most every 30 seconds, so a
 revoke at Ward ends it within 30 seconds.
@@ -52,7 +52,7 @@ with `?ward_error=access_denied`, which the page puts into words.
 The service used to hold **one shared secret in a header** — the same string for
 every caller, with `?user=` naming whose document was wanted.
 
-That secret authenticated the *installation*, never a person. Anyone holding it
+That secret authenticated the _installation_, never a person. Anyone holding it
 could read or write anyone's training history by changing a query parameter, and
 the file header said so plainly rather than pretending otherwise.
 
@@ -113,7 +113,7 @@ searches the database files and every captured log line for it.
 The wire shapes are **TypeBox** declarations in `shared/api.ts`, so the same
 declaration that guards the service also types the client.
 
-A `Type.Object({...})` value *is* a JSON Schema object, so Fastify's AJV reads
+A `Type.Object({...})` value _is_ a JSON Schema object, so Fastify's AJV reads
 the response schemas directly with no adapter, and `Static<typeof X>` gives the TypeScript type
 from the same expression. Hand-written JSON Schema plus a separately maintained
 interface would recreate exactly the duplication `shared/` exists to delete.

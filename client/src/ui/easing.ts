@@ -34,10 +34,10 @@
  */
 
 /** Maps normalised time `t ∈ [0,1]` to an output in `[0,1]`. */
-export type EaseFn = (t: number) => number
+export type EaseFn = (t: number) => number;
 
 /** No easing. Named rather than inlined so a caller can say it meant it. */
-export const linear: EaseFn = (t) => t
+export const linear: EaseFn = (t) => t;
 
 /**
  * Fast out, settling in — the counterpart of `--ease-out`
@@ -51,12 +51,12 @@ export const linear: EaseFn = (t) => t
  * `CountUp.tsx` that apologised for the same approximation without naming it.
  */
 export const easeOutCubic: EaseFn = (t) => {
-  const u = 1 - t
-  return 1 - u * u * u
-}
+  const u = 1 - t;
+  return 1 - u * u * u;
+};
 
 /** Slow out of the gate — the counterpart of `--ease-in`. */
-export const easeInCubic: EaseFn = (t) => t * t * t
+export const easeInCubic: EaseFn = (t) => t * t * t;
 
 /**
  * Normalised progress through a duration, clamped to `[0,1]`.
@@ -66,9 +66,9 @@ export const easeInCubic: EaseFn = (t) => t * t * t
  * show the final value, not `NaN`.
  */
 export function progress(elapsedMs: number, durationMs: number): number {
-  if (!(durationMs > 0)) return 1
-  const t = elapsedMs / durationMs
-  return t <= 0 ? 0 : t >= 1 ? 1 : t
+  if (!(durationMs > 0)) return 1;
+  const t = elapsedMs / durationMs;
+  return t <= 0 ? 0 : t >= 1 ? 1 : t;
 }
 
 /**
@@ -79,14 +79,8 @@ export function progress(elapsedMs: number, durationMs: number): number {
  * bug the user reads as a wrong number, which matters here because the value in
  * question is how many sessions they have completed.
  */
-export function tween(
-  from: number,
-  to: number,
-  elapsedMs: number,
-  durationMs: number,
-  ease: EaseFn = linear,
-): number {
-  const t = progress(elapsedMs, durationMs)
-  if (t >= 1) return to
-  return from + (to - from) * ease(t)
+export function tween(from: number, to: number, elapsedMs: number, durationMs: number, ease: EaseFn = linear): number {
+  const t = progress(elapsedMs, durationMs);
+  if (t >= 1) return to;
+  return from + (to - from) * ease(t);
 }

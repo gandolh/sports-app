@@ -35,7 +35,7 @@ running.
 
 :::note[If querying ever matters, derive — do not replace]
 The recorded call is explicit: should tables ever be wanted for querying, derive
-them *from* the snapshots rather than replacing the snapshots with them.
+them _from_ the snapshots rather than replacing the snapshots with them.
 :::
 
 **Byte-preservation is why `GET /api/state` has no response schema.** A
@@ -52,10 +52,10 @@ Every snapshot embeds the **entire** history, so snapshot size grows linearly
 with sessions completed — and total storage grows as sessions × snapshots kept.
 At three years of daily training one snapshot is roughly a megabyte:
 
-| Snapshots kept | Storage per person |
-|---|---|
-| 20 | ~20 MB — fine |
-| 1000 | multiple gigabytes — the story |
+| Snapshots kept | Storage per person             |
+| -------------- | ------------------------------ |
+| 20             | ~20 MB — fine                  |
+| 1000           | multiple gigabytes — the story |
 
 The cap exists so that the second row never happens. **Raising it is a real
 capacity decision**, not a config tweak.
@@ -79,6 +79,6 @@ The client no longer sends `?user=`, and the server ignores one if it is
 there. A `PUT` whose document names somebody other than the session's subject
 is a `400` and stores nothing.
 
-Before that, one shared secret authenticated the *installation* and `?user=`
+Before that, one shared secret authenticated the _installation_ and `?user=`
 chose the target, so anyone holding it could read anyone's training history by
 editing a query parameter. That is the hole Ward closed.

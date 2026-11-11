@@ -1,13 +1,13 @@
-import { useState } from 'react'
-import { Field } from '@base-ui/react/field'
-import { useForm } from 'react-hook-form'
-import type { StateDoc, SyncSettings as SyncTarget } from '@sports-app/shared/types.ts'
-import type { SyncStatus } from '../../persistence/sync.ts'
-import { useBackupNow, useSaveSync, useSyncCheck } from '../document.ts'
-import { AlertBanner } from './AlertBanner.tsx'
-import { QuietButton, SecondaryButton } from './Buttons.tsx'
-import { FIELD_DESCRIPTION, FIELD_ERROR, FIELD_INPUT, FIELD_LABEL } from './fields.ts'
-import { Eyebrow, SectionHeading } from './Shell.tsx'
+import { useState } from "react";
+import { Field } from "@base-ui/react/field";
+import { useForm } from "react-hook-form";
+import type { StateDoc, SyncSettings as SyncTarget } from "@sports-app/shared/types.ts";
+import type { SyncStatus } from "../../persistence/sync.ts";
+import { useBackupNow, useSaveSync, useSyncCheck } from "../document.ts";
+import { AlertBanner } from "./AlertBanner.tsx";
+import { QuietButton, SecondaryButton } from "./Buttons.tsx";
+import { FIELD_DESCRIPTION, FIELD_ERROR, FIELD_INPUT, FIELD_LABEL } from "./fields.ts";
+import { Eyebrow, SectionHeading } from "./Shell.tsx";
 
 /**
  * The sync settings — the service address and the deployment secret.
@@ -63,8 +63,8 @@ import { Eyebrow, SectionHeading } from './Shell.tsx'
  */
 
 interface SyncValues {
-  readonly baseUrl: string
-  readonly secret: string
+  readonly baseUrl: string;
+  readonly secret: string;
 }
 
 /**
@@ -74,62 +74,62 @@ interface SyncValues {
  * resolved against the app's own origin and silently sync to nothing.
  */
 function validateBaseUrl(value: string): true | string {
-  const trimmed = value.trim()
-  if (trimmed === '') return true
-  let parsed: URL
+  const trimmed = value.trim();
+  if (trimmed === "") return true;
+  let parsed: URL;
   try {
-    parsed = new URL(trimmed)
+    parsed = new URL(trimmed);
   } catch {
-    return 'That is not a full address. Use something like http://192.168.1.20:8787, or leave it empty to use this app’s own origin.'
+    return "That is not a full address. Use something like http://192.168.1.20:8787, or leave it empty to use this app’s own origin.";
   }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return `The address has to start with http:// or https://, not ${parsed.protocol}`
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return `The address has to start with http:// or https://, not ${parsed.protocol}`;
   }
-  return true
+  return true;
 }
 
 /** What a `SyncStatus` means, in the plainest words available for each case. */
 function describeStatus(status: SyncStatus): {
-  readonly label: string
-  readonly text: string
-  readonly canBackUp: boolean
+  readonly label: string;
+  readonly text: string;
+  readonly canBackUp: boolean;
 } {
   switch (status.kind) {
-    case 'not-configured':
+    case "not-configured":
       return {
-        label: 'Not syncing',
-        text: 'Nothing is configured, so this device keeps its training history to itself.',
+        label: "Not syncing",
+        text: "Nothing is configured, so this device keeps its training history to itself.",
         canBackUp: false,
-      }
-    case 'failed':
-      return { label: 'No answer', text: status.error, canBackUp: false }
-    case 'remote-empty':
+      };
+    case "failed":
+      return { label: "No answer", text: status.error, canBackUp: false };
+    case "remote-empty":
       return {
-        label: 'Reached, and empty',
-        text: 'The service answered and has nothing stored for this account yet. Backing up now is safe — there is nothing there to lose.',
+        label: "Reached, and empty",
+        text: "The service answered and has nothing stored for this account yet. Backing up now is safe — there is nothing there to lose.",
         canBackUp: true,
-      }
-    case 'adopt-remote':
+      };
+    case "adopt-remote":
       return {
-        label: 'Only the service has a history',
+        label: "Only the service has a history",
         text: `The service holds ${sessionWord(status.remoteSessions)} and this device holds none that could be read.`,
         canBackUp: false,
-      }
-    case 'in-sync':
+      };
+    case "in-sync":
       return {
-        label: 'In sync',
+        label: "In sync",
         text: `Both this device and the service hold ${sessionWord(status.sessions)}.`,
         canBackUp: false,
-      }
-    case 'local-ahead':
+      };
+    case "local-ahead":
       return {
-        label: 'This device is ahead',
+        label: "This device is ahead",
         text: `This device holds ${sessionWord(status.localSessions)}; the service holds ${sessionWord(status.remoteSessions)}. Backing up now overwrites the service copy with this one and loses nothing.`,
         canBackUp: true,
-      }
-    case 'conflict':
+      };
+    case "conflict":
       return {
-        label: 'The service is ahead',
+        label: "The service is ahead",
         text:
           `The service holds ${sessionWord(status.remoteSessions)} and this device holds ` +
           `${sessionWord(status.localSessions)}, so training happened somewhere else. ` +
@@ -137,28 +137,22 @@ function describeStatus(status: SyncStatus): {
           `and downloading would discard these. Train on one device, or merge the two ` +
           `documents by hand — both are plain JSON.`,
         canBackUp: false,
-      }
+      };
   }
 }
 
 function sessionWord(count: number): string {
-  return count === 1 ? '1 session' : `${count} sessions`
+  return count === 1 ? "1 session" : `${count} sessions`;
 }
 
-export function SyncSettings({
-  doc,
-  username,
-}: {
-  readonly doc: StateDoc
-  readonly username: string
-}) {
-  const stored = doc.settings.sync
-  const saveSync = useSaveSync(username)
-  const check = useSyncCheck()
-  const backup = useBackupNow()
+export function SyncSettings({ doc, username }: { readonly doc: StateDoc; readonly username: string }) {
+  const stored = doc.settings.sync;
+  const saveSync = useSaveSync(username);
+  const check = useSyncCheck();
+  const backup = useBackupNow();
   // Cleared whenever the settings change, so a green "in sync" can never be left
   // sitting under an address it was not measured against.
-  const [status, setStatus] = useState<SyncStatus | null>(null)
+  const [status, setStatus] = useState<SyncStatus | null>(null);
 
   const {
     register,
@@ -170,12 +164,12 @@ export function SyncSettings({
   } = useForm<SyncValues>({
     // Blur and submit only. A URL passes through a dozen invalid prefixes on its
     // way in, and marking each of them red is hostile.
-    mode: 'onBlur',
-    reValidateMode: 'onBlur',
+    mode: "onBlur",
+    reValidateMode: "onBlur",
     // The secret is deliberately absent from the defaults, not blanked: there is
     // nothing to prefill it from that would not be the value itself.
-    defaultValues: { baseUrl: stored?.baseUrl ?? '', secret: '' },
-  })
+    defaultValues: { baseUrl: stored?.baseUrl ?? "", secret: "" },
+  });
 
   /**
    * The target the fields currently describe, which is what Check has to test —
@@ -187,50 +181,49 @@ export function SyncSettings({
    * as "off" on its own.
    */
   function targetFromForm(): SyncTarget | null {
-    const values = getValues()
-    const baseUrl = values.baseUrl.trim()
-    const typed = values.secret.trim()
-    if (stored === null && baseUrl === '' && typed === '') return null
-    return { baseUrl, secret: typed === '' ? (stored?.secret ?? '') : typed }
+    const values = getValues();
+    const baseUrl = values.baseUrl.trim();
+    const typed = values.secret.trim();
+    if (stored === null && baseUrl === "" && typed === "") return null;
+    return { baseUrl, secret: typed === "" ? (stored?.secret ?? "") : typed };
   }
 
   function submit(): void {
-    const target = targetFromForm()
-    setStatus(null)
-    backup.reset()
+    const target = targetFromForm();
+    setStatus(null);
+    backup.reset();
     saveSync.mutate(
       { doc, sync: target },
       // Emptied rather than left holding the typed secret, so it does not sit in
       // form state — or in a form autofill — after the save.
-      { onSuccess: () => reset({ baseUrl: target?.baseUrl ?? '', secret: '' }) },
-    )
+      { onSuccess: () => reset({ baseUrl: target?.baseUrl ?? "", secret: "" }) },
+    );
   }
 
   async function runCheck(): Promise<void> {
     // The same validation submit gets. Without it a mistyped address reports as a
     // network failure, which sends the user looking for the wrong problem.
-    if (!(await trigger('baseUrl'))) return
-    setStatus(null)
-    backup.reset()
-    check.mutate({ username, doc, sync: targetFromForm() }, { onSuccess: setStatus })
+    if (!(await trigger("baseUrl"))) return;
+    setStatus(null);
+    backup.reset();
+    check.mutate({ username, doc, sync: targetFromForm() }, { onSuccess: setStatus });
   }
 
   function stopSyncing(): void {
-    setStatus(null)
-    backup.reset()
-    saveSync.mutate({ doc, sync: null }, { onSuccess: () => reset({ baseUrl: '', secret: '' }) })
+    setStatus(null);
+    backup.reset();
+    saveSync.mutate({ doc, sync: null }, { onSuccess: () => reset({ baseUrl: "", secret: "" }) });
   }
 
-  const described = status === null ? null : describeStatus(status)
-  const hasSecret = stored !== null && stored.secret !== ''
+  const described = status === null ? null : describeStatus(status);
+  const hasSecret = stored !== null && stored.secret !== "";
 
   return (
     <form onSubmit={(event) => void handleSubmit(submit)(event)} noValidate>
       <SectionHeading>Backup</SectionHeading>
       <p className="text-body text-tx2">
-        Training history is saved on this device first and always. If a state service is running,
-        each finished session is also uploaded to it — the app never waits for that, and a failed
-        upload never blocks a session.
+        Training history is saved on this device first and always. If a state service is running, each finished session
+        is also uploaded to it — the app never waits for that, and a failed upload never blocks a session.
       </p>
 
       <div className="mt-[var(--sp-3)] flex flex-col gap-[var(--sp-3)]">
@@ -243,17 +236,16 @@ export function SyncSettings({
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            {...register('baseUrl', { validate: validateBaseUrl })}
+            {...register("baseUrl", { validate: validateBaseUrl })}
           />
           {/* No placeholder. An example address in a field whose *emptiness* is
               meaningful reads as a stored value, and the one thing this field must
               never do is make somebody think they have configured a service they
               have not. The example goes in the description instead. */}
           <p className={FIELD_DESCRIPTION}>
-            Something like{' '}
-            <span className="font-mono text-tx2">http://192.168.1.20:8787</span>. Leave it empty
-            to use this app&rsquo;s own origin, under the same path you sign in through, which is
-            what a co-hosted service and the dev proxy both want.
+            Something like <span className="font-mono text-tx2">http://192.168.1.20:8787</span>. Leave it empty to use
+            this app&rsquo;s own origin, under the same path you sign in through, which is what a co-hosted service and
+            the dev proxy both want.
           </p>
           {errors.baseUrl === undefined ? null : (
             <Field.Error className={FIELD_ERROR} match>
@@ -276,19 +268,14 @@ export function SyncSettings({
         */}
         {!hasSecret ? null : (
           <p className={FIELD_DESCRIPTION}>
-            This device still has an old sync secret saved from before the service had accounts.
-            It is no longer sent anywhere and no longer does anything; it will be dropped from
-            the saved document by a later update.
+            This device still has an old sync secret saved from before the service had accounts. It is no longer sent
+            anywhere and no longer does anything; it will be dropped from the saved document by a later update.
           </p>
         )}
       </div>
 
-      {saveSync.error === null ? null : (
-        <AlertBanner label="Not saved" text={saveSync.error.message} />
-      )}
-      {backup.error === null ? null : (
-        <AlertBanner label="Not uploaded" text={backup.error.message} />
-      )}
+      {saveSync.error === null ? null : <AlertBanner label="Not saved" text={saveSync.error.message} />}
+      {backup.error === null ? null : <AlertBanner label="Not uploaded" text={backup.error.message} />}
 
       {described === null ? null : (
         <div
@@ -302,20 +289,16 @@ export function SyncSettings({
       {backup.isSuccess ? (
         <div className="mt-[var(--sp-3)] rounded border border-line bg-s1 p-[var(--sp-3)] shadow-1">
           <Eyebrow>Uploaded</Eyebrow>
-          <p className="mt-[2px] text-body text-tx2">
-            The service now holds this device&rsquo;s history.
-          </p>
+          <p className="mt-[2px] text-body text-tx2">The service now holds this device&rsquo;s history.</p>
         </div>
       ) : null}
 
-      {check.error === null ? null : (
-        <AlertBanner label="Check failed" text={check.error.message} />
-      )}
+      {check.error === null ? null : <AlertBanner label="Check failed" text={check.error.message} />}
 
       <div className="mt-[var(--sp-3)] flex items-center gap-[var(--sp-2)]">
-        <SecondaryButton type="submit">{saveSync.isPending ? 'Saving…' : 'Save'}</SecondaryButton>
+        <SecondaryButton type="submit">{saveSync.isPending ? "Saving…" : "Save"}</SecondaryButton>
         <SecondaryButton onClick={() => void runCheck()}>
-          {check.isPending ? 'Checking…' : 'Check connection'}
+          {check.isPending ? "Checking…" : "Check connection"}
         </SecondaryButton>
       </div>
 
@@ -326,7 +309,7 @@ export function SyncSettings({
       {described?.canBackUp === true ? (
         <div className="mt-[var(--sp-2)]">
           <SecondaryButton onClick={() => backup.mutate(doc)}>
-            {backup.isPending ? 'Uploading…' : 'Back up now'}
+            {backup.isPending ? "Uploading…" : "Back up now"}
           </SecondaryButton>
         </div>
       ) : null}
@@ -337,5 +320,5 @@ export function SyncSettings({
         </div>
       )}
     </form>
-  )
+  );
 }

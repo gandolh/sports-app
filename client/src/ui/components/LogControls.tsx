@@ -1,9 +1,9 @@
-import { useId, useState } from 'react'
-import { motion } from 'motion/react'
-import type { TargetUnit } from '@sports-app/shared/types.ts'
-import { SecondaryButton } from './Buttons.tsx'
-import { CheckIcon, PencilIcon } from './icons.tsx'
-import { unitWord } from './format.ts'
+import { useId, useState } from "react";
+import { motion } from "motion/react";
+import type { TargetUnit } from "@sports-app/shared/types.ts";
+import { SecondaryButton } from "./Buttons.tsx";
+import { CheckIcon, PencilIcon } from "./icons.tsx";
+import { unitWord } from "./format.ts";
 
 /**
  * `Log 8` and `Log other`, beside Next. **Offered, never demanded.**
@@ -44,29 +44,29 @@ import { unitWord } from './format.ts'
 
 export interface LogControlsProps {
   /** Today's target for this set. The one-tap answer. */
-  readonly target: number
-  readonly unit: TargetUnit
+  readonly target: number;
+  readonly unit: TargetUnit;
   /** What is already logged for THIS set, or `null`. */
-  readonly logged: number | null
+  readonly logged: number | null;
   /** `null` clears the log for this set. */
-  readonly onLog: (value: number | null) => void
+  readonly onLog: (value: number | null) => void;
 }
 
 export function LogControls({ target, unit, logged, onLog }: LogControlsProps) {
-  const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState('')
-  const fieldId = useId()
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const fieldId = useId();
 
   function submit(): void {
-    const parsed = Number(draft.trim())
+    const parsed = Number(draft.trim());
     // Anything unreadable closes the panel and logs nothing, rather than showing
     // an error. The user is mid-set; a validation message here is an obstacle
     // in front of an optional action.
-    if (draft.trim() !== '' && Number.isFinite(parsed) && parsed >= 0) {
-      onLog(Math.round(parsed))
+    if (draft.trim() !== "" && Number.isFinite(parsed) && parsed >= 0) {
+      onLog(Math.round(parsed));
     }
-    setDraft('')
-    setOpen(false)
+    setDraft("");
+    setOpen(false);
   }
 
   return (
@@ -80,7 +80,7 @@ export function LogControls({ target, unit, logged, onLog }: LogControlsProps) {
               ? `Logged ${target} ${unitWord(unit, target)}. Tap to remove.`
               : `Log ${target} ${unitWord(unit, target)} for this set.`
           }
-          className={logged === target ? 'border-accent text-accent' : ''}
+          className={logged === target ? "border-accent text-accent" : ""}
         >
           {logged === target ? <CheckIcon size={18} /> : null}
           {logged === target ? `Logged ${target}` : `Log ${target}`}
@@ -90,10 +90,10 @@ export function LogControls({ target, unit, logged, onLog }: LogControlsProps) {
           onClick={() => setOpen((was) => !was)}
           aria-expanded={open}
           aria-label="Log a different number for this set"
-          className={logged !== null && logged !== target ? 'border-accent text-accent' : ''}
+          className={logged !== null && logged !== target ? "border-accent text-accent" : ""}
         >
           <PencilIcon size={18} />
-          {logged !== null && logged !== target ? `Logged ${logged}` : 'Log other'}
+          {logged !== null && logged !== target ? `Logged ${logged}` : "Log other"}
         </SecondaryButton>
       </div>
 
@@ -105,7 +105,7 @@ export function LogControls({ target, unit, logged, onLog }: LogControlsProps) {
           className="flex items-center gap-[var(--sp-2)]"
         >
           <label htmlFor={fieldId} className="text-meta text-tx2">
-            {unit === 'reps' ? 'Reps' : 'Seconds'}
+            {unit === "reps" ? "Reps" : "Seconds"}
           </label>
           <input
             id={fieldId}
@@ -116,8 +116,8 @@ export function LogControls({ target, unit, logged, onLog }: LogControlsProps) {
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') submit()
-              if (event.key === 'Escape') setOpen(false)
+              if (event.key === "Enter") submit();
+              if (event.key === "Escape") setOpen(false);
             }}
             className="h-[var(--tap-row)] min-w-0 flex-1 rounded border border-line2 bg-s2 px-[var(--sp-3)] text-body text-tx tabular-nums"
           />
@@ -127,5 +127,5 @@ export function LogControls({ target, unit, logged, onLog }: LogControlsProps) {
         </motion.div>
       ) : null}
     </div>
-  )
+  );
 }

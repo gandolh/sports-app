@@ -1,4 +1,4 @@
-import type { FigureDefinition, Rig } from './types.ts'
+import type { FigureDefinition, Rig } from "./types.ts";
 
 /**
  * Hinge: lying with the hips down, to the bridge (hips raised, shoulders and
@@ -23,30 +23,30 @@ export const HINGE_RIG: Rig = {
   torso: { length: 66, angleDeg: { start: 6.96, end: -35.13 } },
   neck: { length: 20, angleDeg: { start: 180, end: 180 } },
   limbs: {
-    armL: { kind: 'fk', root: 'shoulder', length: 20.4, angleDeg: { start: 101, end: 101 } },
-    armR: { kind: 'fk', root: 'shoulder', length: 24.1, angleDeg: { start: 85, end: 85 } },
+    armL: { kind: "fk", root: "shoulder", length: 20.4, angleDeg: { start: 101, end: 101 } },
+    armR: { kind: "fk", root: "shoulder", length: 24.1, angleDeg: { start: 85, end: 85 } },
     legL: {
-      kind: 'ik',
-      root: 'hip',
+      kind: "ik",
+      root: "hip",
       upper: 33,
       lower: 43.91,
       bend: -1,
       target: { start: { x: 160, y: 170 }, end: { x: 160, y: 170 } },
     },
     legR: {
-      kind: 'ik',
-      root: 'hip',
+      kind: "ik",
+      root: "hip",
       upper: 39.5,
       lower: 45.65,
       bend: -1,
       target: { start: { x: 166, y: 176 }, end: { x: 166, y: 176 } },
     },
   },
-}
+};
 
 /** Points up, directly above the bridged hip: the hips rise. The old arrow ran
  * up through the hip and thigh. */
 export const HINGE_FIGURE: FigureDefinition = {
   rig: HINGE_RIG,
   arrow: { x: 112, y1: 98, y2: 56 },
-}
+};

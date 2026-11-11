@@ -24,19 +24,13 @@
 // Extends the same idea `figures/__tests__/noHexColors.test.ts` applies to the
 // drawings, from that directory to the whole client source tree.
 const sources = import.meta.glob(
-  [
-    '../../**/*.ts',
-    '../../**/*.tsx',
-    '../../**/*.css',
-    '!../../**/__tests__/**',
-    '!../../ui/tokens.css',
-  ],
-  { eager: true, query: '?raw', import: 'default' },
-) as Record<string, string>
+  ["../../**/*.ts", "../../**/*.tsx", "../../**/*.css", "!../../**/__tests__/**", "!../../ui/tokens.css"],
+  { eager: true, query: "?raw", import: "default" },
+) as Record<string, string>;
 
-const HEX_COLOR = /#[0-9a-fA-F]{3,8}\b/
+const HEX_COLOR = /#[0-9a-fA-F]{3,8}\b/;
 
-describe('no hex colour outside the token file', () => {
+describe("no hex colour outside the token file", () => {
   // The guard that caught this test running vacuously for its whole life: with
   // `css: false` in the Vitest config, every `?raw` CSS import is stubbed to an
   // empty string while the glob still returns the right *keys*, so the loop below
@@ -46,17 +40,17 @@ describe('no hex colour outside the token file', () => {
   //
   // It asserts that *some* `.css` file was found rather than naming `app.css`,
   // because the 2026-09-04 rebuild deletes that file and a guard that dies with it is no guard.
-  it('found UI sources to check, and excluded exactly one token file', () => {
-    const paths = Object.keys(sources)
-    expect(paths.length).toBeGreaterThan(10)
-    expect(paths.filter((path) => path.endsWith('.css')).length).toBeGreaterThan(0)
-    expect(paths.filter((path) => path.endsWith('/tokens.css'))).toEqual([])
-    expect(Object.values(sources).every((source) => source.length > 0)).toBe(true)
-  })
+  it("found UI sources to check, and excluded exactly one token file", () => {
+    const paths = Object.keys(sources);
+    expect(paths.length).toBeGreaterThan(10);
+    expect(paths.filter((path) => path.endsWith(".css")).length).toBeGreaterThan(0);
+    expect(paths.filter((path) => path.endsWith("/tokens.css"))).toEqual([]);
+    expect(Object.values(sources).every((source) => source.length > 0)).toBe(true);
+  });
 
   for (const [path, source] of Object.entries(sources)) {
     it(`${path} contains no hex colour literal`, () => {
-      expect(source).not.toMatch(HEX_COLOR)
-    })
+      expect(source).not.toMatch(HEX_COLOR);
+    });
   }
-})
+});

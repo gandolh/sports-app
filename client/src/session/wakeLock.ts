@@ -19,30 +19,30 @@
  *     Every path is caught, because a rejected screen lock must never surface as
  *     an error on top of a workout.
  */
-import { useEffect } from 'react'
+import { useEffect } from "react";
 
 interface WakeLockSentinelLike {
-  readonly released: boolean
-  release(): Promise<void>
+  readonly released: boolean;
+  release(): Promise<void>;
 }
 
 interface WakeLockLike {
-  request(type: 'screen'): Promise<WakeLockSentinelLike>
+  request(type: "screen"): Promise<WakeLockSentinelLike>;
 }
 
 function readWakeLock(): WakeLockLike | null {
   try {
-    const nav = globalThis.navigator as (Navigator & { wakeLock?: WakeLockLike }) | undefined
-    const lock = nav?.wakeLock
-    return lock && typeof lock.request === 'function' ? lock : null
+    const nav = globalThis.navigator as (Navigator & { wakeLock?: WakeLockLike }) | undefined;
+    const lock = nav?.wakeLock;
+    return lock && typeof lock.request === "function" ? lock : null;
   } catch {
-    return null
+    return null;
   }
 }
 
 /** Whether this browser can hold a screen lock at all. Safari cannot. */
 export function isScreenLockSupported(): boolean {
-  return readWakeLock() !== null
+  return readWakeLock() !== null;
 }
 
 /**
@@ -55,40 +55,40 @@ export function isScreenLockSupported(): boolean {
  */
 export function useScreenAwake(active: boolean): void {
   useEffect(() => {
-    const wakeLock = readWakeLock()
-    if (!wakeLock || !active) return
+    const wakeLock = readWakeLock();
+    if (!wakeLock || !active) return;
 
-    let cancelled = false
-    let sentinel: WakeLockSentinelLike | null = null
+    let cancelled = false;
+    let sentinel: WakeLockSentinelLike | null = null;
 
     const acquire = async (): Promise<void> => {
       // Requesting while hidden always rejects, so don't.
-      if (document.visibilityState !== 'visible') return
-      if (sentinel !== null && !sentinel.released) return
+      if (document.visibilityState !== "visible") return;
+      if (sentinel !== null && !sentinel.released) return;
       try {
-        const next = await wakeLock.request('screen')
+        const next = await wakeLock.request("screen");
         if (cancelled) {
-          void next.release().catch(() => {})
-          return
+          void next.release().catch(() => {});
+          return;
         }
-        sentinel = next
+        sentinel = next;
       } catch {
         // Unsupported, denied, or the document went hidden mid-request. The
         // session is unaffected; there is nothing to report.
       }
-    }
+    };
 
-    void acquire()
+    void acquire();
     // The browser drops the lock on hide and does not give it back.
     const onVisibility = (): void => {
-      if (document.visibilityState === 'visible') void acquire()
-    }
-    document.addEventListener('visibilitychange', onVisibility)
+      if (document.visibilityState === "visible") void acquire();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      cancelled = true
-      document.removeEventListener('visibilitychange', onVisibility)
-      if (sentinel !== null && !sentinel.released) void sentinel.release().catch(() => {})
-    }
-  }, [active])
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (sentinel !== null && !sentinel.released) void sentinel.release().catch(() => {});
+    };
+  }, [active]);
 }

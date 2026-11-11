@@ -1,37 +1,37 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { Modifier, Rung } from '../domain/types.ts'
-import { AngleArc, ElevationMarker, HandPositionDots, TempoDot } from './figures/overlays.tsx'
-import { FIGURE_VIEWBOX, getFigure } from './figures/index.ts'
-import { buildTimeline, motionClassNames, motionStyles } from './figures/motion.ts'
-import { RigFigure } from './figures/primitives.tsx'
+import { useEffect, useMemo, useState } from "react";
+import type { Modifier, Rung } from "../domain/types.ts";
+import { AngleArc, ElevationMarker, HandPositionDots, TempoDot } from "./figures/overlays.tsx";
+import { FIGURE_VIEWBOX, getFigure } from "./figures/index.ts";
+import { buildTimeline, motionClassNames, motionStyles } from "./figures/motion.ts";
+import { RigFigure } from "./figures/primitives.tsx";
 
 export interface ExerciseFigureProps {
   /** Only the fields the figure system needs — callers can pass a full
    * `Rung` straight through. */
-  readonly rung: Pick<Rung, 'name' | 'figureId' | 'modifier'>
+  readonly rung: Pick<Rung, "name" | "figureId" | "modifier">;
   /** Rendered size in px (square). Figures must stay legible around ~120,
    * the smallest size an exercise card is expected to show one at. */
-  readonly size?: number
-  readonly className?: string
+  readonly size?: number;
+  readonly className?: string;
 }
 
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState<boolean>(() =>
-    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
       : false,
-  )
+  );
 
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
-    const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const handleChange = () => setReduced(mql.matches)
-    handleChange()
-    mql.addEventListener('change', handleChange)
-    return () => mql.removeEventListener('change', handleChange)
-  }, [])
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handleChange = () => setReduced(mql.matches);
+    handleChange();
+    mql.addEventListener("change", handleChange);
+    return () => mql.removeEventListener("change", handleChange);
+  }, []);
 
-  return reduced
+  return reduced;
 }
 
 /**
@@ -44,17 +44,15 @@ function usePrefersReducedMotion(): boolean {
  * and the accent-coloured ones are the brightest thing on the drawing.
  */
 function renderOverlays(modifier: Modifier | undefined) {
-  if (!modifier) return null
+  if (!modifier) return null;
   return (
     <>
-      {modifier.elevation && modifier.elevation !== 'none' ? (
-        <ElevationMarker at={modifier.elevation} />
-      ) : null}
+      {modifier.elevation && modifier.elevation !== "none" ? <ElevationMarker at={modifier.elevation} /> : null}
       {modifier.unilateral ? <HandPositionDots /> : null}
       {modifier.pauseAt && modifier.pauseSeconds ? <AngleArc at={modifier.pauseAt} /> : null}
       {modifier.eccentricSeconds ? <TempoDot /> : null}
     </>
-  )
+  );
 }
 
 // One shared, static stylesheet. Duplicated per instance if several figures
@@ -101,7 +99,7 @@ const STYLES = `
   padding: 0 6px 8px;
   overflow-wrap: anywhere;
 }
-`
+`;
 
 /**
  * Renders a rung's figure by its `figureId`, moving the rig between its `start`
@@ -119,29 +117,29 @@ const STYLES = `
  * its own rather than an obvious "TODO" box.
  */
 export function ExerciseFigure({ rung, size = 120, className }: ExerciseFigureProps) {
-  const reducedMotion = usePrefersReducedMotion()
-  const figure = getFigure(rung.figureId)
+  const reducedMotion = usePrefersReducedMotion();
+  const figure = getFigure(rung.figureId);
   // A real branch, not a slowed animation: under reduced motion no keyframes are
   // generated, no animation class is applied, and the figure's static `end` pose
   // is what shows.
-  const animated = !reducedMotion && figure !== undefined
+  const animated = !reducedMotion && figure !== undefined;
   // Solving the rig and writing ~300 keyframe stops is cheap but not free, and
   // this re-renders on every tick of the countdown beside it. Keyed on what the
   // CSS actually depends on.
   const motion = useMemo(() => {
-    if (!animated || !figure) return undefined
-    const timeline = buildTimeline(rung.figureId, rung.modifier)
-    return { classes: motionClassNames(timeline, figure.rig), css: motionStyles(timeline, figure.rig) }
-  }, [animated, figure, rung.figureId, rung.modifier])
+    if (!animated || !figure) return undefined;
+    const timeline = buildTimeline(rung.figureId, rung.modifier);
+    return { classes: motionClassNames(timeline, figure.rig), css: motionStyles(timeline, figure.rig) };
+  }, [animated, figure, rung.figureId, rung.modifier]);
 
   const rootClassName = [
-    'exercise-figure',
-    figure ? null : 'exercise-figure--placeholder',
-    animated ? null : 'exercise-figure--static',
+    "exercise-figure",
+    figure ? null : "exercise-figure--placeholder",
+    animated ? null : "exercise-figure--static",
     className,
   ]
     .filter(Boolean)
-    .join(' ')
+    .join(" ");
 
   return (
     <div className={rootClassName} role="img" aria-label={rung.name} style={{ width: size, height: size }}>
@@ -149,20 +147,10 @@ export function ExerciseFigure({ rung, size = 120, className }: ExerciseFigurePr
       {motion ? <style>{motion.css}</style> : null}
       {figure ? (
         <>
-          <svg
-            className="exercise-figure__frame"
-            viewBox={FIGURE_VIEWBOX}
-            aria-hidden="true"
-            focusable="false"
-          >
+          <svg className="exercise-figure__frame" viewBox={FIGURE_VIEWBOX} aria-hidden="true" focusable="false">
             <RigFigure rig={figure.rig} arrow={figure.arrow} motion={motion?.classes} />
           </svg>
-          <svg
-            className="exercise-figure__overlays"
-            viewBox={FIGURE_VIEWBOX}
-            aria-hidden="true"
-            focusable="false"
-          >
+          <svg className="exercise-figure__overlays" viewBox={FIGURE_VIEWBOX} aria-hidden="true" focusable="false">
             {renderOverlays(rung.modifier)}
           </svg>
         </>
@@ -209,5 +197,5 @@ export function ExerciseFigure({ rung, size = 120, className }: ExerciseFigurePr
         </>
       )}
     </div>
-  )
+  );
 }

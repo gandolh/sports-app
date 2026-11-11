@@ -14,7 +14,7 @@
  * on the origin, adds it (`wardReturnTo`), and takes it off again when a refused
  * sign-in hands it back (`nextFromWardReturn`).
  */
-import { redirect } from '@tanstack/react-router'
+import { redirect } from "@tanstack/react-router";
 
 /**
  * What `/login` keeps of its search: a `next` only when it is safe to go to.
@@ -22,7 +22,7 @@ import { redirect } from '@tanstack/react-router'
  * explicitly; see there.
  */
 export interface LoginSearch {
-  readonly next?: string | undefined
+  readonly next?: string | undefined;
 }
 
 /**
@@ -30,8 +30,8 @@ export interface LoginSearch {
  * is left off for `/`, so a plain visit still shows a clean `/login`.
  */
 export function toLogin(location: { readonly pathname: string }) {
-  const search: LoginSearch = location.pathname === '/' ? {} : { next: location.pathname }
-  return redirect({ to: '/login', search })
+  const search: LoginSearch = location.pathname === "/" ? {} : { next: location.pathname };
+  return redirect({ to: "/login", search });
 }
 
 /**
@@ -45,14 +45,14 @@ export function toLogin(location: { readonly pathname: string }) {
  * applies to the Ward return, plus the last three.
  */
 export function appPath(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  if (value.length === 0 || value.length > 512) return null
-  if (!value.startsWith('/') || value.includes('//') || value.includes('\\')) return null
+  if (typeof value !== "string") return null;
+  if (value.length === 0 || value.length > 512) return null;
+  if (!value.startsWith("/") || value.includes("//") || value.includes("\\")) return null;
   // eslint-disable-next-line no-control-regex
-  if (/[\u0000-\u001f\u007f]/.test(value)) return null
-  if (value.includes('?') || value.includes('#')) return null
-  if (value === '/login' || value === '/login/') return null
-  return value
+  if (/[\u0000-\u001f\u007f]/.test(value)) return null;
+  if (value.includes("?") || value.includes("#")) return null;
+  if (value === "/login" || value === "/login/") return null;
+  return value;
 }
 
 /**
@@ -65,7 +65,7 @@ export function appPath(value: unknown): string | null {
  * read, unchecked. `signin.test.tsx` signs in past four bad values to pin this.
  */
 export function validateLoginSearch(raw: Record<string, unknown>): LoginSearch {
-  return { next: appPath(raw['next']) ?? undefined }
+  return { next: appPath(raw["next"]) ?? undefined };
 }
 
 /**
@@ -75,7 +75,7 @@ export function validateLoginSearch(raw: Record<string, unknown>): LoginSearch {
  * `afterSignInPath` from, so this is that page with one search param more.
  */
 export function wardReturnTo(next: string): string {
-  return `${import.meta.env.BASE_URL}login?next=${encodeURIComponent(next)}`
+  return `${import.meta.env.BASE_URL}login?next=${encodeURIComponent(next)}`;
 }
 
 /**
@@ -91,7 +91,7 @@ export function wardReturnTo(next: string): string {
  * goes to `/`, as before the Ward retry fix.
  */
 export function nextFromWardReturn(returnTo: string | null): string | undefined {
-  const page = `${import.meta.env.BASE_URL}login?`
-  if (returnTo === null || !returnTo.startsWith(page)) return undefined
-  return appPath(new URLSearchParams(returnTo.slice(page.length)).get('next')) ?? undefined
+  const page = `${import.meta.env.BASE_URL}login?`;
+  if (returnTo === null || !returnTo.startsWith(page)) return undefined;
+  return appPath(new URLSearchParams(returnTo.slice(page.length)).get("next")) ?? undefined;
 }

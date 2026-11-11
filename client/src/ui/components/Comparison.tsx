@@ -1,6 +1,6 @@
-import type { TargetUnit } from '@sports-app/shared/types.ts'
-import { Eyebrow } from './Shell.tsx'
-import { deltaLabel, formatLog, logLabel, signedDelta, unitWord } from './format.ts'
+import type { TargetUnit } from "@sports-app/shared/types.ts";
+import { Eyebrow } from "./Shell.tsx";
+import { deltaLabel, formatLog, logLabel, signedDelta, unitWord } from "./format.ts";
 
 /**
  * The strip under the target: what this was last time, what changed, and what
@@ -47,11 +47,11 @@ import { deltaLabel, formatLog, logLabel, signedDelta, unitWord } from './format
  */
 
 export interface ComparisonProps {
-  readonly unit: TargetUnit
+  readonly unit: TargetUnit;
   /** The previous prescribed target for this pattern. `null` = never trained. */
-  readonly lastTarget: number | null
+  readonly lastTarget: number | null;
   /** Today's target, post-variant. The number on the screen above this strip. */
-  readonly todayTarget: number
+  readonly todayTarget: number;
   /**
    * The previous session's logged sets, or `null` for "not logged".
    *
@@ -59,7 +59,7 @@ export interface ComparisonProps {
    * means no answer was given, and an empty array means the person logged that
    * they did nothing. The codec keeps them apart, so this does too.
    */
-  readonly lastLogged: readonly number[] | null
+  readonly lastLogged: readonly number[] | null;
 }
 
 function Cell({
@@ -68,20 +68,17 @@ function Cell({
   srLabel,
   accent = false,
 }: {
-  readonly value: string
-  readonly label: string
-  readonly srLabel: string
-  readonly accent?: boolean
+  readonly value: string;
+  readonly label: string;
+  readonly srLabel: string;
+  readonly accent?: boolean;
 }) {
   return (
     <div className="text-center">
       <span className="sr-only">{srLabel}</span>
       <span
         aria-hidden="true"
-        className={
-          'block text-body font-bold tracking-[-0.02em] tabular-nums ' +
-          (accent ? 'text-accent' : 'text-tx')
-        }
+        className={"block text-body font-bold tracking-[-0.02em] tabular-nums " + (accent ? "text-accent" : "text-tx")}
       >
         {value}
       </span>
@@ -89,14 +86,14 @@ function Cell({
         <Eyebrow>{label}</Eyebrow>
       </span>
     </div>
-  )
+  );
 }
 
 export function Comparison({ unit, lastTarget, todayTarget, lastLogged }: ComparisonProps) {
-  if (lastTarget === null) return null
+  if (lastTarget === null) return null;
 
-  const delta = todayTarget - lastTarget
-  const suffix = unit === 'seconds' ? 's' : ''
+  const delta = todayTarget - lastTarget;
+  const suffix = unit === "seconds" ? "s" : "";
 
   return (
     <div
@@ -115,14 +112,10 @@ export function Comparison({ unit, lastTarget, todayTarget, lastLogged }: Compar
         srLabel={`${deltaLabel(delta, unit)}. This is the schedule, not a measurement.`}
       />
       <Cell
-        value={lastLogged === null ? '—' : formatLog(lastLogged)}
+        value={lastLogged === null ? "—" : formatLog(lastLogged)}
         label="You logged"
-        srLabel={
-          lastLogged === null
-            ? 'You did not log that session.'
-            : `${logLabel(lastLogged, unit)} last time.`
-        }
+        srLabel={lastLogged === null ? "You did not log that session." : `${logLabel(lastLogged, unit)} last time.`}
       />
     </div>
-  )
+  );
 }

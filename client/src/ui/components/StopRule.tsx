@@ -1,4 +1,4 @@
-import { StopIcon } from './icons.tsx'
+import { StopIcon } from "./icons.tsx";
 
 /**
  * `Rung.stopRule`, in its own box, in the `dang` hue, **above the cues**.
@@ -59,5 +59,5 @@ export function StopRule({ text }: { readonly text: string }) {
         <p className="mt-[2px] text-body leading-[var(--lh-body)] text-tx">{text}</p>
       </div>
     </div>
-  )
+  );
 }

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { groupDigits } from './format.ts'
-import { easeOutCubic, tween } from '../easing.ts'
+import { useEffect, useState } from "react";
+import { groupDigits } from "./format.ts";
+import { easeOutCubic, tween } from "../easing.ts";
 
 /**
  * **The entire celebration budget of this app**: one count-up of the sessions
@@ -15,7 +15,7 @@ import { easeOutCubic, tween } from '../easing.ts'
  * than in the effect, so a reduced-motion user never sees a zero frame.
  */
 
-const DURATION_MS = 520 // --dur-slow
+const DURATION_MS = 520; // --dur-slow
 
 /**
  * Whether to animate at all, answered once, before the first paint. `false` also
@@ -23,46 +23,40 @@ const DURATION_MS = 520 // --dur-slow
  * never runs would otherwise leave the number stuck at zero.
  */
 function shouldAnimate(value: number): boolean {
-  if (value <= 0) return false
-  if (typeof requestAnimationFrame !== 'function') return false
+  if (value <= 0) return false;
+  if (typeof requestAnimationFrame !== "function") return false;
   try {
     return !(
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    )
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
   } catch {
-    return false
+    return false;
   }
 }
 
-export function CountUp({
-  value,
-  className,
-}: {
-  readonly value: number
-  readonly className?: string
-}) {
+export function CountUp({ value, className }: { readonly value: number; readonly className?: string }) {
   /**
    * Elapsed milliseconds, not normalised progress — the curve and the clamping
    * both live in `easing.tween` now, so this holds the one thing only the
    * component can know. Starts *finished* when there is nothing to animate, so a
    * reduced-motion user never sees a zero frame.
    */
-  const [elapsedMs, setElapsedMs] = useState(() => (shouldAnimate(value) ? 0 : DURATION_MS))
+  const [elapsedMs, setElapsedMs] = useState(() => (shouldAnimate(value) ? 0 : DURATION_MS));
 
   useEffect(() => {
-    if (!shouldAnimate(value)) return
-    let frame = 0
-    const startedAt = performance.now()
+    if (!shouldAnimate(value)) return;
+    let frame = 0;
+    const startedAt = performance.now();
     const step = (now: number): void => {
-      const elapsed = now - startedAt
-      setElapsedMs(elapsed)
-      if (elapsed < DURATION_MS) frame = requestAnimationFrame(step)
-    }
-    frame = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(frame)
-  }, [value])
+      const elapsed = now - startedAt;
+      setElapsedMs(elapsed);
+      if (elapsed < DURATION_MS) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
 
   // `easing.ts` owns the curve, the clamp, and the guarantee that the last frame
   // is exactly `value` rather than a hair short of it. Reading the clock is the
@@ -71,5 +65,5 @@ export function CountUp({
     <span className={className} aria-label={`${value}`}>
       {groupDigits(tween(0, value, elapsedMs, DURATION_MS, easeOutCubic))}
     </span>
-  )
+  );
 }

@@ -26,26 +26,26 @@
  * `client/src/persistence/` and are passed in. Nothing in this file calls
  * `new Date()` either — every function takes the `Date` it is given.
  */
-import type { Pattern, TargetUnit } from '@sports-app/shared/types.ts'
-import { LADDERS } from '../../domain/ladders.ts'
-import { slotAt } from '../../domain/types.ts'
-import type { PrescribedExercise, PrescribedItem, Prescription } from '../../domain/schedule.ts'
+import type { Pattern, TargetUnit } from "@sports-app/shared/types.ts";
+import { LADDERS } from "../../domain/ladders.ts";
+import { slotAt } from "../../domain/types.ts";
+import type { PrescribedExercise, PrescribedItem, Prescription } from "../../domain/schedule.ts";
 
 /**
  * `12480` → `12,480`. Grouped because the account page's totals reach six
  * figures and an ungrouped `128400` is unreadable at a glance.
  */
 export function groupDigits(value: number): string {
-  const rounded = Math.round(value)
-  const sign = rounded < 0 ? '-' : ''
-  const digits = Math.abs(rounded).toString()
-  let out = ''
+  const rounded = Math.round(value);
+  const sign = rounded < 0 ? "-" : "";
+  const digits = Math.abs(rounded).toString();
+  let out = "";
   for (let i = 0; i < digits.length; i += 1) {
     // Comma every three digits counting from the right.
-    if (i > 0 && (digits.length - i) % 3 === 0) out += ','
-    out += digits[i]
+    if (i > 0 && (digits.length - i) % 3 === 0) out += ",";
+    out += digits[i];
   }
-  return `${sign}${out}`
+  return `${sign}${out}`;
 }
 
 /**
@@ -59,29 +59,29 @@ export function groupDigits(value: number): string {
  * the seconds are noise.
  */
 export function formatHoldTime(totalSeconds: number): string {
-  const seconds = Math.max(Math.round(totalSeconds), 0)
-  if (seconds < 60) return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
+  const seconds = Math.max(Math.round(totalSeconds), 0);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
   if (minutes < 60) {
-    const rest = seconds % 60
-    return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`
+    const rest = seconds % 60;
+    return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`;
   }
-  const hours = Math.floor(minutes / 60)
-  const restMinutes = minutes % 60
-  return restMinutes === 0 ? `${groupDigits(hours)}h` : `${groupDigits(hours)}h ${restMinutes}m`
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+  return restMinutes === 0 ? `${groupDigits(hours)}h` : `${groupDigits(hours)}h ${restMinutes}m`;
 }
 
 /** `reps` / `seconds`, singular where the number is 1. */
 export function unitWord(unit: TargetUnit, value: number): string {
-  if (unit === 'reps') return value === 1 ? 'rep' : 'reps'
-  return value === 1 ? 'second' : 'seconds'
+  if (unit === "reps") return value === 1 ? "rep" : "reps";
+  return value === 1 ? "second" : "seconds";
 }
 
 /** The compact form for a dense row: `3 × 8`, `2 × 30s`, `5 × 60s`. */
 export function targetText(item: PrescribedItem): string {
-  if (item.type === 'cardio') return `${item.rounds} × ${item.protocol.hardSeconds}s`
-  const value = item.unit === 'seconds' ? `${item.targetValue}s` : `${item.targetValue}`
-  return `${item.sets} × ${value}`
+  if (item.type === "cardio") return `${item.rounds} × ${item.protocol.hardSeconds}s`;
+  const value = item.unit === "seconds" ? `${item.targetValue}s` : `${item.targetValue}`;
+  return `${item.sets} × ${value}`;
 }
 
 /**
@@ -92,19 +92,19 @@ export function targetText(item: PrescribedItem): string {
  * read as prose.
  */
 export function targetLabel(item: PrescribedItem): string {
-  if (item.type === 'cardio') {
-    return `${item.rounds} rounds of ${item.protocol.hardSeconds} seconds hard`
+  if (item.type === "cardio") {
+    return `${item.rounds} rounds of ${item.protocol.hardSeconds} seconds hard`;
   }
-  const sets = `${item.sets} ${item.sets === 1 ? 'set' : 'sets'}`
-  if (item.unit === 'seconds') {
-    return `${sets} of a ${item.targetValue} second hold`
+  const sets = `${item.sets} ${item.sets === 1 ? "set" : "sets"}`;
+  if (item.unit === "seconds") {
+    return `${sets} of a ${item.targetValue} second hold`;
   }
-  return `${sets} of ${item.targetValue} ${unitWord(item.unit, item.targetValue)}`
+  return `${sets} of ${item.targetValue} ${unitWord(item.unit, item.targetValue)}`;
 }
 
 /** The movement's name, or the protocol's label on a cardio slot. */
 export function itemName(item: PrescribedItem): string {
-  return item.type === 'cardio' ? item.protocol.label : item.rung.name
+  return item.type === "cardio" ? item.protocol.label : item.rung.name;
 }
 
 /**
@@ -114,42 +114,34 @@ export function itemName(item: PrescribedItem): string {
  * (corpus/wiki/programme.md).
  */
 export const PATTERN_LABEL: Readonly<Record<Pattern, string>> = {
-  push: 'Push',
-  squat: 'Squat',
-  hinge: 'Hinge',
-  core: 'Core',
-  pull: 'Posture (pull)',
-}
+  push: "Push",
+  squat: "Squat",
+  hinge: "Hinge",
+  core: "Core",
+  pull: "Posture (pull)",
+};
 
 // ─── Dates ──────────────────────────────────────────────────────────────────
 //
 // New in the 2026-09-04 rebuild. See the header for why they are hand-rolled and why they
 // exist at all.
 
-const WEEKDAY_NAMES: readonly string[] = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-]
+const WEEKDAY_NAMES: readonly string[] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const MONTH_NAMES: readonly string[] = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-]
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 /**
  * `Friday, 4 September` — the date rail on the Today screen.
@@ -159,9 +151,9 @@ const MONTH_NAMES: readonly string[] = [
  * characters of noise on 364 days and mildly startling on the 365th.
  */
 export function formatLongDate(date: Date): string {
-  const weekday = WEEKDAY_NAMES[date.getDay()] ?? ''
-  const month = MONTH_NAMES[date.getMonth()] ?? ''
-  return `${weekday}, ${date.getDate()} ${month}`
+  const weekday = WEEKDAY_NAMES[date.getDay()] ?? "";
+  const month = MONTH_NAMES[date.getMonth()] ?? "";
+  return `${weekday}, ${date.getDate()} ${month}`;
 }
 
 // ─── The prescription, as headings ──────────────────────────────────────────
@@ -175,8 +167,8 @@ export function formatLongDate(date: Date): string {
  * have (`CardioProtocol`, "deliberately not a `Ladder`").
  */
 export function rungSummary(item: PrescribedItem): string | null {
-  if (item.type === 'cardio') return null
-  return `rung ${item.rungIndex + 1} of ${LADDERS[item.pattern].rungs.length}`
+  if (item.type === "cardio") return null;
+  return `rung ${item.rungIndex + 1} of ${LADDERS[item.pattern].rungs.length}`;
 }
 
 /**
@@ -194,15 +186,12 @@ export function sessionSummary(prescription: Prescription, sessionNumber: number
   // block's core ladder is `kind: 'strength'` too, so filtering on that put
   // `core rung 2 of 6` under every single day — which is exactly the unreadable
   // line this filter exists to avoid.
-  const slot = slotAt(prescription.position)
+  const slot = slotAt(prescription.position);
   const parts = prescription.items
-    .filter(
-      (item): item is PrescribedExercise =>
-        item.type === 'exercise' && slot.patterns.includes(item.pattern),
-    )
-    .map((item) => `${item.pattern} ${rungSummary(item)}`)
-  if (parts.length === 0) parts.push('five hard minutes, no ladder')
-  return `Session ${sessionNumber} · ${parts.join(' · ')}`
+    .filter((item): item is PrescribedExercise => item.type === "exercise" && slot.patterns.includes(item.pattern))
+    .map((item) => `${item.pattern} ${rungSummary(item)}`);
+  if (parts.length === 0) parts.push("five hard minutes, no ladder");
+  return `Session ${sessionNumber} · ${parts.join(" · ")}`;
 }
 
 // ─── Logged sets ────────────────────────────────────────────────────────────
@@ -216,15 +205,15 @@ export function sessionSummary(prescription: Prescription, sessionNumber: number
  * word rather than an empty span; anything else is what they did.
  */
 export function formatLog(values: readonly number[]): string {
-  if (values.length === 0) return 'nothing'
-  return values.join(' · ')
+  if (values.length === 0) return "nothing";
+  return values.join(" · ");
 }
 
 /** The same list as a sentence, for `aria-label`. `8 · 8 · 6` is not speech. */
 export function logLabel(values: readonly number[], unit: TargetUnit): string {
-  if (values.length === 0) return 'Logged: nothing'
-  const spoken = values.map((value) => `${value} ${unitWord(unit, value)}`).join(', ')
-  return `Logged: ${spoken}`
+  if (values.length === 0) return "Logged: nothing";
+  const spoken = values.map((value) => `${value} ${unitWord(unit, value)}`).join(", ");
+  return `Logged: ${spoken}`;
 }
 
 /**
@@ -236,15 +225,15 @@ export function logLabel(values: readonly number[], unit: TargetUnit): string {
  * character nobody can type.
  */
 export function signedDelta(value: number): string {
-  if (value > 0) return `+${value}`
-  if (value < 0) return `−${Math.abs(value)}`
-  return '0'
+  if (value > 0) return `+${value}`;
+  if (value < 0) return `−${Math.abs(value)}`;
+  return "0";
 }
 
 /** The same, as prose: screen readers read `−` inconsistently or not at all. */
 export function deltaLabel(value: number, unit: TargetUnit): string {
-  const word = unitWord(unit, Math.abs(value))
-  if (value > 0) return `${value} ${word} more than last time`
-  if (value < 0) return `${Math.abs(value)} ${word} fewer than last time`
-  return `The same as last time`
+  const word = unitWord(unit, Math.abs(value));
+  if (value > 0) return `${value} ${word} more than last time`;
+  if (value < 0) return `${Math.abs(value)} ${word} fewer than last time`;
+  return `The same as last time`;
 }

@@ -41,7 +41,7 @@
  * a person types to identify their own training log, and short enough that neither
  * of those becomes a story.
  */
-export const USERNAME_MAX_LENGTH = 32
+export const USERNAME_MAX_LENGTH = 32;
 
 /**
  * The allowlist. Lowercase letters, digits, and `.`/`-`/`_` after the first
@@ -66,7 +66,7 @@ export const USERNAME_MAX_LENGTH = 32
  * Built from `USERNAME_MAX_LENGTH` rather than restating the bound, so the cap and
  * the pattern cannot drift apart.
  */
-export const USERNAME_PATTERN = new RegExp(`^[a-z0-9][a-z0-9._-]{0,${USERNAME_MAX_LENGTH - 1}}$`)
+export const USERNAME_PATTERN = new RegExp(`^[a-z0-9][a-z0-9._-]{0,${USERNAME_MAX_LENGTH - 1}}$`);
 
 /**
  * Human-readable statement of the rule — for the service's `400` body, for the
@@ -75,10 +75,10 @@ export const USERNAME_PATTERN = new RegExp(`^[a-z0-9][a-z0-9._-]{0,${USERNAME_MA
  */
 export const USERNAME_RULE =
   `1–${USERNAME_MAX_LENGTH} characters, starting with a lowercase letter or a digit, ` +
-  'then lowercase letters, digits, dots, dashes or underscores'
+  "then lowercase letters, digits, dots, dashes or underscores";
 
 export function isValidUsername(value: unknown): value is string {
-  return typeof value === 'string' && USERNAME_PATTERN.test(value)
+  return typeof value === "string" && USERNAME_PATTERN.test(value);
 }
 
 /**
@@ -101,4 +101,4 @@ export function isValidUsername(value: unknown): value is string {
  *
  *   sqlite3 db/app.db "UPDATE snapshots SET username = '<ward subject>' WHERE username = 'local'"
  */
-export const LEGACY_USERNAME = 'local'
+export const LEGACY_USERNAME = "local";

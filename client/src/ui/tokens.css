@@ -1,7 +1,7 @@
 /* Tailwind first, and it has to be literally first: `@import` may only be
    preceded by `@charset` and `@layer`, and this file is itself the first import
    in `src/index.css`, so the whole cascade hangs off this line. */
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /**
  * The design system, as tokens. `corpus/wiki/design-system.md` is the doctrine;
@@ -90,18 +90,18 @@
    work outside this brief's file list; until they land, `font-display: swap`
    means the app renders in the system stack rather than breaking. */
 @font-face {
-  font-family: 'Inter';
+  font-family: "Inter";
   font-style: normal;
   font-weight: 400 800;
   font-display: swap;
   src:
-    local('InterVariable'),
-    local('Inter Variable'),
-    local('Inter'),
-    url('/fonts/inter-latin-var.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
-    U+2212, U+2215, U+FEFF, U+FFFD;
+    local("InterVariable"),
+    local("Inter Variable"),
+    local("Inter"),
+    url("/fonts/inter-latin-var.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -170,10 +170,8 @@
      shadow on near-black is a different physical claim than one on white — it
      needs far more opacity to be visible at all. */
   --sh-1: 0 1px 2px rgba(12, 17, 23, 0.05);
-  --sh-2:
-    0 1px 2px rgba(12, 17, 23, 0.05), 0 8px 24px -14px rgba(12, 17, 23, 0.28);
-  --sh-3:
-    0 2px 4px rgba(12, 17, 23, 0.06), 0 18px 44px -20px rgba(12, 17, 23, 0.34);
+  --sh-2: 0 1px 2px rgba(12, 17, 23, 0.05), 0 8px 24px -14px rgba(12, 17, 23, 0.28);
+  --sh-3: 0 2px 4px rgba(12, 17, 23, 0.06), 0 18px 44px -20px rgba(12, 17, 23, 0.34);
 
   /* ── Radii ────────────────────────────────────────────────────────────────
      The reference build's three, plus the pill. Four, down from the old world's
@@ -192,8 +190,7 @@
      The minimum-weight rule (400, 500 under 17px) outlived two themes and now
      has to hold on both at once: on dark, thin type halates; on light, dark-on-
      light optically thins the stroke. Same floor, opposite causes. */
-  --font-ui: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
-    sans-serif;
+  --font-ui: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --fs-hero: clamp(5.5rem, 26vw, 8.25rem); /* set target, rest countdown */
   --fs-mono: 4.5rem; /* sessions-completed count */
@@ -268,42 +265,42 @@
    the fill, and the tint is what stops that.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-:root[data-accent='mint'] {
+:root[data-accent="mint"] {
   --accent: #0d7153;
   --accent-2: #6d41fd;
   --on-accent: #eef9f6;
 }
-:root[data-accent='azure'] {
+:root[data-accent="azure"] {
   --accent: #0261c1;
   --accent-2: #6d41fd;
   --on-accent: #eff4f8;
 }
-:root[data-accent='violet'] {
+:root[data-accent="violet"] {
   --accent: #6e30fd;
   --accent-2: #0658fc;
   --on-accent: #f2eff8;
 }
-:root[data-accent='magenta'] {
+:root[data-accent="magenta"] {
   --accent: #bf0c71;
   --accent-2: #8b28fd;
   --on-accent: #f8eff4;
 }
-:root[data-accent='coral'] {
+:root[data-accent="coral"] {
   --accent: #b33905;
   --accent-2: #8f5f0c;
   --on-accent: #f8f1ef;
 }
-:root[data-accent='amber'] {
+:root[data-accent="amber"] {
   --accent: #7f5e01;
   --accent-2: #c0380e;
   --on-accent: #f9f6ee;
 }
-:root[data-accent='lime'] {
+:root[data-accent="lime"] {
   --accent: #456e0c;
   --accent-2: #0d7758;
   --on-accent: #f4f9ee;
 }
-:root[data-accent='slate'] {
+:root[data-accent="slate"] {
   --accent: #4c667c;
   --accent-2: #4a6c8a;
   --on-accent: #f2f4f5;
@@ -318,7 +315,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
 
     --bg: #0a0d11;
@@ -354,42 +351,42 @@
      3.8–4.3:1 against, and the primary button's gradient puts that ink squarely
      on the partner end. Lifting the partner was the cheap fix; darkening the ink
      would have cost its contrast on `--accent`. */
-  :root:not([data-theme='light'])[data-accent='mint'] {
+  :root:not([data-theme="light"])[data-accent="mint"] {
     --accent: #2bd9a4;
     --accent-2: #9075ff;
     --on-accent: #04231a;
   }
-  :root:not([data-theme='light'])[data-accent='azure'] {
+  :root:not([data-theme="light"])[data-accent="azure"] {
     --accent: #3b9bff;
     --accent-2: #9075ff;
     --on-accent: #04182e;
   }
-  :root:not([data-theme='light'])[data-accent='violet'] {
+  :root:not([data-theme="light"])[data-accent="violet"] {
     --accent: #9b7bff;
     --accent-2: #4a7dff;
     --on-accent: #150a33;
   }
-  :root:not([data-theme='light'])[data-accent='magenta'] {
+  :root:not([data-theme="light"])[data-accent="magenta"] {
     --accent: #f062b0;
     --accent-2: #a163ff;
     --on-accent: #2e0620;
   }
-  :root:not([data-theme='light'])[data-accent='coral'] {
+  :root:not([data-theme="light"])[data-accent="coral"] {
     --accent: #ff7a5c;
     --accent-2: #f0b457;
     --on-accent: #2e0c04;
   }
-  :root:not([data-theme='light'])[data-accent='amber'] {
+  :root:not([data-theme="light"])[data-accent="amber"] {
     --accent: #f5b93c;
     --accent-2: #ff7a5c;
     --on-accent: #2b1b00;
   }
-  :root:not([data-theme='light'])[data-accent='lime'] {
+  :root:not([data-theme="light"])[data-accent="lime"] {
     --accent: #9be04a;
     --accent-2: #2bd9a4;
     --on-accent: #152600;
   }
-  :root:not([data-theme='light'])[data-accent='slate'] {
+  :root:not([data-theme="light"])[data-accent="slate"] {
     --accent: #8fa3b8;
     --accent-2: #6486a7;
     --on-accent: #0a141e;
@@ -400,7 +397,7 @@
    3 · Dark by explicit stamp. Identical to block 2 by necessity — see the header.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-:root[data-theme='dark'] {
+:root[data-theme="dark"] {
   color-scheme: dark;
 
   --bg: #0a0d11;
@@ -431,42 +428,42 @@
   --sh-3: 0 2px 6px rgba(0, 0, 0, 0.55), 0 22px 50px -22px rgba(0, 0, 0, 0.9);
 }
 
-:root[data-theme='dark'][data-accent='mint'] {
+:root[data-theme="dark"][data-accent="mint"] {
   --accent: #2bd9a4;
   --accent-2: #9075ff;
   --on-accent: #04231a;
 }
-:root[data-theme='dark'][data-accent='azure'] {
+:root[data-theme="dark"][data-accent="azure"] {
   --accent: #3b9bff;
   --accent-2: #9075ff;
   --on-accent: #04182e;
 }
-:root[data-theme='dark'][data-accent='violet'] {
+:root[data-theme="dark"][data-accent="violet"] {
   --accent: #9b7bff;
   --accent-2: #4a7dff;
   --on-accent: #150a33;
 }
-:root[data-theme='dark'][data-accent='magenta'] {
+:root[data-theme="dark"][data-accent="magenta"] {
   --accent: #f062b0;
   --accent-2: #a163ff;
   --on-accent: #2e0620;
 }
-:root[data-theme='dark'][data-accent='coral'] {
+:root[data-theme="dark"][data-accent="coral"] {
   --accent: #ff7a5c;
   --accent-2: #f0b457;
   --on-accent: #2e0c04;
 }
-:root[data-theme='dark'][data-accent='amber'] {
+:root[data-theme="dark"][data-accent="amber"] {
   --accent: #f5b93c;
   --accent-2: #ff7a5c;
   --on-accent: #2b1b00;
 }
-:root[data-theme='dark'][data-accent='lime'] {
+:root[data-theme="dark"][data-accent="lime"] {
   --accent: #9be04a;
   --accent-2: #2bd9a4;
   --on-accent: #152600;
 }
-:root[data-theme='dark'][data-accent='slate'] {
+:root[data-theme="dark"][data-accent="slate"] {
   --accent: #8fa3b8;
   --accent-2: #6486a7;
   --on-accent: #0a141e;

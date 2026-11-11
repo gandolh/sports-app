@@ -15,606 +15,589 @@ import {
   rungIndexAt,
   targetAt,
   toSessionResult,
-} from '../schedule.ts'
-import type { PrescribedExercise, PrescribedItem } from '../schedule.ts'
-import { CARDIO, LADDERS, topRungIndex } from '../ladders.ts'
-import { DAILY_BLOCK, ROTATION, slotAt } from '../types.ts'
-import { PATTERNS, VARIANTS } from '@sports-app/shared/types.ts'
-import type {
-  ExerciseRecord,
-  Pattern,
-  SessionResult,
-  StateDoc,
-  Variant,
-} from '@sports-app/shared/types.ts'
-import { midProgram } from './fixtures.ts'
+} from "../schedule.ts";
+import type { PrescribedExercise, PrescribedItem } from "../schedule.ts";
+import { CARDIO, LADDERS, topRungIndex } from "../ladders.ts";
+import { DAILY_BLOCK, ROTATION, slotAt } from "../types.ts";
+import { PATTERNS, VARIANTS } from "@sports-app/shared/types.ts";
+import type { ExerciseRecord, Pattern, SessionResult, StateDoc, Variant } from "@sports-app/shared/types.ts";
+import { midProgram } from "./fixtures.ts";
 
-const ZERO: Readonly<Record<Pattern, number>> = { push: 0, squat: 0, hinge: 0, core: 0, pull: 0 }
+const ZERO: Readonly<Record<Pattern, number>> = { push: 0, squat: 0, hinge: 0, core: 0, pull: 0 };
 
 function docWith(sessionsDone: Partial<Record<Pattern, number>>, cyclePosition = 0): StateDoc {
   return {
     schemaVersion: 5,
-    username: 'test',
+    username: "test",
     cyclePosition,
     sessionsDone: { ...ZERO, ...sessionsDone },
     history: [],
     settings: { persistGranted: null, sync: null },
-  }
+  };
 }
 
 const exercises = (items: readonly PrescribedItem[]): readonly PrescribedExercise[] =>
-  items.filter((item): item is PrescribedExercise => item.type === 'exercise')
+  items.filter((item): item is PrescribedExercise => item.type === "exercise");
 
 // ─── Property 1 ─────────────────────────────────────────────────────────────
 
-describe('every rung takes sessionsPerRung sessions, whatever its span', () => {
-  it('holds for all five ladders, over the whole ladder', () => {
+describe("every rung takes sessionsPerRung sessions, whatever its span", () => {
+  it("holds for all five ladders, over the whole ladder", () => {
     // This IS the law — "a rung takes about six weeks" — so it is asserted as a
     // count of sessions per rung rather than as a target at a session number.
     for (const pattern of PATTERNS) {
-      const ladder = LADDERS[pattern]
-      const per = ladder.sessionsPerRung
-      const rungsAbove = topRungIndex(pattern) - ladder.startRungIndex
-      const seen = new Map<number, number>()
+      const ladder = LADDERS[pattern];
+      const per = ladder.sessionsPerRung;
+      const rungsAbove = topRungIndex(pattern) - ladder.startRungIndex;
+      const seen = new Map<number, number>();
       for (let n = 0; n < per * rungsAbove; n++) {
-        const index = rungIndexAt(pattern, n)
-        seen.set(index, (seen.get(index) ?? 0) + 1)
+        const index = rungIndexAt(pattern, n);
+        seen.set(index, (seen.get(index) ?? 0) + 1);
       }
       for (const [index, count] of seen) {
-        expect(count, `${pattern} rung ${index} lasted ${count} sessions, not ${per}`).toBe(per)
+        expect(count, `${pattern} rung ${index} lasted ${count} sessions, not ${per}`).toBe(per);
       }
-      expect(seen.size, `${pattern} did not climb every rung`).toBe(rungsAbove)
+      expect(seen.size, `${pattern} did not climb every rung`).toBe(rungsAbove);
     }
-  })
+  });
 
-  it('advances on exactly the sessions divisible by sessionsPerRung', () => {
+  it("advances on exactly the sessions divisible by sessionsPerRung", () => {
     for (const pattern of PATTERNS) {
-      const per = LADDERS[pattern].sessionsPerRung
+      const per = LADDERS[pattern].sessionsPerRung;
       for (let n = 1; n < per * 3; n++) {
-        const advanced = rungIndexAt(pattern, n) !== rungIndexAt(pattern, n - 1)
-        expect(advanced, `${pattern} at session ${n}`).toBe(n % per === 0)
+        const advanced = rungIndexAt(pattern, n) !== rungIndexAt(pattern, n - 1);
+        expect(advanced, `${pattern} at session ${n}`).toBe(n % per === 0);
       }
     }
-  })
+  });
 
-  it('starts every ladder at its own startRungIndex, at the bottom of that range', () => {
+  it("starts every ladder at its own startRungIndex, at the bottom of that range", () => {
     for (const pattern of PATTERNS) {
-      const ladder = LADDERS[pattern]
-      expect(rungIndexAt(pattern, 0)).toBe(ladder.startRungIndex)
-      expect(targetAt(pattern, 0)).toBe(rangeAt(pattern, ladder.startRungIndex).min)
+      const ladder = LADDERS[pattern];
+      expect(rungIndexAt(pattern, 0)).toBe(ladder.startRungIndex);
+      expect(targetAt(pattern, 0)).toBe(rangeAt(pattern, ladder.startRungIndex).min);
     }
-  })
+  });
 
-  it('attains both ends of every rung exactly — the caps are values, not limits', () => {
+  it("attains both ends of every rung exactly — the caps are values, not limits", () => {
     // The denominator is `per - 1`, so the first session of a rung prescribes its
     // `min` and the last prescribes its `max`. With `per` as the denominator the
     // fraction stopped at `(per-1)/per` and a declared cap was only reached when
     // rounding happened to close the gap: the 20→60s plank topped out at 59s and
     // never once prescribed 60.
     for (const pattern of PATTERNS) {
-      const ladder = LADDERS[pattern]
-      const per = ladder.sessionsPerRung
-      const rungsAbove = topRungIndex(pattern) - ladder.startRungIndex
+      const ladder = LADDERS[pattern];
+      const per = ladder.sessionsPerRung;
+      const rungsAbove = topRungIndex(pattern) - ladder.startRungIndex;
       for (let rung = 0; rung <= rungsAbove; rung++) {
-        const range = rangeAt(pattern, rungIndexAt(pattern, rung * per))
-        expect(targetAt(pattern, rung * per), `${pattern} rung ${rung} start`).toBe(range.min)
-        expect(targetAt(pattern, rung * per + per - 1), `${pattern} rung ${rung} end`).toBe(
-          range.max,
-        )
+        const range = rangeAt(pattern, rungIndexAt(pattern, rung * per));
+        expect(targetAt(pattern, rung * per), `${pattern} rung ${rung} start`).toBe(range.min);
+        expect(targetAt(pattern, rung * per + per - 1), `${pattern} rung ${rung} end`).toBe(range.max);
       }
     }
-  })
+  });
 
-  it('attains the cap on a rep ladder and on a timed one, by name', () => {
+  it("attains the cap on a rep ladder and on a timed one, by name", () => {
     // Spelled out rather than only asserted as a loop, because these are the two
     // numbers the wiki quotes as ceilings.
-    expect(rangeAt('push', rungIndexAt('push', 0))).toEqual({ min: 5, max: 12 })
-    expect(targetAt('push', 0)).toBe(5)
-    expect(targetAt('push', 13)).toBe(12)
-    expect(rangeAt('core', rungIndexAt('core', 0))).toEqual({ min: 20, max: 60 })
-    expect(targetAt('core', 0)).toBe(20)
-    expect(targetAt('core', 41)).toBe(60)
-  })
-})
+    expect(rangeAt("push", rungIndexAt("push", 0))).toEqual({ min: 5, max: 12 });
+    expect(targetAt("push", 0)).toBe(5);
+    expect(targetAt("push", 13)).toBe(12);
+    expect(rangeAt("core", rungIndexAt("core", 0))).toEqual({ min: 20, max: 60 });
+    expect(targetAt("core", 0)).toBe(20);
+    expect(targetAt("core", 41)).toBe(60);
+  });
+});
 
 // ─── Property 2 ─────────────────────────────────────────────────────────────
 
-describe('the top rung cycles, with no special case', () => {
-  it('clamps the rung index and never exceeds the top', () => {
+describe("the top rung cycles, with no special case", () => {
+  it("clamps the rung index and never exceeds the top", () => {
     for (const pattern of PATTERNS) {
-      const per = LADDERS[pattern].sessionsPerRung
+      const per = LADDERS[pattern].sessionsPerRung;
       for (const n of [per * 50, per * 500, 10 ** 6]) {
-        expect(rungIndexAt(pattern, n), `${pattern} at ${n}`).toBe(topRungIndex(pattern))
+        expect(rungIndexAt(pattern, n), `${pattern} at ${n}`).toBe(topRungIndex(pattern));
       }
     }
-  })
+  });
 
-  it('keeps sweeping min→max→min for ever once clamped', () => {
+  it("keeps sweeping min→max→min for ever once clamped", () => {
     for (const pattern of PATTERNS) {
-      const ladder = LADDERS[pattern]
-      const per = ladder.sessionsPerRung
+      const ladder = LADDERS[pattern];
+      const per = ladder.sessionsPerRung;
       // Well past the top of every ladder.
-      const base = per * (ladder.rungs.length + 20)
-      const range = rangeAt(pattern, topRungIndex(pattern))
-      const sweep = Array.from({ length: per }, (_, i) => targetAt(pattern, base + i))
-      expect(sweep[0], `${pattern} does not restart at the bottom`).toBe(range.min)
-      expect(sweep[sweep.length - 1], `${pattern} does not reach its cap`).toBe(range.max)
-      expect(Math.max(...sweep), `${pattern} overshot its cap`).toBe(range.max)
+      const base = per * (ladder.rungs.length + 20);
+      const range = rangeAt(pattern, topRungIndex(pattern));
+      const sweep = Array.from({ length: per }, (_, i) => targetAt(pattern, base + i));
+      expect(sweep[0], `${pattern} does not restart at the bottom`).toBe(range.min);
+      expect(sweep[sweep.length - 1], `${pattern} does not reach its cap`).toBe(range.max);
+      expect(Math.max(...sweep), `${pattern} overshot its cap`).toBe(range.max);
       // Monotonic across the sweep, then back to the bottom on the next session.
       for (let i = 1; i < sweep.length; i++) {
-        expect(sweep[i]!, `${pattern} sweep dipped at ${i}`).toBeGreaterThanOrEqual(sweep[i - 1]!)
+        expect(sweep[i]!, `${pattern} sweep dipped at ${i}`).toBeGreaterThanOrEqual(sweep[i - 1]!);
       }
-      expect(targetAt(pattern, base + per)).toBe(range.min)
+      expect(targetAt(pattern, base + per)).toBe(range.min);
     }
-  })
+  });
 
-  it('is periodic with period sessionsPerRung once clamped', () => {
+  it("is periodic with period sessionsPerRung once clamped", () => {
     // The honest statement of "you stay there and it cycles": the whole
     // prescription repeats, and nothing special-cases it into existence.
     for (const pattern of PATTERNS) {
-      const per = LADDERS[pattern].sessionsPerRung
-      const base = per * (LADDERS[pattern].rungs.length + 5)
+      const per = LADDERS[pattern].sessionsPerRung;
+      const base = per * (LADDERS[pattern].rungs.length + 5);
       for (let i = 0; i < per; i++) {
-        expect(targetAt(pattern, base + i)).toBe(targetAt(pattern, base + i + per))
+        expect(targetAt(pattern, base + i)).toBe(targetAt(pattern, base + i + per));
       }
     }
-  })
-})
+  });
+});
 
 // ─── Property 3 ─────────────────────────────────────────────────────────────
 
-describe('re-tuning a range does not move anyone', () => {
-  it('derives the rung index from sessions alone, never from a range', () => {
+describe("re-tuning a range does not move anyone", () => {
+  it("derives the rung index from sessions alone, never from a range", () => {
     // Stated as: the index is exactly the closed form, which mentions no range.
     for (const pattern of PATTERNS) {
-      const ladder = LADDERS[pattern]
+      const ladder = LADDERS[pattern];
       for (let n = 0; n < ladder.sessionsPerRung * (ladder.rungs.length + 2); n += 3) {
         const expected = Math.min(
           ladder.startRungIndex + Math.floor(n / ladder.sessionsPerRung),
           ladder.rungs.length - 1,
-        )
-        expect(rungIndexAt(pattern, n), `${pattern} at ${n}`).toBe(expected)
+        );
+        expect(rungIndexAt(pattern, n), `${pattern} at ${n}`).toBe(expected);
       }
     }
-  })
+  });
 
-  it('gives two ladders with the same start and cadence the same rung sequence', () => {
+  it("gives two ladders with the same start and cadence the same rung sequence", () => {
     // core and pull both start at index 1 and both run 42 sessions per rung, but
     // their rungs' spans differ (20→60 vs 10→30). Identical index sequences are
     // the observable form of "the caps are free to re-tune".
-    expect(LADDERS.core.startRungIndex).toBe(LADDERS.pull.startRungIndex)
-    expect(LADDERS.core.sessionsPerRung).toBe(LADDERS.pull.sessionsPerRung)
+    expect(LADDERS.core.startRungIndex).toBe(LADDERS.pull.startRungIndex);
+    expect(LADDERS.core.sessionsPerRung).toBe(LADDERS.pull.sessionsPerRung);
     for (let n = 0; n < 42 * 6; n += 7) {
-      expect(rungIndexAt('core', n)).toBe(rungIndexAt('pull', n))
+      expect(rungIndexAt("core", n)).toBe(rungIndexAt("pull", n));
     }
-  })
+  });
 
-  it('advances through the same fraction of every rung, whatever the span', () => {
+  it("advances through the same fraction of every rung, whatever the span", () => {
     // Two core rungs with different spans, at the same point inside their rung,
     // sit at the same fraction of their own range. That is what lets a rung's caps
     // change without anything stored becoming wrong.
-    const plank = rangeAt('core', 1) // 20 → 60
-    const lsit = rangeAt('core', 5) // 10 → 30
-    expect(plank).not.toEqual(lsit)
+    const plank = rangeAt("core", 1); // 20 → 60
+    const lsit = rangeAt("core", 5); // 10 → 30
+    expect(plank).not.toEqual(lsit);
     for (const into of [0, 7, 21, 35, 41]) {
-      const a = (targetAt('core', into) - plank.min) / (plank.max - plank.min)
-      const b = (targetAt('core', 4 * 42 + into) - lsit.min) / (lsit.max - lsit.min)
-      expect(a, `sessionsIntoRung ${into}`).toBeCloseTo(b, 1)
+      const a = (targetAt("core", into) - plank.min) / (plank.max - plank.min);
+      const b = (targetAt("core", 4 * 42 + into) - lsit.min) / (lsit.max - lsit.min);
+      expect(a, `sessionsIntoRung ${into}`).toBeCloseTo(b, 1);
     }
-  })
-})
+  });
+});
 
 // ─── The derived steps ──────────────────────────────────────────────────────
 
-describe('the derived steps match the law', () => {
-  it('gives push +1 rep per 2 sessions', () => {
+describe("the derived steps match the law", () => {
+  it("gives push +1 rep per 2 sessions", () => {
     for (let n = 0; n + 2 < 14; n++) {
-      expect(targetAt('push', n + 2) - targetAt('push', n), `push at ${n}`).toBe(1)
+      expect(targetAt("push", n + 2) - targetAt("push", n), `push at ${n}`).toBe(1);
     }
-    expect(targetAt('push', 0)).toBe(5)
-    expect(targetAt('push', 13)).toBe(12)
-  })
+    expect(targetAt("push", 0)).toBe(5);
+    expect(targetAt("push", 13)).toBe(12);
+  });
 
-  it('gives the 20→60s plank +1s per session', () => {
-    expect(rangeAt('core', rungIndexAt('core', 0))).toEqual({ min: 20, max: 60 })
-    const diffs = Array.from({ length: 41 }, (_, n) => targetAt('core', n + 1) - targetAt('core', n))
-    for (const d of diffs) expect(d === 0 || d === 1).toBe(true)
-    const mean = diffs.reduce((a, b) => a + b, 0) / diffs.length
-    expect(mean).toBeCloseTo(40 / 41, 2)
-  })
+  it("gives the 20→60s plank +1s per session", () => {
+    expect(rangeAt("core", rungIndexAt("core", 0))).toEqual({ min: 20, max: 60 });
+    const diffs = Array.from({ length: 41 }, (_, n) => targetAt("core", n + 1) - targetAt("core", n));
+    for (const d of diffs) expect(d === 0 || d === 1).toBe(true);
+    const mean = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+    expect(mean).toBeCloseTo(40 / 41, 2);
+  });
 
-  it('gives the 10→30s prone T +1s per 2 sessions', () => {
+  it("gives the 10→30s prone T +1s per 2 sessions", () => {
     // Same 10→30 span as the prone Y the wiki quotes; the Y sits below the start
     // rung, so the T is the one the schedule actually prescribes first.
-    expect(rangeAt('pull', rungIndexAt('pull', 0))).toEqual({ min: 10, max: 30 })
+    expect(rangeAt("pull", rungIndexAt("pull", 0))).toEqual({ min: 10, max: 30 });
     for (let n = 0; n + 2 < 42; n += 2) {
-      const step = targetAt('pull', n + 2) - targetAt('pull', n)
-      expect(step === 0 || step === 1, `pull at ${n} stepped ${step}`).toBe(true)
+      const step = targetAt("pull", n + 2) - targetAt("pull", n);
+      expect(step === 0 || step === 1, `pull at ${n} stepped ${step}`).toBe(true);
     }
-    expect(targetAt('pull', 0)).toBe(10)
-    expect(targetAt('pull', 41)).toBe(30)
-  })
+    expect(targetAt("pull", 0)).toBe(10);
+    expect(targetAt("pull", 41)).toBe(30);
+  });
 
-  it('never prescribes outside the range of the current rung', () => {
+  it("never prescribes outside the range of the current rung", () => {
     for (const pattern of PATTERNS) {
-      const per = LADDERS[pattern].sessionsPerRung
+      const per = LADDERS[pattern].sessionsPerRung;
       for (let n = 0; n < per * (LADDERS[pattern].rungs.length + 3); n++) {
-        const range = rangeAt(pattern, rungIndexAt(pattern, n))
-        const target = targetAt(pattern, n)
-        expect(target, `${pattern} at ${n}`).toBeGreaterThanOrEqual(range.min)
-        expect(target, `${pattern} at ${n}`).toBeLessThanOrEqual(range.max)
+        const range = rangeAt(pattern, rungIndexAt(pattern, n));
+        const target = targetAt(pattern, n);
+        expect(target, `${pattern} at ${n}`).toBeGreaterThanOrEqual(range.min);
+        expect(target, `${pattern} at ${n}`).toBeLessThanOrEqual(range.max);
       }
     }
-  })
+  });
 
-  it('survives a hand-edited negative counter without leaving the range', () => {
+  it("survives a hand-edited negative counter without leaving the range", () => {
     for (const pattern of PATTERNS) {
       for (const n of [-1, -5, -100]) {
-        expect(rungIndexAt(pattern, n)).toBeGreaterThanOrEqual(0)
-        const range = rangeAt(pattern, rungIndexAt(pattern, n))
-        expect(targetAt(pattern, n)).toBeGreaterThanOrEqual(range.min)
-        expect(targetAt(pattern, n)).toBeLessThanOrEqual(range.max)
+        expect(rungIndexAt(pattern, n)).toBeGreaterThanOrEqual(0);
+        const range = rangeAt(pattern, rungIndexAt(pattern, n));
+        expect(targetAt(pattern, n)).toBeGreaterThanOrEqual(range.min);
+        expect(targetAt(pattern, n)).toBeLessThanOrEqual(range.max);
       }
     }
-  })
-})
+  });
+});
 
 // ─── The variant ────────────────────────────────────────────────────────────
 
-describe('applyVariant', () => {
-  const reps = { min: 5, max: 12 }
-  const plank = { min: 20, max: 60 }
+describe("applyVariant", () => {
+  const reps = { min: 5, max: 12 };
+  const plank = { min: 20, max: 60 };
 
-  it('moves reps by 2 and seconds by 5', () => {
-    expect(applyVariant(8, 'reps', 'easy', reps)).toBe(6)
-    expect(applyVariant(8, 'reps', 'medium', reps)).toBe(8)
-    expect(applyVariant(8, 'reps', 'hard', reps)).toBe(10)
-    expect(applyVariant(40, 'seconds', 'easy', plank)).toBe(35)
-    expect(applyVariant(40, 'seconds', 'medium', plank)).toBe(40)
-    expect(applyVariant(40, 'seconds', 'hard', plank)).toBe(45)
-  })
+  it("moves reps by 2 and seconds by 5", () => {
+    expect(applyVariant(8, "reps", "easy", reps)).toBe(6);
+    expect(applyVariant(8, "reps", "medium", reps)).toBe(8);
+    expect(applyVariant(8, "reps", "hard", reps)).toBe(10);
+    expect(applyVariant(40, "seconds", "easy", plank)).toBe(35);
+    expect(applyVariant(40, "seconds", "medium", plank)).toBe(40);
+    expect(applyVariant(40, "seconds", "hard", plank)).toBe(45);
+  });
 
-  it('makes `hard` a NO-OP at range.max, deliberately', () => {
+  it("makes `hard` a NO-OP at range.max, deliberately", () => {
     // The rep ceiling exists because past ~12–15 bodyweight reps the adaptation
     // drifts to endurance and there is no load to add. The variant must not be a
     // way around it. corpus/wiki/decisions.md.
-    expect(applyVariant(12, 'reps', 'hard', reps)).toBe(12)
-    expect(applyVariant(11, 'reps', 'hard', reps)).toBe(12)
-    expect(applyVariant(60, 'seconds', 'hard', plank)).toBe(60)
-    expect(applyVariant(58, 'seconds', 'hard', plank)).toBe(60)
+    expect(applyVariant(12, "reps", "hard", reps)).toBe(12);
+    expect(applyVariant(11, "reps", "hard", reps)).toBe(12);
+    expect(applyVariant(60, "seconds", "hard", plank)).toBe(60);
+    expect(applyVariant(58, "seconds", "hard", plank)).toBe(60);
     // And it is a no-op through the real schedule, not just in the abstract:
     // push session 13 prescribes the cap.
-    const capped = prescribe(docWith({ push: 13 }), 'hard')
-    const push = exercises(capped.items).find((e) => e.pattern === 'push')!
-    expect(push.targetValue).toBe(12)
-  })
+    const capped = prescribe(docWith({ push: 13 }), "hard");
+    const push = exercises(capped.items).find((e) => e.pattern === "push")!;
+    expect(push.targetValue).toBe(12);
+  });
 
-  it('floors `easy` at range.min and never below 3 reps', () => {
-    expect(applyVariant(5, 'reps', 'easy', reps)).toBe(5)
-    expect(applyVariant(6, 'reps', 'easy', reps)).toBe(5)
-    expect(applyVariant(20, 'seconds', 'easy', plank)).toBe(20)
+  it("floors `easy` at range.min and never below 3 reps", () => {
+    expect(applyVariant(5, "reps", "easy", reps)).toBe(5);
+    expect(applyVariant(6, "reps", "easy", reps)).toBe(5);
+    expect(applyVariant(20, "seconds", "easy", plank)).toBe(20);
     // A rung with an unusually low floor still cannot produce a 1-rep set.
-    expect(applyVariant(4, 'reps', 'easy', { min: 1, max: 12 })).toBe(3)
-    expect(applyVariant(3, 'reps', 'easy', { min: 1, max: 12 })).toBe(3)
-  })
+    expect(applyVariant(4, "reps", "easy", { min: 1, max: 12 })).toBe(3);
+    expect(applyVariant(3, "reps", "easy", { min: 1, max: 12 })).toBe(3);
+  });
 
-  it('never leaves the range, for every variant at every point in a rung', () => {
+  it("never leaves the range, for every variant at every point in a rung", () => {
     for (const pattern of PATTERNS) {
-      const ladder = LADDERS[pattern]
+      const ladder = LADDERS[pattern];
       for (let n = 0; n < ladder.sessionsPerRung * 3; n++) {
-        const range = rangeAt(pattern, rungIndexAt(pattern, n))
+        const range = rangeAt(pattern, rungIndexAt(pattern, n));
         for (const variant of VARIANTS) {
-          const value = applyVariant(targetAt(pattern, n), ladder.unit, variant, range)
-          expect(value, `${pattern} ${variant} at ${n}`).toBeGreaterThanOrEqual(range.min)
-          expect(value, `${pattern} ${variant} at ${n}`).toBeLessThanOrEqual(range.max)
+          const value = applyVariant(targetAt(pattern, n), ladder.unit, variant, range);
+          expect(value, `${pattern} ${variant} at ${n}`).toBeGreaterThanOrEqual(range.min);
+          expect(value, `${pattern} ${variant} at ${n}`).toBeLessThanOrEqual(range.max);
         }
       }
     }
-  })
-})
+  });
+});
 
-describe('the variant NEVER touches sessionsDone', () => {
+describe("the variant NEVER touches sessionsDone", () => {
   // The single most important property in this file: an easy day costs no
   // progress and banks no debt, so a bad day is free.
-  it('leaves the document untouched whichever variant is prescribed', () => {
-    const before = docWith({ push: 20, squat: 20, hinge: 20, core: 60, pull: 60 }, 4)
-    const snapshot = JSON.stringify(before)
-    for (const variant of VARIANTS) prescribe(before, variant)
-    expect(JSON.stringify(before)).toBe(snapshot)
-  })
+  it("leaves the document untouched whichever variant is prescribed", () => {
+    const before = docWith({ push: 20, squat: 20, hinge: 20, core: 60, pull: 60 }, 4);
+    const snapshot = JSON.stringify(before);
+    for (const variant of VARIANTS) prescribe(before, variant);
+    expect(JSON.stringify(before)).toBe(snapshot);
+  });
 
-  it('prescribes the same rung, sets and unit for all three variants', () => {
-    const state = docWith({ push: 20, squat: 20, hinge: 20, core: 60, pull: 60 }, 1)
-    const byVariant = VARIANTS.map((v) => exercises(prescribe(state, v).items))
+  it("prescribes the same rung, sets and unit for all three variants", () => {
+    const state = docWith({ push: 20, squat: 20, hinge: 20, core: 60, pull: 60 }, 1);
+    const byVariant = VARIANTS.map((v) => exercises(prescribe(state, v).items));
     const [easy, medium, hard] = byVariant as [
       readonly PrescribedExercise[],
       readonly PrescribedExercise[],
       readonly PrescribedExercise[],
-    ]
+    ];
     for (const [i, m] of medium.entries()) {
-      expect(easy[i]!.rung.id).toBe(m.rung.id)
-      expect(hard[i]!.rung.id).toBe(m.rung.id)
-      expect(easy[i]!.rungIndex).toBe(m.rungIndex)
-      expect(easy[i]!.sets).toBe(m.sets)
-      expect(hard[i]!.sets).toBe(m.sets)
+      expect(easy[i]!.rung.id).toBe(m.rung.id);
+      expect(hard[i]!.rung.id).toBe(m.rung.id);
+      expect(easy[i]!.rungIndex).toBe(m.rungIndex);
+      expect(easy[i]!.sets).toBe(m.sets);
+      expect(hard[i]!.sets).toBe(m.sets);
       // Only the number moves, and only by the unit's step.
-      expect(m.targetValue - easy[i]!.targetValue).toBeGreaterThanOrEqual(0)
-      expect(hard[i]!.targetValue - m.targetValue).toBeGreaterThanOrEqual(0)
+      expect(m.targetValue - easy[i]!.targetValue).toBeGreaterThanOrEqual(0);
+      expect(hard[i]!.targetValue - m.targetValue).toBeGreaterThanOrEqual(0);
     }
-  })
+  });
 
-  it('advances the counters identically whatever variant was recorded', () => {
-    const state = docWith({ push: 5, squat: 5, hinge: 5, core: 15, pull: 15 }, 1)
+  it("advances the counters identically whatever variant was recorded", () => {
+    const state = docWith({ push: 5, squat: 5, hinge: 5, core: 15, pull: 15 }, 1);
     const results = VARIANTS.map((variant): SessionResult => ({
-      completedAt: '2026-07-29T00:00:00.000Z',
+      completedAt: "2026-07-29T00:00:00.000Z",
       position: state.cyclePosition,
       variant,
       exercises: [],
-    }))
-    const after = results.map((r) => recordSession(state, r))
+    }));
+    const after = results.map((r) => recordSession(state, r));
     for (const doc of after) {
-      expect(doc.sessionsDone).toEqual(after[0]!.sessionsDone)
-      expect(doc.cyclePosition).toBe(after[0]!.cyclePosition)
+      expect(doc.sessionsDone).toEqual(after[0]!.sessionsDone);
+      expect(doc.cyclePosition).toBe(after[0]!.cyclePosition);
     }
-  })
-})
+  });
+});
 
 // ─── recordSession ──────────────────────────────────────────────────────────
 
-describe('recordSession', () => {
-  const result = (position: number, variant: Variant = 'medium'): SessionResult => ({
-    completedAt: '2026-07-29T06:00:00.000Z',
+describe("recordSession", () => {
+  const result = (position: number, variant: Variant = "medium"): SessionResult => ({
+    completedAt: "2026-07-29T06:00:00.000Z",
     position,
     variant,
     exercises: [],
-  })
+  });
 
-  it('has no conditional in it at all', () => {
+  it("has no conditional in it at all", () => {
     // Structural, deliberately. There is nothing for this function to decide, and
     // an `if` here would mean adaptation had crept back in.
-    const source = recordSession.toString()
-    expect(source).not.toMatch(/\bif\b|\bswitch\b|\?|&&|\|\|/)
-  })
+    const source = recordSession.toString();
+    expect(source).not.toMatch(/\bif\b|\bswitch\b|\?|&&|\|\|/);
+  });
 
-  it('advances the position by exactly one', () => {
+  it("advances the position by exactly one", () => {
     for (const position of [0, 1, 2, 7, 100]) {
-      expect(recordSession(docWith({}, position), result(position)).cyclePosition).toBe(position + 1)
+      expect(recordSession(docWith({}, position), result(position)).cyclePosition).toBe(position + 1);
     }
-  })
+  });
 
-  it('counts one session for the slot patterns plus the daily block', () => {
+  it("counts one session for the slot patterns plus the daily block", () => {
     for (const position of [0, 1, 2, 3, 4, 5]) {
-      const before = docWith({}, position)
-      const after = recordSession(before, result(position))
-      const trained = new Set([...slotAt(position).patterns, ...DAILY_BLOCK])
+      const before = docWith({}, position);
+      const after = recordSession(before, result(position));
+      const trained = new Set([...slotAt(position).patterns, ...DAILY_BLOCK]);
       for (const pattern of PATTERNS) {
-        expect(
-          after.sessionsDone[pattern],
-          `${pattern} after a ${slotAt(position).label} session`,
-        ).toBe(trained.has(pattern) ? 1 : 0)
+        expect(after.sessionsDone[pattern], `${pattern} after a ${slotAt(position).label} session`).toBe(
+          trained.has(pattern) ? 1 : 0,
+        );
       }
     }
-  })
+  });
 
-  it('counts the daily block in every slot, cardio included', () => {
+  it("counts the daily block in every slot, cardio included", () => {
     for (let position = 0; position < ROTATION.length; position++) {
-      const after = recordSession(docWith({}, position), result(position))
+      const after = recordSession(docWith({}, position), result(position));
       for (const pattern of DAILY_BLOCK) {
-        expect(after.sessionsDone[pattern], `${pattern} at position ${position}`).toBe(1)
+        expect(after.sessionsDone[pattern], `${pattern} at position ${position}`).toBe(1);
       }
     }
-  })
+  });
 
-  it('does not read the recorded exercises', () => {
+  it("does not read the recorded exercises", () => {
     // Nothing is measured, so the recorded exercises cannot influence the
     // counters. A session that recorded nothing advances exactly as far as one
     // that recorded everything.
-    const state = docWith({}, 1)
-    const empty = recordSession(state, result(1))
+    const state = docWith({}, 1);
+    const empty = recordSession(state, result(1));
     const full = recordSession(state, {
       ...result(1),
       exercises: [
-        { pattern: 'squat', rungId: 'squat-02-bodyweight', sets: 3, targetValue: 5 },
-        { pattern: 'core', rungId: 'core-02-plank', sets: 2, targetValue: 20 },
+        { pattern: "squat", rungId: "squat-02-bodyweight", sets: 3, targetValue: 5 },
+        { pattern: "core", rungId: "core-02-plank", sets: 2, targetValue: 20 },
       ],
-    })
-    expect(full.sessionsDone).toEqual(empty.sessionsDone)
-  })
+    });
+    expect(full.sessionsDone).toEqual(empty.sessionsDone);
+  });
 
-  it('appends to history without mutating the input document', () => {
-    const before = midProgram
-    const snapshot = JSON.stringify(before)
-    const after = recordSession(before, result(before.cyclePosition))
-    expect(after.history).toHaveLength(before.history.length + 1)
-    expect(after.history.slice(0, before.history.length)).toEqual(before.history)
-    expect(JSON.stringify(before), 'recordSession mutated its input').toBe(snapshot)
-    expect(after.sessionsDone).not.toBe(before.sessionsDone)
-  })
+  it("appends to history without mutating the input document", () => {
+    const before = midProgram;
+    const snapshot = JSON.stringify(before);
+    const after = recordSession(before, result(before.cyclePosition));
+    expect(after.history).toHaveLength(before.history.length + 1);
+    expect(after.history.slice(0, before.history.length)).toEqual(before.history);
+    expect(JSON.stringify(before), "recordSession mutated its input").toBe(snapshot);
+    expect(after.sessionsDone).not.toBe(before.sessionsDone);
+  });
 
-  it('replays a full turn of the rotation into the ratio the volume budget assumes', () => {
+  it("replays a full turn of the rotation into the ratio the volume budget assumes", () => {
     // Three sessions = one turn. Each rotating pattern once, the daily block three
     // times. That 1:3 is where "2.3 vs 7 sessions a week" and therefore 14 vs 42
     // come from.
-    let state = docWith({}, 0)
-    for (let i = 0; i < 3; i++) state = recordSession(state, result(state.cyclePosition))
-    expect(state.sessionsDone).toEqual({ push: 1, squat: 1, hinge: 1, core: 3, pull: 3 })
-    expect(state.cyclePosition).toBe(3)
-  })
+    let state = docWith({}, 0);
+    for (let i = 0; i < 3; i++) state = recordSession(state, result(state.cyclePosition));
+    expect(state.sessionsDone).toEqual({ push: 1, squat: 1, hinge: 1, core: 3, pull: 3 });
+    expect(state.cyclePosition).toBe(3);
+  });
 
-  it('survives a hand-edited absurd position rather than throwing', () => {
+  it("survives a hand-edited absurd position rather than throwing", () => {
     for (const position of [-1, -1000, 10 ** 9, 2.5, Number.NaN]) {
-      expect(() => recordSession(docWith({}, position), result(position))).not.toThrow()
+      expect(() => recordSession(docWith({}, position), result(position))).not.toThrow();
     }
-  })
-})
+  });
+});
 
 // ─── prescribe ──────────────────────────────────────────────────────────────
 
-describe('prescribe', () => {
-  it('labels the slot and echoes the position and variant', () => {
+describe("prescribe", () => {
+  it("labels the slot and echoes the position and variant", () => {
     for (let position = 0; position < ROTATION.length; position++) {
-      const p = prescribe(docWith({}, position), 'medium')
-      expect(p.position).toBe(position)
-      expect(p.label).toBe(slotAt(position).label)
-      expect(p.variant).toBe('medium')
+      const p = prescribe(docWith({}, position), "medium");
+      expect(p.position).toBe(position);
+      expect(p.label).toBe(slotAt(position).label);
+      expect(p.variant).toBe("medium");
     }
-  })
+  });
 
-  it('orders the slot own work first and the daily block last', () => {
-    const legs = prescribe(docWith({}, 1), 'medium')
-    expect(exercises(legs.items).map((e) => e.pattern)).toEqual(['squat', 'hinge', 'core', 'pull'])
-    const push = prescribe(docWith({}, 0), 'medium')
-    expect(exercises(push.items).map((e) => e.pattern)).toEqual(['push', 'core', 'pull'])
-  })
+  it("orders the slot own work first and the daily block last", () => {
+    const legs = prescribe(docWith({}, 1), "medium");
+    expect(exercises(legs.items).map((e) => e.pattern)).toEqual(["squat", "hinge", "core", "pull"]);
+    const push = prescribe(docWith({}, 0), "medium");
+    expect(exercises(push.items).map((e) => e.pattern)).toEqual(["push", "core", "pull"]);
+  });
 
-  it('runs strength at 3 sets and the daily block at 2', () => {
-    expect([SETS_PER_STRENGTH, SETS_PER_DAILY_BLOCK]).toEqual([3, 2])
+  it("runs strength at 3 sets and the daily block at 2", () => {
+    expect([SETS_PER_STRENGTH, SETS_PER_DAILY_BLOCK]).toEqual([3, 2]);
     for (let position = 0; position < ROTATION.length; position++) {
-      const slot = slotAt(position)
-      for (const e of exercises(prescribe(docWith({}, position), 'medium').items)) {
-        const expected = slot.patterns.includes(e.pattern)
-          ? SETS_PER_STRENGTH
-          : SETS_PER_DAILY_BLOCK
-        expect(e.sets, `${e.pattern} on the ${slot.label} slot`).toBe(expected)
+      const slot = slotAt(position);
+      for (const e of exercises(prescribe(docWith({}, position), "medium").items)) {
+        const expected = slot.patterns.includes(e.pattern) ? SETS_PER_STRENGTH : SETS_PER_DAILY_BLOCK;
+        expect(e.sets, `${e.pattern} on the ${slot.label} slot`).toBe(expected);
       }
     }
-  })
+  });
 
-  it('trains the daily block in EVERY slot', () => {
+  it("trains the daily block in EVERY slot", () => {
     for (let position = 0; position < ROTATION.length * 3; position++) {
-      const patterns = exercises(prescribe(docWith({}, position), 'medium').items).map(
-        (e) => e.pattern,
-      )
+      const patterns = exercises(prescribe(docWith({}, position), "medium").items).map((e) => e.pattern);
       for (const pattern of DAILY_BLOCK) {
-        expect(patterns, `${pattern} missing at position ${position}`).toContain(pattern)
+        expect(patterns, `${pattern} missing at position ${position}`).toContain(pattern);
       }
     }
-  })
+  });
 
-  it('puts cardio in place of the strength work, with rounds and no target', () => {
-    const cardioPosition = ROTATION.findIndex((s) => s.cardio)
-    const p = prescribe(docWith({}, cardioPosition), 'hard')
-    expect(p.label).toBe('Cardio')
-    expect(p.items[0]).toEqual({ type: 'cardio', protocol: CARDIO, rounds: CARDIO_ROUNDS })
-    expect(CARDIO_ROUNDS).toBe(5)
+  it("puts cardio in place of the strength work, with rounds and no target", () => {
+    const cardioPosition = ROTATION.findIndex((s) => s.cardio);
+    const p = prescribe(docWith({}, cardioPosition), "hard");
+    expect(p.label).toBe("Cardio");
+    expect(p.items[0]).toEqual({ type: "cardio", protocol: CARDIO, rounds: CARDIO_ROUNDS });
+    expect(CARDIO_ROUNDS).toBe(5);
     // Cardio is not a strength pattern in disguise: no target, no unit, no sets,
     // and the variant does not reach it.
-    const cardio = p.items[0]!
-    for (const field of ['targetValue', 'unit', 'sets', 'pattern', 'rung']) {
-      expect(cardio, `cardio must not carry ${field}`).not.toHaveProperty(field)
+    const cardio = p.items[0]!;
+    for (const field of ["targetValue", "unit", "sets", "pattern", "rung"]) {
+      expect(cardio, `cardio must not carry ${field}`).not.toHaveProperty(field);
     }
     // …and the rest of the session is the daily block, at 2 sets.
-    expect(exercises(p.items).map((e) => e.pattern)).toEqual([...DAILY_BLOCK])
-  })
+    expect(exercises(p.items).map((e) => e.pattern)).toEqual([...DAILY_BLOCK]);
+  });
 
-  it('carries the rung, its unit and its ladder kind for each exercise', () => {
-    for (const e of exercises(prescribe(midProgram, 'medium').items)) {
-      const ladder = LADDERS[e.pattern]
-      expect(e.unit).toBe(ladder.unit)
-      expect(e.ladderKind).toBe(ladder.kind)
-      expect(e.rung).toBe(ladder.rungs[e.rungIndex])
-      expect(e.rung.cues.length).toBeGreaterThan(1)
-      expect(e.rungIndex).toBe(rungIndexAt(e.pattern, midProgram.sessionsDone[e.pattern]))
+  it("carries the rung, its unit and its ladder kind for each exercise", () => {
+    for (const e of exercises(prescribe(midProgram, "medium").items)) {
+      const ladder = LADDERS[e.pattern];
+      expect(e.unit).toBe(ladder.unit);
+      expect(e.ladderKind).toBe(ladder.kind);
+      expect(e.rung).toBe(ladder.rungs[e.rungIndex]);
+      expect(e.rung.cues.length).toBeGreaterThan(1);
+      expect(e.rungIndex).toBe(rungIndexAt(e.pattern, midProgram.sessionsDone[e.pattern]));
     }
     // The pull slot still announces itself as postural, wherever it is rendered.
-    const pull = exercises(prescribe(midProgram, 'medium').items).find((e) => e.pattern === 'pull')
-    expect(pull?.ladderKind).toBe('postural')
-  })
+    const pull = exercises(prescribe(midProgram, "medium").items).find((e) => e.pattern === "pull");
+    expect(pull?.ladderKind).toBe("postural");
+  });
 
-  it('puts the five fixture patterns on five distinguishable prescriptions', () => {
-    const seen = new Set<string>()
+  it("puts the five fixture patterns on five distinguishable prescriptions", () => {
+    const seen = new Set<string>();
     for (let position = 0; position < ROTATION.length; position++) {
-      for (const e of exercises(prescribe({ ...midProgram, cyclePosition: position }, 'medium').items)) {
-        seen.add(`${e.pattern}:${e.rung.id}:${e.targetValue}`)
+      for (const e of exercises(prescribe({ ...midProgram, cyclePosition: position }, "medium").items)) {
+        seen.add(`${e.pattern}:${e.rung.id}:${e.targetValue}`);
       }
     }
-    expect(seen.size).toBe(5)
-  })
+    expect(seen.size).toBe(5);
+  });
 
-  it('never throws on a hand-edited absurd position', () => {
+  it("never throws on a hand-edited absurd position", () => {
     for (const position of [-1, -999, 10 ** 9, 2.5, Number.NaN]) {
-      expect(() => prescribe(docWith({}, position), 'medium'), `position ${position}`).not.toThrow()
-      expect(prescribe(docWith({}, position), 'medium').items.length).toBeGreaterThan(0)
+      expect(() => prescribe(docWith({}, position), "medium"), `position ${position}`).not.toThrow();
+      expect(prescribe(docWith({}, position), "medium").items.length).toBeGreaterThan(0);
     }
-  })
-})
+  });
+});
 
 // ─── toSessionResult ────────────────────────────────────────────────────────
 
-describe('toSessionResult', () => {
-  const AT = '2026-07-29T06:30:00.000Z'
+describe("toSessionResult", () => {
+  const AT = "2026-07-29T06:30:00.000Z";
 
-  it('carries the position and variant through and records what was prescribed', () => {
-    const state = docWith({ push: 30, squat: 31, hinge: 29, core: 90, pull: 90 }, 0)
-    const p = prescribe(state, 'hard')
-    const result = toSessionResult(p, AT)
-    expect(result.completedAt).toBe(AT)
-    expect(result.position).toBe(p.position)
-    expect(result.variant).toBe('hard')
-    const prescribed = exercises(p.items)
-    expect(result.exercises).toHaveLength(prescribed.length)
+  it("carries the position and variant through and records what was prescribed", () => {
+    const state = docWith({ push: 30, squat: 31, hinge: 29, core: 90, pull: 90 }, 0);
+    const p = prescribe(state, "hard");
+    const result = toSessionResult(p, AT);
+    expect(result.completedAt).toBe(AT);
+    expect(result.position).toBe(p.position);
+    expect(result.variant).toBe("hard");
+    const prescribed = exercises(p.items);
+    expect(result.exercises).toHaveLength(prescribed.length);
     for (const [i, record] of result.exercises.entries()) {
-      const e = prescribed[i]!
+      const e = prescribed[i]!;
       expect(record).toEqual({
         pattern: e.pattern,
         rungId: e.rung.id,
         sets: e.sets,
         targetValue: e.targetValue,
-      })
+      });
     }
-  })
+  });
 
-  it('records no ExerciseRecord for cardio, only the daily block', () => {
-    const cardioPosition = ROTATION.findIndex((s) => s.cardio)
-    const result = toSessionResult(prescribe(docWith({}, cardioPosition), 'medium'), AT)
-    expect(result.exercises.map((e) => e.pattern)).toEqual([...DAILY_BLOCK])
+  it("records no ExerciseRecord for cardio, only the daily block", () => {
+    const cardioPosition = ROTATION.findIndex((s) => s.cardio);
+    const result = toSessionResult(prescribe(docWith({}, cardioPosition), "medium"), AT);
+    expect(result.exercises.map((e) => e.pattern)).toEqual([...DAILY_BLOCK]);
     // Nothing in the record hints at a cardio round count — there is nothing to log.
-    expect(JSON.stringify(result)).not.toMatch(/cardio|rounds/i)
-  })
+    expect(JSON.stringify(result)).not.toMatch(/cardio|rounds/i);
+  });
 
-  it('takes the timestamp as its only other input — the domain cannot read a clock', () => {
-    const state = docWith({ push: 4 }, 0)
-    const a = toSessionResult(prescribe(state, 'medium'), '2020-01-01T00:00:00.000Z')
-    const b = toSessionResult(prescribe(state, 'medium'), '2030-01-01T00:00:00.000Z')
-    expect({ ...a, completedAt: '' }).toEqual({ ...b, completedAt: '' })
-  })
+  it("takes the timestamp as its only other input — the domain cannot read a clock", () => {
+    const state = docWith({ push: 4 }, 0);
+    const a = toSessionResult(prescribe(state, "medium"), "2020-01-01T00:00:00.000Z");
+    const b = toSessionResult(prescribe(state, "medium"), "2030-01-01T00:00:00.000Z");
+    expect({ ...a, completedAt: "" }).toEqual({ ...b, completedAt: "" });
+  });
 
-  it('round-trips through recordSession for every slot and every variant', () => {
+  it("round-trips through recordSession for every slot and every variant", () => {
     // The property the four-screen shell depends on: finishing what you were prescribed
     // advances every pattern the session trained by exactly one, and nothing else.
     for (let position = 0; position < ROTATION.length; position++) {
       for (const variant of VARIANTS) {
-        const before = docWith({ push: 3, squat: 3, hinge: 3, core: 9, pull: 9 }, position)
-        const after = recordSession(before, toSessionResult(prescribe(before, variant), AT))
-        const trained = new Set([...slotAt(position).patterns, ...DAILY_BLOCK])
+        const before = docWith({ push: 3, squat: 3, hinge: 3, core: 9, pull: 9 }, position);
+        const after = recordSession(before, toSessionResult(prescribe(before, variant), AT));
+        const trained = new Set([...slotAt(position).patterns, ...DAILY_BLOCK]);
         for (const pattern of PATTERNS) {
-          const delta = after.sessionsDone[pattern] - before.sessionsDone[pattern]
-          expect(delta, `${pattern} on ${slotAt(position).label}/${variant}`).toBe(
-            trained.has(pattern) ? 1 : 0,
-          )
+          const delta = after.sessionsDone[pattern] - before.sessionsDone[pattern];
+          expect(delta, `${pattern} on ${slotAt(position).label}/${variant}`).toBe(trained.has(pattern) ? 1 : 0);
         }
-        expect(after.cyclePosition).toBe(position + 1)
-        expect(after.history.at(-1)?.variant).toBe(variant)
+        expect(after.cyclePosition).toBe(position + 1);
+        expect(after.history.at(-1)?.variant).toBe(variant);
       }
     }
-  })
+  });
 
-  it('replays a whole rotation into a history that agrees with the counters', () => {
-    let state = docWith({}, 0)
+  it("replays a whole rotation into a history that agrees with the counters", () => {
+    let state = docWith({}, 0);
     for (let i = 0; i < 9; i++) {
-      state = recordSession(state, toSessionResult(prescribe(state, 'medium'), AT))
+      state = recordSession(state, toSessionResult(prescribe(state, "medium"), AT));
     }
-    expect(state.sessionsDone).toEqual({ push: 3, squat: 3, hinge: 3, core: 9, pull: 9 })
+    expect(state.sessionsDone).toEqual({ push: 3, squat: 3, hinge: 3, core: 9, pull: 9 });
     // Every pattern's recorded appearances equal its counter. Nothing derived is
     // stored, so this is the only consistency check the document can fail.
     for (const pattern of PATTERNS) {
-      const appearances = state.history.filter((s) =>
-        s.exercises.some((e) => e.pattern === pattern),
-      ).length
-      expect(appearances, pattern).toBe(state.sessionsDone[pattern])
+      const appearances = state.history.filter((s) => s.exercises.some((e) => e.pattern === pattern)).length;
+      expect(appearances, pattern).toBe(state.sessionsDone[pattern]);
     }
-  })
-})
+  });
+});
 
 // ─── The causation guard ────────────────────────────────────────────────────
 
@@ -645,9 +628,9 @@ describe('toSessionResult', () => {
  * reversal and adaptation. Do not delete it for looking tautological, and do not
  * repair a failure here by narrowing the case that failed.
  */
-describe('LOGGING NEVER REACHES THE PRESCRIPTION — causation guard, do not delete', () => {
+describe("LOGGING NEVER REACHES THE PRESCRIPTION — causation guard, do not delete", () => {
   /** What to write on the `index`-th `ExerciseRecord` of a document; `undefined` means "not logged". */
-  type Logger = (index: number, record: ExerciseRecord) => readonly number[] | undefined
+  type Logger = (index: number, record: ExerciseRecord) => readonly number[] | undefined;
 
   /**
    * A copy of `doc` with `log` applied to every recorded exercise.
@@ -657,150 +640,136 @@ describe('LOGGING NEVER REACHES THE PRESCRIPTION — causation guard, do not del
    * accident, which is the one way this guard could pass while being wrong.
    */
   function withLogs(doc: StateDoc, log: Logger): StateDoc {
-    const clone = structuredClone(doc)
-    let index = 0
+    const clone = structuredClone(doc);
+    let index = 0;
     return {
       ...clone,
       history: clone.history.map((session) => ({
         ...session,
         exercises: session.exercises.map((record) => {
-          const logged = log(index++, record)
+          const logged = log(index++, record);
           // `exactOptionalPropertyTypes` is on and the contract says an absent key
           // is not `logged: undefined`, so "not logged" is built by omission.
-          const { logged: _cleared, ...rest } = record
-          return logged === undefined ? rest : { ...rest, logged }
+          const { logged: _cleared, ...rest } = record;
+          return logged === undefined ? rest : { ...rest, logged };
         }),
       })),
-    }
+    };
   }
 
   const loggedCount = (doc: StateDoc): number =>
-    doc.history.reduce((n, s) => n + s.exercises.filter((e) => e.logged !== undefined).length, 0)
+    doc.history.reduce((n, s) => n + s.exercises.filter((e) => e.logged !== undefined).length, 0);
 
   /** A document produced by actually playing the app, so its history is real rather than hand-written. */
   function played(sessions: number, from = 0): StateDoc {
-    let state = docWith({ push: 7, squat: 8, hinge: 6, core: 20, pull: 25 }, from)
+    let state = docWith({ push: 7, squat: 8, hinge: 6, core: 20, pull: 25 }, from);
     for (let i = 0; i < sessions; i++) {
-      const variant = VARIANTS[i % VARIANTS.length]!
-      state = recordSession(state, toSessionResult(prescribe(state, variant), '2026-09-04T06:00:00.000Z'))
+      const variant = VARIANTS[i % VARIANTS.length]!;
+      state = recordSession(state, toSessionResult(prescribe(state, variant), "2026-09-04T06:00:00.000Z"));
     }
-    return state
+    return state;
   }
 
   const SHAPES: readonly (readonly [string, StateDoc])[] = [
-    ['the midProgram fixture', midProgram],
-    ['one full turn of the rotation, played', played(3)],
-    ['three turns, played from the cardio slot', played(9, 2)],
+    ["the midProgram fixture", midProgram],
+    ["one full turn of the rotation, played", played(3)],
+    ["three turns, played from the cardio slot", played(9, 2)],
     [
-      'a top-rung document, where the target cycles rather than climbs',
+      "a top-rung document, where the target cycles rather than climbs",
       docWith({ push: 900, squat: 900, hinge: 900, core: 3000, pull: 3000 }, 1),
     ],
-    ['a fresh document with no history at all', docWith({}, 0)],
+    ["a fresh document with no history at all", docWith({}, 0)],
     [
-      'a hand-edited document full of absurd numbers',
+      "a hand-edited document full of absurd numbers",
       {
         ...midProgram,
         cyclePosition: -7,
         sessionsDone: { push: -3, squat: 2.5, hinge: 0, core: 10 ** 9, pull: 41 },
       },
     ],
-  ]
+  ];
 
-  const EVERY_SET: Logger = (index, record) => [record.targetValue, record.targetValue - 1, index]
+  const EVERY_SET: Logger = (index, record) => [record.targetValue, record.targetValue - 1, index];
 
   const LOGGERS: readonly (readonly [string, Logger])[] = [
-    ['nothing logged — the baseline the app ships with', () => undefined],
-    ['every set logged at exactly what was prescribed', EVERY_SET],
-    ['every set logged far short of the target', () => [1, 1, 1]],
-    ['every set logged far above the target', () => [10 ** 4, 10 ** 4, 10 ** 4]],
+    ["nothing logged — the baseline the app ships with", () => undefined],
+    ["every set logged at exactly what was prescribed", EVERY_SET],
+    ["every set logged far short of the target", () => [1, 1, 1]],
+    ["every set logged far above the target", () => [10 ** 4, 10 ** 4, 10 ** 4]],
     ['zeros — "I did nothing", which must prescribe the same as "I did well"', () => [0, 0, 0]],
-    ['an empty array, which is a different value from an absent key', () => []],
-    ['a log on every other record, so presence itself varies', (i) => (i % 2 === 0 ? [7] : undefined)],
-    [
-      'values no honest client would write, as a hand-edited file might',
-      (i) => [-5, 0.5, Number.NaN, 10 ** 9, i],
-    ],
-  ]
+    ["an empty array, which is a different value from an absent key", () => []],
+    ["a log on every other record, so presence itself varies", (i) => (i % 2 === 0 ? [7] : undefined)],
+    ["values no honest client would write, as a hand-edited file might", (i) => [-5, 0.5, Number.NaN, 10 ** 9, i]],
+  ];
 
-  it('gives an identical prescription however history is logged, for every variant', () => {
+  it("gives an identical prescription however history is logged, for every variant", () => {
     for (const [shape, original] of SHAPES) {
       for (const variant of VARIANTS) {
-        const baseline = prescribe(original, variant)
+        const baseline = prescribe(original, variant);
         for (const [logging, log] of LOGGERS) {
-          expect(
-            prescribe(withLogs(original, log), variant),
-            `${shape} / ${variant} / ${logging}`,
-          ).toEqual(baseline)
+          expect(prescribe(withLogs(original, log), variant), `${shape} / ${variant} / ${logging}`).toEqual(baseline);
         }
       }
     }
-  })
+  });
 
-  it('is unmoved by CHANGING a log, not only by adding one', () => {
+  it("is unmoved by CHANGING a log, not only by adding one", () => {
     for (const [shape, original] of SHAPES) {
-      const meagre = withLogs(original, () => [3, 3, 3])
-      const strong = withLogs(original, () => [12, 12, 12])
+      const meagre = withLogs(original, () => [3, 3, 3]);
+      const strong = withLogs(original, () => [12, 12, 12]);
       for (const variant of VARIANTS) {
-        expect(prescribe(strong, variant), `${shape} / ${variant}`).toEqual(
-          prescribe(meagre, variant),
-        )
+        expect(prescribe(strong, variant), `${shape} / ${variant}`).toEqual(prescribe(meagre, variant));
       }
     }
-  })
+  });
 
-  it('is unmoved by REMOVING a log from a document that carried one', () => {
+  it("is unmoved by REMOVING a log from a document that carried one", () => {
     // The direction that matters the day logs become deletable on screen: clearing
     // an entry you mistyped must not move your own schedule, forwards or back.
     for (const [shape, original] of SHAPES) {
-      const logged = withLogs(original, EVERY_SET)
-      const cleared = withLogs(logged, () => undefined)
-      expect(loggedCount(cleared), shape).toBe(0)
+      const logged = withLogs(original, EVERY_SET);
+      const cleared = withLogs(logged, () => undefined);
+      expect(loggedCount(cleared), shape).toBe(0);
       for (const variant of VARIANTS) {
-        expect(prescribe(cleared, variant), `${shape} / ${variant}`).toEqual(
-          prescribe(logged, variant),
-        )
+        expect(prescribe(cleared, variant), `${shape} / ${variant}`).toEqual(prescribe(logged, variant));
       }
     }
-  })
+  });
 
-  it('does not let a log on the incoming result move the counters either', () => {
+  it("does not let a log on the incoming result move the counters either", () => {
     // The other end of the same loop. `recordSession` is the only function that
     // advances state, so a log reaching IT would adapt the schedule exactly as
     // surely as one reaching `prescribe` — and it is the likelier mistake, because
     // the result is the object the logging UI will actually be holding.
-    const state = docWith({ push: 4, squat: 4, hinge: 4, core: 12, pull: 12 }, 0)
-    const plain = toSessionResult(prescribe(state, 'medium'), '2026-09-04T06:00:00.000Z')
+    const state = docWith({ push: 4, squat: 4, hinge: 4, core: 12, pull: 12 }, 0);
+    const plain = toSessionResult(prescribe(state, "medium"), "2026-09-04T06:00:00.000Z");
     const annotated: SessionResult = {
       ...plain,
       exercises: plain.exercises.map((e) => ({ ...e, logged: [0, 0, 0] })),
-    }
-    expect(recordSession(state, annotated).sessionsDone).toEqual(
-      recordSession(state, plain).sessionsDone,
-    )
-    expect(recordSession(state, annotated).cyclePosition).toBe(
-      recordSession(state, plain).cyclePosition,
-    )
-  })
+    };
+    expect(recordSession(state, annotated).sessionsDone).toEqual(recordSession(state, plain).sessionsDone);
+    expect(recordSession(state, annotated).cyclePosition).toBe(recordSession(state, plain).cyclePosition);
+  });
 
-  it('writes no `logged` of its own — the pure core has nothing to put in one', () => {
+  it("writes no `logged` of its own — the pure core has nothing to put in one", () => {
     // `logged` is written by the person, through the UI. The domain has no source
     // for it, so a `logged` appearing out of `toSessionResult` would be fabricated
     // data wearing the same field name as real data.
-    const result = toSessionResult(prescribe(midProgram, 'hard'), '2026-09-04T06:00:00.000Z')
-    expect(result.exercises.length).toBeGreaterThan(0)
+    const result = toSessionResult(prescribe(midProgram, "hard"), "2026-09-04T06:00:00.000Z");
+    expect(result.exercises.length).toBeGreaterThan(0);
     for (const record of result.exercises) {
-      expect(record, record.rungId).not.toHaveProperty('logged')
+      expect(record, record.rungId).not.toHaveProperty("logged");
     }
-  })
+  });
 
-  it('actually writes logs — a guard that mutated nothing would pass vacuously', () => {
+  it("actually writes logs — a guard that mutated nothing would pass vacuously", () => {
     // Without this, every assertion above would still pass if `withLogs` silently
     // stopped writing anything, and the guard would become decoration.
-    const withHistory = SHAPES.filter(([, doc]) => doc.history.length > 0)
-    expect(withHistory.length, 'no shape has a history; the guard proves nothing').toBeGreaterThan(2)
+    const withHistory = SHAPES.filter(([, doc]) => doc.history.length > 0);
+    expect(withHistory.length, "no shape has a history; the guard proves nothing").toBeGreaterThan(2);
     for (const [shape, doc] of withHistory) {
-      expect(loggedCount(doc), `${shape} already carries logs`).toBe(0)
-      expect(loggedCount(withLogs(doc, EVERY_SET)), shape).toBeGreaterThan(0)
+      expect(loggedCount(doc), `${shape} already carries logs`).toBe(0);
+      expect(loggedCount(withLogs(doc, EVERY_SET)), shape).toBeGreaterThan(0);
     }
-  })
-})
+  });
+});

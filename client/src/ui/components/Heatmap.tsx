@@ -1,4 +1,4 @@
-import type { HeatCell } from './history.ts'
+import type { HeatCell } from "./history.ts";
 
 /**
  * Forty-two days, fourteen to a row.
@@ -34,14 +34,14 @@ import type { HeatCell } from './history.ts'
  * anyone wants from it.
  */
 
-const FILL: Readonly<Record<HeatCell['level'], string>> = {
-  0: 'bg-grid0',
-  1: 'bg-[color-mix(in_srgb,var(--accent)_38%,var(--grid0))]',
-  2: 'bg-accent',
-}
+const FILL: Readonly<Record<HeatCell["level"], string>> = {
+  0: "bg-grid0",
+  1: "bg-[color-mix(in_srgb,var(--accent)_38%,var(--grid0))]",
+  2: "bg-accent",
+};
 
 export function Heatmap({ cells }: { readonly cells: readonly HeatCell[] }) {
-  const trained = cells.filter((cell) => cell.level > 0).length
+  const trained = cells.filter((cell) => cell.level > 0).length;
 
   return (
     <div className="mt-[var(--sp-4)]">
@@ -51,20 +51,14 @@ export function Heatmap({ cells }: { readonly cells: readonly HeatCell[] }) {
         className="grid grid-cols-14 gap-[4px]"
       >
         {cells.map((cell) => (
-          <span
-            key={cell.key}
-            className={`block aspect-square rounded-[3px] ${FILL[cell.level]}`}
-          />
+          <span key={cell.key} className={`block aspect-square rounded-[3px] ${FILL[cell.level]}`} />
         ))}
       </div>
       {/* The key is `aria-hidden` because the grid's own label already says what
           the grid says. It exists for the eye: three unlabelled shades of the
           accent are not self-explanatory, and "less → more" is the shortest
           sentence that makes them so. */}
-      <div
-        aria-hidden="true"
-        className="mt-[var(--sp-2)] flex items-center gap-[var(--sp-1)] text-label text-tx3"
-      >
+      <div aria-hidden="true" className="mt-[var(--sp-2)] flex items-center gap-[var(--sp-1)] text-label text-tx3">
         <span className="mr-auto">Last {cells.length} days</span>
         <span>Less</span>
         <span className={`block h-[10px] w-[10px] rounded-[2px] ${FILL[0]}`} />
@@ -73,5 +67,5 @@ export function Heatmap({ cells }: { readonly cells: readonly HeatCell[] }) {
         <span>More</span>
       </div>
     </div>
-  )
+  );
 }

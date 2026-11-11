@@ -1,7 +1,7 @@
-import { Link } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
-import { PlanIcon, ProgressIcon, TodayIcon, YouIcon } from './icons.tsx'
-import type { IconProps } from './icons.tsx'
+import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
+import { PlanIcon, ProgressIcon, TodayIcon, YouIcon } from "./icons.tsx";
+import type { IconProps } from "./icons.tsx";
 
 /**
  * The four-item bottom bar: Today · Plan · Progress · You.
@@ -32,40 +32,40 @@ import type { IconProps } from './icons.tsx'
  * lost its `Pending` branch along with it: every tab is now a real `Link`.
  */
 
-export type TabKey = 'today' | 'plan' | 'progress' | 'you'
+export type TabKey = "today" | "plan" | "progress" | "you";
 
-type TabTarget = '/' | '/plan' | '/progress' | '/account'
+type TabTarget = "/" | "/plan" | "/progress" | "/account";
 
 interface Tab {
-  readonly key: TabKey
-  readonly label: string
-  readonly Icon: (props: IconProps) => ReactNode
-  readonly to: TabTarget
+  readonly key: TabKey;
+  readonly label: string;
+  readonly Icon: (props: IconProps) => ReactNode;
+  readonly to: TabTarget;
 }
 
 const TABS: readonly Tab[] = [
-  { key: 'today', label: 'Today', Icon: TodayIcon, to: '/' },
-  { key: 'plan', label: 'Plan', Icon: PlanIcon, to: '/plan' },
-  { key: 'progress', label: 'Progress', Icon: ProgressIcon, to: '/progress' },
-  { key: 'you', label: 'You', Icon: YouIcon, to: '/account' },
-]
+  { key: "today", label: "Today", Icon: TodayIcon, to: "/" },
+  { key: "plan", label: "Plan", Icon: PlanIcon, to: "/plan" },
+  { key: "progress", label: "Progress", Icon: ProgressIcon, to: "/progress" },
+  { key: "you", label: "You", Icon: YouIcon, to: "/account" },
+];
 
 /**
  * A cell. `min-h-[var(--tap-min)]` and `min-w` are not decoration: a 10px label
  * with a 24px icon is about 38px of content, and the floor is 44.
  */
 const CELL =
-  'grid min-h-[var(--tap-min)] place-items-center gap-[2px] py-[var(--sp-1)] ' +
-  'text-label font-semibold tracking-[0.02em]'
+  "grid min-h-[var(--tap-min)] place-items-center gap-[2px] py-[var(--sp-1)] " +
+  "text-label font-semibold tracking-[0.02em]";
 
 function Inner({ tab }: { readonly tab: Tab }) {
-  const { Icon, label } = tab
+  const { Icon, label } = tab;
   return (
     <>
       <Icon size={24} />
       {label}
     </>
-  )
+  );
 }
 
 export function TabBar({ active }: { readonly active: TabKey }) {
@@ -75,19 +75,19 @@ export function TabBar({ active }: { readonly active: TabKey }) {
       className="pad-bottom-safe grid shrink-0 grid-cols-4 border-t border-line bg-s1 pt-[var(--sp-1)]"
     >
       {TABS.map((tab) => {
-        const current = tab.key === active
-        const tone = current ? 'text-accent' : 'text-tx3'
+        const current = tab.key === active;
+        const tone = current ? "text-accent" : "text-tx3";
         return (
           <Link
             key={tab.key}
             to={tab.to}
             className={`${CELL} ${tone}`}
-            {...(current ? { 'aria-current': 'page' as const } : {})}
+            {...(current ? { "aria-current": "page" as const } : {})}
           >
             <Inner tab={tab} />
           </Link>
-        )
+        );
       })}
     </nav>
-  )
+  );
 }

@@ -61,24 +61,18 @@
  * labelled placeholder rather than throwing. A typo in content data must
  * never break a workout — see `getFigure` below.
  */
-import { HINGE_FIGURE } from './Hinge.tsx'
-import { PLANK_FIGURE } from './Plank.tsx'
-import { PRONE_FIGURE } from './Prone.tsx'
-import { PUSH_FIGURE } from './Push.tsx'
-import { SQUAT_FIGURE } from './Squat.tsx'
-import type { FigureDefinition } from './types.ts'
+import { HINGE_FIGURE } from "./Hinge.tsx";
+import { PLANK_FIGURE } from "./Plank.tsx";
+import { PRONE_FIGURE } from "./Prone.tsx";
+import { PUSH_FIGURE } from "./Push.tsx";
+import { SQUAT_FIGURE } from "./Squat.tsx";
+import type { FigureDefinition } from "./types.ts";
 
-export { FIGURE_VIEWBOX, STROKE_WIDTH } from './constants.ts'
-export type {
-  FigureDefinition,
-  FigurePhase,
-  Joint,
-  MovementArrowSpec,
-  Rig,
-} from './types.ts'
-export { ElevationMarker, AngleArc, HandPositionDots, TempoDot } from './overlays.tsx'
-export { MovementArrow, RigFigure } from './primitives.tsx'
-export type { RigFigureProps, RigPartId } from './primitives.tsx'
+export { FIGURE_VIEWBOX, STROKE_WIDTH } from "./constants.ts";
+export type { FigureDefinition, FigurePhase, Joint, MovementArrowSpec, Rig } from "./types.ts";
+export { ElevationMarker, AngleArc, HandPositionDots, TempoDot } from "./overlays.tsx";
+export { MovementArrow, RigFigure } from "./primitives.tsx";
+export type { RigFigureProps, RigPartId } from "./primitives.tsx";
 export {
   BASE_PHASE_SECONDS,
   LOWERED_PHASE,
@@ -86,8 +80,8 @@ export {
   buildTimeline,
   motionClassNames,
   motionStyles,
-} from './motion.ts'
-export type { MotionSegment, MotionSegmentPhase, MotionTimeline } from './motion.ts'
+} from "./motion.ts";
+export type { MotionSegment, MotionSegmentPhase, MotionTimeline } from "./motion.ts";
 
 /**
  * The five base rigs, keyed by `figureId`. This is the full registry; an
@@ -99,7 +93,7 @@ export const figures: Readonly<Record<string, FigureDefinition>> = {
   hinge: HINGE_FIGURE,
   prone: PRONE_FIGURE,
   plank: PLANK_FIGURE,
-}
+};
 
 /**
  * Look up a figure by id. Never throws: an unregistered or missing id
@@ -107,6 +101,6 @@ export const figures: Readonly<Record<string, FigureDefinition>> = {
  * placeholder instead of drawing anything.
  */
 export function getFigure(figureId: string | undefined): FigureDefinition | undefined {
-  if (!figureId) return undefined
-  return Object.hasOwn(figures, figureId) ? figures[figureId] : undefined
+  if (!figureId) return undefined;
+  return Object.hasOwn(figures, figureId) ? figures[figureId] : undefined;
 }

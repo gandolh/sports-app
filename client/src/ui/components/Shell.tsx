@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode } from "react";
 
 /**
  * The bands every screen is made of, rebuilt for the category standard.
@@ -49,14 +49,14 @@ export function Shell({ children }: { readonly children: ReactNode }) {
     <div className="mx-auto flex h-[100dvh] w-full max-w-[30rem] flex-col overflow-hidden bg-bg text-tx">
       {children}
     </div>
-  )
+  );
 }
 
 export interface ShellRailProps {
   /** Glanced at, never aimed at. The date, or the position in a session. */
-  readonly children: ReactNode
+  readonly children: ReactNode;
   /** The right end: a status pill, or the one control that leaves the screen. */
-  readonly trailing?: ReactNode
+  readonly trailing?: ReactNode;
 }
 
 /**
@@ -72,12 +72,12 @@ export function ShellRail({ children, trailing }: ShellRailProps) {
       <span className="text-meta font-medium text-tx2 tabular-nums">{children}</span>
       {trailing === undefined ? null : <div className="flex items-center">{trailing}</div>}
     </div>
-  )
+  );
 }
 
 export interface ShellTitleProps {
-  readonly title: string
-  readonly subtitle?: string
+  readonly title: string;
+  readonly subtitle?: string;
   /**
    * `day` is the Today screen's 40px title; `movement` is the player's 28px one.
    *
@@ -87,26 +87,24 @@ export interface ShellTitleProps {
    * away, and it is four times as long — set at 40px it wraps to three lines and
    * pushes the rep target under the fold.
    */
-  readonly size?: 'day' | 'movement'
+  readonly size?: "day" | "movement";
 }
 
-export function ShellTitle({ title, subtitle, size = 'day' }: ShellTitleProps) {
+export function ShellTitle({ title, subtitle, size = "day" }: ShellTitleProps) {
   return (
     <div className="shrink-0 px-[var(--sp-4)] pb-[var(--sp-2)]">
       <h1
         className={
-          size === 'day'
-            ? 'text-display leading-[var(--lh-display)] font-extrabold tracking-[var(--ls-display)] text-balance'
-            : 'text-title leading-[var(--lh-title)] font-bold tracking-[var(--ls-title)] text-balance'
+          size === "day"
+            ? "text-display leading-[var(--lh-display)] font-extrabold tracking-[var(--ls-display)] text-balance"
+            : "text-title leading-[var(--lh-title)] font-bold tracking-[var(--ls-title)] text-balance"
         }
       >
         {title}
       </h1>
-      {subtitle === undefined ? null : (
-        <p className="mt-[var(--sp-1)] text-meta text-tx2 tabular-nums">{subtitle}</p>
-      )}
+      {subtitle === undefined ? null : <p className="mt-[var(--sp-1)] text-meta text-tx2 tabular-nums">{subtitle}</p>}
     </div>
-  )
+  );
 }
 
 /**
@@ -118,10 +116,8 @@ export function ShellTitle({ title, subtitle, size = 'day' }: ShellTitleProps) {
  */
 export function ShellBody({ children }: { readonly children: ReactNode }) {
   return (
-    <main className="flex-1 overflow-y-auto overscroll-contain px-[var(--sp-4)] pb-[var(--sp-4)]">
-      {children}
-    </main>
-  )
+    <main className="flex-1 overflow-y-auto overscroll-contain px-[var(--sp-4)] pb-[var(--sp-4)]">{children}</main>
+  );
 }
 
 /**
@@ -132,19 +128,13 @@ export function ShellBody({ children }: { readonly children: ReactNode }) {
  * with a gap rather than margins so that a screen with no secondary row (the
  * finish page) closes up on its own with no conditional spacing.
  */
-export function ShellFooter({
-  above,
-  children,
-}: {
-  readonly above?: ReactNode
-  readonly children: ReactNode
-}) {
+export function ShellFooter({ above, children }: { readonly above?: ReactNode; readonly children: ReactNode }) {
   return (
     <div className="grid shrink-0 gap-[var(--sp-2)] bg-bg px-[var(--sp-4)] pt-[var(--sp-2)] pb-[var(--sp-3)]">
       {above}
       {children}
     </div>
-  )
+  );
 }
 
 /**
@@ -155,20 +145,12 @@ export function ShellFooter({
  * (`tokens.css`), so this component is also the enforcement of that: there is
  * one `uppercase` in the components tree and it is here.
  */
-export function Eyebrow({
-  children,
-  className,
-}: {
-  readonly children: ReactNode
-  readonly className?: string
-}) {
+export function Eyebrow({ children, className }: { readonly children: ReactNode; readonly className?: string }) {
   return (
-    <span
-      className={`text-label font-bold uppercase tracking-[var(--ls-label)] ${className ?? 'text-tx3'}`}
-    >
+    <span className={`text-label font-bold uppercase tracking-[var(--ls-label)] ${className ?? "text-tx3"}`}>
       {children}
     </span>
-  )
+  );
 }
 
 /**
@@ -177,8 +159,6 @@ export function Eyebrow({
  */
 export function SectionHeading({ children }: { readonly children: ReactNode }) {
   return (
-    <h2 className="mt-[var(--sp-5)] mb-[var(--sp-1)] text-meta font-bold tracking-[var(--ls-title)]">
-      {children}
-    </h2>
-  )
+    <h2 className="mt-[var(--sp-5)] mb-[var(--sp-1)] text-meta font-bold tracking-[var(--ls-title)]">{children}</h2>
+  );
 }

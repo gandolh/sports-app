@@ -1,10 +1,10 @@
 // `defineConfig` comes from vitest/config, not vite — that is what types the
 // `test` block below. Importing it from 'vite' typechecks everything except the
 // test config, which then silently does nothing.
-import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import { VitePWA } from 'vite-plugin-pwa'
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { VitePWA } from "vite-plugin-pwa";
 
 /**
  * This repo deliberately carries no `@types/node` — `client/tsconfig.json` pins
@@ -12,7 +12,7 @@ import { VitePWA } from 'vite-plugin-pwa'
  * `.mjs`. One env var does not justify reversing that, so this declares the
  * single member of `process` used below and nothing else.
  */
-declare const process: { readonly env: Readonly<Record<string, string | undefined>> }
+declare const process: { readonly env: Readonly<Record<string, string | undefined>> };
 
 /**
  * Where the app is served from, with a guaranteed leading and trailing slash.
@@ -26,8 +26,8 @@ declare const process: { readonly env: Readonly<Record<string, string | undefine
  * manifest and service-worker scope below have to agree with it exactly or the
  * installed app resolves its own start URL outside its own scope.
  */
-const baseSegment = (process.env.SPORTS_APP_BASE ?? '').replace(/^\/+|\/+$/g, '')
-const base = baseSegment === '' ? '/' : `/${baseSegment}/`
+const baseSegment = (process.env.SPORTS_APP_BASE ?? "").replace(/^\/+|\/+$/g, "");
+const base = baseSegment === "" ? "/" : `/${baseSegment}/`;
 
 /**
  * What the **browser** puts in front of `/api` to reach the state service, with a
@@ -41,15 +41,15 @@ const base = baseSegment === '' ? '/' : `/${baseSegment}/`
  * session cookie's `Path` and the browser's request path cannot disagree.
  */
 const apiPrefix = (() => {
-  const value = (process.env.SPORTS_APP_API_PREFIX ?? '').trim()
-  if (value === '') return ''
+  const value = (process.env.SPORTS_APP_API_PREFIX ?? "").trim();
+  if (value === "") return "";
   if (!/^\/[A-Za-z0-9._~/-]*[A-Za-z0-9._~-]$/.test(value)) {
     throw new Error(
       `SPORTS_APP_API_PREFIX must be empty or a path like /sports-app-api (a leading slash, no trailing one), got "${value}"`,
-    )
+    );
   }
-  return value
-})()
+  return value;
+})();
 
 export default defineConfig({
   base,
@@ -66,17 +66,17 @@ export default defineConfig({
     // exactly one CSS file.
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
+      registerType: "autoUpdate",
+      includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
       manifest: {
         // All three follow `base`. `scope` is what stops an installed PWA at
         // /sports-app/ from claiming the whole domain on a shared host.
         id: base,
         start_url: base,
         scope: base,
-        name: 'Calisthenics',
-        short_name: 'Calisthenics',
-        description: 'Zero-equipment calisthenics trainer',
+        name: "Calisthenics",
+        short_name: "Calisthenics",
+        description: "Zero-equipment calisthenics trainer",
         // Matches light `--bg` in tokens.css. These two are the splash and the OS
         // chrome, so a mismatch here shows up as a coloured flash between the
         // splash and the first paint — the one place the theme is visible
@@ -87,25 +87,25 @@ export default defineConfig({
         // unstamped default in `tokens.css`; making the flash follow the user's
         // choice needs a `<meta name="theme-color" media="…">` pair in
         // `index.html`, which is the file.
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
-        display: 'standalone',
-        orientation: 'portrait',
+        theme_color: "#ffffff",
+        background_color: "#ffffff",
+        display: "standalone",
+        orientation: "portrait",
         icons: [
-          { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
           {
-            src: 'icons/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
+            src: "icons/icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
       },
       workbox: {
         // Precache the whole shell. The app must be fully usable with no
         // network — nothing on the session-critical path may require it.
-        globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
+        globPatterns: ["**/*.{js,css,html,png,svg,woff2}"],
         cleanupOutdatedCaches: true,
         // Client-side routing: a cold load of /sports-app/week must serve the
         // shell, not 404. Caddy's `try_files` does this when online; this is the
@@ -131,13 +131,13 @@ export default defineConfig({
   // There is no `/ward` proxy any more: the browser goes to Ward's own origin.
   server: {
     proxy: {
-      '/api': { target: 'http://127.0.0.1:8787', changeOrigin: false },
+      "/api": { target: "http://127.0.0.1:8787", changeOrigin: false },
     },
   },
   test: {
     // `node` by default so src/domain/ tests run with no DOM at all. Component
     // tests opt in per-file with `// @vitest-environment jsdom`.
-    environment: 'node',
+    environment: "node",
     // Not for styling — no test renders anything that needs a stylesheet. It is
     // what makes a CSS file readable *as text* from `import.meta.glob(…, '?raw')`.
     //
@@ -153,6 +153,6 @@ export default defineConfig({
     // Client tests only. The service's tests are a separate Vitest project
     // (server/vitest.config.mjs) that the root config aggregates, so `npm test`
     // at the root still reports one total across both.
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
-})
+});

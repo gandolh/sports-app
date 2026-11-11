@@ -1,4 +1,4 @@
-import { FlameIcon } from './icons.tsx'
+import { FlameIcon } from "./icons.tsx";
 
 /**
  * Days in a row, in the `warn` hue, with a **drawn** flame.
@@ -28,7 +28,7 @@ import { FlameIcon } from './icons.tsx'
  * easy, and the honest render of no streak is no pill.
  */
 export function StreakPill({ days }: { readonly days: number }) {
-  if (days <= 0) return null
+  if (days <= 0) return null;
   return (
     // `role="img"` is not decoration: both children are aria-hidden — the icon
     // by default, the digit explicitly — so the label is the only accessible
@@ -40,10 +40,10 @@ export function StreakPill({ days }: { readonly days: number }) {
     <span
       role="img"
       className="inline-flex items-center gap-[var(--sp-1)] rounded-full bg-warn-bg py-[2px] pr-[var(--sp-2)] pl-[var(--sp-1)] text-meta font-bold text-warn tabular-nums"
-      aria-label={`${days} ${days === 1 ? 'day' : 'days'} in a row.`}
+      aria-label={`${days} ${days === 1 ? "day" : "days"} in a row.`}
     >
       <FlameIcon size={16} />
       <span aria-hidden="true">{days}</span>
     </span>
-  )
+  );
 }

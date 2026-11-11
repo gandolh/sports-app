@@ -1,4 +1,4 @@
-import { StopIcon } from './icons.tsx'
+import { StopIcon } from "./icons.tsx";
 
 /**
  * The store could not write, or the stored document could not be read.
@@ -23,13 +23,7 @@ import { StopIcon } from './icons.tsx'
  * `Notices.tsx` held the previous version, rendering against `app.css`. Both
  * were deleted on 2026-09-04 once every route had been ported off them.
  */
-export function AlertBanner({
-  label,
-  text,
-}: {
-  readonly label: string
-  readonly text: string
-}) {
+export function AlertBanner({ label, text }: { readonly label: string; readonly text: string }) {
   return (
     <div
       role="alert"
@@ -37,13 +31,9 @@ export function AlertBanner({
     >
       <StopIcon size={20} className="mt-[1px] text-dang" />
       <div>
-        <span className="block text-label font-bold uppercase tracking-[var(--ls-label)] text-dang">
-          {label}
-        </span>
-        <p className="mt-[2px] text-meta leading-[var(--lh-body)] whitespace-pre-line text-tx">
-          {text}
-        </p>
+        <span className="block text-label font-bold uppercase tracking-[var(--ls-label)] text-dang">{label}</span>
+        <p className="mt-[2px] text-meta leading-[var(--lh-body)] whitespace-pre-line text-tx">{text}</p>
       </div>
     </div>
-  )
+  );
 }
