@@ -241,10 +241,9 @@ const PRUNE = `
  * `LEGACY_USERNAME` in place. No table rebuild, no copy, no window where the
  * history is in two places.
  *
- * @param {import('node:sqlite').DatabaseSync} db
- * @returns {boolean} whether this call performed the migration
+ * Returns whether this call performed the migration.
  */
-function addUsernameColumn(db) {
+function addUsernameColumn(db: DatabaseSync): boolean {
   const columns = db
     .prepare("PRAGMA table_info(snapshots)")
     .all()
@@ -256,38 +255,47 @@ function addUsernameColumn(db) {
   return true;
 }
 
-/**
- * @typedef {object} Snapshot
- * @property {number} id
- * @property {string} createdAt
- * @property {string} username
- * @property {number} historyLength  `history.length` of the stored document
- * @property {number} schemaVersion
- * @property {string} docJson the stored bytes, verbatim
- */
+export interface Snapshot {
+  id: number;
+  createdAt: string;
+  username: string;
+  /** `history.length` of the stored document */
+  historyLength: number;
+  schemaVersion: number;
+  /** the stored bytes, verbatim */
+  docJson: string;
+}
 
-/**
- * @typedef {object} SnapshotStore
- * @property {string} file            the database path actually opened
- * @property {import('node:sqlite').DatabaseSync} db  the open handle, handed to the
- *   vendored auth library so its `auth_*` tables live in this same file
- * @property {number} retention       per username, not in total
- * @property {boolean} migrated       true when this open added the username column
- * @property {(username: string) => Snapshot | null} latest
- * @property {(input: {username: string, docJson: string, historyLength: number, schemaVersion: number, createdAt?: string}) => {id: number, createdAt: string, pruned: number}} insert
- * @property {(username?: string) => number} count   one user's rows, or every row
- * @property {(username?: string) => number[]} ids   newest first; for tests and diagnostics
- * @property {() => string[]} usernames              streams present, for diagnostics
- * @property {() => void} close
- */
+export interface SnapshotInput {
+  username: string;
+  docJson: string;
+  historyLength: number;
+  schemaVersion: number;
+  createdAt?: string;
+}
 
-/**
- * Open (creating if absent) the snapshot database.
- *
- * @param {{file?: string, retention?: number}} [options]
- * @returns {SnapshotStore}
- */
-export function openSnapshotStore(options = {}) {
+export interface SnapshotStore {
+  /** the database path actually opened */
+  file: string;
+  /** the open handle, handed to the vendored auth library so its `auth_*` tables live in this same file */
+  db: DatabaseSync;
+  /** per username, not in total */
+  retention: number;
+  /** true when this open added the username column */
+  migrated: boolean;
+  latest(username: string): Snapshot | null;
+  insert(input: SnapshotInput): { id: number; createdAt: string; pruned: number };
+  /** one user's rows, or every row */
+  count(username?: string): number;
+  /** newest first; for tests and diagnostics */
+  ids(username?: string): number[];
+  /** streams present, for diagnostics */
+  usernames(): string[];
+  close(): void;
+}
+
+/** Open (creating if absent) the snapshot database. */
+export function openSnapshotStore(options: { file?: string; retention?: number } = {}): SnapshotStore {
   const file = options.file ?? DEFAULT_DB_FILE;
   const retention = options.retention ?? RETENTION;
 
@@ -337,15 +345,12 @@ export function openSnapshotStore(options = {}) {
    * that stops a future caller (a repair script, a one-off import) from
    * creating a stream no HTTP request can name, which would be a silently
    * unreachable copy of somebody's history.
-   *
-   * @param {unknown} username
-   * @returns {string}
    */
-  function requireUsername(username) {
+  function requireUsername(username: unknown): string {
     if (!isValidUsername(username)) {
       throw new TypeError(`username must be ${USERNAME_RULE}; got ${JSON.stringify(username)}`);
     }
-    return /** @type {string} */ (username);
+    return username;
   }
 
   return {
@@ -357,7 +362,7 @@ export function openSnapshotStore(options = {}) {
     retention,
     migrated,
 
-    latest(username) {
+    latest(username: string) {
       const row = selectLatest.get(requireUsername(username));
       if (!row) return null;
       return {
@@ -370,7 +375,7 @@ export function openSnapshotStore(options = {}) {
       };
     },
 
-    insert({ username, docJson, historyLength, schemaVersion, createdAt }) {
+    insert({ username, docJson, historyLength, schemaVersion, createdAt }: SnapshotInput) {
       const owner = requireUsername(username);
       const stamp = createdAt ?? new Date().toISOString();
 
@@ -394,12 +399,12 @@ export function openSnapshotStore(options = {}) {
       }
     },
 
-    count(username) {
+    count(username?: string) {
       const row = username === undefined ? countAll.get() : countForUser.get(requireUsername(username));
       return row ? Number(row.n) : 0;
     },
 
-    ids(username) {
+    ids(username?: string) {
       const rows = username === undefined ? selectAllIds.all() : selectIdsForUser.all(requireUsername(username));
       return rows.map((row) => Number(row.id));
     },

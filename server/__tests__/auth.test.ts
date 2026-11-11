@@ -17,8 +17,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
-import { PROJECT_ROOT, openSnapshotStore } from "../db.mjs";
-import { createStateServer } from "../state-server.mjs";
+import { PROJECT_ROOT, openSnapshotStore } from "../db.ts";
+import { createStateServer } from "../state-server.ts";
 import {
   SESSION_COOKIE_NAME,
   UNSUPPORTED_USERNAME,
@@ -28,15 +28,16 @@ import {
   orphanStreamNames,
   readAuthConfig,
 } from "../ward.ts";
-import { seedAccount } from "../seed-users.mjs";
+import { seedAccount } from "../seed-users.ts";
 import { createWardIdentities } from "../vendor/ward/ward-auth.js";
-import { testAuthConfig } from "./auth-fixture.mjs";
+import type { Accounts, WardClient } from "../vendor/ward/ward-auth.js";
+import type { AddressInfo } from "node:net";
+import { testAuthConfig } from "./auth-fixture.ts";
 
 const ISSUER = "http://localhost:8792/ward-api/oidc";
 const PASSWORD = "correct-horse-battery";
 
-/** @type {(() => Promise<void> | void)[]} */
-let cleanups = [];
+let cleanups: (() => Promise<void> | void)[] = [];
 
 afterEach(async () => {
   const pending = cleanups;
@@ -53,7 +54,7 @@ function clientKeyEnvValue() {
   ).toString("base64url");
 }
 
-function json(status, body) {
+function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "content-type": "application/json" },
@@ -67,8 +68,8 @@ function json(status, body) {
  * the way a stopped Ward does.
  */
 function fakeWard() {
-  const state = { down: false, active: true, calls: [] };
-  const fetchImpl = async (input) => {
+  const state = { down: false, active: true, calls: [] as string[] };
+  const fetchImpl = async (input: string | URL | Request) => {
     const url = String(input instanceof Request ? input.url : input);
     state.calls.push(url);
     if (state.down) throw new TypeError("fetch failed");
@@ -92,17 +93,15 @@ function fakeWard() {
 
 /**
  * Start the service the way `main` assembles it, over a fresh database.
- *
- * @param {{ ward?: boolean, apiPrefix?: string, fetch?: typeof fetch }} [options]
  */
-async function startService(options = {}) {
+async function startService(options: { ward?: boolean; apiPrefix?: string; fetch?: typeof fetch } = {}) {
   const root = mkdtempSync(join(tmpdir(), "sports-app-auth-"));
   const store = openSnapshotStore({ file: join(root, "db", "app.db") });
   const accounts = openAccounts(store.db);
 
   const apiPrefix = options.apiPrefix ?? "";
   let auth = testAuthConfig({ apiPrefix, cookiePath: `${apiPrefix}/api` });
-  let wardClient;
+  let wardClient: WardClient | undefined;
   if (options.ward) {
     const config = readAuthConfig({
       WARD_OIDC_ISSUER: ISSUER,
@@ -117,15 +116,15 @@ async function startService(options = {}) {
   }
 
   const server = createStateServer({ store, accounts, auth, wardClient });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   cleanups.push(async () => {
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise<void>((resolve) => server.close(resolve));
     store.close();
     rmSync(root, { recursive: true, force: true });
   });
 
-  const post = (path, body, headers = {}) =>
+  const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
     fetch(`${base}${path}`, {
       method: "POST",
       headers: { "content-type": "application/json", ...headers },
@@ -136,12 +135,12 @@ async function startService(options = {}) {
 }
 
 /** `name=value` out of a `Set-Cookie` header, ready to send back. */
-function cookieFrom(response) {
+function cookieFrom(response: Response) {
   const header = response.headers.get("set-cookie") ?? "";
-  return header.split(";")[0];
+  return header.split(";")[0] ?? "";
 }
 
-function docText(username, sessions) {
+function docText(username: string, sessions: number) {
   return `${JSON.stringify(
     {
       schemaVersion: 5,
@@ -162,7 +161,7 @@ describe("local sign-in, with Ward not configured at all", () => {
 
     const login = await post("/api/auth/login", { username: "alice", password: PASSWORD });
     expect(login.status).toBe(200);
-    const body = await login.json();
+    const body = (await login.json()) as Record<string, unknown>;
     expect(body.user).toMatchObject({ username: "alice", hasPassword: true });
     expect(body.ward).toEqual({ enabled: false, linked: false });
 
@@ -242,10 +241,10 @@ describe("the guard", () => {
       ["POST", "/api/health"],
       ["GET", "/"],
       ["POST", "/api/auth/password"],
-    ]) {
+    ] as [string, string][]) {
       const response = await fetch(`${base}${path}`, { method });
       expect(response.status, `${method} ${path}`).toBe(401);
-      expect((await response.json()).error).toBe("unauthorized");
+      expect(((await response.json()) as Record<string, unknown>).error).toBe("unauthorized");
     }
   });
 
@@ -279,7 +278,10 @@ describe("the guard", () => {
     expect(await state.json()).toEqual({ error: "unauthorized", reason: UNSUPPORTED_USERNAME });
 
     // And the session call says why, so the login page can word it.
-    const session = await (await fetch(`${base}/api/auth/session`, { headers: { cookie } })).json();
+    const session = (await (await fetch(`${base}/api/auth/session`, { headers: { cookie } })).json()) as Record<
+      string,
+      unknown
+    >;
     expect(session.user).toBeNull();
     expect(session.reason).toBe(UNSUPPORTED_USERNAME);
   });
@@ -298,14 +300,17 @@ describe("GET /api/auth/session", () => {
     const { base, store, post } = await startService();
     await seedAccount({ username: "alice", password: PASSWORD, store });
 
-    const anonymous = await (await fetch(`${base}/api/auth/session`)).json();
+    const anonymous = (await (await fetch(`${base}/api/auth/session`)).json()) as Record<string, unknown>;
     expect(anonymous.user).toBeNull();
     expect(anonymous.ward).toEqual({ enabled: false, linked: false });
 
     const cookie = cookieFrom(await post("/api/auth/login", { username: "alice", password: PASSWORD }));
-    const known = await (await fetch(`${base}/api/auth/session`, { headers: { cookie } })).json();
+    const known = (await (await fetch(`${base}/api/auth/session`, { headers: { cookie } })).json()) as Record<
+      string,
+      unknown
+    >;
     expect(known.user).toMatchObject({ username: "alice", role: "user", hasPassword: true });
-    expect(known.session.origin).toBe("local");
+    expect((known.session as { origin: string }).origin).toBe("local");
   });
 });
 
@@ -452,7 +457,7 @@ describe('"Sign in with Ward" is wired', () => {
 
     const response = await post("/api/auth/ward/start", {});
     expect(response.status).toBe(200);
-    const { url } = await response.json();
+    const { url } = (await response.json()) as { url: string };
     const target = new URL(url);
     expect(`${target.origin}${target.pathname}`).toBe(`${ISSUER}/auth`);
     expect(target.searchParams.get("client_id")).toBe("sports-app");
@@ -469,7 +474,7 @@ describe('"Sign in with Ward" is wired', () => {
 
     const start = await post("/api/auth/ward/start", {});
     const flowCookie = cookieFrom(start);
-    const state = new URL((await start.json()).url).searchParams.get("state");
+    const state = new URL(((await start.json()) as { url: string }).url).searchParams.get("state") ?? "";
 
     // What Ward answers for an account with no sports-app grant (or one that
     // pressed "Back to the app"): the OAuth error, on the redirect URI.
@@ -478,7 +483,7 @@ describe('"Sign in with Ward" is wired', () => {
       { headers: { cookie: flowCookie }, redirect: "manual" },
     );
     expect(callback.status).toBe(303);
-    const landed = new URL(callback.headers.get("location"));
+    const landed = new URL(callback.headers.get("location") ?? "");
     expect(landed.pathname).toBe("/sports-app/login");
     expect(landed.searchParams.get("ward_error")).toBe("access_denied");
     // One page with a sentence on it, not a loop: no session was started.
@@ -487,13 +492,15 @@ describe('"Sign in with Ward" is wired', () => {
 
   it("tells the login page the button is available, and not before", async () => {
     const withWard = await startService({ ward: true, fetch: fakeWard().fetch });
-    expect((await (await fetch(`${withWard.base}/api/auth/session`)).json()).ward).toEqual({
-      enabled: true,
-      linked: false,
-    });
+    expect(((await (await fetch(`${withWard.base}/api/auth/session`)).json()) as Record<string, unknown>).ward).toEqual(
+      {
+        enabled: true,
+        linked: false,
+      },
+    );
 
     const without = await startService();
-    expect((await (await fetch(`${without.base}/api/auth/session`)).json()).ward).toEqual({
+    expect(((await (await fetch(`${without.base}/api/auth/session`)).json()) as Record<string, unknown>).ward).toEqual({
       enabled: false,
       linked: false,
     });
@@ -511,7 +518,7 @@ describe('"Sign in with Ward" is wired', () => {
 
     const start = await post("/api/auth/ward/start", {});
     expect(start.status).toBeGreaterThanOrEqual(400);
-    expect((await start.json()).error).toBe("ward_unavailable");
+    expect(((await start.json()) as Record<string, unknown>).error).toBe("ward_unavailable");
   });
 
   it("moves the cookie path and the callback together when the prefix changes", async () => {
@@ -526,7 +533,7 @@ describe('"Sign in with Ward" is wired', () => {
     const login = await post("/api/auth/login", { username: "alice", password: PASSWORD });
     expect(login.headers.get("set-cookie")).toContain("Path=/sports-app-api/api");
 
-    const { url } = await (await post("/api/auth/ward/start", {})).json();
+    const { url } = (await (await post("/api/auth/ward/start", {})).json()) as { url: string };
     expect(new URL(url).searchParams.get("redirect_uri")).toBe(
       "http://localhost:5173/sports-app-api/api/auth/ward/callback",
     );
@@ -537,7 +544,7 @@ describe('"Sign in with Ward" is wired', () => {
     // what stops a deploy that registered one prefix and configured another.
     const root = mkdtempSync(join(tmpdir(), "sports-app-boot-"));
     cleanups.push(() => rmSync(root, { recursive: true, force: true }));
-    const child = spawn(process.execPath, [join(PROJECT_ROOT, "server", "state-server.mjs")], {
+    const child = spawn(process.execPath, [join(PROJECT_ROOT, "server", "state-server.ts")], {
       env: {
         ...process.env,
         SPORTS_APP_HOST: "127.0.0.1",
@@ -563,7 +570,7 @@ describe('"Sign in with Ward" is wired', () => {
 
 describe("a session that began with Ward is checked, and a local one is not", () => {
   /** A user created the way a first Ward sign-in creates one, with a live Ward session. */
-  async function wardUser(accounts, subject = "ward-subject-1") {
+  async function wardUser(accounts: Accounts, subject = "ward-subject-1") {
     const identities = createWardIdentities({ accounts });
     const { user } = await identities.userForSignIn({
       subject,

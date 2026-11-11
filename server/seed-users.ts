@@ -22,18 +22,17 @@
 import { createInterface } from "node:readline/promises";
 import { pathToFileURL } from "node:url";
 import { Writable } from "node:stream";
-import { DEFAULT_DB_FILE, openSnapshotStore } from "./db.mjs";
+import { DEFAULT_DB_FILE, openSnapshotStore } from "./db.ts";
+import type { SnapshotStore } from "./db.ts";
 import { DEFAULT_ROLE, USERNAME_RULE, linkWardStreams, openAccounts, orphanStreamNames } from "./ward.ts";
 import { isValidUsername } from "@sports-app/shared/username.ts";
 import { seedUsers } from "./vendor/ward/ward-auth.js";
+import type { Accounts } from "./vendor/ward/ward-auth.js";
 
 /**
  * Ask a question on the terminal. With `hidden`, what is typed is not echoed.
- *
- * @param {string} question
- * @param {{ hidden?: boolean }} [options]
  */
-async function ask(question, { hidden = false } = {}) {
+async function ask(question: string, { hidden = false }: { hidden?: boolean } = {}) {
   let muted = false;
   const output = new Writable({
     write(chunk, _encoding, done) {
@@ -55,17 +54,20 @@ async function ask(question, { hidden = false } = {}) {
 
 /**
  * Create the account if it does not exist. Throws with a message fit to print.
- *
- * @param {{
- *   username: string,
- *   password: string,
- *   role?: string,
- *   store: import('./db.mjs').SnapshotStore,
- *   accounts?: import('./vendor/ward/ward-auth.js').Accounts,
- * }} input
- * @returns {Promise<{ created: boolean, hadHistory: boolean, orphans: string[] }>}
  */
-export async function seedAccount({ username, password, role = DEFAULT_ROLE, store, accounts }) {
+export async function seedAccount({
+  username,
+  password,
+  role = DEFAULT_ROLE,
+  store,
+  accounts,
+}: {
+  username: string;
+  password: string;
+  role?: string;
+  store: SnapshotStore;
+  accounts?: Accounts | undefined;
+}): Promise<{ created: boolean; hadHistory: boolean; orphans: string[] }> {
   const name = String(username ?? "").trim();
   if (!isValidUsername(name)) {
     throw new Error(`That username will not work: expected ${USERNAME_RULE}.`);
@@ -86,8 +88,7 @@ export async function seedAccount({ username, password, role = DEFAULT_ROLE, sto
   };
 }
 
-/** @param {Record<string, string | undefined>} env */
-async function main(env) {
+async function main(env: Record<string, string | undefined>) {
   const dbFile = env.SPORTS_APP_DB ?? DEFAULT_DB_FILE;
   const interactive = process.stdin.isTTY === true;
 

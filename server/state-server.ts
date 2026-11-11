@@ -122,9 +122,12 @@
  * training history to a network. Host and port are environment variables.
  */
 import Fastify from "fastify";
+import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
+import type { AddressInfo } from "node:net";
 import { pathToFileURL } from "node:url";
 import { TypeCompiler } from "@sinclair/typebox/compiler";
-import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from "./db.mjs";
+import { DEFAULT_DB_FILE, RETENTION, openSnapshotStore } from "./db.ts";
+import type { SnapshotStore } from "./db.ts";
 import {
   ALLOW_RENAME,
   ROUTE_PREFIX,
@@ -135,7 +138,9 @@ import {
   readAuthConfig,
   requireSupportedUsername,
 } from "./ward.ts";
+import type { AuthConfig } from "./ward.ts";
 import { wardAuth } from "./vendor/ward/ward-auth.js";
+import type { Accounts, WardClient } from "./vendor/ward/ward-auth.js";
 // The wire contract, from the one place it is declared. `shared/` may not import
 // `node:` anything, so nothing in here can drag a Node-only module into the client
 // bundle or a browser-only one into this process. Node ≥22.18 strips the types at
@@ -145,6 +150,7 @@ import {
   HEALTH_PATH,
   HealthResponse,
   STATE_PATH,
+  ErrorResponse,
   SnapshotReceipt,
   StateDocumentEnvelope,
 } from "@sports-app/shared/api.ts";
@@ -189,15 +195,12 @@ const checkStateDocument = TypeCompiler.Compile(StateDocumentEnvelope);
  * Fastify's router already matches on the path alone, so this is only needed
  * where a request has *not* matched a route — the 404/405 handler — and in log
  * lines, which must never carry a query string into a log file.
- *
- * @param {string | undefined} url
- * @returns {string}
  */
-function pathOf(url) {
-  return (url ?? "").split("?")[0];
+function pathOf(url: string | undefined): string {
+  return (url ?? "").split("?")[0] ?? "";
 }
 
-function messageOf(cause) {
+function messageOf(cause: unknown) {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
@@ -221,7 +224,7 @@ function messageOf(cause) {
  * staring at a rejected sync actually needs. Keyed by pointer so adding a field to
  * the envelope without a message here is visible rather than silent.
  */
-const DOCUMENT_ERRORS = {
+const DOCUMENT_ERRORS: Record<string, string> = {
   "/schemaVersion":
     "schemaVersion: expected a number. Every state document carries one; " +
     "a body without it is probably not a state document at all.",
@@ -232,12 +235,11 @@ const DOCUMENT_ERRORS = {
   "/history": "history: expected an array",
 };
 
-/**
- * @param {string} text
- * @returns {{ok: true, schemaVersion: number, username: string, historyLength: number} | {ok: false, error: string}}
- */
-export function checkDocument(text) {
-  let raw;
+export type CheckedDocument =
+  { ok: true; schemaVersion: number; username: string; historyLength: number } | { ok: false; error: string };
+
+export function checkDocument(text: string): CheckedDocument {
+  let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch (cause) {
@@ -269,6 +271,15 @@ export function checkDocument(text) {
 // ─── The service ────────────────────────────────────────────────────────────
 
 /**
+ * The signed-in user's username. The guard registered first answers every request without a
+ * session before a handler runs, so a missing one here means the guard was not registered.
+ */
+function signedInUsername(request: FastifyRequest): string {
+  if (request.auth === null) throw new Error("a state route ran without a session");
+  return request.auth.user.username;
+}
+
+/**
  * The subset of `node:http.Server` this service is driven through.
  *
  * Fastify owns the socket internally and its own `listen` is promise-based, so
@@ -276,25 +287,23 @@ export function checkDocument(text) {
  * tests actually use are adapted here. `listen` boots Fastify's plugin graph
  * first — routes are registered during `ready()`, so a raw `server.listen()` would
  * open the port before there was anything to route to.
- *
- * @typedef {object} StateService
- * @property {(port: number, host: string, onListening?: () => void) => void} listen
- * @property {() => import('node:net').AddressInfo | string | null} address
- * @property {(done?: () => void) => void} close
  */
+export interface StateService {
+  listen(port: number, host: string, onListening?: () => void): void;
+  address(): AddressInfo | string | null;
+  close(done?: () => void): void;
+}
 
-/**
- * @param {{
- *   store: import('./db.mjs').SnapshotStore,
- *   accounts: import('./vendor/ward/ward-auth.js').Accounts,
- *   auth: ReturnType<typeof readAuthConfig>,
- *   wardClient?: import('./vendor/ward/ward-auth.js').WardClient | undefined,
- *   maxBodyBytes?: number,
- *   log?: (message: string) => void,
- * }} config
- * @returns {StateService}
- */
-export function createStateServer(config) {
+export interface StateServerConfig {
+  store: SnapshotStore;
+  accounts: Accounts;
+  auth: AuthConfig;
+  wardClient?: WardClient | undefined;
+  maxBodyBytes?: number;
+  log?: (message: string) => void;
+}
+
+export function createStateServer(config: StateServerConfig): StateService {
   const { store, accounts, auth, wardClient } = config;
   const maxBodyBytes = config.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
   const log = config.log ?? (() => {});
@@ -373,14 +382,14 @@ export function createStateServer(config) {
         }),
   });
 
-  function methodNotAllowed(reply, allow) {
+  function methodNotAllowed(reply: FastifyReply, allow: string) {
     return reply
       .header("Allow", allow)
       .code(405)
       .send({ error: `method not allowed; try ${allow}` });
   }
 
-  function unsupportedMediaType(reply) {
+  function unsupportedMediaType(reply: FastifyReply) {
     return reply.code(415).send({ error: `expected Content-Type: ${JSON_CONTENT_TYPE}` });
   }
 
@@ -410,7 +419,7 @@ export function createStateServer(config) {
   // Fastify's own error bodies carry `statusCode`, `code` and `error` keys. The
   // client reads `error` and nothing else, so each of the three reachable
   // framework failures is restated in the shape the contract has always used.
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: FastifyError, _request, reply) => {
     if (error.code === "FST_ERR_CTP_INVALID_MEDIA_TYPE") return unsupportedMediaType(reply);
 
     if (error.code === "FST_ERR_CTP_BODY_TOO_LARGE") {
@@ -507,7 +516,7 @@ export function createStateServer(config) {
          * and was suffixed because their Ward name was taken is `alice-2` here, and
          * that is the stream they get; it never follows the Ward name.
          */
-        const username = request.auth.user.username;
+        const username = signedInUsername(request);
 
         const snapshot = store.latest(username);
         if (snapshot === null) {
@@ -535,13 +544,13 @@ export function createStateServer(config) {
     });
 
     // ── PUT /api/state ────────────────────────────────────────────────────────
-    scope.route({
+    scope.route<{ Body: string | undefined }>({
       method: "PUT",
       url: STATE_PATH,
-      schema: { response: { 200: SnapshotReceipt } },
+      schema: { response: { 200: SnapshotReceipt, 400: ErrorResponse, 415: ErrorResponse } },
       handler: (request, reply) => {
         // The session's username, for the reason `GET` gives above.
-        const username = request.auth.user.username;
+        const username = signedInUsername(request);
 
         const text = request.body;
         if (text === undefined) return unsupportedMediaType(reply);
@@ -629,10 +638,7 @@ export function createStateServer(config) {
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
-/**
- * @param {Record<string, string | undefined>} env
- */
-export function readConfig(env) {
+export function readConfig(env: Record<string, string | undefined>) {
   const rawPort = env.SPORTS_APP_PORT;
   const port = rawPort === undefined || rawPort === "" ? DEFAULT_PORT : Number(rawPort);
   const rawMax = env.SPORTS_APP_MAX_BODY_BYTES;
@@ -649,11 +655,10 @@ export function readConfig(env) {
 
 // ─── Entry point ────────────────────────────────────────────────────────────
 
-/**
- * @param {Record<string, string | undefined>} env
- * @param {{error: (m: string) => void, log: (m: string) => void}} out
- */
-export async function main(env, out = console) {
+export async function main(
+  env: Record<string, string | undefined>,
+  out: { error: (m: string) => void; log: (m: string) => void } = console,
+) {
   const config = readConfig(env);
 
   if (!Number.isInteger(config.port) || config.port < 0 || config.port > 65535) {
@@ -667,7 +672,7 @@ export async function main(env, out = console) {
    * Secure or not sent back; a half-set Ward configuration is always a deploy
    * mistake, and `readAuthConfig` names what is missing.
    */
-  let auth;
+  let auth: AuthConfig;
   try {
     auth = readAuthConfig(env);
   } catch (error) {
@@ -676,10 +681,10 @@ export async function main(env, out = console) {
   }
 
   const store = openSnapshotStore({ file: config.dbFile });
-  const log = config.quiet ? () => {} : (message) => out.log(`[state] ${message}`);
+  const log = config.quiet ? () => {} : (message: string) => out.log(`[state] ${message}`);
 
   const accounts = openAccounts(store.db);
-  let wardClient;
+  let wardClient: WardClient | undefined;
   try {
     // Validates the values and imports the key now, so a bad key fails here.
     // It does not contact Ward: discovery is lazy, and the service starts while
@@ -693,7 +698,7 @@ export async function main(env, out = console) {
 
   // Before anything listens: a Ward sign-in must find the account that owns an
   // existing stream the moment it can arrive.
-  let linkedStreams;
+  let linkedStreams: string[];
   try {
     linkedStreams = await linkWardStreams(store, accounts);
   } catch (error) {

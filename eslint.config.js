@@ -29,7 +29,7 @@ export default [
     // docs build helpers.
     scripts: ["scripts", "docs/scripts"],
     // CLIs inside the app: the service entry and the seed command talk to the person running them.
-    console: ["server/seed-users.mjs", "server/state-server.mjs"],
+    console: ["server/seed-users.ts", "server/state-server.ts"],
     // Docusaurus reads `default` from its sidebar file and from its component.
     defaultExports: ["docs/sidebars.ts", "docs/src/components/Diagram.tsx"],
     // Test helpers that wrap `expect`, so `vitest/expect-expect` counts a test that calls one.
@@ -233,7 +233,7 @@ export default [
     // A warning for now (2026-11-11): these two CLIs still read the environment themselves. When the
     // server takes its settings from config.ts, this block goes and the rule is an error again.
     name: "sports-app/process-env-warns",
-    files: ["server/seed-users.mjs", "server/state-server.mjs"],
+    files: ["server/seed-users.ts", "server/state-server.ts"],
     rules: { "n/no-process-env": "warn" },
   },
 ];

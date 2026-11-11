@@ -40,4 +40,4 @@ VOLUME /data
 EXPOSE 8794
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
   CMD wget -qO- "http://127.0.0.1:${SPORTS_APP_PORT}/api/health" || exit 1
-CMD ["node", "server/state-server.mjs"]
+CMD ["node", "server/state-server.ts"]

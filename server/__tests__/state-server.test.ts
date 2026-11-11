@@ -40,20 +40,22 @@ import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { DEFAULT_DB_DIR, DEFAULT_DB_FILE, PROJECT_ROOT, RETENTION, openSnapshotStore } from "../db.mjs";
-import { STATE_PATH, checkDocument, createStateServer, readConfig } from "../state-server.mjs";
-import { createTestAuth } from "./auth-fixture.mjs";
+import { DEFAULT_DB_DIR, DEFAULT_DB_FILE, PROJECT_ROOT, RETENTION, openSnapshotStore } from "../db.ts";
+import type { AddressInfo } from "node:net";
+import type { SnapshotStore } from "../db.ts";
+import { STATE_PATH, checkDocument, createStateServer, readConfig } from "../state-server.ts";
+import type { StateServerConfig } from "../state-server.ts";
+import { createTestAuth } from "./auth-fixture.ts";
 
 /** The default signed-in identity for tests that only need one person. */
 const SUBJECT = "alice";
 
 /** The auth fixture and cookie of the service the current test started. */
-let current;
+let current: { testAuth: ReturnType<typeof createTestAuth>; cookie: string };
 
 // ─── Harness ────────────────────────────────────────────────────────────────
 
-/** @type {(() => void)[]} */
-let cleanups = [];
+let cleanups: (() => void | Promise<void>)[] = [];
 
 afterEach(async () => {
   const pending = cleanups;
@@ -61,7 +63,7 @@ afterEach(async () => {
   for (const stop of pending.reverse()) await stop();
 });
 
-async function startService(options = {}) {
+async function startService(options: { store?: SnapshotStore; retention?: number; maxBodyBytes?: number } = {}) {
   const root = mkdtempSync(join(tmpdir(), "sports-app-state-"));
   // Deliberately nested inside a `db/` directory the store has to create
   // itself — the acceptance criterion is that the database lands under `db/`.
@@ -70,7 +72,7 @@ async function startService(options = {}) {
     options.store ?? openSnapshotStore({ file, ...(options.retention ? { retention: options.retention } : {}) });
 
   /** Every log line the service emitted, for the "nothing leaked" assertions. */
-  const logs = [];
+  const logs: string[] = [];
   const testAuth = createTestAuth(store);
   const server = createStateServer({
     store,
@@ -80,12 +82,12 @@ async function startService(options = {}) {
     ...(options.maxBodyBytes ? { maxBodyBytes: options.maxBodyBytes } : {}),
   });
 
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address() as AddressInfo;
   const base = `http://127.0.0.1:${address.port}`;
 
   cleanups.push(async () => {
-    await new Promise((resolve) => server.close(resolve));
+    await new Promise<void>((resolve) => server.close(resolve));
     store.close();
     rmSync(root, { recursive: true, force: true });
   });
@@ -120,7 +122,7 @@ async function startServiceProcess() {
   const root = mkdtempSync(join(tmpdir(), "sports-app-proc-"));
   const file = join(root, "db", "app.db");
 
-  const child = spawn(process.execPath, [join(PROJECT_ROOT, "server", "state-server.mjs")], {
+  const child = spawn(process.execPath, [join(PROJECT_ROOT, "server", "state-server.ts")], {
     env: {
       ...process.env,
       SPORTS_APP_PUBLIC_ORIGIN: "http://127.0.0.1:5173",
@@ -133,7 +135,7 @@ async function startServiceProcess() {
 
   /** Every byte the process wrote to either stream, in order. */
   let output = "";
-  const collect = (chunk) => {
+  const collect = (chunk: unknown) => {
     output += String(chunk);
   };
   child.stdout.on("data", collect);
@@ -187,11 +189,11 @@ async function startServiceProcess() {
  * cutover in one line: the same tests, asking the same questions, with the name
  * moved from the URL to the cookie.
  */
-function stateUrl(base) {
+function stateUrl(base: string) {
   return `${base}${STATE_PATH}`;
 }
 
-async function put(base, username, text, headers = {}) {
+async function put(base: string, username: string | undefined, text: string, headers: Record<string, string> = {}) {
   return fetch(stateUrl(base), {
     method: "PUT",
     headers: {
@@ -203,7 +205,7 @@ async function put(base, username, text, headers = {}) {
   });
 }
 
-async function get(base, username) {
+async function get(base: string, username?: string) {
   return fetch(stateUrl(base), {
     headers: { cookie: await current.testAuth.cookieFor(username ?? SUBJECT) },
   });
@@ -217,7 +219,7 @@ async function get(base, username) {
  * server never looks inside them and a test that pretended otherwise would be
  * asserting the codec's business.
  */
-function docText(username, sessions, overrides = {}) {
+function docText(username: string, sessions: number, overrides: { schemaVersion?: number; username?: string } = {}) {
   const done = { push: 0, squat: 0, hinge: 0, core: 0, pull: 0 };
   const history = Array.from(
     { length: sessions },
@@ -360,7 +362,9 @@ describe("the session identifies a PERSON, which the shared secret never did", (
   });
 
   it("refuses to construct without accounts", () => {
-    expect(() => createStateServer({ store: openSnapshotStore({ file: ":memory:" }) })).toThrow(/requires accounts/);
+    expect(() => createStateServer({ store: openSnapshotStore({ file: ":memory:" }) } as StateServerConfig)).toThrow(
+      /requires accounts/,
+    );
   });
 });
 
@@ -369,7 +373,7 @@ describe("GET /api/health", () => {
     const { base } = await startService();
     const response = await fetch(`${base}/api/health`);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ status: "ok" });
+    expect((await response.json()) as Record<string, unknown>).toEqual({ status: "ok" });
   });
 
   it("reads no database, and cannot be turned into an existence oracle", async () => {
@@ -396,7 +400,7 @@ describe("GET /api/health", () => {
       },
       close: () => {},
     };
-    const { base } = await startService({ store: exploding });
+    const { base } = await startService({ store: exploding as unknown as SnapshotStore });
 
     const response = await fetch(`${base}/api/health`);
     expect(response.status).toBe(200);
@@ -404,7 +408,7 @@ describe("GET /api/health", () => {
     // The body is exactly one fixed field: no version, no uptime, no row count,
     // no user list, no database path. Nothing that says who uses this deployment
     // or how much they train.
-    const body = await response.json();
+    const body = (await response.json()) as Record<string, unknown>;
     expect(Object.keys(body)).toEqual(["status"]);
     expect(body.status).toBe("ok");
   });
@@ -524,7 +528,7 @@ describe("routing and method handling", () => {
     for (const path of ["/", "/api", "/api/nope", "/api/state/extra", "/api/login"]) {
       const response = await fetch(`${base}${path}`, { headers: authorised() });
       expect(response.status, path).toBe(404);
-      expect(await response.json()).toEqual({ error: "not found" });
+      expect((await response.json()) as Record<string, unknown>).toEqual({ error: "not found" });
     }
   });
 
@@ -592,7 +596,7 @@ describe("one stream per user", () => {
 
     const response = await get(base, "carol");
     expect(response.status).toBe(404);
-    expect((await response.json()).error).toMatch(/no state/i);
+    expect(((await response.json()) as Record<string, unknown>).error).toMatch(/no state/i);
     // The 404 is the same one an empty database gives: it says nothing about
     // whether anybody else is stored here.
     const empty = await startService();
@@ -608,8 +612,8 @@ describe("one stream per user", () => {
     for (let i = 1; i <= 5; i += 1) await put(base, "alice", docText("alice", i));
 
     const bobAfter = store.latest("bob");
-    expect(bobAfter.id).toBe(bobBefore.id);
-    expect(bobAfter.docJson).toBe(bob);
+    expect(bobAfter?.id).toBe(bobBefore?.id);
+    expect(bobAfter?.docJson).toBe(bob);
     expect(await (await get(base, "bob")).text()).toBe(bob);
   });
 
@@ -621,13 +625,13 @@ describe("one stream per user", () => {
     // A client bug: the right target, somebody else's document.
     const response = await put(base, "alice", bob);
     expect(response.status).toBe(400);
-    const { error } = await response.json();
+    const { error } = (await response.json()) as { error: string };
     expect(error).toMatch(/username mismatch/);
     expect(error).toMatch(/Nothing was stored/);
 
     expect(store.count("alice")).toBe(0);
     expect(store.count("bob")).toBe(1);
-    expect(store.latest("bob").docJson).toBe(bob);
+    expect(store.latest("bob")?.docJson).toBe(bob);
     expect((await get(base, "alice")).status).toBe(404);
   });
 
@@ -636,8 +640,8 @@ describe("one stream per user", () => {
     await put(base, "alice", docText("alice", 1));
     await put(base, "bob", docText("bob", 1));
     expect(store.usernames()).toEqual(["alice", "bob"]);
-    expect(store.latest("alice").username).toBe("alice");
-    expect(store.latest("bob").username).toBe("bob");
+    expect(store.latest("alice")?.username).toBe("alice");
+    expect(store.latest("bob")?.username).toBe("bob");
   });
 });
 
@@ -650,7 +654,7 @@ describe("PUT then GET round-trips byte-identically", () => {
 
     const written = await put(base, "alice", sent);
     expect(written.status).toBe(200);
-    const receipt = await written.json();
+    const receipt = (await written.json()) as Record<string, unknown>;
     expect(receipt.historyLength).toBe(9);
     expect(receipt.username).toBe("alice");
 
@@ -708,8 +712,8 @@ describe("PUT then GET round-trips byte-identically", () => {
     // Byte length, not character count: an accidental re-encode of the astral
     // escape would change this and not the string comparison above.
     expect(read.headers.get("content-length")).toBe(String(Buffer.byteLength(sent, "utf8")));
-    expect(read.headers.get("x-snapshot-id")).toBe(String(store.latest("alice").id));
-    expect(store.latest("alice").docJson).toBe(sent);
+    expect(read.headers.get("x-snapshot-id")).toBe(String(store.latest("alice")?.id));
+    expect(store.latest("alice")?.docJson).toBe(sent);
 
     // Proof the assertions above are not vacuous: every one of those choices is
     // something `JSON.parse` → `JSON.stringify` would rewrite.
@@ -729,9 +733,9 @@ describe("PUT then GET round-trips byte-identically", () => {
     await put(base, "alice", sent);
 
     const latest = store.latest("alice");
-    expect(latest.docJson).toBe(sent);
-    expect(latest.historyLength).toBe(4);
-    expect(latest.schemaVersion).toBe(97);
+    expect(latest?.docJson).toBe(sent);
+    expect(latest?.historyLength).toBe(4);
+    expect(latest?.schemaVersion).toBe(97);
   });
 
   it("accepts 3 and 4 alike, because it has no list of versions to be on", async () => {
@@ -744,8 +748,8 @@ describe("PUT then GET round-trips byte-identically", () => {
       const sent = docText("alice", 2, { schemaVersion: version });
       const response = await put(base, "alice", sent);
       expect(response.status, String(version)).toBe(200);
-      expect(store.latest("alice").docJson, String(version)).toBe(sent);
-      expect(store.latest("alice").schemaVersion, String(version)).toBe(version);
+      expect(store.latest("alice")?.docJson, String(version)).toBe(sent);
+      expect(store.latest("alice")?.schemaVersion, String(version)).toBe(version);
     }
   });
 
@@ -761,8 +765,8 @@ describe("PUT then GET round-trips byte-identically", () => {
       expect(sent, String(version)).toContain('"push": 14');
       const response = await put(base, "alice", sent);
       expect(response.status, String(version)).toBe(200);
-      expect(store.latest("alice").docJson, String(version)).toBe(sent);
-      expect(store.latest("alice").schemaVersion, String(version)).toBe(version);
+      expect(store.latest("alice")?.docJson, String(version)).toBe(sent);
+      expect(store.latest("alice")?.schemaVersion, String(version)).toBe(version);
       expect(await (await get(base, "alice")).text(), String(version)).toBe(sent);
     }
   });
@@ -805,10 +809,10 @@ describe("PUT then GET round-trips byte-identically", () => {
 
     const latest = store.latest("alice");
     // Byte-for-byte, logs included. The GET hands the same bytes back.
-    expect(latest.docJson).toBe(sent);
-    expect(latest.schemaVersion).toBe(4);
+    expect(latest?.docJson).toBe(sent);
+    expect(latest?.schemaVersion).toBe(4);
     // One session, whatever is inside it.
-    expect(latest.historyLength).toBe(1);
+    expect(latest?.historyLength).toBe(1);
 
     expect(await (await get(base, "alice")).text()).toBe(sent);
   });
@@ -820,8 +824,8 @@ describe("PUT then GET round-trips byte-identically", () => {
     // A document *with* a stray `sessionsCompleted` must not be believed over it.
     const sent = docText("alice", 3).replace('"cyclePosition"', '"sessionsCompleted": 999,\n  "cyclePosition"');
     const response = await put(base, "alice", sent);
-    expect((await response.json()).historyLength).toBe(3);
-    expect(store.latest("alice").historyLength).toBe(3);
+    expect(((await response.json()) as Record<string, unknown>).historyLength).toBe(3);
+    expect(store.latest("alice")?.historyLength).toBe(3);
   });
 
   it("survives a close and reopen of the same file", async () => {
@@ -833,7 +837,7 @@ describe("PUT then GET round-trips byte-identically", () => {
     // test rather than a test of an in-process cache.
     const reopened = openSnapshotStore({ file: service.file });
     try {
-      expect(reopened.latest("alice").docJson).toBe(sent);
+      expect(reopened.latest("alice")?.docJson).toBe(sent);
     } finally {
       reopened.close();
     }
@@ -873,8 +877,8 @@ describe("a rejected PUT changes nothing", () => {
     }
 
     const after = store.latest("alice");
-    expect(after.id).toBe(before.id);
-    expect(after.docJson).toBe(good);
+    expect(after?.id).toBe(before?.id);
+    expect(after?.docJson).toBe(good);
     expect(store.count()).toBe(1);
 
     expect(await (await get(base, "alice")).text()).toBe(good);
@@ -940,14 +944,14 @@ describe("retention", () => {
     const sent = [];
     for (let i = 1; i <= 12; i += 1) {
       sent.push(docText("alice", i));
-      const response = await put(base, "alice", sent[i - 1]);
+      const response = await put(base, "alice", sent[i - 1] ?? "");
       expect(response.status).toBe(200);
       expect(store.count("alice")).toBe(Math.min(i, retention));
     }
 
     expect(store.count("alice")).toBe(retention);
-    expect(store.latest("alice").docJson).toBe(sent[11]);
-    expect(store.latest("alice").historyLength).toBe(12);
+    expect(store.latest("alice")?.docJson).toBe(sent[11]);
+    expect(store.latest("alice")?.historyLength).toBe(12);
 
     // The survivors are the *newest* five, not an arbitrary five.
     expect(store.ids("alice")).toEqual([12, 11, 10, 9, 8]);
@@ -974,7 +978,7 @@ describe("retention", () => {
 
     expect(store.count("alice")).toBe(retention);
     expect(store.count("bob")).toBe(1);
-    expect(store.latest("bob").id).toBe(bobRow.id);
+    expect(store.latest("bob")?.id).toBe(bobRow?.id);
     expect(await (await get(base, "bob")).text()).toBe(bobDoc);
   });
 
@@ -985,7 +989,7 @@ describe("retention", () => {
     const response = await put(base, "alice", docText("alice", 1));
     // 1, not 3: a count of every row would tell each user how much the others
     // train.
-    expect((await response.json()).retained).toBe(1);
+    expect(((await response.json()) as Record<string, unknown>).retained).toBe(1);
   });
 });
 

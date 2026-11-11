@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { ROUTE_PREFIX, SESSION_COOKIE_NAME, DEFAULT_ROLE, openAccounts } from "../ward.ts";
+import type { AuthConfig } from "../ward.ts";
 
 /**
  * Real accounts and real sessions for the service tests.
@@ -17,7 +18,7 @@ import { ROUTE_PREFIX, SESSION_COOKIE_NAME, DEFAULT_ROLE, openAccounts } from ".
  */
 
 /** The auth config as `readAuthConfig` would produce it for local development. */
-export function testAuthConfig(overrides = {}) {
+export function testAuthConfig(overrides: Partial<AuthConfig> = {}): AuthConfig {
   return {
     publicOrigin: "http://localhost:5173",
     apiPrefix: "",
@@ -31,27 +32,26 @@ export function testAuthConfig(overrides = {}) {
   };
 }
 
-/**
- * @param {{ db?: import('node:sqlite').DatabaseSync }} store
- */
-export function createTestAuth(store) {
+export function createTestAuth(store: { db?: DatabaseSync }) {
   const accounts = openAccounts(store.db ?? new DatabaseSync(":memory:"));
-  /** @type {Map<string, string>} */
-  const cookies = new Map();
+  const cookies = new Map<string, string>();
 
   return {
     accounts,
     auth: testAuthConfig(),
 
     /** Create the user if it does not exist yet, with no password. */
-    async ensureUser(username, { password = null, role = DEFAULT_ROLE } = {}) {
+    async ensureUser(
+      username: string,
+      { password = null, role = DEFAULT_ROLE }: { password?: string | null; role?: string } = {},
+    ) {
       const existing = await accounts.findUserByUsername(username);
       if (existing !== undefined) return existing;
       return accounts.createUser({ username, password, role });
     },
 
     /** A `Cookie` header for a live local session as `username`, minted once. */
-    async cookieFor(username) {
+    async cookieFor(username: string) {
       const known = cookies.get(username);
       if (known !== undefined) return known;
       const user = await this.ensureUser(username);

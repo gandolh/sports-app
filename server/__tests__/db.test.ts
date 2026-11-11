@@ -22,7 +22,8 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { RETENTION, openSnapshotStore } from "../db.mjs";
+import { RETENTION, openSnapshotStore } from "../db.ts";
+import type { SnapshotStore } from "../db.ts";
 import {
   LEGACY_USERNAME,
   USERNAME_MAX_LENGTH,
@@ -32,8 +33,7 @@ import {
 
 // ─── Harness ────────────────────────────────────────────────────────────────
 
-/** @type {(() => void)[]} */
-let cleanups = [];
+let cleanups: (() => void)[] = [];
 
 afterEach(() => {
   const pending = cleanups;
@@ -47,14 +47,14 @@ function tempDir() {
   return root;
 }
 
-function openStore(file, options = {}) {
+function openStore(file: string, options: { retention?: number } = {}) {
   const store = openSnapshotStore({ file, ...options });
   cleanups.push(() => store.close());
   return store;
 }
 
 /** A document body. Only `history.length` and `username` matter to the store. */
-function doc(username, sessions) {
+function doc(username: string, sessions: number) {
   return JSON.stringify({
     schemaVersion: 3,
     username,
@@ -62,7 +62,7 @@ function doc(username, sessions) {
   });
 }
 
-function put(store, username, sessions, createdAt) {
+function put(store: SnapshotStore, username: string, sessions: number, createdAt?: string) {
   return store.insert({
     username,
     docJson: doc(username, sessions),
@@ -79,7 +79,7 @@ function put(store, username, sessions, createdAt) {
  * two schemas, and the difference surfaces the first time somebody runs
  * `SELECT *` or diffs `.schema`.
  */
-function tableShape(file) {
+function tableShape(file: string) {
   const db = new DatabaseSync(file);
   try {
     return db
@@ -97,7 +97,7 @@ function tableShape(file) {
  * from anything the current code exports — a fixture that follows the
  * implementation around cannot detect a migration that stopped being needed.
  */
-function legacyDatabase(rows) {
+function legacyDatabase(rows: { createdAt: string; sessions: number; docJson: string }[]) {
   const root = tempDir();
   const dir = join(root, "db");
   mkdirSync(dir, { recursive: true });
@@ -199,10 +199,10 @@ describe("migrating a pre-existing single-user database", () => {
     // re-serialised the documents would pass a deep-equality check while
     // destroying the layout the codec wrote them in.
     const latest = store.latest(LEGACY_USERNAME);
-    expect(latest.docJson).toBe(V2_DOC_B);
-    expect(latest.historyLength).toBe(42);
-    expect(latest.schemaVersion).toBe(2);
-    expect(latest.username).toBe(LEGACY_USERNAME);
+    expect(latest?.docJson).toBe(V2_DOC_B);
+    expect(latest?.historyLength).toBe(42);
+    expect(latest?.schemaVersion).toBe(2);
+    expect(latest?.username).toBe(LEGACY_USERNAME);
   });
 
   it("is idempotent: opening the same database again migrates nothing and changes nothing", () => {
@@ -216,7 +216,7 @@ describe("migrating a pre-existing single-user database", () => {
       const again = openSnapshotStore({ file });
       expect(again.migrated, `pass ${pass}`).toBe(false);
       expect(again.count()).toBe(1);
-      expect(again.latest(LEGACY_USERNAME).docJson).toBe(V2_DOC_A);
+      expect(again.latest(LEGACY_USERNAME)?.docJson).toBe(V2_DOC_A);
       again.close();
     }
 
@@ -243,7 +243,7 @@ describe("migrating a pre-existing single-user database", () => {
     put(store, "alice", 1);
 
     expect(store.usernames()).toEqual(["alice", LEGACY_USERNAME]);
-    expect(store.latest(LEGACY_USERNAME).docJson).toBe(V2_DOC_A);
+    expect(store.latest(LEGACY_USERNAME)?.docJson).toBe(V2_DOC_A);
     expect(store.count(LEGACY_USERNAME)).toBe(1);
     expect(store.count("alice")).toBe(1);
   });
@@ -253,7 +253,7 @@ describe("migrating a pre-existing single-user database", () => {
     expect(store.migrated).toBe(false);
     expect(store.latest("alice")).toBe(null);
     put(store, "alice", 1);
-    expect(store.latest("alice").historyLength).toBe(1);
+    expect(store.latest("alice")?.historyLength).toBe(1);
   });
 });
 
@@ -272,7 +272,7 @@ describe("retention is per user", () => {
     for (let i = 1; i <= 26; i += 1) put(store, "alice", i);
 
     expect(store.count("alice")).toBe(20);
-    expect(store.latest("alice").historyLength).toBe(26);
+    expect(store.latest("alice")?.historyLength).toBe(26);
     // The survivors are the newest twenty, by id.
     expect(store.ids("alice")).toEqual(Array.from({ length: 20 }, (_, i) => 26 - i));
   });
@@ -292,8 +292,8 @@ describe("retention is per user", () => {
     // written before thirty of Alice's arrived. A global cap would have eaten it.
     expect(store.count("bob")).toBe(2);
     expect(store.ids("bob")).toEqual(bobIds);
-    expect(store.latest("bob").historyLength).toBe(2);
-    expect(store.latest("alice").historyLength).toBe(30);
+    expect(store.latest("bob")?.historyLength).toBe(2);
+    expect(store.latest("alice")?.historyLength).toBe(30);
   });
 
   it("reports how many rows the write pruned, counting only that user", () => {
@@ -320,8 +320,8 @@ describe("retention is per user", () => {
 
     expect(store.ids("alice")).toEqual([3, 2]);
     const latest = store.latest("alice");
-    expect(latest.historyLength).toBe(3);
-    expect(latest.createdAt).toBe("2020-01-01T00:00:00.000Z");
+    expect(latest?.historyLength).toBe(3);
+    expect(latest?.createdAt).toBe("2020-01-01T00:00:00.000Z");
   });
 
   it('rejects a retention that would make "keep the newest N" meaningless', () => {
@@ -341,10 +341,10 @@ describe("the store refuses a username it could not serve", () => {
     // a silently unreachable copy.
     for (const name of ["", "Alice", "x".repeat(33), "../etc", null, 7]) {
       expect(
-        () => store.insert({ username: name, docJson: "{}", historyLength: 0, schemaVersion: 3 }),
+        () => store.insert({ username: name as string, docJson: "{}", historyLength: 0, schemaVersion: 3 }),
         String(name),
       ).toThrow(/username must be/);
-      expect(() => store.latest(name), String(name)).toThrow(/username must be/);
+      expect(() => store.latest(name as string), String(name)).toThrow(/username must be/);
     }
     expect(store.count()).toBe(0);
   });
