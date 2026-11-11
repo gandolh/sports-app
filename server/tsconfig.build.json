@@ -1,0 +1,19 @@
+{
+  /* What the image runs: `tsc -p tsconfig.build.json` writes `dist/`, and `node dist/server.js` is the
+     container's CMD. Development and the tests run the `src/` files straight through Node's type
+     stripping, so neither needs this build. The relative `.ts` imports are rewritten to `.js` on the way
+     out. The `@sports-app/shared/*.ts` imports stay bare specifiers: they are resolved at run time through
+     the workspace link to `shared/`, which ships as source (see ../tsconfig.base.json). `vendor/` is
+     generated JavaScript that is imported as `../vendor/…` from `src/` and from `dist/` alike, so it is
+     copied, not compiled. */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"],
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/testing"]
+}

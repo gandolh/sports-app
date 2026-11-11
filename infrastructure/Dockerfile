@@ -1,8 +1,9 @@
 # sports-app — the state service behind the offline-first PWA.
 #
-# The lightest image in the estate: the service's only runtime dependency is
-# Fastify, and its storage is `node:sqlite`, which is BUILT IN. There is no
-# native module to compile and no build step — the server is plain .mjs.
+# The lightest image in the estate: the service's runtime dependencies are Fastify
+# and TypeBox, and its storage is `node:sqlite`, which is BUILT IN. There is no
+# native module to compile. The server is TypeScript, built with `tsc` in a stage
+# of its own, so the image holds `server/dist` and no compiler.
 #
 # Build context is the REPO ROOT (one root lockfile covers shared/client/server).
 #
@@ -23,13 +24,28 @@ COPY server/package.json ./server/
 # was built on the deploy machine and shipped to Caddy as static files.
 RUN npm ci --omit=dev -w @sports-app/server --include-workspace-root
 
+FROM node:24-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY shared/package.json ./shared/
+COPY client/package.json ./client/
+COPY server/package.json ./server/
+# The server's own dev dependencies (`typescript`, `@types/node`) come from its manifest, and the
+# client's React tree stays out, as in `proddeps`.
+RUN npm ci -w @sports-app/server
+COPY shared ./shared
+COPY server ./server
+RUN npm run build -w @sports-app/server
+
 FROM node:24-alpine AS prod
 LABEL org.opencontainers.image.title="sports-app state service"
 WORKDIR /app
 COPY --from=proddeps /app/node_modules ./node_modules
 COPY package.json ./
 COPY shared ./shared
-COPY server ./server
+COPY server/package.json ./server/
+COPY server/vendor ./server/vendor
+COPY --from=build /app/server/dist ./server/dist
 ENV NODE_ENV=production \
     SPORTS_APP_HOST=0.0.0.0 \
     SPORTS_APP_PORT=8794 \
@@ -40,4 +56,4 @@ VOLUME /data
 EXPOSE 8794
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
   CMD wget -qO- "http://127.0.0.1:${SPORTS_APP_PORT}/api/health" || exit 1
-CMD ["node", "server/state-server.ts"]
+CMD ["node", "server/dist/state-server.js"]

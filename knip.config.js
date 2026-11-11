@@ -14,11 +14,5 @@ export default {
       // client's test pass.
       ignoreDependencies: ["@testing-library/jest-dom"],
     },
-    server: {
-      // A warning for now (2026-11-11): state-server.mjs imports Typebox's compiler, which arrives
-      // through Fastify and is not declared. When the server moves to TypeScript and declares what it
-      // imports, this goes.
-      ignoreDependencies: ["@sinclair/typebox"],
-    },
   },
 };

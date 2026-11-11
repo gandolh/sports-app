@@ -5,14 +5,16 @@
   "type": "module",
   "description": "The state service. Fastify, node:sqlite, and the shared contract.",
   "exports": {
-    "./db.ts": "./db.ts",
-    "./state-server.ts": "./state-server.ts"
+    "./db.ts": "./src/db.ts",
+    "./state-server.ts": "./src/state-server.ts"
   },
   "scripts": {
-    "start": "node --env-file-if-exists=../.env state-server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "node --env-file-if-exists=../.env src/state-server.ts",
+    "start": "node --env-file-if-exists=../.env dist/state-server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "seed": "node --env-file-if-exists=../.env seed-users.ts"
+    "seed": "node --env-file-if-exists=../.env src/seed-users.ts"
   },
   "dependencies": {
     "@sinclair/typebox": "0.34.52",

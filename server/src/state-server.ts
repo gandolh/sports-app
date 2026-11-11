@@ -139,8 +139,8 @@ import {
   requireSupportedUsername,
 } from "./ward.ts";
 import type { AuthConfig } from "./ward.ts";
-import { wardAuth } from "./vendor/ward/ward-auth.js";
-import type { Accounts, WardClient } from "./vendor/ward/ward-auth.js";
+import { wardAuth } from "../vendor/ward/ward-auth.js";
+import type { Accounts, WardClient } from "../vendor/ward/ward-auth.js";
 // The wire contract, from the one place it is declared. `shared/` may not import
 // `node:` anything, so nothing in here can drag a Node-only module into the client
 // bundle or a browser-only one into this process. Node ≥22.18 strips the types at

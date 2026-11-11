@@ -40,11 +40,11 @@ import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { basename, dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { DEFAULT_DB_DIR, DEFAULT_DB_FILE, PROJECT_ROOT, RETENTION, openSnapshotStore } from "../db.ts";
+import { DEFAULT_DB_DIR, DEFAULT_DB_FILE, PROJECT_ROOT, RETENTION, openSnapshotStore } from "../src/db.ts";
 import type { AddressInfo } from "node:net";
-import type { SnapshotStore } from "../db.ts";
-import { STATE_PATH, checkDocument, createStateServer, readConfig } from "../state-server.ts";
-import type { StateServerConfig } from "../state-server.ts";
+import type { SnapshotStore } from "../src/db.ts";
+import { STATE_PATH, checkDocument, createStateServer, readConfig } from "../src/state-server.ts";
+import type { StateServerConfig } from "../src/state-server.ts";
 import { createTestAuth } from "./auth-fixture.ts";
 
 /** The default signed-in identity for tests that only need one person. */
@@ -103,7 +103,7 @@ function authorised(extra = {}) {
 }
 
 /**
- * Start the service the way a deployment does — `node server/state-server.mjs`, a
+ * Start the service the way a deployment does — `node server/src/state-server.ts`, a
  * real child process — and capture its stdout and stderr as raw pipes.
  *
  * This is the harness for the one thing the Fastify move could plausibly have broken
@@ -122,7 +122,7 @@ async function startServiceProcess() {
   const root = mkdtempSync(join(tmpdir(), "sports-app-proc-"));
   const file = join(root, "db", "app.db");
 
-  const child = spawn(process.execPath, [join(PROJECT_ROOT, "server", "state-server.ts")], {
+  const child = spawn(process.execPath, [join(PROJECT_ROOT, "server", "src", "state-server.ts")], {
     env: {
       ...process.env,
       SPORTS_APP_PUBLIC_ORIGIN: "http://127.0.0.1:5173",

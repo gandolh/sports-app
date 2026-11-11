@@ -17,8 +17,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
-import { PROJECT_ROOT, openSnapshotStore } from "../db.ts";
-import { createStateServer } from "../state-server.ts";
+import { PROJECT_ROOT, openSnapshotStore } from "../src/db.ts";
+import { createStateServer } from "../src/state-server.ts";
 import {
   SESSION_COOKIE_NAME,
   UNSUPPORTED_USERNAME,
@@ -27,8 +27,8 @@ import {
   openWardClient,
   orphanStreamNames,
   readAuthConfig,
-} from "../ward.ts";
-import { seedAccount } from "../seed-users.ts";
+} from "../src/ward.ts";
+import { seedAccount } from "../src/seed-users.ts";
 import { createWardIdentities } from "../vendor/ward/ward-auth.js";
 import type { Accounts, WardClient } from "../vendor/ward/ward-auth.js";
 import type { AddressInfo } from "node:net";
@@ -544,7 +544,7 @@ describe('"Sign in with Ward" is wired', () => {
     // what stops a deploy that registered one prefix and configured another.
     const root = mkdtempSync(join(tmpdir(), "sports-app-boot-"));
     cleanups.push(() => rmSync(root, { recursive: true, force: true }));
-    const child = spawn(process.execPath, [join(PROJECT_ROOT, "server", "state-server.ts")], {
+    const child = spawn(process.execPath, [join(PROJECT_ROOT, "server", "src", "state-server.ts")], {
       env: {
         ...process.env,
         SPORTS_APP_HOST: "127.0.0.1",

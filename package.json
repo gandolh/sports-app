@@ -16,8 +16,9 @@
   "scripts": {
     "dev": "npm run dev --workspace @sports-app/client",
     "build": "npm run build --workspace @sports-app/client",
+    "build:server": "npm run build --workspace @sports-app/server",
     "preview": "npm run preview --workspace @sports-app/client",
-    "server": "npm run start --workspace @sports-app/server",
+    "server": "npm run dev --workspace @sports-app/server",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit",

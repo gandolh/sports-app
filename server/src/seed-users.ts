@@ -26,8 +26,8 @@ import { DEFAULT_DB_FILE, openSnapshotStore } from "./db.ts";
 import type { SnapshotStore } from "./db.ts";
 import { DEFAULT_ROLE, USERNAME_RULE, linkWardStreams, openAccounts, orphanStreamNames } from "./ward.ts";
 import { isValidUsername } from "@sports-app/shared/username.ts";
-import { seedUsers } from "./vendor/ward/ward-auth.js";
-import type { Accounts } from "./vendor/ward/ward-auth.js";
+import { seedUsers } from "../vendor/ward/ward-auth.js";
+import type { Accounts } from "../vendor/ward/ward-auth.js";
 
 /**
  * Ask a question on the terminal. With `hidden`, what is typed is not echoed.

@@ -6,8 +6,8 @@ import {
   createWardClient,
   createWardIdentities,
   wardClientOptionsFromEnv,
-} from "./vendor/ward/ward-auth.js";
-import type { Accounts, ResolvedSession, SessionVerdict, WardClient } from "./vendor/ward/ward-auth.js";
+} from "../vendor/ward/ward-auth.js";
+import type { Accounts, ResolvedSession, SessionVerdict, WardClient } from "../vendor/ward/ward-auth.js";
 
 /**
  * Accounts and "Sign in with Ward", as this service wires them.

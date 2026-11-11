@@ -92,10 +92,11 @@ const SERVICE_DIR = dirname(fileURLToPath(import.meta.url));
 
 /**
  * The repository root — the service is the `server/` workspace directly beneath
- * it. Unchanged by the workspace split: `server/` did not move, so `db/` is still
- * a sibling of it at the repo root and still gitignored.
+ * it, and this file sits one folder down in it, in `src/` and in `dist/` alike, so the
+ * root is two levels up from either. `db/` is still a sibling of `server/` at the repo
+ * root and still gitignored.
  */
-export const PROJECT_ROOT = resolve(SERVICE_DIR, "..");
+export const PROJECT_ROOT = resolve(SERVICE_DIR, "..", "..");
 
 /**
  * The database directory. Gitignored — see `.gitignore`. It holds real training

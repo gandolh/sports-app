@@ -10,3 +10,4 @@ infrastructure/.env
 server/data
 **/*.map
 __tests__
+server/dist

@@ -22,8 +22,8 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { RETENTION, openSnapshotStore } from "../db.ts";
-import type { SnapshotStore } from "../db.ts";
+import { RETENTION, openSnapshotStore } from "../src/db.ts";
+import type { SnapshotStore } from "../src/db.ts";
 import {
   LEGACY_USERNAME,
   USERNAME_MAX_LENGTH,
