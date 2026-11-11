@@ -57,6 +57,12 @@ const SUBJECT = "alice";
 /** The auth fixture and cookie of the service the current test started. */
 let current: { testAuth: ReturnType<typeof createTestAuth>; cookie: string };
 
+/** A stored snapshot the test knows is there: a missing one fails the test at the line that reads it. */
+function present<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) throw new Error("expected a stored snapshot");
+  return value;
+}
+
 // ─── Harness ────────────────────────────────────────────────────────────────
 
 let cleanups: (() => void | Promise<void>)[] = [];
@@ -616,8 +622,8 @@ describe("one stream per user", () => {
     for (let i = 1; i <= 5; i += 1) await put(base, "alice", docText("alice", i));
 
     const bobAfter = store.latest("bob");
-    expect(bobAfter?.id).toBe(bobBefore?.id);
-    expect(bobAfter?.docJson).toBe(bob);
+    expect(present(bobAfter).id).toBe(present(bobBefore).id);
+    expect(present(bobAfter).docJson).toBe(bob);
     expect(await (await get(base, "bob")).text()).toBe(bob);
   });
 
@@ -881,8 +887,8 @@ describe("a rejected PUT changes nothing", () => {
     }
 
     const after = store.latest("alice");
-    expect(after?.id).toBe(before?.id);
-    expect(after?.docJson).toBe(good);
+    expect(present(after).id).toBe(present(before).id);
+    expect(present(after).docJson).toBe(good);
     expect(store.count()).toBe(1);
 
     expect(await (await get(base, "alice")).text()).toBe(good);
@@ -982,7 +988,7 @@ describe("retention", () => {
 
     expect(store.count("alice")).toBe(retention);
     expect(store.count("bob")).toBe(1);
-    expect(store.latest("bob")?.id).toBe(bobRow?.id);
+    expect(present(store.latest("bob")).id).toBe(present(bobRow).id);
     expect(await (await get(base, "bob")).text()).toBe(bobDoc);
   });
 
@@ -1045,7 +1051,7 @@ describe("the process options", () => {
     const app = buildApp({ store, accounts: testAuth.accounts, auth: testAuth.auth }, TIMEOUTS);
     try {
       expect(app.initialConfig).toMatchObject({
-        connectionTimeout: 10_000,
+        connectionTimeout: 30_000,
         requestTimeout: 60_000,
         keepAliveTimeout: 125_000,
       });

@@ -36,17 +36,19 @@ export type StateServerConfig = AppDeps;
 /**
  * The server's timeouts, for this service.
  *
- * - `connectionTimeout`: a socket that says nothing for 10 s is dropped. The longest silent wait
- *   here is a phone uploading a document, and the bytes keep arriving while it does.
+ * - `connectionTimeout`: a socket that is silent for 30 s is dropped, and that includes a response
+ *   still being worked on, so it has to outlast the longest silent wait: the Ward callback makes up to
+ *   three calls to Ward in a row (discovery, the token, the keys), each given 5 s by the library.
  * - `requestTimeout`: the whole request must arrive within a minute: a 1 MB document over a poor link.
- * - `keepAliveTimeout`: above the 2 minutes the proxy keeps an idle upstream connection, so the
- *   proxy closes it first and never sends a request into a connection this side just dropped.
+ * - `keepAliveTimeout`: above the proxy's idle upstream keep-alive, so the proxy closes an idle
+ *   connection first and never sends a request into one this side just dropped. Caddy's default is
+ *   2 minutes; the deploy's own snippet lives in vps-deploy and was not checked here.
  *
  * `trustProxy` is deliberately not set: logging is off and nothing here reads `request.ip`
  * (the guard's lockout reads the socket itself), so it would change nothing.
  */
 export const TIMEOUTS: AppOptions = {
-  connectionTimeout: 10_000,
+  connectionTimeout: 30_000,
   requestTimeout: 60_000,
   keepAliveTimeout: 125_000,
 };

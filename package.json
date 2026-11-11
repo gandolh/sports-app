@@ -24,7 +24,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present && tsc --noEmit",
     "lint": "eslint .",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run check:conventions && npm test",
-    "seed": "npm run seed --workspace @sports-app/server",
+    "seed": "npm run seed:dev --workspace @sports-app/server",
     "house-style:sync": "node vendor/house-style/bin/sync.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

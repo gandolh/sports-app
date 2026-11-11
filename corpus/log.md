@@ -1531,6 +1531,8 @@ cite brief numbers.
   in status, headers and body from the first conversion to the last, on the source and on the built `dist`. One
   difference, on purpose: the `Keep-Alive: timeout=` header reads 125 (was 72, Fastify's default) from brief step 7.
   Removing `retained` from `SnapshotReceipt` once changed the two PUT replies, so the response schema is live.
+  `connectionTimeout` is 30 s, not the brief's 10 s: it also cuts a response still being worked on (shown with a 2 s
+  timeout and a 4 s route), and the Ward callback makes up to three 5 s calls in a row.
 - Not the same as before, both on purpose: a start that cannot configure itself (a bad port, no public origin, a
   half-set Ward configuration, a bad Ward key) exits 1 (it printed the reason and exited 0); the PUT route declares its
   400 and 415 bodies (`ErrorResponse`), which serialise to the same bytes. The package exports one path now

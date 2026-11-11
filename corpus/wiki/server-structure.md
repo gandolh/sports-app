@@ -26,7 +26,7 @@ updated: 2026-11-11
 - **Shutdown:** the `SIGINT`/`SIGTERM` handler closes the server, then the database. No `close-with-grace`:
   the service has no long-lived response (no stream, no long poll), so `close()` returns at once, and it
   would add a dependency to do the same thing.
-- **Timeouts:** `connectionTimeout` 10 s, `requestTimeout` 60 s (a phone uploading a document over a poor
+- **Timeouts:** `connectionTimeout` 30 s (a silent socket is cut, an in-flight response included, so it must outlast the Ward callback's three calls of 5 s each; the brief's 10 s would cut them), `requestTimeout` 60 s (a phone uploading a document over a poor
   link), `keepAliveTimeout` 125 s (above the proxy's idle upstream keep-alive). **`trustProxy` is not set:**
   logging is off and nothing reads `request.ip`; the guard's lockout reads the socket itself.
 - **A start that cannot configure itself exits 1** (it used to print the reason and exit 0).
