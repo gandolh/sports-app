@@ -22,15 +22,12 @@ import { PressButton } from "./PressButton.tsx";
  * listener, i.e. on the one platform this app is installed on. The visual half
  * of that lives in `src/index.css` as a single rule.
  *
- * ── Why the primary has two tones ───────────────────────────────────────────
+ * ── The primary is solid ────────────────────────────────────────────────────
  *
- * `gradient` is the accent pairing from the design system and it marks the one
- * button that starts something. `flat` is the same button after that: `Next set`
- * is pressed seven or more times in a session and a gradient on it is a flourish
- * repeating itself, which is exactly the "scattered effects" the motion rule
- * forbids in the other medium. Same size, same ink, same contrast — the
- * `--on-accent` for each accent is derived against both ends of the gradient
- * precisely so this choice is a visual one and never a legibility one.
+ * Start workout and Next set are the accent, flat, with `--sh-btn` under them
+ * and `--on-accent` on top: one fill, so the pair can be measured. The gradient
+ * the primary used to carry moved nowhere; the progress ring is the one place the
+ * accent's second hue is drawn.
  */
 
 type NativeButtonProps = ButtonHTMLAttributes<HTMLButtonElement>;
@@ -39,29 +36,19 @@ type NativeButtonProps = ButtonHTMLAttributes<HTMLButtonElement>;
 // icon beside their label, and a single-cell grid stacks the two vertically —
 // which reads as a two-line button rather than as a labelled icon.
 const PRIMARY_BASE =
-  "flex w-full items-center justify-center gap-[var(--sp-2)] rounded text-btn " +
-  "font-bold tracking-[-0.01em] text-on-accent shadow-2 h-[var(--tap-primary)]";
+  "flex w-full items-center justify-center gap-[var(--sp-2)] rounded-[14px] bg-accent text-btn " +
+  "font-bold tracking-[-0.01em] text-on-accent shadow-btn h-[var(--tap-primary)]";
 
-export function PrimaryButton({
-  tone = "gradient",
-  className,
-  ...rest
-}: NativeButtonProps & { readonly tone?: "gradient" | "flat" }) {
-  const fill = tone === "gradient" ? "bg-[linear-gradient(96deg,var(--accent-2),var(--accent))]" : "bg-accent";
-  return <PressButton className={`${PRIMARY_BASE} ${fill} ${className ?? ""}`} {...rest} />;
+export function PrimaryButton({ className, ...rest }: NativeButtonProps) {
+  return <PressButton className={`${PRIMARY_BASE} ${className ?? ""}`} {...rest} />;
 }
 
-/**
- * The row above the primary. Outlined rather than filled, because two filled
- * buttons stacked read as two primaries and the whole point of the band is that
- * there is one.
- */
 export function SecondaryButton({ className, ...rest }: NativeButtonProps) {
   return (
     <PressButton
       className={
-        "flex w-full items-center justify-center gap-[var(--sp-2)] rounded border " +
-        "border-line2 bg-transparent text-meta font-semibold text-tx2 h-[var(--tap-row)] " +
+        "flex w-full items-center justify-center gap-[var(--sp-2)] rounded-[14px] border-[1.5px] " +
+        "border-edge bg-s1 text-[1rem] font-semibold text-tx data-[pressed]:bg-s3 h-[var(--tap-row)] " +
         (className ?? "")
       }
       {...rest}

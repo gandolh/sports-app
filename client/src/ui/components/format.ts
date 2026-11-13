@@ -143,6 +143,26 @@ const MONTH_NAMES: readonly string[] = [
   "December",
 ];
 
+const MONTH_SHORT: readonly string[] = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/** `5 Oct`: a day and a short month, the label of a row in the six-week grid. */
+export function formatShortDate(date: Date): string {
+  return `${date.getDate()} ${MONTH_SHORT[date.getMonth()] ?? ""}`;
+}
+
 /**
  * `Friday, 4 September` — the date rail on the Today screen.
  *

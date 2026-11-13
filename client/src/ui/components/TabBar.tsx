@@ -1,5 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { useWide } from "./useMedia.ts";
+import { formatLongDate } from "./format.ts";
 import { PlanIcon, ProgressIcon, TodayIcon, YouIcon } from "./icons.tsx";
 import type { IconProps } from "./icons.tsx";
 
@@ -51,12 +53,9 @@ const TABS: readonly Tab[] = [
 ];
 
 /**
- * A cell. `min-h-[var(--tap-min)]` and `min-w` are not decoration: a 10px label
- * with a 24px icon is about 38px of content, and the floor is 44.
+ * A cell on a phone: a 24px icon over a 13px label, 56px tall.
  */
-const CELL =
-  "grid min-h-[var(--tap-min)] place-items-center gap-[2px] py-[var(--sp-1)] " +
-  "text-label font-semibold tracking-[0.02em]";
+const CELL = "grid min-h-[56px] place-items-center content-center gap-[2px] text-label leading-4 font-semibold";
 
 function Inner({ tab }: { readonly tab: Tab }) {
   const { Icon, label } = tab;
@@ -68,26 +67,64 @@ function Inner({ tab }: { readonly tab: Tab }) {
   );
 }
 
-export function TabBar({ active }: { readonly active: TabKey }) {
+export interface TabBarProps {
+  readonly active: TabKey;
+  /**
+   * The right end of the top bar from 840px: the date and the streak. Left out,
+   * the bar shows the date alone.
+   */
+  readonly trailing?: ReactNode;
+}
+
+/**
+ * The four places. On a phone the bar sits at the foot, `--s1` with a `--line2`
+ * head; from 840px the same links become a 64px bar across the top (`order-first`
+ * in the shell's column), the current place underlined in the accent, and the date
+ * and streak at its right end.
+ */
+export function TabBar({ active, trailing }: TabBarProps) {
+  const wide = useWide();
+  const links = TABS.map((tab) => {
+    const current = tab.key === active;
+    const mark = current ? { "aria-current": "page" as const } : {};
+    if (wide) {
+      return (
+        <Link
+          key={tab.key}
+          to={tab.to}
+          {...mark}
+          className={
+            "-mb-px flex items-center gap-[var(--sp-2)] border-b-[3px] px-[var(--sp-4)] text-meta font-semibold " +
+            (current ? "border-accent text-accent" : "border-transparent text-tx2")
+          }
+        >
+          <tab.Icon size={22} />
+          <span>{tab.label}</span>
+        </Link>
+      );
+    }
+    return (
+      <Link key={tab.key} to={tab.to} {...mark} className={`${CELL} ${current ? "text-accent" : "text-tx2"}`}>
+        <Inner tab={tab} />
+      </Link>
+    );
+  });
+
+  if (wide) {
+    return (
+      <header className="sticky top-0 z-[var(--z-rail)] order-first flex h-16 shrink-0 items-stretch justify-between border-b border-line2 bg-s1 px-[max(24px,calc((100%-1120px)/2))]">
+        <nav aria-label="Sections" className="-ml-4 flex gap-[var(--sp-1)]">
+          {links}
+        </nav>
+        <div className="flex items-center gap-[var(--sp-4)] text-meta font-medium text-tx2 tabular-nums">
+          {trailing ?? formatLongDate(new Date())}
+        </div>
+      </header>
+    );
+  }
   return (
-    <nav
-      aria-label="Sections"
-      className="pad-bottom-safe grid shrink-0 grid-cols-4 border-t border-line bg-s1 pt-[var(--sp-1)]"
-    >
-      {TABS.map((tab) => {
-        const current = tab.key === active;
-        const tone = current ? "text-accent" : "text-tx3";
-        return (
-          <Link
-            key={tab.key}
-            to={tab.to}
-            className={`${CELL} ${tone}`}
-            {...(current ? { "aria-current": "page" as const } : {})}
-          >
-            <Inner tab={tab} />
-          </Link>
-        );
-      })}
+    <nav aria-label="Sections" className="pad-bottom-safe grid shrink-0 grid-cols-4 border-t border-line2 bg-s1">
+      {links}
     </nav>
   );
 }

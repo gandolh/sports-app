@@ -110,6 +110,15 @@ export function FlameIcon(props: IconProps) {
   );
 }
 
+/** The disclosure arrow on a row that opens in place. Turned over by the row when it is open. */
+export function ChevronIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </Icon>
+  );
+}
+
 /** `<HonestNote>`. A disclosure mark, not an alarm — see that component. */
 export function NoteIcon(props: IconProps) {
   return (

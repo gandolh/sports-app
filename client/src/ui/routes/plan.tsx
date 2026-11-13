@@ -239,8 +239,8 @@ function PlanRoute() {
   if (doc === null) {
     return (
       <Shell>
-        <ShellRail>Plan</ShellRail>
-        <ShellBody>
+        <ShellRail topBar>Plan</ShellRail>
+        <ShellBody narrow>
           <AlertBanner
             label="Read-only"
             text={snapshot.readOnly ?? snapshot.error ?? "The document could not be read."}
@@ -255,9 +255,9 @@ function PlanRoute() {
 
   return (
     <Shell>
-      <ShellRail>Plan</ShellRail>
-      <ShellTitle title="This month" size="movement" />
-      <ShellBody>
+      <ShellRail topBar>Plan</ShellRail>
+      <ShellBody narrow>
+        <ShellTitle title="This month" size="movement" />
         {snapshot.readOnly === null ? null : <AlertBanner label="Read-only" text={snapshot.readOnly} />}
 
         <CalendarGrid cells={cells} />

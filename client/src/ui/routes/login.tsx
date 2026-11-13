@@ -116,11 +116,11 @@ function LoginRoute() {
   return (
     <Shell>
       <ShellRail>Calisthenics</ShellRail>
-      <ShellTitle
-        title="Sign in"
-        subtitle="Your account on this service. Training itself works offline once you are in."
-      />
-      <ShellBody>
+      <ShellBody narrow>
+        <ShellTitle
+          title="Sign in"
+          subtitle="Your account on this service. Training itself works offline once you are in."
+        />
         {rememberError === null ? null : <AlertBanner label="Not remembered" text={rememberError} />}
         {notice === null ? null : <AlertBanner label="Not signed in" text={notice} />}
 

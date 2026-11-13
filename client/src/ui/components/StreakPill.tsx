@@ -30,20 +30,15 @@ import { FlameIcon } from "./icons.tsx";
 export function StreakPill({ days }: { readonly days: number }) {
   if (days <= 0) return null;
   return (
-    // `role="img"` is not decoration: both children are aria-hidden — the icon
-    // by default, the digit explicitly — so the label is the only accessible
-    // content, and a bare span resolves to the generic role, which does not
-    // reliably carry an author-supplied name. Ring and Heatmap already set it
-    // on the same shape; this was the one place it was dropped, and the streak
-    // is the element looked at most often. Testing-library's `getByText` reads
-    // text content rather than the computed name, so no existing test caught it.
     <span
       role="img"
-      className="inline-flex items-center gap-[var(--sp-1)] rounded-full bg-warn-bg py-[2px] pr-[var(--sp-2)] pl-[var(--sp-1)] text-meta font-bold text-warn tabular-nums"
+      className="inline-flex h-9 items-center gap-[var(--sp-1)] rounded-full border border-warn-line bg-warn-bg px-[var(--sp-3)] text-warn tabular-nums"
       aria-label={`${days} ${days === 1 ? "day" : "days"} in a row.`}
     >
       <FlameIcon size={16} />
-      <span aria-hidden="true">{days}</span>
+      <span aria-hidden="true" className="text-[1rem] leading-none font-extrabold">
+        {days}
+      </span>
     </span>
   );
 }

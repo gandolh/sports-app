@@ -1,5 +1,3 @@
-import { Eyebrow } from "./Shell.tsx";
-
 /**
  * Three numbers in a row, and the rule that keeps them from becoming six.
  *
@@ -29,26 +27,54 @@ export interface Stat {
   readonly srLabel: string;
 }
 
-export function StatTiles({ stats }: { readonly stats: readonly Stat[] }) {
+export function StatTiles({
+  stats,
+  layout = "rows",
+}: {
+  readonly stats: readonly Stat[];
+  /** `rows`: thin tiles stacked beside the ring. `columns`: three totals in one card, divided. */
+  readonly layout?: "rows" | "columns";
+}) {
+  if (layout === "columns") {
+    return (
+      <ul className="grid grid-cols-3">
+        {stats.map((stat, index) => (
+          <li
+            key={stat.label}
+            className={
+              "grid content-start justify-items-center gap-[2px] px-[var(--sp-2)] pt-[var(--sp-4)] pb-[var(--sp-3)] text-center min-[840px]:px-[var(--sp-3)] min-[840px]:py-[var(--sp-5)] " +
+              (index === 0 ? "" : "border-l border-line")
+            }
+          >
+            <span className="sr-only">{stat.srLabel}</span>
+            <span
+              aria-hidden="true"
+              className="text-[2rem] leading-[1.1] font-extrabold tabular-nums tracking-[-0.02em] min-[840px]:text-[2.5rem]"
+            >
+              {stat.value}
+            </span>
+            <span aria-hidden="true" className="text-label leading-[1.15] font-semibold text-tx2 min-[840px]:text-meta">
+              {stat.label}
+            </span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
   return (
-    <ul className="mt-[var(--sp-3)] grid grid-cols-3 gap-[var(--sp-2)]">
+    <ul className="grid min-w-0 flex-1 gap-[var(--sp-2)]">
       {stats.map((stat) => (
         <li
           key={stat.label}
-          className="rounded border border-line bg-s1 px-[var(--sp-2)] py-[var(--sp-2)] text-center shadow-1"
+          className="flex h-8 items-center justify-between gap-[var(--sp-2)] rounded-[10px] bg-s2 px-[var(--sp-3)]"
         >
           <span className="sr-only">{stat.srLabel}</span>
-          <span aria-hidden="true" className="block text-h leading-none font-bold tracking-[-0.03em] tabular-nums">
+          <span aria-hidden="true" className="text-label leading-4 font-semibold text-tx2">
+            {stat.label}
+          </span>
+          <span aria-hidden="true" className="text-[1.125rem] leading-[1.1] font-extrabold tabular-nums">
             {stat.value}
           </span>
-          <span aria-hidden="true" className="mt-[var(--sp-1)] block">
-            <Eyebrow>{stat.label}</Eyebrow>
-          </span>
-          {stat.note === undefined ? null : (
-            <span aria-hidden="true" className="mt-[1px] block text-label font-semibold text-accent tabular-nums">
-              {stat.note}
-            </span>
-          )}
         </li>
       ))}
     </ul>

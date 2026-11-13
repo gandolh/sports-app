@@ -11,15 +11,16 @@ import { useAdoptLegacy, useDocument, useRequestPersistence } from "../document.
 import { AlertBanner } from "../components/AlertBanner.tsx";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons.tsx";
 import { CountUp } from "../components/CountUp.tsx";
-import { ExerciseRow } from "../components/ExerciseRow.tsx";
+import { ThenRow, UpFirst } from "../components/ExerciseRow.tsx";
 import { Heatmap } from "../components/Heatmap.tsx";
 import { Player } from "../components/Player.tsx";
 import { Ring } from "../components/Ring.tsx";
 import { StatTiles } from "../components/StatTiles.tsx";
 import { StreakPill } from "../components/StreakPill.tsx";
 import { TabBar } from "../components/TabBar.tsx";
-import { Eyebrow, SectionHeading, Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from "../components/Shell.tsx";
-import { currentStreak, heatmap, sessionsByDay, weekProgress } from "../components/history.ts";
+import { Eyebrow, Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from "../components/Shell.tsx";
+import { currentStreak, heatmap, sessionsByDay, weekGrid, weekProgress } from "../components/history.ts";
+import { useTall, useWide } from "../components/useMedia.ts";
 import { formatLongDate, groupDigits, sessionSummary } from "../components/format.ts";
 
 /**
@@ -230,6 +231,7 @@ function Home({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: st
       week: weekProgress(byDay, now),
       streak: currentStreak(byDay, now),
       cells: heatmap(byDay, now),
+      weeks: weekGrid(byDay, now),
       reps: totalWork(doc).reps,
     };
   }, [doc, now]);
@@ -239,78 +241,158 @@ function Home({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: st
   }
 
   const percent = Math.round(stats.week.fraction * 100);
+  const wide = useWide();
+  const tall = useTall();
+  const [first, ...rest] = prescription.items;
+
+  const help = (
+    <p id={HELP_ID} className="text-meta leading-[1.4] text-tx2">
+      Easier and harder shift today&rsquo;s numbers by two reps or five seconds. Neither changes what comes next.
+    </p>
+  );
+  const easier = (
+    <SecondaryButton
+      onClick={() => start("easy")}
+      aria-label="Start today's session, easier"
+      aria-describedby={HELP_ID}
+      className="px-0"
+    >
+      Easier
+    </SecondaryButton>
+  );
+  const harder = (
+    <SecondaryButton
+      onClick={() => start("hard")}
+      aria-label="Start today's session, harder"
+      aria-describedby={HELP_ID}
+      className="px-0"
+    >
+      Harder
+    </SecondaryButton>
+  );
 
   return (
     <Shell>
-      <ShellRail trailing={<StreakPill days={stats.streak} />}>{formatLongDate(now)}</ShellRail>
-
-      <ShellTitle title={`${prescription.label} day`} subtitle={sessionSummary(prescription, doc.history.length + 1)} />
+      <ShellRail topBar trailing={<StreakPill days={stats.streak} />}>
+        {formatLongDate(now)}
+      </ShellRail>
 
       <ShellBody>
+        <ShellTitle
+          title={`${prescription.label} day`}
+          subtitle={sessionSummary(prescription, doc.history.length + 1)}
+        />
         {readOnly === null ? null : <AlertBanner label="Read-only" text={readOnly} />}
 
-        <SectionHeading>Today</SectionHeading>
-        <ol>
-          {prescription.items.map((item, index) => (
-            <ExerciseRow key={index} item={item} />
-          ))}
-        </ol>
+        <div className="mt-[var(--sp-3)] grid gap-[var(--sp-3)] min-[840px]:mt-0 min-[840px]:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] min-[840px]:items-start min-[840px]:gap-[var(--sp-4)]">
+          <div className="grid gap-[var(--sp-3)] max-[419px]:gap-[var(--sp-2)] min-[840px]:gap-[var(--sp-4)]">
+            {first === undefined ? null : <UpFirst item={first} />}
 
-        <SectionHeading>How it is going</SectionHeading>
+            {rest.length === 0 ? null : (
+              <section
+                aria-labelledby="then"
+                className="overflow-hidden rounded-lg border border-line bg-s1 pt-[var(--sp-4)] shadow-1 max-[419px]:pt-[var(--sp-3)] max-[389px]:pt-[var(--sp-2)]"
+              >
+                <div className="flex items-baseline justify-between gap-[var(--sp-3)] px-[var(--sp-4)] pb-[var(--sp-2)] min-[840px]:px-6 max-[419px]:pb-[var(--sp-1)]">
+                  <h2 id="then" className="text-h leading-[1.27] font-bold">
+                    Then
+                  </h2>
+                  {wide ? null : (
+                    <span className="text-label leading-4 font-semibold text-tx2">Tap a row for how to do it</span>
+                  )}
+                </div>
+                <ul>
+                  {rest.map((item, index) => (
+                    <ThenRow key={index} item={item} />
+                  ))}
+                </ul>
+              </section>
+            )}
 
-        <Ring
-          fraction={stats.week.fraction}
-          value={`${percent}%`}
-          caption="Weekly goal"
-          label={`This week: ${stats.week.done} of ${stats.week.goal} sessions.`}
-        />
+            {wide || tall ? null : <div className="px-[var(--sp-1)]">{help}</div>}
+          </div>
 
-        <StatTiles
-          stats={[
-            {
-              value: groupDigits(doc.history.length),
-              label: "Sessions",
-              srLabel: `${doc.history.length} sessions completed.`,
-            },
-            {
-              value: groupDigits(stats.streak),
-              label: "Day streak",
-              srLabel: `${stats.streak} days in a row.`,
-            },
-            {
-              value: groupDigits(stats.reps),
-              label: "Reps ever",
-              srLabel: `${stats.reps} reps prescribed and completed, all time.`,
-            },
-          ]}
-        />
+          <div className="grid gap-[var(--sp-3)] min-[840px]:sticky min-[840px]:top-[var(--sp-4)] min-[840px]:gap-[var(--sp-4)]">
+            {wide ? (
+              <section aria-label="Start" className="rounded-lg border border-line bg-s1 px-6 pt-5 pb-6 shadow-1">
+                {help}
+                <div className="mt-[var(--sp-3)] grid grid-cols-2 gap-[var(--sp-2)]">
+                  {easier}
+                  {harder}
+                </div>
+                <PrimaryButton className="mt-[var(--sp-2)]" onClick={() => start("medium")}>
+                  Start workout
+                </PrimaryButton>
+              </section>
+            ) : null}
 
-        <Heatmap cells={stats.cells} />
+            <section
+              aria-labelledby="going"
+              className="rounded-lg border border-line bg-s1 p-[var(--sp-4)] min-[840px]:px-6 min-[840px]:py-5"
+            >
+              <h2 id="going" className="mb-[var(--sp-3)] text-body leading-[1.3] font-bold">
+                How it is going
+              </h2>
+              <div className="flex items-center gap-[var(--sp-4)]">
+                <Ring
+                  fraction={stats.week.fraction}
+                  value={`${percent}%`}
+                  caption="Weekly goal"
+                  label={`This week: ${stats.week.done} of ${stats.week.goal} sessions.`}
+                />
+                <StatTiles
+                  stats={[
+                    {
+                      value: groupDigits(doc.history.length),
+                      label: "Sessions",
+                      srLabel: `${doc.history.length} sessions completed.`,
+                    },
+                    {
+                      value: groupDigits(stats.streak),
+                      label: "Day streak",
+                      srLabel: `${stats.streak} days in a row.`,
+                    },
+                    {
+                      value: groupDigits(stats.reps),
+                      label: "Reps ever",
+                      srLabel: `${stats.reps} reps prescribed and completed, all time.`,
+                    },
+                  ]}
+                />
+              </div>
+              <Heatmap last42={stats.cells} weeks={stats.weeks} />
+            </section>
+          </div>
+        </div>
       </ShellBody>
 
-      <ShellFooter
-        above={
-          <>
-            <p className="text-center text-label text-tx3">
-              Easier and harder shift today&rsquo;s numbers by two reps or five seconds. Neither changes what comes
-              next.
-            </p>
-            <div className="flex gap-[var(--sp-2)]">
-              <SecondaryButton onClick={() => start("easy")} aria-label="Start today's session, easier">
-                Easier
-              </SecondaryButton>
-              <SecondaryButton onClick={() => start("hard")} aria-label="Start today's session, harder">
-                Harder
-              </SecondaryButton>
-            </div>
-          </>
-        }
-      >
-        <PrimaryButton onClick={() => start("medium")}>Start workout</PrimaryButton>
-      </ShellFooter>
+      {wide ? null : (
+        <ShellFooter>
+          {tall ? <div className="text-label leading-[1.3]">{help}</div> : null}
+          <div className="grid grid-cols-[76px_76px_minmax(0,1fr)] items-center gap-[var(--sp-2)] max-[370px]:grid-cols-[68px_68px_minmax(0,1fr)]">
+            {easier}
+            {harder}
+            <PrimaryButton className="max-[370px]:px-2 max-[370px]:text-[1.0625rem]" onClick={() => start("medium")}>
+              Start workout
+            </PrimaryButton>
+          </div>
+        </ShellFooter>
+      )}
 
-      <TabBar active="today" />
+      <TabBar active="today" trailing={<TodayFacts now={now} days={stats.streak} />} />
     </Shell>
+  );
+}
+
+const HELP_ID = "start-help";
+
+/** The top bar's right end from 840px: the date, and the streak when there is one. */
+function TodayFacts({ now, days }: { readonly now: Date; readonly days: number }) {
+  return (
+    <>
+      <span>{formatLongDate(now)}</span>
+      <StreakPill days={days} />
+    </>
   );
 }
 
@@ -333,8 +415,8 @@ function Finish({ doc }: { readonly doc: StateDoc }) {
   const navigate = useNavigate();
   return (
     <Shell>
-      <ShellRail>Done</ShellRail>
-      <ShellBody>
+      <ShellRail topBar>Done</ShellRail>
+      <ShellBody narrow>
         <div className="grid place-items-center py-[var(--sp-12)] text-center">
           <h1 className="text-display leading-[var(--lh-display)] font-extrabold tracking-[var(--ls-display)]">
             Session complete.
@@ -364,8 +446,8 @@ function LegacyPrompt({ username, legacy }: { readonly username: string; readonl
   return (
     <Shell>
       <ShellRail>Existing history</ShellRail>
-      <ShellTitle title="There is already a training history on this browser." size="movement" />
-      <ShellBody>
+      <ShellBody narrow>
+        <ShellTitle title="There is already a training history on this browser." size="movement" />
         <p className="mt-[var(--sp-3)] text-body text-tx2">
           It was saved before this app had accounts, so no owner is recorded in it —{" "}
           {sessions === 1 ? "1 session" : `${sessions} sessions`}. Nothing has been written yet.
@@ -390,9 +472,9 @@ function LegacyPrompt({ username, legacy }: { readonly username: string; readonl
 function Unreadable({ message }: { readonly message: string }) {
   return (
     <Shell>
-      <ShellRail>Read-only</ShellRail>
-      <ShellTitle title="The saved training history could not be read." size="movement" />
-      <ShellBody>
+      <ShellRail topBar>Read-only</ShellRail>
+      <ShellBody narrow>
+        <ShellTitle title="The saved training history could not be read." size="movement" />
         <AlertBanner label="Nothing was changed" text={message} />
         <p className="mt-[var(--sp-3)] text-body text-tx2">
           The stored text is untouched and is usually repairable by hand — it is plain JSON in this browser&rsquo;s

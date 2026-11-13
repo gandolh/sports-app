@@ -160,13 +160,13 @@ describe("/ — Today", () => {
     await renderApp("/");
 
     const headings = [...document.querySelectorAll("h2")].map((h) => h.textContent);
-    expect(headings).toContain("Today");
+    expect(headings).toContain("Up first");
     expect(headings).toContain("How it is going");
-    expect(headings.indexOf("Today")).toBeLessThan(headings.indexOf("How it is going"));
+    expect(headings.indexOf("Up first")).toBeLessThan(headings.indexOf("How it is going"));
 
     const plan = document.querySelector("h2");
     const ring = screen.getByRole("img", { name: /This week: \d+ of \d+ sessions\./ });
-    expect(plan?.textContent).toBe("Today");
+    expect(plan?.textContent).toBe("Up first");
     expect(plan?.compareDocumentPosition(ring) ?? 0 & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

@@ -212,7 +212,7 @@ function ProgressRoute() {
   if (doc === null) {
     return (
       <Shell>
-        <ShellRail>Progress</ShellRail>
+        <ShellRail topBar>Progress</ShellRail>
         <ShellBody>
           <AlertBanner
             label="Read-only"
@@ -226,9 +226,9 @@ function ProgressRoute() {
 
   return (
     <Shell>
-      <ShellRail>Progress</ShellRail>
-      <ShellTitle title="Progress" size="movement" />
+      <ShellRail topBar>Progress</ShellRail>
       <ShellBody>
+        <ShellTitle title="Progress" size="movement" />
         {snapshot.readOnly === null ? null : <AlertBanner label="Read-only" text={snapshot.readOnly} />}
 
         <ProgressBody doc={doc} />

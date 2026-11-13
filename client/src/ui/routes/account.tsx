@@ -68,9 +68,9 @@ function AccountRoute() {
 
   return (
     <Shell>
-      <ShellRail>Account</ShellRail>
-      <ShellTitle title={username} />
-      <ShellBody>
+      <ShellRail topBar>Account</ShellRail>
+      <ShellBody narrow>
+        <ShellTitle title={username} />
         {snapshot.readOnly === null ? null : <AlertBanner label="Read-only" text={snapshot.readOnly} />}
 
         {snapshot.doc === null ? (

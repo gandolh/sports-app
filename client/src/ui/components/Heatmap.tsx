@@ -1,7 +1,8 @@
-import type { HeatCell } from "./history.ts";
+import type { GridCell, GridWeek, HeatCell } from "./history.ts";
+import { formatShortDate } from "./format.ts";
 
 /**
- * Forty-two days, fourteen to a row.
+ * The last six weeks, a row to a week, Monday first.
  *
  * ── What this costs, stated once ────────────────────────────────────────────
  *
@@ -15,56 +16,90 @@ import type { HeatCell } from "./history.ts";
  * The answer is in what the empty cell is: `--grid0`, the same quiet fill as the
  * unstarted part of the progress ring, deliberately below the 3:1 floor.
  * **There is no missed state and no red.** A fortnight of not training renders
- * as fourteen quiet squares, which is what not training looks like — not as
- * fourteen accusations. The one place a missed day is ever marked is the plan
- * calendar, and it ships with an `<HonestNote>` next to it saying, in words,
- * that it costs nothing.
+ * as quiet squares, which is what not training looks like — not as accusations.
+ * The days still to come are outlines, so the rectangle is whole and nothing
+ * pretends they have happened.
  *
  * ── Three levels, not a gradient ────────────────────────────────────────────
  *
- * Nothing, one session, two or more. That is every state this programme can
- * produce, and a five-step ramp over a three-valued dataset is a chart implying
- * precision it does not have. The middle step is a `color-mix` toward the accent
- * rather than a third token, so it follows all eight accents for free.
+ * Nothing, one session, two or more: the accent, then the accent's second hue.
+ * That is every state this programme can produce.
  *
  * ── One image, not 42 ───────────────────────────────────────────────────────
  *
- * `role="img"` on the grid with a one-sentence label. A screen reader walking 42
- * unlabelled cells is 42 seconds of nothing, and the sentence is the only thing
- * anyone wants from it.
+ * The grid is one `role="img"` with a count, because 42 unlabelled squares are
+ * 42 stops of nothing for a screen reader. The count comes from the 42-day
+ * window (`heatmap()`), not from the cells drawn, so no number is invented. The
+ * cells are capped at 28 by 14 px: a wider card does not stretch the grid.
  */
 
-const FILL: Readonly<Record<HeatCell["level"], string>> = {
+const FILL: Readonly<Record<GridCell["level"], string>> = {
   0: "bg-grid0",
-  1: "bg-[color-mix(in_srgb,var(--accent)_38%,var(--grid0))]",
-  2: "bg-accent",
+  1: "bg-accent",
+  2: "bg-accent-2",
 };
 
-export function Heatmap({ cells }: { readonly cells: readonly HeatCell[] }) {
-  const trained = cells.filter((cell) => cell.level > 0).length;
+const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
+
+const COLUMNS = "grid grid-cols-[44px_repeat(7,28px)] gap-[var(--sp-1)]";
+
+export function Heatmap({
+  last42,
+  weeks,
+}: {
+  readonly last42: readonly HeatCell[];
+  readonly weeks: readonly GridWeek[];
+}) {
+  const trained = last42.filter((cell) => cell.level > 0).length;
 
   return (
     <div className="mt-[var(--sp-4)]">
+      <div aria-hidden="true" className={COLUMNS}>
+        <span />
+        {DAYS.map((day, index) => (
+          <span key={index} className="pb-[var(--sp-1)] text-center text-label leading-4 font-semibold text-tx2">
+            {day}
+          </span>
+        ))}
+      </div>
       <div
         role="img"
-        aria-label={`Trained on ${trained} of the last ${cells.length} days.`}
-        className="grid grid-cols-14 gap-[4px]"
+        aria-label={`Trained on ${trained} of the last ${last42.length} days.`}
+        className="grid gap-[var(--sp-1)]"
       >
-        {cells.map((cell) => (
-          <span key={cell.key} className={`block aspect-square rounded-[3px] ${FILL[cell.level]}`} />
+        {weeks.map((week) => (
+          <div key={week.monday.getTime()} className={COLUMNS}>
+            <span aria-hidden="true" className="self-center text-label leading-4 font-medium text-tx2 tabular-nums">
+              {formatShortDate(week.monday)}
+            </span>
+            {week.cells.map((cell) => (
+              <span
+                key={cell.key}
+                className={
+                  "block h-[14px] rounded-[4px] " +
+                  (cell.future ? "shadow-[inset_0_0_0_1px_var(--line)]" : FILL[cell.level])
+                }
+              />
+            ))}
+          </div>
         ))}
       </div>
       {/* The key is `aria-hidden` because the grid's own label already says what
-          the grid says. It exists for the eye: three unlabelled shades of the
-          accent are not self-explanatory, and "less → more" is the shortest
-          sentence that makes them so. */}
-      <div aria-hidden="true" className="mt-[var(--sp-2)] flex items-center gap-[var(--sp-1)] text-label text-tx3">
-        <span className="mr-auto">Last {cells.length} days</span>
-        <span>Less</span>
-        <span className={`block h-[10px] w-[10px] rounded-[2px] ${FILL[0]}`} />
-        <span className={`block h-[10px] w-[10px] rounded-[2px] ${FILL[1]}`} />
-        <span className={`block h-[10px] w-[10px] rounded-[2px] ${FILL[2]}`} />
-        <span>More</span>
+          the grid says. It exists for the eye: shades of the accent are not
+          self-explanatory, and "less → more" is the shortest sentence that makes
+          them so. */}
+      <div
+        aria-hidden="true"
+        className="mt-[var(--sp-3)] flex items-center justify-between text-label leading-4 font-semibold text-tx2"
+      >
+        <span className="tabular-nums">Last {last42.length} days</span>
+        <span className="flex items-center gap-[var(--sp-2)]">
+          Less
+          <span className={`block size-[14px] rounded-[4px] ${FILL[0]}`} />
+          <span className={`block size-[14px] rounded-[4px] ${FILL[1]}`} />
+          <span className={`block size-[14px] rounded-[4px] ${FILL[2]}`} />
+          More
+        </span>
       </div>
     </div>
   );

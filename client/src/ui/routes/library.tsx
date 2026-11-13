@@ -62,8 +62,8 @@ function LibraryRoute() {
       >
         Reference
       </ShellRail>
-      <ShellTitle title="Exercise reference" subtitle="Bodyweight movements, for looking things up" />
-      <ShellBody>
+      <ShellBody narrow>
+        <ShellTitle title="Exercise reference" subtitle="Bodyweight movements, for looking things up" />
         <HonestNote label="What this list is not">
           A reference, not a plan. Nothing here is scheduled, and opening this page changes nothing about what you are
           asked to do next — the programme is still the five ladders, on the same fixed clock.

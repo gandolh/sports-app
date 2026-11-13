@@ -29,9 +29,9 @@ export const rootRoute = createRootRoute({
    */
   notFoundComponent: () => (
     <Shell>
-      <ShellRail>Not found</ShellRail>
-      <ShellTitle title="There is no page at that address." size="movement" />
-      <ShellBody>
+      <ShellRail topBar>Not found</ShellRail>
+      <ShellBody narrow>
+        <ShellTitle title="There is no page at that address." size="movement" />
         <p className="text-body text-tx2">
           <Link to="/" className="text-accent underline">
             Go to today&rsquo;s session.

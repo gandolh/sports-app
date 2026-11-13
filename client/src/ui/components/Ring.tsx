@@ -46,8 +46,8 @@ import { Eyebrow } from "./Shell.tsx";
 
 // A 120-unit box. `r` and the stroke are in those units, so the ring scales
 // with its CSS width and the geometry below stays readable as plain numbers.
-const RADIUS = 50;
-const STROKE = 11;
+const RADIUS = 58;
+const STROKE = 12;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 const DURATION_MS = 1200;
@@ -102,19 +102,19 @@ export function Ring({ fraction, value, caption, label }: RingProps) {
   }, [offset]);
 
   return (
-    <div className="relative grid place-items-center py-[var(--sp-2)]" role="img" aria-label={label}>
-      <svg viewBox="0 0 120 120" className="block h-[172px] w-[172px]" aria-hidden="true">
+    <div className="relative size-[124px] flex-none" role="img" aria-label={label}>
+      <svg viewBox="0 0 140 140" className="block size-[124px]" aria-hidden="true">
         <defs>
           <linearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">
-            <stop offset="0" stopColor="var(--accent-2)" />
-            <stop offset="1" stopColor="var(--accent)" />
+            <stop offset="0" stopColor="var(--accent)" />
+            <stop offset="1" stopColor="var(--accent-2)" />
           </linearGradient>
         </defs>
-        <circle cx="60" cy="60" r={RADIUS} fill="none" stroke="var(--grid0)" strokeWidth={STROKE} />
+        <circle cx="70" cy="70" r={RADIUS} fill="none" stroke="var(--grid0)" strokeWidth={STROKE} />
         <circle
           ref={progress}
-          cx="60"
-          cy="60"
+          cx="70"
+          cy="70"
           r={RADIUS}
           fill="none"
           stroke={`url(#${gradientId})`}
@@ -122,13 +122,15 @@ export function Ring({ fraction, value, caption, label }: RingProps) {
           strokeLinecap="round"
           // 12 o'clock, not 3 o'clock. A ring that fills from the right reads as
           // a dial; one that fills from the top reads as a proportion.
-          transform="rotate(-90 60 60)"
+          transform="rotate(-90 70 70)"
           strokeDasharray={CIRCUMFERENCE}
           strokeDashoffset={offset}
         />
       </svg>
-      <div className="absolute text-center" aria-hidden="true">
-        <span className="block text-display leading-none font-extrabold tracking-[-0.04em] tabular-nums">{value}</span>
+      <div className="absolute inset-0 grid place-content-center text-center" aria-hidden="true">
+        <span className="block text-[1.5rem] leading-[1.1] font-extrabold tracking-[-0.02em] tabular-nums">
+          {value}
+        </span>
         <Eyebrow>{caption}</Eyebrow>
       </div>
     </div>

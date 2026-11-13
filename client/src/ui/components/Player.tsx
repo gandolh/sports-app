@@ -357,7 +357,7 @@ function PlayerPage({
           )
         }
       >
-        <PrimaryButton tone="flat" data-testid="next" onClick={next}>
+        <PrimaryButton data-testid="next" onClick={next}>
           {finishing ? "Finish" : cardio ? "Next round" : "Next set"}
         </PrimaryButton>
       </ShellFooter>

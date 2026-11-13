@@ -57,17 +57,16 @@ export function HonestNote({ label, children, inset = false }: HonestNoteProps) 
     <div
       data-testid="honest-note"
       className={
-        "mt-[var(--sp-3)] grid grid-cols-[20px_minmax(0,1fr)] gap-[var(--sp-2)] rounded " +
-        "border border-warn-line bg-warn-bg " +
-        (inset ? "p-[var(--sp-2)]" : "p-[var(--sp-3)]")
+        "flex gap-[var(--sp-3)] rounded-[12px] border border-warn-line bg-warn-bg px-[var(--sp-4)] py-[var(--sp-3)] " +
+        (inset ? "mx-[var(--sp-3)] mb-[var(--sp-3)]" : "mt-[var(--sp-3)]")
       }
     >
-      <NoteIcon size={20} className="mt-[1px] text-warn" />
+      <NoteIcon size={20} className="mt-[1px] flex-none text-warn" />
       <div>
         {/* Sentence case in the warn hue: the label has to be findable without
             being loud. */}
-        <span className="block text-label font-semibold text-warn">{label}</span>
-        <p className="mt-[2px] text-meta leading-[var(--lh-body)] text-tx">{children}</p>
+        <p className="mb-[var(--sp-1)] text-label leading-4 font-bold text-warn">{label}</p>
+        <p className="text-body leading-[1.55] text-tx">{children}</p>
       </div>
     </div>
   );

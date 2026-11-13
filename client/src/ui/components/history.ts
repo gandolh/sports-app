@@ -141,6 +141,42 @@ export function heatmap(byDay: ReadonlyMap<string, number>, now: Date, days: num
   return cells;
 }
 
+export interface GridCell {
+  readonly key: string;
+  readonly level: 0 | 1 | 2;
+  /** After today: drawn as an outline, because nothing has happened there yet. */
+  readonly future: boolean;
+}
+
+export interface GridWeek {
+  /** The Monday of the row, midnight local. */
+  readonly monday: Date;
+  readonly cells: readonly GridCell[];
+}
+
+/**
+ * The last six weeks as rows, Monday first, the current week last. The days after
+ * today are present and marked `future`, so the grid is always a full rectangle
+ * and a column is always the same weekday.
+ */
+export function weekGrid(byDay: ReadonlyMap<string, number>, now: Date, weeks: number = 6): readonly GridWeek[] {
+  const backToMonday = (now.getDay() + 6) % 7;
+  const firstMonday = addDays(now, -backToMonday - 7 * (weeks - 1));
+  const today = dayKey(now);
+  const rows: GridWeek[] = [];
+  for (let week = 0; week < weeks; week += 1) {
+    const monday = addDays(firstMonday, week * 7);
+    const cells: GridCell[] = [];
+    for (let day = 0; day < 7; day += 1) {
+      const key = dayKey(addDays(monday, day));
+      const count = byDay.get(key) ?? 0;
+      cells.push({ key, level: count === 0 ? 0 : count === 1 ? 1 : 2, future: key > today });
+    }
+    rows.push({ monday, cells });
+  }
+  return rows;
+}
+
 export interface WeekProgress {
   readonly done: number;
   readonly goal: number;
