@@ -39,13 +39,11 @@ export function SafetyCue({ text }: { readonly text: string }) {
   return (
     <div
       data-testid="safety-cue"
-      className="mt-[var(--sp-3)] grid grid-cols-[20px_minmax(0,1fr)] gap-[var(--sp-2)] rounded border border-[color-mix(in_srgb,var(--dang)_38%,transparent)] bg-dang-bg p-[var(--sp-3)]"
+      className="mt-[var(--sp-3)] grid grid-cols-[20px_minmax(0,1fr)] gap-[var(--sp-2)] rounded border border-dang-line bg-dang-bg p-[var(--sp-3)]"
     >
       <ShieldIcon size={20} className="mt-[1px] text-dang" />
       <div>
-        <span className="block text-label font-bold uppercase tracking-[var(--ls-label)] text-dang">
-          Read before starting
-        </span>
+        <span className="block text-label font-semibold text-dang">Read before starting</span>
         <p className="mt-[2px] text-body leading-[var(--lh-body)] text-tx">{text}</p>
       </div>
     </div>

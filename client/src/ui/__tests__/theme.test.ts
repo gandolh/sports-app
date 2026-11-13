@@ -59,7 +59,7 @@ describe("a stored choice", () => {
     localStorage.setItem("sports-app.theme", "dark");
     stubDarkOs(false);
     runBootScript();
-    expect(bar()).toBe("#0a0d11");
+    expect(bar()).toBe("#080b0e");
 
     document.head.innerHTML = '<meta name="theme-color" content="#ffffff" />';
     localStorage.setItem("sports-app.theme", "system");
@@ -68,7 +68,7 @@ describe("a stored choice", () => {
 
     stubDarkOs(true);
     runBootScript();
-    expect(bar()).toBe("#0a0d11");
+    expect(bar()).toBe("#080b0e");
   });
 });
 

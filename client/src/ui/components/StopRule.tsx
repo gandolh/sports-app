@@ -38,24 +38,20 @@ import { StopIcon } from "./icons.tsx";
  * is what lets the user pick any of the eight without changing what a warning
  * looks like.
  *
- * `--dang-bg` is deliberately NOT used as the fill. The box sits on `--bg` with
- * a `--line2` hairline, so the red is carried entirely by the icon and the
- * label. A red wash behind a paragraph on every single exercise page is an
- * alarm that fires forty times a week, and an alarm that always fires is
- * furniture.
+ * `--dang-bg` is the fill, solid, with a `--dang-line` edge, so the red ground
+ * can be measured against its text. The sentence stays at 19px: it is the one
+ * line on the screen that outranks the number.
  */
 
 export function StopRule({ text }: { readonly text: string }) {
   return (
     <div
       data-testid="stop-rule"
-      className="mt-[var(--sp-3)] grid grid-cols-[20px_minmax(0,1fr)] gap-[var(--sp-2)] rounded border border-line2 bg-bg p-[var(--sp-3)] shadow-1"
+      className="mt-[var(--sp-3)] grid grid-cols-[20px_minmax(0,1fr)] gap-[var(--sp-2)] rounded border border-dang-line bg-dang-bg p-[var(--sp-3)]"
     >
       <StopIcon size={20} className="mt-[1px] text-dang" />
       <div>
-        <span className="block text-label font-bold uppercase tracking-[var(--ls-label)] text-dang">
-          Stop the set when
-        </span>
+        <span className="block text-label font-semibold text-dang">Stop the set when</span>
         <p className="mt-[2px] text-body leading-[var(--lh-body)] text-tx">{text}</p>
       </div>
     </div>

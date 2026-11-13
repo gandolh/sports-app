@@ -18,7 +18,7 @@
       `client/src/**`, so this file is outside it by construction rather than by
       exemption.
     -->
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="theme-color" content="#e9edf1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <!-- `default`, not `black-translucent`: translucent draws the status bar's
          own text in white over the page, which on the light theme is invisible.
@@ -59,7 +59,7 @@
         if (t !== "dark" && t !== "system") t = "light";
         document.documentElement.setAttribute("data-theme", t);
         var dark = t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-        if (dark) document.querySelector('meta[name="theme-color"]').setAttribute("content", "#0a0d11");
+        if (dark) document.querySelector('meta[name="theme-color"]').setAttribute("content", "#080b0e");
         var a = localStorage.getItem("sports-app.accent");
         if (a && /^[a-z]{4,8}$/.test(a)) document.documentElement.setAttribute("data-accent", a);
       } catch (_) {

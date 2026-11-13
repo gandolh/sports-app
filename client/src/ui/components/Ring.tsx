@@ -71,7 +71,7 @@ export interface RingProps {
   readonly fraction: number;
   /** The numeral inside, already formatted: `62%`, or `4/7`. */
   readonly value: string;
-  /** The uppercase caption under it. Two or three words. */
+  /** The caption under it, in sentence case. Two or three words. */
   readonly caption: string;
   /** The whole ring as one sentence, for a screen reader. */
   readonly label: string;

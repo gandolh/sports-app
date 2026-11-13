@@ -58,16 +58,15 @@ export function HonestNote({ label, children, inset = false }: HonestNoteProps) 
       data-testid="honest-note"
       className={
         "mt-[var(--sp-3)] grid grid-cols-[20px_minmax(0,1fr)] gap-[var(--sp-2)] rounded " +
-        "border border-[color-mix(in_srgb,var(--warn)_32%,transparent)] bg-warn-bg " +
+        "border border-warn-line bg-warn-bg " +
         (inset ? "p-[var(--sp-2)]" : "p-[var(--sp-3)]")
       }
     >
       <NoteIcon size={20} className="mt-[1px] text-warn" />
       <div>
-        {/* `--fs-label` uppercase, in the warn hue: the label has to be findable
-            without being loud, and at 13px it is the smallest thing on screen
-            that is still allowed to be bold. */}
-        <span className="block text-label font-bold uppercase tracking-[var(--ls-label)] text-warn">{label}</span>
+        {/* Sentence case in the warn hue: the label has to be findable without
+            being loud. */}
+        <span className="block text-label font-semibold text-warn">{label}</span>
         <p className="mt-[2px] text-meta leading-[var(--lh-body)] text-tx">{children}</p>
       </div>
     </div>

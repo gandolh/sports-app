@@ -138,19 +138,12 @@ export function ShellFooter({ above, children }: { readonly above?: ReactNode; r
 }
 
 /**
- * The uppercase micro-label: tile captions, disclosure headings, the unit under
- * a numeral.
- *
- * `--fs-label` is the ONLY size in the system that is allowed to be uppercase
- * (`tokens.css`), so this component is also the enforcement of that: there is
- * one `uppercase` in the components tree and it is here.
+ * The micro-label: tile captions, disclosure headings, the unit under a numeral.
+ * Sentence case at `--fs-label`, weight 600; nothing in the app is set in
+ * tracked capitals.
  */
 export function Eyebrow({ children, className }: { readonly children: ReactNode; readonly className?: string }) {
-  return (
-    <span className={`text-label font-bold uppercase tracking-[var(--ls-label)] ${className ?? "text-tx3"}`}>
-      {children}
-    </span>
-  );
+  return <span className={`text-label font-semibold ${className ?? "text-tx2"}`}>{children}</span>;
 }
 
 /**

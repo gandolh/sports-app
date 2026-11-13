@@ -305,18 +305,28 @@ function pairsFor(): ReadonlyArray<Pair> {
     pairs.push(["--accent", surface, 4.5, "tab label, tile delta, eyebrow"]);
   }
 
-  // Each accent's own ink, on both ends of the primary button's gradient. The
-  // second pair is the one a single shared ink fails first.
-  pairs.push(["--on-accent", "--accent", 4.5, "the primary button label, flat"]);
-  pairs.push(["--on-accent", "--accent-2", 4.5, "the same label over the gradient start"]);
+  // The pressed fill of Easier and Harder carries their label.
+  pairs.push(["--tx", "--s3", 4.5, "a secondary button's label while pressed"]);
+
+  // Each accent's own ink on the solid primary button (Start workout, Next set).
+  // This is the pair a single shared ink fails first.
+  pairs.push(["--on-accent", "--accent", 4.5, "the primary button label"]);
 
   // Non-text. The ring arc has to read against its own track, not just the page.
-  pairs.push(["--accent-2", "--bg", 3, "the gradient start of the progress ring"]);
+  pairs.push(["--accent-2", "--bg", 3, "the far end of the progress ring"]);
+  pairs.push(["--accent-2", "--s1", 3, "the far end of the progress ring, on its card"]);
   pairs.push(["--accent", "--grid0", 3, "the filled arc against the unfilled track"]);
+  pairs.push(["--accent-2", "--grid0", 3, "the far end of the arc against the unfilled track"]);
 
-  // Semantics, on the ground and on their own washes. The wash is translucent, so
-  // `resolve` composites it over `--bg` before either is measured.
+  // The control edge: Easier, Harder, Log and the Reps field.
+  pairs.push(["--edge", "--s1", 3, "a control's border on a card"]);
+  pairs.push(["--edge", "--bg", 3, "a control's border on the page"]);
+
+  // Semantics, on the ground and on their own solid grounds, which `resolve`
+  // reads as the hex they are.
   pairs.push(["--warn", "--bg", 4.5, "the disclosure icon and label"]);
+  pairs.push(["--warn", "--s1", 4.5, "the disclosure label on a card"]);
+  pairs.push(["--dang", "--s1", 4.5, "the stop-rule label on a card"]);
   pairs.push(["--dang", "--bg", 4.5, "the stop-rule icon and label"]);
   pairs.push(["--warn", "--warn-bg", 4.5, "the streak pill and the disclosure heading"]);
   pairs.push(["--tx", "--warn-bg", 4.5, "the disclosure body copy on its tint"]);
@@ -384,12 +394,9 @@ describe("the documented exceptions stay exceptions", () => {
         });
       }
 
-      it("the surface ramp ascends away from the canvas without becoming a line", () => {
-        const ratios = (["--s1", "--s2", "--s3"] as const).map((token) =>
-          contrast(resolve(palette, token, ground), ground),
-        );
-        expect(ratios).toEqual([...ratios].sort((a, b) => a - b));
-        expect(ratios[0]).toBeGreaterThan(1);
+      it("a card stands off the canvas without becoming a line", () => {
+        const ratio = contrast(resolve(palette, "--s1", ground), ground);
+        expect(ratio).toBeGreaterThan(1.1);
       });
     });
   }

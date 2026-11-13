@@ -87,8 +87,8 @@ export default defineConfig({
         // unstamped default in `tokens.css`; making the flash follow the user's
         // choice needs a `<meta name="theme-color" media="…">` pair in
         // `index.html`, which is the file.
-        theme_color: "#ffffff",
-        background_color: "#ffffff",
+        theme_color: "#e9edf1",
+        background_color: "#e9edf1",
         display: "standalone",
         orientation: "portrait",
         icons: [
