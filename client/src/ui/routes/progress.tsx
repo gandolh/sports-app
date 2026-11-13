@@ -11,9 +11,11 @@ import { useDocument } from "../document.ts";
 import { AlertBanner } from "../components/AlertBanner.tsx";
 import { HonestNote } from "../components/HonestNote.tsx";
 import { StatTiles } from "../components/StatTiles.tsx";
+import { StreakPill } from "../components/StreakPill.tsx";
 import { TabBar } from "../components/TabBar.tsx";
-import { Eyebrow, SectionHeading, Shell, ShellBody, ShellRail, ShellTitle } from "../components/Shell.tsx";
-import { groupDigits } from "../components/format.ts";
+import { Eyebrow, Shell, ShellBody, ShellRail, ShellTitle } from "../components/Shell.tsx";
+import { currentStreak, sessionsByDay } from "../components/history.ts";
+import { formatLongDate, groupDigits } from "../components/format.ts";
 
 /**
  * `/progress` — the one chart this app draws, and the disclosure that says what
@@ -118,15 +120,20 @@ function buildPushChart(sessionsDone: number): PushChart {
 }
 
 function PushChart({ chart }: { readonly chart: PushChart }) {
-  const { domainEnd, points, ticks, yMin, yMax, currentSession, currentTarget, currentRung } = chart;
+  const { domainEnd, points, yMin, yMax, currentSession, currentTarget, currentRung } = chart;
   const height = yMax - yMin;
   const leftPct = (currentSession / domainEnd) * 100;
   const topPct = ((yMax - currentTarget) / height) * 100;
 
   return (
-    <div className="mt-[var(--sp-2)]">
-      <div className="flex items-baseline justify-between">
-        <Eyebrow>Push target</Eyebrow>
+    <section
+      aria-labelledby="push-target"
+      className="rounded-lg border border-line bg-s1 p-[var(--sp-4)] shadow-1 min-[840px]:px-6 min-[840px]:pt-5 min-[840px]:pb-6"
+    >
+      <div className="mb-[var(--sp-2)] flex items-baseline justify-between gap-[var(--sp-3)]">
+        <h2 id="push-target" className="text-h leading-[1.27] font-bold">
+          Push target
+        </h2>
         <span className="text-meta text-tx2 tabular-nums">
           rung {currentRung + 1} of {PUSH_RUNG_COUNT}
         </span>
@@ -139,60 +146,73 @@ function PushChart({ chart }: { readonly chart: PushChart }) {
           `rung and resetting at the next. Currently rung ${currentRung + 1} of ${PUSH_RUNG_COUNT}, ` +
           `targeting ${currentTarget} reps.`
         }
-        className="relative mt-[var(--sp-2)] h-40 rounded border border-line bg-s1 p-[var(--sp-2)] shadow-1"
+        className="relative aspect-[8/3] rounded-[12px] bg-s2"
       >
-        <svg
-          viewBox={`0 0 ${domainEnd} ${height}`}
-          preserveAspectRatio="none"
-          className="h-full w-full"
-          aria-hidden="true"
-        >
-          {ticks.map((tick) => (
-            <line
-              key={tick}
-              x1={tick}
-              y1={0}
-              x2={tick}
-              y2={height}
-              stroke="var(--line)"
-              strokeWidth={1}
+        {/* The plot sits in an inset of the well, so the two guide lines at the
+            ends of the range have room to breathe above and below the line. */}
+        <div className="absolute inset-x-[1.25%] top-[8.3%] bottom-[10%]">
+          <svg
+            viewBox={`0 0 ${domainEnd} ${height}`}
+            preserveAspectRatio="none"
+            className="h-full w-full overflow-visible"
+            aria-hidden="true"
+          >
+            {[0, height].map((y) => (
+              <line
+                key={y}
+                x1={0}
+                y1={y}
+                x2={domainEnd}
+                y2={y}
+                stroke="var(--line2)"
+                strokeWidth={1}
+                strokeDasharray="3 5"
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+            <polyline
+              points={points}
+              fill="none"
+              stroke="var(--accent)"
+              strokeWidth={3}
+              strokeLinejoin="round"
+              strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
             />
-          ))}
-          <polyline
-            points={points}
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
+          </svg>
+          {/* An HTML dot rather than an SVG circle: a circle's radius scales with
+              the viewBox, and a dot that is a fixed size on screen needs to sit
+              outside that coordinate system entirely. */}
+          <span
+            aria-hidden="true"
+            className="absolute size-[14px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-s1 bg-accent box-content"
+            style={{ left: `${leftPct}%`, top: `${topPct}%` }}
           />
-        </svg>
-        {/* An HTML dot rather than an SVG circle: a circle's radius scales with
-            the viewBox, which runs from 126 units wide to several hundred, and a
-            dot that is a fixed size on screen needs to sit outside that
-            coordinate system entirely. */}
+        </div>
         <span
           aria-hidden="true"
-          className="absolute h-[10px] w-[10px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-1"
-          style={{ left: `${leftPct}%`, top: `${topPct}%` }}
-        />
+          className="absolute top-[calc(8.3%+4px)] left-[var(--sp-3)] text-label leading-4 font-semibold text-tx2 tabular-nums"
+        >
+          {yMax} reps
+        </span>
+        <span
+          aria-hidden="true"
+          className="absolute bottom-[calc(10%+4px)] left-[var(--sp-3)] text-label leading-4 font-semibold text-tx2 tabular-nums"
+        >
+          {yMin} reps
+        </span>
       </div>
 
-      <div className="mt-[var(--sp-1)] flex items-center justify-between text-label text-tx3">
-        <span className="tabular-nums">{yMin} reps</span>
-        <span className="inline-flex items-center gap-[var(--sp-1)]">
-          <span aria-hidden="true" className="block h-[8px] w-[8px] rounded-full bg-accent" />
-          Today
-        </span>
-        <span className="tabular-nums">{yMax} reps</span>
+      <div
+        aria-hidden="true"
+        className="mt-[var(--sp-2)] flex items-center gap-[var(--sp-2)] text-label leading-4 font-semibold text-tx2"
+      >
+        <span className="block size-[10px] rounded-full bg-accent" />
+        Today
       </div>
-    </div>
+    </section>
   );
 }
-
-// ─── The route ──────────────────────────────────────────────────────────────
 
 export const progressRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -224,16 +244,32 @@ function ProgressRoute() {
     );
   }
 
+  return <ProgressPage doc={doc} readOnly={snapshot.readOnly} />;
+}
+
+function ProgressPage({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: string | null }) {
+  const now = useMemo(() => new Date(), []);
+  const streak = useMemo(() => currentStreak(sessionsByDay(doc.history), now), [doc, now]);
   return (
     <Shell>
-      <ShellRail topBar>Progress</ShellRail>
+      <ShellRail topBar trailing={<StreakPill days={streak} />}>
+        {formatLongDate(now)}
+      </ShellRail>
       <ShellBody>
-        <ShellTitle title="Progress" size="movement" />
-        {snapshot.readOnly === null ? null : <AlertBanner label="Read-only" text={snapshot.readOnly} />}
+        <ShellTitle title="Progress" />
+        {readOnly === null ? null : <AlertBanner label="Read-only" text={readOnly} />}
 
         <ProgressBody doc={doc} />
       </ShellBody>
-      <TabBar active="progress" />
+      <TabBar
+        active="progress"
+        trailing={
+          <>
+            <span>{formatLongDate(now)}</span>
+            <StreakPill days={streak} />
+          </>
+        }
+      />
     </Shell>
   );
 }
@@ -248,55 +284,70 @@ function ProgressBody({ doc }: { readonly doc: StateDoc }) {
   const chart = useMemo(() => buildPushChart(doc.sessionsDone.push), [doc.sessionsDone.push]);
 
   return (
-    <>
-      <StatTiles
-        stats={[
-          {
-            value: groupDigits(work.sessions),
-            label: "Sessions",
-            srLabel: `${work.sessions} sessions completed.`,
-          },
-          {
-            value: groupDigits(milestones.length),
-            label: "Milestones",
-            srLabel: `${milestones.length} milestones reached.`,
-          },
-          {
-            value: groupDigits(ladders.length),
-            label: "Ladders finished",
-            srLabel: `${ladders.length} ladders reached their top rung.`,
-          },
-        ]}
-      />
+    <div className="mt-[var(--sp-3)] grid gap-[var(--sp-3)] min-[840px]:mt-0 min-[840px]:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] min-[840px]:items-start min-[840px]:gap-[var(--sp-4)]">
+      <div className="grid gap-[var(--sp-3)] min-[840px]:gap-[var(--sp-4)]">
+        <section aria-label="Totals" className="rounded-lg border border-line bg-s1 shadow-1">
+          <StatTiles
+            layout="columns"
+            stats={[
+              {
+                value: groupDigits(work.sessions),
+                label: "Sessions",
+                srLabel: `${work.sessions} sessions completed.`,
+              },
+              {
+                value: groupDigits(milestones.length),
+                label: "Milestones",
+                srLabel: `${milestones.length} milestones reached.`,
+              },
+              {
+                value: groupDigits(ladders.length),
+                label: "Ladders finished",
+                srLabel: `${ladders.length} ladders reached their top rung.`,
+              },
+            ]}
+          />
+        </section>
 
-      <PushChart chart={chart} />
-      <HonestNote label="What this chart plots">
-        The schedule, not your capability. The app prescribes on a fixed six-week clock and never adapts to what you log
-        — this line was knowable on day one.
-      </HonestNote>
+        <PushChart chart={chart} />
+      </div>
 
-      <SectionHeading>Milestones</SectionHeading>
-      {milestones.length === 0 ? (
-        <p className="text-body text-tx2">
-          Nothing yet — the first one lands the first time a ladder moves up a rung, about six weeks in. Start a session
-          from Today.
-        </p>
-      ) : (
-        <ol>
-          {milestones.map((milestone, index) => (
-            <li
-              key={`${milestone.sessionNumber}-${index}`}
-              data-testid="milestone"
-              className="mt-[var(--sp-2)] rounded border border-line bg-s1 p-[var(--sp-3)] shadow-1"
-            >
-              <span data-testid="milestone-ordinal">
-                <Eyebrow className="text-tx3 tabular-nums">{`Session ${milestone.sessionNumber}`}</Eyebrow>
-              </span>
-              <p className="mt-[2px] text-body text-tx">{milestone.label}</p>
-            </li>
-          ))}
-        </ol>
-      )}
-    </>
+      <div className="grid gap-[var(--sp-3)] min-[840px]:gap-[var(--sp-4)]">
+        <HonestNote flush label="What this chart plots">
+          The schedule, not your capability. The app prescribes on a fixed six-week clock and never adapts to what you
+          log — this line was knowable on day one.
+        </HonestNote>
+
+        <section
+          aria-labelledby="milestones"
+          className="rounded-lg border border-line bg-s1 p-[var(--sp-4)] shadow-1 min-[840px]:px-6 min-[840px]:pt-5 min-[840px]:pb-6"
+        >
+          <h2 id="milestones" className="text-h leading-[1.27] font-bold">
+            Milestones
+          </h2>
+          {milestones.length === 0 ? (
+            <p className="mt-[var(--sp-3)] text-body text-tx2">
+              Nothing yet — the first one lands the first time a ladder moves up a rung, about six weeks in. Start a
+              session from Today.
+            </p>
+          ) : (
+            <ol>
+              {milestones.map((milestone, index) => (
+                <li
+                  key={`${milestone.sessionNumber}-${index}`}
+                  data-testid="milestone"
+                  className="mt-[var(--sp-3)] rounded-[12px] bg-s2 px-[var(--sp-4)] py-[var(--sp-3)]"
+                >
+                  <span data-testid="milestone-ordinal">
+                    <Eyebrow className="text-tx2 tabular-nums">{`Session ${milestone.sessionNumber}`}</Eyebrow>
+                  </span>
+                  <p className="mt-[2px] text-body leading-[1.45] text-tx">{milestone.label}</p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }

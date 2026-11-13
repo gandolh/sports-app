@@ -50,15 +50,17 @@ export interface HonestNoteProps {
   readonly children: ReactNode;
   /** The tighter form used inside a list row, where the row already has padding. */
   readonly inset?: boolean;
+  /** Alone in a grid that already spaces its children: no margin of its own. */
+  readonly flush?: boolean;
 }
 
-export function HonestNote({ label, children, inset = false }: HonestNoteProps) {
+export function HonestNote({ label, children, inset = false, flush = false }: HonestNoteProps) {
   return (
     <div
       data-testid="honest-note"
       className={
         "flex gap-[var(--sp-3)] rounded-[12px] border border-warn-line bg-warn-bg px-[var(--sp-4)] py-[var(--sp-3)] " +
-        (inset ? "mx-[var(--sp-3)] mb-[var(--sp-3)]" : "mt-[var(--sp-3)]")
+        (inset ? "mx-[var(--sp-3)] mb-[var(--sp-3)]" : flush ? "" : "mt-[var(--sp-3)]")
       }
     >
       <NoteIcon size={20} className="mt-[1px] flex-none text-warn" />
