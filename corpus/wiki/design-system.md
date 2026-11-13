@@ -1,6 +1,6 @@
 ---
 summary: Design tokens and the doctrine governing them — colour, type, spacing and motion. The banned patterns and accessibility floor live in design-guardrails.md.
-updated: 2026-11-02
+updated: 2026-11-13
 ---
 
 # Design system
@@ -98,10 +98,10 @@ AI-generated-UI fingerprint. Self-hosted because the app is offline-first: no fo
 --fs-title:   28px;   /* exercise name in session */
 --fs-h:       22px;   --fs-btn: 19px;   --fs-body-l: 19px;  /* cues */
 --fs-body:    17px;   /* floor for body text */
---fs-meta:    15px;   --fs-label: 13px;  /* tracked uppercase eyebrows only */
+--fs-meta:    15px;   --fs-label: 13px;  /* labels, units, captions: sentence case, 600 (changed 2026-11-13) */
 
 --lh-hero: 0.92;  --lh-display: 1.05;  --lh-title: 1.15;  --lh-body: 1.45;
---ls-hero: -0.03em;  --ls-display: -0.02em;  --ls-title: -0.015em;  --ls-label: 0.10em;
+--ls-hero: -0.03em;  --ls-display: -0.02em;  --ls-title: -0.015em;  /* --ls-label (0.10em) dropped 2026-11-13 */
 ```
 
 **Doctrine:**
@@ -113,7 +113,9 @@ AI-generated-UI fingerprint. Self-hosted because the app is offline-first: no fo
   rule did not: thin type halated on dark; on white, dark-on-light optically thins the
   stroke, so 300 would be spindly rather than glowing. Same floor, opposite cause.
 - Ship the scale in `rem`; never set a px `font-size` on `html`, so OS text scaling works.
-- **Only `--fs-label` is uppercase.** Uppercase body text is slower to read.
+- ~~**Only `--fs-label` is uppercase.**~~ **Changed 2026-11-13: nothing is uppercase.** Labels, units and the ring
+  caption are sentence case at `--fs-label` (13/16, weight 600), untracked. Uppercase body text is slower to read, and
+  a tracked capital label was the one place the rule allowed it.
 
 ## Spacing, radii, sizing
 
@@ -183,3 +185,6 @@ The banned patterns, the floor-phone accessibility floor, and the four mechanica
 now live in [design-guardrails.md](design-guardrails.md). Split out on 2026-07-30 when
 this page passed 200 lines. **Read that page before adding anything visual** — this one
 tells you what the vocabulary is, that one tells you what you may not do with it.
+
+The 2026-11-13 redesign (new grounds and lines, the new tokens, the top bar from 840 px, a solid primary) is in
+[design-up-first.md](design-up-first.md).

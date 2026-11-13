@@ -284,7 +284,7 @@ function Home({ doc, readOnly }: { readonly doc: StateDoc; readonly readOnly: st
         />
         {readOnly === null ? null : <AlertBanner label="Read-only" text={readOnly} />}
 
-        <div className="mt-[var(--sp-3)] grid gap-[var(--sp-3)] min-[840px]:mt-0 min-[840px]:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] min-[840px]:items-start min-[840px]:gap-[var(--sp-4)]">
+        <div className="grid gap-[var(--sp-3)] min-[840px]:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] min-[840px]:items-start min-[840px]:gap-[var(--sp-4)]">
           <div className="grid gap-[var(--sp-3)] max-[419px]:gap-[var(--sp-2)] min-[840px]:gap-[var(--sp-4)]">
             {first === undefined ? null : <UpFirst item={first} />}
 

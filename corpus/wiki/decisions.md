@@ -185,7 +185,7 @@ Dark ground, gradient progress ring, streak grid, stat tiles, bottom tab bar, In
 throughout — **executed straight, at full fidelity, without irony or smuggled quirk.**
 Shown the roll's assignment (a crag guidebook), a pick (a physio handout) and a
 competitive challenger (a split-flap board) as running interfaces, the user took the
-standing exit. Convention is the commitment; this is not a fallback.
+standing exit. Convention is the commitment; this is not a fallback. **Changed 2026-11-13** (the owner approved the redesign "Up first"; the lines above are kept as history): the four places are a bottom tab bar on phones and a 64 px top bar from 840 px, the ring is still a gradient but within the accent's own hue (`--accent-2` is no longer violet), the Start and Next set buttons are solid `--accent`, and nothing is set in tracked capitals (labels are sentence case, 13/16, weight 600; `--ls-label` is gone). Detail in [decisions-redesign.md](decisions-redesign.md).
 
 **The craft bar is openGym** — light/dark themes, eight accent colours, custom
 iconography, "designed, not assembled". A finish level, not a feature list.

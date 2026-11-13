@@ -100,7 +100,7 @@ export function Comparison({ unit, lastTarget, todayTarget, lastLogged }: Compar
   return (
     <div
       data-testid="comparison"
-      className="mt-[var(--sp-3)] grid grid-cols-3 gap-[var(--sp-2)] max-[389px]:gap-[var(--sp-1)]"
+      className="mt-[var(--sp-2)] grid grid-cols-3 gap-[var(--sp-2)] max-[389px]:gap-[var(--sp-1)]"
     >
       <Cell
         value={`${lastTarget}${suffix}`}

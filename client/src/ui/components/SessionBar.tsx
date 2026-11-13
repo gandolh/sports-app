@@ -19,7 +19,7 @@ export function SessionBar({
   readonly onStop: () => void;
 }) {
   return (
-    <header className="pad-top-safe shrink-0 border-b border-line2 bg-s1">
+    <header className="shrink-0 pt-[env(safe-area-inset-top)] border-b border-line2 bg-s1">
       <div className="mx-auto grid min-h-14 w-full max-w-[1168px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-[var(--sp-4)] pr-[var(--sp-4)] pl-[var(--sp-4)] min-[840px]:min-h-16 min-[840px]:px-6">
         <p className="flex gap-[var(--sp-3)] text-meta font-semibold text-tx2 tabular-nums min-[840px]:text-body">
           <span>{label}</span>

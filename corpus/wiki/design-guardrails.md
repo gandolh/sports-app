@@ -116,3 +116,22 @@ Vitest stubs CSS modules to an empty string by default, and it does so by module
 a grep over nothing passes. `css: true` in `client/vite.config.ts` is what makes both 3 and
 4 read real bytes. Worth remembering as a shape: **a test that greps files it failed to
 open is green and worthless**, so assert that the input is non-empty.
+
+## Browser checks (2026-11-13)
+
+Playwright 1.63.0, headless Chromium, in `client/e2e/` (`playwright test --workers=2` from `client/`, against a Vite
+server started from `client/` and not through `npm run dev`). Every request to `/api` is answered by the fixture, a
+generated 16-session history is written to local storage, and the clock is frozen at 12 November 2026, 10:00. The
+checks are the Floor made mechanical:
+
+- a focus ring of at least 3:1 on every tab stop of every screen (`focus.spec.ts`);
+- no animation on the figures and no movement of the ring under reduced motion (`motion.spec.ts`);
+- nothing reaches past the screen at 390 and 360 px: the page's own width, `main`'s overflow and every element's edge
+  (`phone.spec.ts`);
+- Light, Dark and System stamp the page and paint it (`theme.spec.ts`);
+- the whole session above the action band at 1280x800, 390x844 and 360x800, and the stop rule above the actions on the
+  player at 360 (`first-screen.spec.ts`).
+
+The tab-bar line in the anti-patterns above ("a bottom tab bar on a two-destination app") still holds: the app has four
+destinations, a bottom bar on a phone and a top bar from 840 px.
+

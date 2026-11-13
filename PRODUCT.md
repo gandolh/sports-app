@@ -114,7 +114,7 @@ Zero photography.
 
 **The visual direction is the category standard, committed 2026-09-04** and chosen by
 the user over three alternatives shown as running interfaces. Dark ground, gradient
-progress ring, streak grid, stat tiles, bottom tab bar, Inter throughout — executed
+progress ring, streak grid, stat tiles, a bottom tab bar on phones (a top bar from 840 px), Inter throughout — executed
 straight, at full fidelity, without irony or smuggled quirk. This is a standing
 preference, not a fallback.
 

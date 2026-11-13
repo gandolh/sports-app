@@ -284,7 +284,7 @@ function ProgressBody({ doc }: { readonly doc: StateDoc }) {
   const chart = useMemo(() => buildPushChart(doc.sessionsDone.push), [doc.sessionsDone.push]);
 
   return (
-    <div className="mt-[var(--sp-3)] grid gap-[var(--sp-3)] min-[840px]:mt-0 min-[840px]:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] min-[840px]:items-start min-[840px]:gap-[var(--sp-4)]">
+    <div className="grid gap-[var(--sp-3)] min-[840px]:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] min-[840px]:items-start min-[840px]:gap-[var(--sp-4)]">
       <div className="grid gap-[var(--sp-3)] min-[840px]:gap-[var(--sp-4)]">
         <section aria-label="Totals" className="rounded-lg border border-line bg-s1 shadow-1">
           <StatTiles

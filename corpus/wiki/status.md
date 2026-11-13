@@ -1,9 +1,9 @@
 ---
-summary: Dated snapshot (2026-11-02) of sports-app, per area. The fixed schedule (v2, 2026-07-29), the category-standard rebuild with logging and the token system (2026-09-04), the rigged figures (2026-10-02), the in-between rungs (2026-10-07), local accounts with Ward as a second way in (2026-10-13), the docs site on Docusaurus and the sign-in fixes (2026-10-19 to 2026-10-28); 1,223 tests; what is still open and left for the owner; what is deliberately out.
-updated: 2026-11-11
+summary: Dated snapshot (2026-11-13) of sports-app, per area. The Up first redesign (2026-11-13: new tokens, a top bar from 840 px, the first exercise open on Today, Playwright checks). The fixed schedule (v2, 2026-07-29), the category-standard rebuild with logging and the token system (2026-09-04), the rigged figures (2026-10-02), the in-between rungs (2026-10-07), local accounts with Ward as a second way in (2026-10-13), the docs site on Docusaurus and the sign-in fixes (2026-10-19 to 2026-10-28); 1,252 client and server tests plus the Playwright specs; what is still open and left for the owner; what is deliberately out.
+updated: 2026-11-13
 ---
 
-# Status — 2026-11-02
+# Status — 2026-11-13
 
 `main` is pushed through `7bb5541` (2026-11-01). The app runs on the VPS as a
 container stack of `vps-deploy`, which depends on Ward; deploying is the
@@ -17,6 +17,10 @@ code structure ([server-structure.md](server-structure.md)); 1,235 tests; awaiti
 The house style is in (2026-11-11): Prettier at 120 columns, the house ESLint
 config, `npm run check` with knip and dependency-cruiser, a root `CLAUDE.md`
 and `.claude/rules/` ([technical-decisions.md](technical-decisions.md)).
+Brief 05 (2026-11-13): the redesign "Up first" is built: new tokens, a 64 px top bar from 840 px (phones keep the
+bottom bar), Today with the first exercise open and the rest in one list, the player and Progress rebuilt, every other
+screen on the new tokens, and Playwright 1.63.0 with the Floor specs in `client/e2e/`
+([design-system.md](design-system.md#the-up-first-redesign-2026-11-13)); awaiting deploy (`deploy` phase, client only).
 
 ## By area
 
@@ -32,6 +36,9 @@ and `.claude/rules/` ([technical-decisions.md](technical-decisions.md)).
   the stop rule, a Tailwind v4 token system carrying eight accents in light and
   dark, and four rebuilt screens: `/`, `/plan`, `/progress`, `/library`, plus
   `/account` ([design-system.md](design-system.md), [reversals.md](reversals.md)).
+- **The Up first redesign** (2026-11-13). The owner approved the direction on the estate redesign board; two lines of
+  [decisions.md](decisions.md) are changed, dated, with the old lines kept (the top bar from 840 px, and no tracked
+  capitals).
 - **Figures** (2026-10-02). Rigged figures that morph between poses; the
   crossfade is gone.
 - **In-between rungs** (2026-10-07). Three rungs at the three big steps, with

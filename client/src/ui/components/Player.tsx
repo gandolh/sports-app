@@ -426,7 +426,7 @@ function PlayerPage({
 
 function RepTarget({ item }: { readonly item: PrescribedExercise }) {
   return (
-    <div className="mt-[var(--sp-2)] grid justify-items-center text-center max-[389px]:mt-0">
+    <div className="grid justify-items-center text-center">
       <span
         aria-hidden="true"
         className="block pt-[var(--sp-2)] text-hero leading-[var(--lh-hero)] font-extrabold tracking-[var(--ls-hero)] tabular-nums max-[389px]:pt-[var(--sp-1)] max-[389px]:text-[4.5rem] min-[840px]:text-[8.25rem]"
