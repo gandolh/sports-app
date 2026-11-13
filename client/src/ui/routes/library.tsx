@@ -129,7 +129,7 @@ function List({ exercises }: { readonly exercises: readonly Entry[] }) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search by name, muscle, force or level"
-          className="min-h-[var(--tap-row)] w-full rounded border border-line2 bg-s1 px-[var(--sp-3)] text-body text-tx placeholder:text-tx3"
+          className="min-h-[var(--tap-row)] w-full rounded border border-edge bg-s1 px-[var(--sp-3)] text-body text-tx placeholder:text-tx3"
         />
       </label>
 

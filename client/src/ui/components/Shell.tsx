@@ -51,9 +51,11 @@ export function ShellRail({ children, trailing, topBar = false }: ShellRailProps
   const wide = useWide();
   if (wide && topBar) return null;
   return (
-    <div className="pad-top-safe flex min-h-[var(--tap-min)] shrink-0 items-center justify-between gap-[var(--sp-3)] px-[var(--sp-4)] pt-[var(--sp-2)] max-[389px]:min-h-9 max-[389px]:px-[var(--sp-3)] max-[389px]:pt-[var(--sp-1)]">
-      <span className="text-meta font-medium text-tx2 tabular-nums">{children}</span>
-      {trailing === undefined ? null : <div className="flex items-center">{trailing}</div>}
+    <div className="pad-top-safe shrink-0">
+      <div className="mx-auto flex min-h-[var(--tap-min)] w-full max-w-[1168px] items-center justify-between gap-[var(--sp-3)] px-[var(--sp-4)] pt-[var(--sp-2)] max-[389px]:min-h-9 max-[389px]:px-[var(--sp-3)] max-[389px]:pt-[var(--sp-1)] min-[840px]:px-6">
+        <span className="text-meta font-medium text-tx2 tabular-nums">{children}</span>
+        {trailing === undefined ? null : <div className="flex items-center">{trailing}</div>}
+      </div>
     </div>
   );
 }

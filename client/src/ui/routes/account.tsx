@@ -94,7 +94,7 @@ function AccountRoute() {
         <div className="mt-[var(--sp-2)]">
           <Link
             to="/library"
-            className="inline-flex min-h-[var(--tap-row)] items-center rounded border border-line2 px-[var(--sp-4)] text-btn font-semibold text-tx"
+            className="inline-flex min-h-[var(--tap-row)] items-center rounded border border-edge px-[var(--sp-4)] text-btn font-semibold text-tx"
           >
             Open the reference
           </Link>

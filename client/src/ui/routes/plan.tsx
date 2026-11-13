@@ -114,10 +114,10 @@ const CELL_FILL: Readonly<Record<DayState, string>> = {
   // alarm. This is the one state the 42-day heatmap on Today deliberately does
   // NOT have (see `Heatmap.tsx`); the honesty about what it costs lives in the
   // note below, not in how loud the square is.
-  missed: "bg-grid0 text-tx3 border border-line2",
+  missed: "bg-grid0 text-tx2 shadow-[inset_0_0_0_1px_var(--line2)]",
   // Quiet. A day that has not happened yet has nothing to report — not even
   // "upcoming", which every future day would say identically.
-  rest: "bg-grid0 text-tx3",
+  rest: "bg-grid0 text-tx2",
 };
 
 /**
@@ -138,7 +138,7 @@ function CalendarGrid({ cells }: { readonly cells: readonly (CalendarDay | null)
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
   return (
-    <table className="mt-[var(--sp-2)] w-full border-separate border-spacing-[3px]">
+    <table className="w-full border-separate border-spacing-[3px]">
       <caption className="sr-only">
         This month, one row per week. Today is outlined; a filled square is a day that was trained.
       </caption>
@@ -146,7 +146,7 @@ function CalendarGrid({ cells }: { readonly cells: readonly (CalendarDay | null)
         <tr>
           {WEEKDAY_SHORT.map((short, index) => (
             <th key={short} scope="col" className="pb-[var(--sp-1)] font-normal">
-              <span aria-hidden="true" className="block text-center text-label text-tx3">
+              <span aria-hidden="true" className="block text-center text-label font-semibold text-tx2">
                 {short}
               </span>
               <span className="sr-only">{WEEKDAY_FULL[index]}</span>
@@ -260,7 +260,9 @@ function PlanRoute() {
         <ShellTitle title="This month" size="movement" />
         {snapshot.readOnly === null ? null : <AlertBanner label="Read-only" text={snapshot.readOnly} />}
 
-        <CalendarGrid cells={cells} />
+        <div className="mt-[var(--sp-2)] rounded-lg border border-line bg-s1 p-[var(--sp-3)] shadow-1">
+          <CalendarGrid cells={cells} />
+        </div>
         <HonestNote label="What a missed day costs">{missedDayNote(missedDay)}</HonestNote>
 
         <SectionHeading>Coming up</SectionHeading>
@@ -271,9 +273,12 @@ function PlanRoute() {
 
         <ol>
           {sessions.map((prescription, offset) => (
-            <li key={offset} className="mt-[var(--sp-2)] rounded border border-line bg-s1 p-[var(--sp-3)] shadow-1">
+            <li
+              key={offset}
+              className="mt-[var(--sp-2)] rounded-lg border border-line bg-s1 px-[var(--sp-4)] py-[var(--sp-3)] shadow-1"
+            >
               <div className="flex items-center justify-between gap-[var(--sp-2)]">
-                <Eyebrow className="text-tx3 tabular-nums">
+                <Eyebrow className="text-tx2 tabular-nums">
                   {offset === 0 ? `Next · Session ${firstNumber}` : `Session ${firstNumber + offset}`}
                 </Eyebrow>
               </div>

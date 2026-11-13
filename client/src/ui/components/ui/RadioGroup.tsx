@@ -38,7 +38,7 @@ export function RadioGroup<Value extends string>({
         <Radio.Root
           key={option.value}
           value={option.value}
-          className={`flex min-h-[var(--tap-row)] items-center justify-center rounded border border-line2 font-semibold text-tx2 select-none data-[checked]:border-accent data-[checked]:text-accent ${optionClassName ?? ""}`}
+          className={`flex min-h-[var(--tap-row)] items-center justify-center rounded border border-edge font-semibold text-tx2 select-none data-[checked]:border-accent data-[checked]:text-accent ${optionClassName ?? ""}`}
         >
           {option.label}
         </Radio.Root>
