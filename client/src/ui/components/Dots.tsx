@@ -31,7 +31,7 @@ export interface DotsProps {
 export function Dots({ filled, total, noun }: DotsProps) {
   return (
     <div
-      className="flex justify-center gap-[var(--sp-1)]"
+      className="flex gap-[var(--sp-2)]"
       // One sentence rather than N list items: a screen reader reading
       // "dot, filled, dot, filled, dot" mid-set is noise, and the count is the
       // only thing anybody wants from it.
@@ -43,9 +43,9 @@ export function Dots({ filled, total, noun }: DotsProps) {
           key={index}
           data-filled={index < filled}
           className={
-            "block h-[6px] w-[2.1rem] rounded-full transition-colors " +
+            "block h-2 w-7 rounded-full transition-colors " +
             "duration-[var(--dur-base)] ease-[var(--ease-spring)] " +
-            (index < filled ? "bg-accent" : "bg-s3")
+            (index < filled ? "bg-accent" : "bg-line2")
           }
         />
       ))}

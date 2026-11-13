@@ -39,7 +39,7 @@ export function SafetyCue({ text }: { readonly text: string }) {
   return (
     <div
       data-testid="safety-cue"
-      className="mt-[var(--sp-3)] grid grid-cols-[20px_minmax(0,1fr)] gap-[var(--sp-2)] rounded border border-dang-line bg-dang-bg p-[var(--sp-3)]"
+      className="mt-[var(--sp-3)] grid grid-cols-[20px_minmax(0,1fr)] gap-[var(--sp-3)] rounded-[12px] border border-dang-line bg-dang-bg px-[var(--sp-4)] py-[var(--sp-3)] first:mt-0"
     >
       <ShieldIcon size={20} className="mt-[1px] text-dang" />
       <div>
@@ -52,19 +52,15 @@ export function SafetyCue({ text }: { readonly text: string }) {
 
 export function CueList({ cues }: { readonly cues: readonly string[] }) {
   return (
-    <ol data-testid="cue-list" className="mt-[var(--sp-4)] grid gap-[var(--sp-3)]">
+    <ol data-testid="cue-list" className="grid gap-[var(--sp-3)] [counter-reset:c]">
       {cues.map((cue, index) => (
+        // The number is a generated marker, so the `<ol>` numbers the item once for a
+        // screen reader and the circle is only for the eye.
         <li
           key={index}
-          className="grid grid-cols-[1.3rem_minmax(0,1fr)] gap-[var(--sp-2)] text-meta leading-[var(--lh-body)] text-tx2"
+          className="relative pl-9 text-body leading-[1.55] text-tx [counter-increment:c] before:absolute before:top-[2px] before:left-0 before:grid before:size-6 before:place-items-center before:rounded-full before:bg-s2 before:text-label before:font-bold before:text-tx2 before:content-[counter(c)]"
         >
-          {/* The numeral is `aria-hidden` because the `<ol>` already numbers the
-              item for a screen reader; rendering it as text too would announce
-              "one, one, setup your hands…". */}
-          <span aria-hidden="true" className="font-bold text-tx3 tabular-nums">
-            {index + 1}
-          </span>
-          <span>{cue}</span>
+          {cue}
         </li>
       ))}
     </ol>

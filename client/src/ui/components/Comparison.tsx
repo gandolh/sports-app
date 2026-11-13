@@ -74,16 +74,18 @@ function Cell({
   readonly accent?: boolean;
 }) {
   return (
-    <div className="text-center">
+    <div className="rounded-[12px] bg-s2 px-[var(--sp-2)] py-[var(--sp-2)] text-center max-[389px]:px-[var(--sp-1)] max-[389px]:py-[var(--sp-1)] min-[840px]:px-3">
       <span className="sr-only">{srLabel}</span>
-      <span
-        aria-hidden="true"
-        className={"block text-body font-bold tracking-[-0.02em] tabular-nums " + (accent ? "text-accent" : "text-tx")}
-      >
-        {value}
-      </span>
       <span aria-hidden="true" className="block">
         <Eyebrow>{label}</Eyebrow>
+      </span>
+      <span
+        aria-hidden="true"
+        className={
+          "block text-[1.125rem] leading-[1.3] font-extrabold tabular-nums " + (accent ? "text-accent" : "text-tx")
+        }
+      >
+        {value}
       </span>
     </div>
   );
@@ -98,7 +100,7 @@ export function Comparison({ unit, lastTarget, todayTarget, lastLogged }: Compar
   return (
     <div
       data-testid="comparison"
-      className="mt-[var(--sp-4)] flex justify-center gap-[var(--sp-8)] border-y border-line py-[var(--sp-2)]"
+      className="mt-[var(--sp-3)] grid grid-cols-3 gap-[var(--sp-2)] max-[389px]:gap-[var(--sp-1)]"
     >
       <Cell
         value={`${lastTarget}${suffix}`}

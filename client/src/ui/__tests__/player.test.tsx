@@ -156,24 +156,25 @@ describe("the stop rule", () => {
    * Ordering, not presence — and it is a separate assertion from "above the
    * cues" on purpose.
    *
-   * The stop rule was already above the cues when the build shipped, and that
-   * was still not enough on a 402x874 phone: the comparison strip sat between
-   * the numeral and the stop rule and pushed the sentence far enough down that
-   * it truncated mid-clause at the fold while still looking complete. Presence
-   * and order relative to the cues are both satisfiable while the line is
-   * unreadable at the moment it matters, so the position that actually needed
-   * locking is this one.
+   * The comparison strip used to sit between the numeral and the stop rule and
+   * pushed the sentence under the fold on a 402x874 phone. The strip is three
+   * thin cells inside the set card now, and the stop rule is the next thing after
+   * that card, so the two things between the number and the rule are the strip
+   * and nothing else. The position the first screen needs is measured in the
+   * browser spec (the whole rule above the actions at 360x800).
    */
-  it("outranks the comparison strip, not just the cues", async () => {
+  it("follows the set card, with the comparison inside it, and comes before the cues", async () => {
     seedUser(docWithHistory());
     await renderApp("/?v=medium&i=0&d=0");
 
     const stop = screen.getByTestId("stop-rule");
-    const comparison = screen.getByTestId("comparison");
+    const card = screen.getByRole("region", { name: "This set" });
     const cues = screen.getByTestId("cue-list");
 
+    expect(card.contains(screen.getByTestId("comparison"))).toBe(true);
+    expect(card.contains(stop)).toBe(false);
     // Node.compareDocumentPosition: FOLLOWING means the argument comes after.
-    expect(stop.compareDocumentPosition(comparison) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(card.compareDocumentPosition(stop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(stop.compareDocumentPosition(cues) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -313,7 +314,7 @@ describe("the position lives in the URL", () => {
     const url = currentUrl(first.router);
     expect(url).toContain("i=1");
     const heading = screen.getByRole("heading", { level: 1 }).textContent;
-    const rail = screen.getByText("Push · 2 of 3").textContent;
+    const rail = screen.getByText("2 of 3").textContent;
 
     // A reload is a brand-new router, a brand-new query cache and a brand-new
     // React tree at the same URL. Nothing survives except the URL and storage.
@@ -321,7 +322,7 @@ describe("the position lives in the URL", () => {
     await renderApp(url);
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(heading);
-    expect(screen.getByText("Push · 2 of 3").textContent).toBe(rail);
+    expect(screen.getByText("2 of 3").textContent).toBe(rail);
   });
 
   it("clamps a position that no longer exists rather than breaking the screen", async () => {

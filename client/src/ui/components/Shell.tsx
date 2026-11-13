@@ -165,7 +165,7 @@ export function ShellFooter({ above, children }: { readonly above?: ReactNode; r
  * tracked capitals.
  */
 export function Eyebrow({ children, className }: { readonly children: ReactNode; readonly className?: string }) {
-  return <span className={`text-label font-semibold ${className ?? "text-tx2"}`}>{children}</span>;
+  return <span className={`text-label font-semibold whitespace-nowrap ${className ?? "text-tx2"}`}>{children}</span>;
 }
 
 /**

@@ -119,7 +119,7 @@ export function LogControls({ target, unit, logged, onLog }: LogControlsProps) {
               if (event.key === "Enter") submit();
               if (event.key === "Escape") setOpen(false);
             }}
-            className="h-[var(--tap-row)] min-w-0 flex-1 rounded border border-line2 bg-s2 px-[var(--sp-3)] text-body text-tx tabular-nums"
+            className="h-[var(--tap-row)] min-w-0 flex-1 rounded-[10px] border-[1.5px] border-edge bg-s1 px-[var(--sp-3)] text-body text-tx tabular-nums"
           />
           <SecondaryButton className="w-auto px-[var(--sp-4)]" onClick={submit}>
             Save

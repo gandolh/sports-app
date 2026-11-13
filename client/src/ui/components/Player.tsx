@@ -8,16 +8,19 @@ import { ExerciseFigure } from "../ExerciseFigure.tsx";
 import { useCompleteSession } from "../document.ts";
 import type { SessionLogs } from "../document.ts";
 import { AlertBanner } from "./AlertBanner.tsx";
-import { PrimaryButton, QuietButton, SecondaryButton } from "./Buttons.tsx";
+import { PrimaryButton, SecondaryButton } from "./Buttons.tsx";
 import { Comparison } from "./Comparison.tsx";
 import { CountdownRing } from "./CountdownRing.tsx";
 import { CueList, SafetyCue } from "./Cues.tsx";
 import { Dots } from "./Dots.tsx";
 import { HonestNote, PosturalNote } from "./HonestNote.tsx";
 import { LogControls } from "./LogControls.tsx";
-import { Eyebrow, Shell, ShellBody, ShellFooter, ShellRail, ShellTitle } from "./Shell.tsx";
+import { Eyebrow, Shell, ShellBody, ShellFooter, ShellRail } from "./Shell.tsx";
+import { SessionBar } from "./SessionBar.tsx";
+import { useWide } from "./useMedia.ts";
 import { StopRule } from "./StopRule.tsx";
-import { ExitIcon } from "./icons.tsx";
+import { PatternIcon } from "./icons.tsx";
+import { LADDERS } from "../../domain/ladders.ts";
 import { lastRecordFor, sanitiseLog } from "./history.ts";
 import { rungSummary, targetLabel, unitWord } from "./format.ts";
 
@@ -215,28 +218,151 @@ function PlayerPage({
   const loggedHere = logs.get(position.itemIndex)?.[position.dotsFilled] ?? null;
   const previous = cardio ? null : lastRecordFor(doc.history, item.pattern);
 
+  const wide = useWide();
+  const name = cardio ? item.protocol.label : item.rung.name;
+  const setWord = cardio ? "Round" : "Set";
+
+  // The row under the figure, the rung's place on its ladder: one tick a rung.
+  const ladder = cardio ? null : (
+    <div aria-hidden="true" className="mt-[var(--sp-2)] flex max-w-[200px] gap-[var(--sp-1)]">
+      {Array.from({ length: LADDERS[item.pattern].rungs.length }, (_, index) => (
+        <i
+          key={index}
+          className={`block h-2 flex-1 rounded-[3px] ${index === item.rungIndex ? "bg-accent" : "bg-line2"}`}
+        />
+      ))}
+    </div>
+  );
+
+  const figure = (
+    <div
+      className={
+        "grid place-items-center rounded-[12px] bg-s2 text-tx " +
+        (cardio
+          ? "h-[116px] min-[840px]:h-[176px]"
+          : "h-[116px] max-[389px]:h-[96px] min-[840px]:h-auto min-[840px]:min-h-[300px] min-[840px]:flex-1")
+      }
+    >
+      {cardio ? (
+        <span className="text-accent">
+          <PatternIcon pattern={null} size={wide ? 96 : 56} />
+        </span>
+      ) : (
+        <ExerciseFigure rung={item.rung} size={wide ? 320 : 96} />
+      )}
+    </div>
+  );
+
+  const heading = (
+    <div className="min-w-0">
+      <h1 className="text-title leading-[var(--lh-title)] font-extrabold tracking-[var(--ls-title)] text-balance max-[389px]:text-[1.5rem] min-[840px]:text-[2rem]">
+        {name}
+      </h1>
+      <p className="mt-[2px] flex flex-wrap gap-x-3 text-meta text-tx2 tabular-nums min-[840px]:text-body">
+        {cardio ? (
+          <>
+            <span>{item.rounds} rounds</span>
+            <span>{item.protocol.hardSeconds}s hard</span>
+            <span>no ladder</span>
+          </>
+        ) : (
+          <>
+            <span>{rungSummary(item)}</span>
+            <span>{item.pattern} ladder</span>
+          </>
+        )}
+      </p>
+      {ladder}
+    </div>
+  );
+
+  const cueList = <CueList cues={listedCues} />;
+  const notes = (
+    <>
+      {!cardio && item.ladderKind === "postural" ? <PosturalNote /> : null}
+      {cardio ? <HonestNote label="What this dose reaches">{item.protocol.notice}</HonestNote> : null}
+    </>
+  );
+
+  const setCard = (
+    <section
+      aria-label="This set"
+      className="rounded-lg border border-line bg-s1 px-[var(--sp-4)] py-[var(--sp-3)] shadow-1 max-[389px]:px-[var(--sp-3)] max-[389px]:py-[var(--sp-2)] min-[840px]:px-6 min-[840px]:pt-5 min-[840px]:pb-6"
+    >
+      <div className="flex items-center justify-between gap-[var(--sp-3)]">
+        <h2 className="text-body leading-[1.3] font-bold tabular-nums min-[840px]:text-h">
+          {`${setWord} ${position.dotsFilled + 1} of ${dotCount}`}
+        </h2>
+        <Dots filled={position.dotsFilled} total={dotCount} noun={cardio ? "rounds" : "sets"} />
+      </div>
+
+      {item.type === "exercise" && item.unit === "reps" ? (
+        <RepTarget item={item} />
+      ) : (
+        <>
+          <CountdownRing
+            total={secondsOnTheClock ?? 0}
+            remaining={countdown.remaining}
+            started={countdown.running || countdown.finished}
+            label={cardio ? `${secondsOnTheClock} second hard round` : `${secondsOnTheClock} second hold`}
+          >
+            <span className="block text-mono leading-none font-extrabold tracking-[var(--ls-hero)] tabular-nums">
+              {countdown.remaining}
+            </span>
+            <Eyebrow>{unitWord("seconds", countdown.remaining)}</Eyebrow>
+          </CountdownRing>
+          <div className="mt-[var(--sp-3)]">
+            <SecondaryButton onClick={countdown.running ? countdown.reset : countdown.start}>
+              {countdown.running
+                ? "Stop the clock"
+                : countdown.finished
+                  ? `Run ${secondsOnTheClock}s again`
+                  : `Start ${secondsOnTheClock}s`}
+            </SecondaryButton>
+            <p className="mt-[var(--sp-2)] text-center text-label text-tx2">
+              The countdown is a guide. Next is live whether or not you run it.
+            </p>
+          </div>
+        </>
+      )}
+
+      {cardio || item.type !== "exercise" ? null : (
+        <Comparison
+          unit={item.unit}
+          lastTarget={previous?.targetValue ?? null}
+          todayTarget={item.targetValue}
+          lastLogged={previous?.logged ?? null}
+        />
+      )}
+    </section>
+  );
+
+  const actions = (
+    <>
+      {cardio ? (
+        // The cardio slot has no target field at all, by design: it is prescribed
+        // by breathlessness, and a number is something you can quietly pace yourself
+        // down to. A "log your rounds" button would put one back.
+        <p className="text-center text-meta text-tx2">
+          Judged by your breathing, not by a count. There is nothing to log.
+        </p>
+      ) : (
+        <>
+          <p className="text-center text-meta text-tx2 max-[389px]:text-label">
+            Log the set, or just tap next — nothing here is required.
+          </p>
+          <LogControls target={item.targetValue} unit={item.unit} logged={loggedHere} onLog={setLog} />
+        </>
+      )}
+      <PrimaryButton data-testid="next" onClick={next}>
+        {finishing ? "Finish" : cardio ? "Next round" : "Next set"}
+      </PrimaryButton>
+    </>
+  );
+
   return (
     <Shell>
-      <ShellRail
-        trailing={
-          <QuietButton onClick={onStop} aria-label="Stop this session. Nothing is recorded.">
-            <ExitIcon size={20} />
-            Stop
-          </QuietButton>
-        }
-      >
-        {`${prescription.label} · ${view.itemNumber} of ${view.itemCount}`}
-      </ShellRail>
-
-      <ShellTitle
-        size="movement"
-        title={cardio ? item.protocol.label : item.rung.name}
-        subtitle={
-          cardio
-            ? `${item.rounds} rounds · ${item.protocol.hardSeconds}s hard · no ladder`
-            : `${rungSummary(item)} · ${item.pattern} ladder`
-        }
-      />
+      <SessionBar label={prescription.label} number={view.itemNumber} count={view.itemCount} onStop={onStop} />
 
       {/*
         The set transition announcement. One polite region, and its content
@@ -252,130 +378,62 @@ function PlayerPage({
       </p>
 
       <ShellBody>
-        {readOnly === null ? null : <AlertBanner label="Read-only" text={readOnly} />}
-        {complete.error === null ? null : <AlertBanner label="Not saved" text={complete.error.message} />}
+        <div className="grid gap-[var(--sp-3)] pt-[var(--sp-3)] max-[389px]:gap-[var(--sp-2)] min-[840px]:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] min-[840px]:items-stretch min-[840px]:gap-[var(--sp-4)] min-[840px]:pt-[var(--sp-4)]">
+          <div className="grid content-start gap-[var(--sp-3)] max-[389px]:gap-[var(--sp-2)] min-[840px]:gap-[var(--sp-4)]">
+            {readOnly === null ? null : <AlertBanner label="Read-only" text={readOnly} />}
+            {complete.error === null ? null : <AlertBanner label="Not saved" text={complete.error.message} />}
 
-        {cardio ? null : (
-          <div className="mt-[var(--sp-2)] grid place-items-center rounded-lg border border-line bg-s1 py-[var(--sp-2)]">
-            <ExerciseFigure rung={item.rung} size={148} />
+            <section className="flex flex-col rounded-lg border border-line bg-s1 p-[var(--sp-3)] shadow-1 max-[389px]:p-[var(--sp-2)] min-[840px]:min-h-0 min-[840px]:p-6">
+              <div className="grid grid-cols-[116px_minmax(0,1fr)] items-center gap-x-4 max-[389px]:grid-cols-[96px_minmax(0,1fr)] max-[389px]:gap-x-3 min-[840px]:flex min-[840px]:flex-col-reverse min-[840px]:items-stretch min-[840px]:gap-4">
+                {figure}
+                {heading}
+              </div>
+              {wide ? <div className="mt-[var(--sp-4)]">{cueList}</div> : null}
+            </section>
+
+            {/* Above the target, not below it: its own label is "Read before
+                starting". It is the only element in the app that outranks the number. */}
+            {safety === undefined ? null : <SafetyCue text={safety} />}
           </div>
-        )}
 
-        {/* Above the target, not below it: the block's own label is "Read before
-            starting". Below the hero numeral it was the seventh thing on the page
-            and its first lines were under the fold — a safety check nobody reads,
-            which is the exact failure separating it out was meant to prevent. It
-            is the only element in the app that outranks the number. */}
-        {safety === undefined ? null : <SafetyCue text={safety} />}
+          <div className="grid content-start gap-[var(--sp-3)] max-[389px]:gap-[var(--sp-2)] min-[840px]:gap-[var(--sp-4)]">
+            {setCard}
 
-        {item.type === "exercise" && item.unit === "reps" ? (
-          <RepTarget item={item} />
-        ) : (
-          <>
-            <CountdownRing
-              total={secondsOnTheClock ?? 0}
-              remaining={countdown.remaining}
-              started={countdown.running || countdown.finished}
-              label={cardio ? `${secondsOnTheClock} second hard round` : `${secondsOnTheClock} second hold`}
-            >
-              <span className="block text-mono leading-none font-extrabold tracking-[var(--ls-hero)] tabular-nums">
-                {countdown.remaining}
-              </span>
-              <Eyebrow>{unitWord("seconds", countdown.remaining)}</Eyebrow>
-            </CountdownRing>
-            <div className="mt-[var(--sp-3)]">
-              <SecondaryButton onClick={countdown.running ? countdown.reset : countdown.start}>
-                {countdown.running
-                  ? "Stop the clock"
-                  : countdown.finished
-                    ? `Run ${secondsOnTheClock}s again`
-                    : `Start ${secondsOnTheClock}s`}
-              </SecondaryButton>
-              <p className="mt-[var(--sp-2)] text-center text-label text-tx3">
-                The countdown is a guide. Next is live whether or not you run it.
-              </p>
-            </div>
-          </>
-        )}
+            {/* Above the cues AND beside the comparison, never below them: a
+                safety line that is legible right up to the moment it stops being
+                legible is worse than one plainly below the fold. */}
+            {cardio ? null : <StopRule text={item.rung.stopRule} />}
 
-        <div className="mt-[var(--sp-4)]">
-          <Dots filled={position.dotsFilled} total={dotCount} noun={cardio ? "rounds" : "sets"} />
+            {wide ? (
+              <section className="grid gap-[var(--sp-2)] rounded-lg border border-line bg-s1 px-6 pt-5 pb-6 shadow-1">
+                {actions}
+              </section>
+            ) : (
+              <>
+                <div>{cueList}</div>
+                <div>{notes}</div>
+              </>
+            )}
+          </div>
         </div>
-
-        {/* Above the cues AND above the comparison strip, which is a change made
-            on 2026-09-06 after the build was driven on a 402x874 phone.
-
-            It was already above the cues, which is what the brief asked for and
-            what the test asserts. On a real phone that was not enough: the
-            comparison strip sat between the numeral and the stop rule and
-            pushed it far enough down that the sentence truncated mid-clause at
-            the fold — "...your chest stops reaching a fist off the" — while
-            still *looking* complete. A safety line that is legible right up to
-            the moment it stops being legible is worse than one plainly below
-            the fold, because nothing tells the reader to scroll.
-
-            Comparison is the thing that yields, and it should: "last time 9"
-            is the least urgent element on the page, and the only one here that
-            exists because the measurement decision was reversed rather than
-            because the exercise needs it. */}
-        {cardio ? null : <StopRule text={item.rung.stopRule} />}
-
-        {cardio || item.type !== "exercise" ? null : (
-          <Comparison
-            unit={item.unit}
-            lastTarget={previous?.targetValue ?? null}
-            todayTarget={item.targetValue}
-            lastLogged={previous?.logged ?? null}
-          />
-        )}
-
-        <CueList cues={listedCues} />
-
-        {!cardio && item.ladderKind === "postural" ? <PosturalNote /> : null}
-        {cardio ? <HonestNote label="What this dose reaches">{item.protocol.notice}</HonestNote> : null}
+        {wide ? notes : null}
       </ShellBody>
 
-      <ShellFooter
-        above={
-          cardio ? (
-            /* No log controls on a cardio round, and the absence is the
-               protocol's. Cardio is prescribed **by breathlessness** and has no
-               target field at all, on the explicit grounds that a number is
-               something you can quietly pace yourself down to
-               (corpus/wiki/programme.md). A "log your rounds" button would put
-               one back. */
-            <p className="text-center text-label text-tx3">
-              Judged by your breathing, not by a count. There is nothing to log.
-            </p>
-          ) : (
-            <>
-              <p className="text-center text-label text-tx3">
-                Log the set, or just tap next — nothing here is required.
-              </p>
-              <LogControls target={item.targetValue} unit={item.unit} logged={loggedHere} onLog={setLog} />
-            </>
-          )
-        }
-      >
-        <PrimaryButton data-testid="next" onClick={next}>
-          {finishing ? "Finish" : cardio ? "Next round" : "Next set"}
-        </PrimaryButton>
-      </ShellFooter>
+      {wide ? null : <ShellFooter>{actions}</ShellFooter>}
     </Shell>
   );
 }
 
-/** A rep target has no clock, so it is the numeral alone. */
 function RepTarget({ item }: { readonly item: PrescribedExercise }) {
   return (
-    <div className="mt-[var(--sp-4)] text-center">
+    <div className="mt-[var(--sp-2)] grid justify-items-center text-center max-[389px]:mt-0">
       <span
         aria-hidden="true"
-        className="block text-hero leading-[var(--lh-hero)] font-extrabold tracking-[var(--ls-hero)] tabular-nums"
+        className="block pt-[var(--sp-2)] text-hero leading-[var(--lh-hero)] font-extrabold tracking-[var(--ls-hero)] tabular-nums max-[389px]:pt-[var(--sp-1)] max-[389px]:text-[4.5rem] min-[840px]:text-[8.25rem]"
       >
         {item.targetValue}
       </span>
-      <span aria-hidden="true">
+      <span aria-hidden="true" className="mt-[var(--sp-1)]">
         <Eyebrow>{unitWord(item.unit, item.targetValue)} this set</Eyebrow>
       </span>
       {/* The visible pair reads as "3 x 8" to a screen reader, which is not a

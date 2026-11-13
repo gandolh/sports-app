@@ -47,12 +47,12 @@ export function StopRule({ text }: { readonly text: string }) {
   return (
     <div
       data-testid="stop-rule"
-      className="mt-[var(--sp-3)] grid grid-cols-[20px_minmax(0,1fr)] gap-[var(--sp-2)] rounded border border-dang-line bg-dang-bg p-[var(--sp-3)]"
+      className="grid grid-cols-[20px_minmax(0,1fr)] gap-[var(--sp-3)] rounded-[12px] border border-dang-line bg-dang-bg px-[var(--sp-4)] py-[var(--sp-3)] max-[389px]:py-[var(--sp-2)] min-[840px]:px-5 min-[840px]:py-4"
     >
       <StopIcon size={20} className="mt-[1px] text-dang" />
       <div>
         <span className="block text-label font-semibold text-dang">Stop the set when</span>
-        <p className="mt-[2px] text-body leading-[var(--lh-body)] text-tx">{text}</p>
+        <p className="mt-[var(--sp-1)] text-body-l leading-[1.45] text-tx">{text}</p>
       </div>
     </div>
   );
