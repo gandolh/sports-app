@@ -311,6 +311,7 @@ function pairsFor(): ReadonlyArray<Pair> {
   // Each accent's own ink on the solid primary button (Start workout, Next set).
   // This is the pair a single shared ink fails first.
   pairs.push(["--on-accent", "--accent", 4.5, "the primary button label"]);
+  pairs.push(["--on-accent", "--accent-2", 4.5, "the same ink over the ring's far end"]);
 
   // Non-text. The ring arc has to read against its own track, not just the page.
   pairs.push(["--accent-2", "--bg", 3, "the far end of the progress ring"]);

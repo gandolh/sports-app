@@ -13,3 +13,6 @@ dev-dist/
 
 # Local SQLite database — never committed.
 db/
+
+# Playwright output.
+client/test-results/

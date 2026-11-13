@@ -14,5 +14,9 @@ export default {
       // client's test pass.
       ignoreDependencies: ["@testing-library/jest-dom"],
     },
+    // The browser tests: Playwright finds its config and the specs by name, so nothing imports them.
+    client: {
+      entry: ["playwright.config.ts", "e2e/*.ts"],
+    },
   },
 };
