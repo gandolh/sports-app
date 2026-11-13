@@ -1549,3 +1549,7 @@ cite brief numbers.
 ## [2026-11-13] decision | Brief 05: the owner approved the redesign direction "Up first"
 
 The owner approved the redesign direction "Up first" on the estate redesign board, with every question on the board standing as proposed: the four places move to a top bar from 840 px wide (phones keep the bottom bar), the new words (`Up first`, `Then`, `How to do it`) and the direction itself over its runner-up, "Straight, at full fidelity". The build follows: the tokens first, then one screen per commit.
+
+## [2026-11-13] brief | 05 A redesign with Hallmark, on the estate board built
+
+The "Up first" redesign is built and the brief is done; it awaits a deploy (`deploy` phase, client only). Tokens first (the board's values, the new `--edge`, `--warn-line`, `--dang-line`, `--sh-btn` and two display sizes, solid warn and danger grounds, no tracked capitals), then Today (a 64 px top bar from 840 px, the first exercise open over a Then list, a sticky Start card, a six-week Monday-first grid), the player, Progress, and every other screen on the new tokens. Two product lines are changed, dated, with the old ones kept ([decisions-redesign.md](wiki/decisions-redesign.md)). Playwright 1.63.0 is in `client/e2e/` with a generated 16-session history, a frozen clock and no state service. The outcome note is in the brief.

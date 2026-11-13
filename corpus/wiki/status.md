@@ -17,7 +17,7 @@ code structure ([server-structure.md](server-structure.md)); 1,235 tests; awaiti
 The house style is in (2026-11-11): Prettier at 120 columns, the house ESLint
 config, `npm run check` with knip and dependency-cruiser, a root `CLAUDE.md`
 and `.claude/rules/` ([technical-decisions.md](technical-decisions.md)).
-Brief 05 (2026-11-13): the redesign "Up first" is built: new tokens, a 64 px top bar from 840 px (phones keep the
+Brief 05 (2026-11-13, done): the redesign "Up first" is built: new tokens, a 64 px top bar from 840 px (phones keep the
 bottom bar), Today with the first exercise open and the rest in one list, the player and Progress rebuilt, every other
 screen on the new tokens, and Playwright 1.63.0 with the Floor specs in `client/e2e/`
 ([design-system.md](design-system.md#the-up-first-redesign-2026-11-13)); awaiting deploy (`deploy` phase, client only).
