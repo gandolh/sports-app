@@ -1545,3 +1545,7 @@ cite brief numbers.
   setting pinned (health 200, signed-out state 401, SIGTERM exit 0 in 0.02 s). Owner: deploy with the `server` phase
   and check the container turns healthy.
 
+
+## [2026-11-13] decision | Brief 05: the owner approved the redesign direction "Up first"
+
+The owner approved the redesign direction "Up first" on the estate redesign board, with every question on the board standing as proposed: the four places move to a top bar from 840 px wide (phones keep the bottom bar), the new words (`Up first`, `Then`, `How to do it`) and the direction itself over its runner-up, "Straight, at full fidelity". The build follows: the tokens first, then one screen per commit.
