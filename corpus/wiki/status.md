@@ -46,7 +46,7 @@ screen on the new tokens, and Playwright 1.63.0 with the Floor specs in `client/
 - **Identity** (2026-10-13, fixes to 2026-10-28). Local accounts on the state
   service with "Sign in with Ward" as a linked second way in; the sign-in loop
   on a fresh browser fixed; a sign-in, and a Ward retry, return to the screen
-  that was asked for; ward-auth 0.7.0 with rename off
+  that was asked for; ward-auth 1.1.0 with rename off (2026-11-19: link and unlink ask for the password)
   ([decisions-identity.md](decisions-identity.md)).
 - **Docs** (2026-10-19). The docs site at `/sports-app/docs` on Docusaurus.
 - **Copy** (2026-10-19). The Account page's total-work note says logged sets

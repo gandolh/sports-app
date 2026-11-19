@@ -1553,3 +1553,7 @@ The owner approved the redesign direction "Up first" on the estate redesign boar
 ## [2026-11-13] brief | 05 A redesign with Hallmark, on the estate board built
 
 The "Up first" redesign is built and the brief is done; it awaits a deploy (`deploy` phase, client only). Tokens first (the board's values, the new `--edge`, `--warn-line`, `--dang-line`, `--sh-btn` and two display sizes, solid warn and danger grounds, no tracked capitals), then Today (a 64 px top bar from 840 px, the first exercise open over a Then list, a sticky Start card, a six-week Monday-first grid), the player, Progress, and every other screen on the new tokens. Two product lines are changed, dated, with the old ones kept ([decisions-redesign.md](wiki/decisions-redesign.md)). Playwright 1.63.0 is in `client/e2e/` with a generated 16-session history, a frozen clock and no state service. The outcome note is in the brief.
+
+## [2026-11-19] brief | 06 Linking and unlinking Ward ask for the password built
+
+ward-auth 1.1.0 is vendored in both copies. Link Ward and Unlink Ward ask for the current password beside the button, a refusal stays on the page, and the library refuses look-alike usernames (this app has no route that makes or renames accounts, so nothing here exercises it). Awaits a deploy (`all`). Outcome note in the brief.

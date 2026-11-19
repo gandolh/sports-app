@@ -13,7 +13,7 @@ the storage and the wire contract is still there.
 _2026-10-13, Ward's local-accounts change, under Ward's decision (`wzd_auth/corpus/wiki/decisions-oidc.md`)._
 The state service has **its own accounts**, in `auth_*` tables of the same SQLite file,
 run by the vendored `ward-auth` library (`server/vendor/ward/` and `client/vendor/ward/`,
-version in their READMEs; 0.7.0 since 2026-10-28).
+version in their READMEs; 1.1.0 since 2026-11-19; link and unlink ask for the local password).
 Local sign-in never calls Ward, so the app works while Ward is down. "Sign in with Ward"
 is an OpenID Connect code flow that the service finishes; a first Ward sign-in creates a
 local user, and a person who already has one links Ward from `/account`. Nothing is ever

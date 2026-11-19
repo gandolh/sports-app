@@ -46,3 +46,15 @@ What the update changes here:
 - [ ] Both vendored copies at the new version; the tests above pass; `npm run check` exit 0; `bash corpus/lint.sh` OK.
 - [ ] The outcome note lists each CHANGELOG entry this app crossed and what it needed.
 - [ ] End move `ready_for_deploy` with the app's deploy step (server and web both change).
+
+## Outcome (2026-11-19)
+
+ward-auth 1.1.0 is vendored in `server/vendor/ward` and `client/vendor/ward` (six files each, `SHA256SUMS` checked); the settings page and tests changed in the same commit. Rename stays off (`ALLOW_RENAME`).
+
+- **What a person notices:** Link Ward and Unlink Ward each have a "Current password" field above the button (`type=password`, `autocomplete=current-password`). A wrong password shows "That password is not right." beside the field, which keeps focus; too many attempts shows the wait. A Ward-only account with no local password sees no field on Unlink and still gets the "Set a password first" line. A link still waiting at Ward when the server restarts lands on the existing `invalid_callback` words.
+- **CHANGELOG entries crossed (0.7.0 to 1.1.0):** 0.7.1 and 0.7.2, nothing to change. 1.0.0: password on link and unlink (settings UI, harness and tests), cookie and budget items need nothing here. 1.1.0: nothing in code; migration 5 runs at the first boot; no step back to an older copy afterwards without a backup.
+- **Migration 5:** a fresh dev database, seeded then started, has `auth_users.username_skeleton` filled (`alice`). The start log shows no shared-key line (one user). Not run against a database created by 0.7.0.
+- **Tests:** server tests for link and unlink without, with a wrong and with the right password, a linked user still signing in with Ward; client tests that the call carries the password, a wrong one shows the message with focus kept, and the 429 wait. The look-alike `/register` test is skipped: this app has no route that creates or renames local accounts.
+- **Shots:** settings at 1280 light and 390 dark with the error showing, read, no clipping or horizontal overflow (Playwright with the session and Ward routes stubbed).
+- **Deviation:** the error for `invalid_credentials` beside these fields reads "That password is not right." rather than the sign-in page's "username and password" sentence. The two Current password fields on the page (Ward and change-password) share a label, as the brief asked.
+- **Checks:** `npm run check` exit 0 (1357 tests). Deploy: `server` and web both change, so `node cli.ts sports-app all` from vps-deploy.
