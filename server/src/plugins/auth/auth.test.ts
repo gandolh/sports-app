@@ -502,6 +502,75 @@ describe('"Sign in with Ward" is wired', () => {
     });
   });
 
+  describe("linking and unlinking ask for the local password", () => {
+    /** Alice signed in with her password, and (optionally) already linked to a Ward account. */
+    async function signedInAlice(linked: boolean) {
+      const ward = fakeWard();
+      const service = await startService({ ward: true, fetch: ward.fetch });
+      await seedAccount({ username: "alice", password: PASSWORD, store: service.store });
+      const alice = await service.accounts.findUserByUsername("alice");
+      if (linked && alice !== undefined) {
+        await createWardIdentities({ accounts: service.accounts }).link(alice.id, "ward-subject-of-alice");
+      }
+      const cookie = cookieFrom(await service.post("/api/auth/login", { username: "alice", password: PASSWORD }));
+      return { ...service, cookie };
+    }
+
+    it("refuses a link without the password, and with a wrong one", async () => {
+      const { post, cookie } = await signedInAlice(false);
+
+      const without = await post("/api/auth/ward/link", {}, { cookie });
+      expect(without.status).toBe(400);
+      expect(await without.json()).toEqual({ error: "invalid_request" });
+
+      const wrong = await post("/api/auth/ward/link", { currentPassword: "not-the-password" }, { cookie });
+      expect(wrong.status).toBe(401);
+      expect(await wrong.json()).toEqual({ error: "invalid_credentials" });
+    });
+
+    it("starts the link at Ward with the right password", async () => {
+      const { post, cookie } = await signedInAlice(false);
+      const response = await post("/api/auth/ward/link", { currentPassword: PASSWORD }, { cookie });
+      expect(response.status).toBe(200);
+      const { url } = (await response.json()) as { url: string };
+      expect(new URL(url).pathname).toBe("/ward-api/oidc/auth");
+    });
+
+    it("refuses an unlink without the password, and with a wrong one, and keeps the link", async () => {
+      const { post, cookie, accounts } = await signedInAlice(true);
+      const identities = createWardIdentities({ accounts });
+
+      expect((await post("/api/auth/ward/unlink", {}, { cookie })).status).toBe(400);
+      const wrong = await post("/api/auth/ward/unlink", { currentPassword: "not-the-password" }, { cookie });
+      expect(wrong.status).toBe(401);
+      expect(await wrong.json()).toEqual({ error: "invalid_credentials" });
+      expect(await identities.findUserBySubject("ward-subject-of-alice")).toBeDefined();
+    });
+
+    it("unlinks with the right password, and the local sign-in still works", async () => {
+      const { post, cookie, accounts } = await signedInAlice(true);
+      const identities = createWardIdentities({ accounts });
+
+      const response = await post("/api/auth/ward/unlink", { currentPassword: PASSWORD }, { cookie });
+      expect(response.status).toBe(200);
+      expect(await identities.findUserBySubject("ward-subject-of-alice")).toBeUndefined();
+      expect((await post("/api/auth/login", { username: "alice", password: PASSWORD })).status).toBe(200);
+    });
+
+    it("signs a linked user in with Ward", async () => {
+      const { accounts } = await signedInAlice(true);
+      const identities = createWardIdentities({ accounts });
+      const { user } = await identities.userForSignIn({
+        subject: "ward-subject-of-alice",
+        username: "alice-at-ward",
+        role: "user",
+        wardSid: "family-1",
+        idToken: "x.y.z",
+      });
+      expect(user.username).toBe("alice");
+    });
+  });
+
   it("starts while Ward is down, and says so only when the button is pressed", async () => {
     const ward = fakeWard();
     ward.state.down = true;

@@ -1,4 +1,4 @@
-// ward-auth 0.7.0 — built from https://github.com/gandolh/ward-auth (shared-library/).
+// ward-auth 1.1.0 — built from https://github.com/gandolh/ward-auth (shared-library/).
 // MIT licensed; see LICENSE beside this file. Do not edit a vendored copy: copy a newer build in.
 import { useState, useCallback, useSyncExternalStore, useEffect } from 'react';
 
@@ -270,10 +270,10 @@ function createAuthClient(options) {
             return { ok: true };
         },
         startWardSignIn: (startOptions = {}) => goToWard("/ward/start", startOptions.returnTo === undefined ? {} : { returnTo: startOptions.returnTo }),
-        startWardLink: () => goToWard("/ward/link"),
+        startWardLink: (currentPassword) => goToWard("/ward/link", { currentPassword }),
         startWardReauthentication: () => goToWard("/ward/reauthenticate"),
-        async unlinkWard() {
-            const result = await act("/ward/unlink");
+        async unlinkWard(currentPassword) {
+            const result = await act("/ward/unlink", { currentPassword });
             if (!result.ok)
                 return result;
             const { signedOut: ended } = (await result.response.json());
@@ -482,16 +482,21 @@ function useWardSignIn(options) {
     };
 }
 /**
- * Settings: "Link Ward". `link()` sends the browser to Ward; the settings
- * page then loads with `linked` true, or with `error` set to
+ * Settings: "Link Ward". `link(currentPassword)`, with the account's local
+ * password (1.0.0), sends the browser to Ward. It resolves `false` without
+ * leaving the page, `error` set to `invalid_credentials`,
+ * `too_many_attempts` (with `retryAfterSeconds`), `already_linked` or
+ * `no_local_password`, when the server refuses the start. After Ward the
+ * settings page loads with `linked` true, or with `error` set to
  * `already_linked`, `ward_account_in_use`, `access_denied`,
  * `invalid_callback`, `sign_in_failed` or `unauthorized` (the session that
- * started the link had ended). Show it when `useSession().ward.enabled && !ward.linked`.
+ * started the link had ended). Show it, with a password field, when
+ * `useSession().ward.enabled && !ward.linked`.
  */
 function useWardLink(options) {
     const client = useClient(options);
     const landed = useWardResult(options);
-    const run = useCallback(() => client.startWardLink(), [client]);
+    const run = useCallback((currentPassword) => client.startWardLink(currentPassword), [client]);
     const { perform, error, reset, pending } = useAction(run);
     const { clear } = landed;
     const resetAll = useCallback(() => {
@@ -507,17 +512,19 @@ function useWardLink(options) {
     };
 }
 /**
- * Settings: "Unlink Ward". Refused with `no_local_password` while the user
+ * Settings: "Unlink Ward". `unlink(currentPassword)`, with the account's
+ * local password (1.0.0). Refused with `no_local_password` while the user
  * has none (offer `useSetLocalPassword` first), `not_linked` when there is
- * nothing to unlink. If the current session began with Ward it ends too, and
- * the session state becomes signed out.
+ * nothing to unlink, `invalid_credentials` for a wrong password and
+ * `too_many_attempts` (with `retryAfterSeconds`). If the current session
+ * began with Ward it ends too, and the session state becomes signed out.
  */
 function useWardUnlink(options) {
     const client = useClient(options);
     const [done, setDone] = useState(false);
-    const run = useCallback(async () => {
+    const run = useCallback(async (currentPassword) => {
         setDone(false);
-        const result = await client.unlinkWard();
+        const result = await client.unlinkWard(currentPassword);
         if (result.ok)
             setDone(true);
         return result;

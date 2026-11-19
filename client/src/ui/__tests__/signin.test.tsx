@@ -330,6 +330,12 @@ describe('"Sign in with Ward"', () => {
 
 // ─── The account's sign-in settings ─────────────────────────────────────────
 
+/** The Ward section comes first on the page; the change-password form below has a field of the same name. */
+async function wardPasswordField(): Promise<HTMLElement> {
+  await screen.findByRole("button", { name: /^(Link|Unlink) Ward$/ });
+  return screen.getAllByLabelText("Current password")[0] as HTMLElement;
+}
+
 describe("/account sign-in settings", () => {
   it("links Ward from settings, which is the only way an existing account gets one", async () => {
     seedUser(doc());
@@ -338,23 +344,72 @@ describe("/account sign-in settings", () => {
       ward: { enabled: true, linked: false },
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Link Ward" }));
+    const field = await wardPasswordField();
+    expect(field.getAttribute("type")).toBe("password");
+    expect(field.getAttribute("autocomplete")).toBe("current-password");
+    fireEvent.change(field, { target: { value: PASSWORD } });
+    fireEvent.click(screen.getByRole("button", { name: "Link Ward" }));
 
     await waitFor(() => expect(auth.navigations).toHaveLength(1));
-    expect(auth.calls).toContain("POST /ward/link");
+    expect(auth.bodies["POST /ward/link"]).toEqual({ currentPassword: PASSWORD });
   });
 
-  it("unlinks Ward", async () => {
+  it("keeps a refused link on the page, with the field still focused", async () => {
+    seedUser(doc());
+    const { auth } = await renderApp("/account", {
+      signedInAs: { username: USERNAME },
+      ward: { enabled: true, linked: false },
+    });
+
+    const field = await wardPasswordField();
+    fireEvent.change(field, { target: { value: "not-the-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "Link Ward" }));
+
+    expect(await screen.findByText("That password is not right.")).toBeTruthy();
+    expect(auth.navigations).toHaveLength(0);
+    await waitFor(() => expect(document.activeElement).toBe(field));
+  });
+
+  it("says how long to wait when the attempts ran out", async () => {
+    seedUser(doc());
+    await renderApp("/account", {
+      signedInAs: { username: USERNAME },
+      ward: { enabled: true, linked: false },
+      tooManyAttempts: { retryAfterSeconds: 30 },
+    });
+
+    fireEvent.change(await wardPasswordField(), { target: { value: PASSWORD } });
+    fireEvent.click(screen.getByRole("button", { name: "Link Ward" }));
+
+    expect(await screen.findByText(/Try again in 30 seconds/)).toBeTruthy();
+  });
+
+  it("unlinks Ward with the password", async () => {
     seedUser(doc());
     const { auth } = await renderApp("/account", {
       signedInAs: { username: USERNAME, hasPassword: true },
       ward: { enabled: true, linked: true },
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Unlink Ward" }));
+    fireEvent.change(await wardPasswordField(), { target: { value: PASSWORD } });
+    fireEvent.click(screen.getByRole("button", { name: "Unlink Ward" }));
 
-    await waitFor(() => expect(auth.calls).toContain("POST /ward/unlink"));
+    await waitFor(() => expect(auth.bodies["POST /ward/unlink"]).toEqual({ currentPassword: PASSWORD }));
     expect(await screen.findByRole("button", { name: "Link Ward" })).toBeTruthy();
+  });
+
+  it("keeps a refused unlink on the page", async () => {
+    seedUser(doc());
+    await renderApp("/account", {
+      signedInAs: { username: USERNAME, hasPassword: true },
+      ward: { enabled: true, linked: true },
+    });
+
+    fireEvent.change(await wardPasswordField(), { target: { value: "wrong" } });
+    fireEvent.click(screen.getByRole("button", { name: "Unlink Ward" }));
+
+    expect(await screen.findByText("That password is not right.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Unlink Ward" })).toBeTruthy();
   });
 
   it("refuses to unlink for an account with no password, and says what to do", async () => {

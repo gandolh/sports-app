@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import { useRef, useState } from "react";
+import type { FormEvent, ReactNode, Ref } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   useChangePassword,
@@ -142,41 +142,61 @@ export function SignInSettings() {
 function WardSection({ linked, hasPassword }: { readonly linked: boolean; readonly hasPassword: boolean }) {
   const link = useWardLink();
   const unlink = useWardUnlink();
+  const [password, setPassword] = useState("");
+  const field = useRef<HTMLInputElement>(null);
   const error: AuthError | null = link.error ?? unlink.error;
+  // A user with no local password has nothing to type: the service answers
+  // `no_local_password` whatever is sent, and the password form below is the way out.
+  const needsPassword = !linked || hasPassword;
+
+  async function submit(event: FormEvent): Promise<void> {
+    event.preventDefault();
+    const done = linked ? await unlink.unlink(password) : await link.link(password);
+    if (done) setPassword("");
+    // A refusal stays on the page with the field still in hand.
+    else field.current?.focus();
+  }
 
   return (
-    <>
+    <form onSubmit={(event) => void submit(event)} noValidate>
       <div className="mt-[var(--sp-4)]">
         <Eyebrow>Ward</Eyebrow>
       </div>
       {linked ? (
-        <>
-          <p className="mt-[var(--sp-1)] text-body text-tx2">
-            A Ward account is linked, so you can sign in with it.
-            {hasPassword ? "" : " You have no password here yet: set one below before you can unlink it."}
-          </p>
-          <div className="mt-[var(--sp-2)]">
-            <SecondaryButton onClick={() => void unlink.unlink()}>
-              {unlink.pending ? "Unlinking…" : "Unlink Ward"}
-            </SecondaryButton>
-          </div>
-        </>
+        <p className="mt-[var(--sp-1)] text-body text-tx2">
+          A Ward account is linked, so you can sign in with it.
+          {hasPassword ? "" : " You have no password here yet: set one below before you can unlink it."}
+        </p>
       ) : (
-        <>
-          <p className="mt-[var(--sp-1)] text-body text-tx2">
-            Link a Ward account to sign in with it here. Ward asks for its own password and brings you back with the two
-            joined. Nothing is matched by name.
-          </p>
-          <div className="mt-[var(--sp-2)]">
-            <SecondaryButton onClick={() => void link.link()}>
-              {link.pending ? "Opening Ward…" : "Link Ward"}
-            </SecondaryButton>
-          </div>
-        </>
+        <p className="mt-[var(--sp-1)] text-body text-tx2">
+          Link a Ward account to sign in with it here. Type your password here first; Ward then asks for its own and
+          brings you back with the two joined. Nothing is matched by name.
+        </p>
       )}
-      {error === null ? null : <AlertBanner label="Ward" text={describeAuthIssue(error)} />}
-    </>
+      {needsPassword ? (
+        <div className="mt-[var(--sp-2)]">
+          <PasswordField
+            label="Current password"
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+            inputRef={field}
+          />
+        </div>
+      ) : null}
+      {error === null ? null : <AlertBanner label="Ward" text={describeWardIssue(error)} />}
+      <div className="mt-[var(--sp-2)]">
+        <SecondaryButton type="submit">
+          {linked ? (unlink.pending ? "Unlinking…" : "Unlink Ward") : link.pending ? "Opening Ward…" : "Link Ward"}
+        </SecondaryButton>
+      </div>
+    </form>
   );
+}
+
+/** Beside a password-only field, a refused password is not "username and password". */
+function describeWardIssue(issue: AuthError): string {
+  return issue.code === "invalid_credentials" ? "That password is not right." : describeAuthIssue(issue);
 }
 
 /** A labelled password field. Controlled, because nothing else reads the value. */
@@ -186,12 +206,14 @@ function PasswordField({
   onChange,
   autoComplete,
   description,
+  inputRef,
 }: {
   readonly label: string;
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly autoComplete: "current-password" | "new-password";
   readonly description?: ReactNode;
+  readonly inputRef?: Ref<HTMLInputElement>;
 }) {
   return (
     <FieldRoot>
@@ -201,6 +223,7 @@ function PasswordField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         autoComplete={autoComplete}
+        ref={inputRef}
       />
       {description === undefined ? null : <FieldDescription>{description}</FieldDescription>}
     </FieldRoot>

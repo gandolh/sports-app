@@ -1,4 +1,4 @@
-// ward-auth 0.7.0 — built from https://github.com/gandolh/ward-auth (shared-library/).
+// ward-auth 1.1.0 — built from https://github.com/gandolh/ward-auth (shared-library/).
 // MIT licensed; see LICENSE beside this file. Do not edit a vendored copy: copy a newer build in.
 /**
  * The browser half, without React: a small client for the plugin's routes and
@@ -56,9 +56,12 @@ interface WardStatus {
  *   if it persists, it is an operator problem.
  * - `already_linked`, `ward_account_in_use` — linking: this user already has
  *   a Ward account, or that Ward account belongs to another user here.
+ *   Linking and unlinking also answer `invalid_credentials` (a wrong current
+ *   password) and `too_many_attempts`, as a password change does (1.0.0).
  * - `ward_account_mismatch` — reauthentication came back as another Ward
  *   account.
- * - `not_linked`, `no_local_password` — unlinking.
+ * - `not_linked`, `no_local_password` — unlinking; `no_local_password` also
+ *   linking, for a user with no local password to give.
  * - `reauthentication_required` — setting a first local password needs a
  *   reauthentication (`reauthenticate()`) from the last ten minutes. A plain
  *   Ward sign-in does not count, however recent.
@@ -162,12 +165,22 @@ interface AuthClient {
     startWardSignIn(options?: {
         returnTo?: string;
     }): Promise<ActionResult>;
-    /** "Link Ward", from settings while signed in. Navigates to Ward. */
-    startWardLink(): Promise<ActionResult>;
+    /**
+     * "Link Ward", from settings while signed in, with the account's current
+     * local password (1.0.0). Navigates to Ward. Stays on the page with
+     * `invalid_credentials`, `invalid_request` (an empty password),
+     * `too_many_attempts`, `already_linked` or `no_local_password`.
+     */
+    startWardLink(currentPassword: string): Promise<ActionResult>;
     /** Reauthenticate with Ward (Ward asks for the password again). Navigates to Ward. */
     startWardReauthentication(): Promise<ActionResult>;
-    /** Unlink Ward. The state becomes signed out if this session began with Ward. */
-    unlinkWard(): Promise<ActionResult>;
+    /**
+     * Unlink Ward, with the account's current local password (1.0.0). The
+     * state becomes signed out if this session began with Ward. Errors:
+     * `invalid_credentials`, `invalid_request` (an empty password),
+     * `too_many_attempts`, `no_local_password`, `not_linked`.
+     */
+    unlinkWard(currentPassword: string): Promise<ActionResult>;
     /**
      * Set a local password: give the current one if there is one; a user with
      * none needs `startWardReauthentication()` in the last ten minutes
@@ -293,24 +306,31 @@ declare function useWardSignIn(options?: HookOptions): ActionState & {
     returnTo: string | null;
 };
 /**
- * Settings: "Link Ward". `link()` sends the browser to Ward; the settings
- * page then loads with `linked` true, or with `error` set to
+ * Settings: "Link Ward". `link(currentPassword)`, with the account's local
+ * password (1.0.0), sends the browser to Ward. It resolves `false` without
+ * leaving the page, `error` set to `invalid_credentials`,
+ * `too_many_attempts` (with `retryAfterSeconds`), `already_linked` or
+ * `no_local_password`, when the server refuses the start. After Ward the
+ * settings page loads with `linked` true, or with `error` set to
  * `already_linked`, `ward_account_in_use`, `access_denied`,
  * `invalid_callback`, `sign_in_failed` or `unauthorized` (the session that
- * started the link had ended). Show it when `useSession().ward.enabled && !ward.linked`.
+ * started the link had ended). Show it, with a password field, when
+ * `useSession().ward.enabled && !ward.linked`.
  */
 declare function useWardLink(options?: HookOptions): ActionState & {
-    link: () => Promise<boolean>;
+    link: (currentPassword: string) => Promise<boolean>;
     linked: boolean;
 };
 /**
- * Settings: "Unlink Ward". Refused with `no_local_password` while the user
+ * Settings: "Unlink Ward". `unlink(currentPassword)`, with the account's
+ * local password (1.0.0). Refused with `no_local_password` while the user
  * has none (offer `useSetLocalPassword` first), `not_linked` when there is
- * nothing to unlink. If the current session began with Ward it ends too, and
- * the session state becomes signed out.
+ * nothing to unlink, `invalid_credentials` for a wrong password and
+ * `too_many_attempts` (with `retryAfterSeconds`). If the current session
+ * began with Ward it ends too, and the session state becomes signed out.
  */
 declare function useWardUnlink(options?: HookOptions): ActionState & {
-    unlink: () => Promise<boolean>;
+    unlink: (currentPassword: string) => Promise<boolean>;
     done: boolean;
 };
 /**

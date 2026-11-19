@@ -62,6 +62,10 @@ export interface FakeAuthOptions {
   readonly down?: boolean;
   /** The error `POST /ward/set-password` answers with, or none. */
   readonly setPasswordError?: string;
+  /** The local password `POST /ward/link` and `/ward/unlink` check `currentPassword` against. */
+  readonly localPassword?: string;
+  /** Answer both with this 429 instead, as the password-change budget does. */
+  readonly tooManyAttempts?: { readonly retryAfterSeconds: number };
 }
 
 export interface FakeAuth {
@@ -138,17 +142,29 @@ export function installAuth(options: FakeAuthOptions = {}): FakeAuth {
       case "POST /logout":
         user = null;
         return new Response(null, { status: 204 });
-      case "POST /ward/start":
       case "POST /ward/link":
-      case "POST /ward/reauthenticate":
-        return json(200, { url: "https://ward.example/oidc/auth?client_id=sports-app" });
       case "POST /ward/unlink": {
-        if (user !== null && user.hasPassword === false) {
+        if (method === "POST" && path === "/ward/unlink" && user !== null && user.hasPassword === false) {
           return json(409, { error: "no_local_password" });
         }
+        if (options.tooManyAttempts !== undefined) {
+          return json(429, {
+            error: "too_many_attempts",
+            retryAfterSeconds: options.tooManyAttempts.retryAfterSeconds,
+          });
+        }
+        const { currentPassword } = JSON.parse(String(init?.body ?? "{}")) as { currentPassword?: unknown };
+        if (typeof currentPassword !== "string") return json(400, { error: "invalid_request" });
+        if (currentPassword !== (options.localPassword ?? "correct-horse-battery")) {
+          return json(401, { error: "invalid_credentials" });
+        }
+        if (path === "/ward/link") return json(200, { url: "https://ward.example/oidc/auth?client_id=sports-app" });
         linked = false;
         return json(200, { signedOut: false });
       }
+      case "POST /ward/start":
+      case "POST /ward/reauthenticate":
+        return json(200, { url: "https://ward.example/oidc/auth?client_id=sports-app" });
       case "POST /ward/set-password":
         return options.setPasswordError === undefined
           ? new Response(null, { status: 204 })
