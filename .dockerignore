@@ -4,6 +4,7 @@ client/dist
 dist
 .git
 corpus
+design
 *.md
 .env
 infrastructure/.env

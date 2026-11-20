@@ -1557,3 +1557,7 @@ The "Up first" redesign is built and the brief is done; it awaits a deploy (`dep
 ## [2026-11-19] brief | 06 Linking and unlinking Ward ask for the password built
 
 ward-auth 1.1.0 is vendored in both copies. Link Ward and Unlink Ward ask for the current password beside the button, a refusal stays on the page, and the library refuses look-alike usernames (this app has no route that makes or renames accounts, so nothing here exercises it). Awaits a deploy (`all`). Outcome note in the brief.
+
+## [2026-11-20] maintenance | The redesign's board page copied into the repo
+
+The estate redesign board is a private canvas, so `design/estate-redesign/` now holds a copy of this app's page on it and the build behind it: the directions, the judges' and the controller's rulings, the critique, the token hand-off, the board's notes, the owner's decisions, the proposed screens (as HTML with renders, or as the board's own artboard sources), and today's shots from before the redesign. It is the design record of brief 05, which built it; its README says what each file is. Prettier and the Docker build skip the folder.

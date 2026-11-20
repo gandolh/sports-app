@@ -1,0 +1,156 @@
+/*
+ * Sports app, direction B "Up first": the token set in the app's own names.
+ * A drop-in for client/src/ui/tokens.css. It replaces the colour and shadow
+ * values of the three palette blocks (bare :root, the system media block, the
+ * explicit dark stamp) and the mint blocks, adds the new names marked NEW, and
+ * extends the @theme inline map. Everything else in that file stays: the
+ * radii, the spacing and tap sizes, the motion, the z-index scale, the other
+ * seven accents (their --accent-2 is re-tuned in the code brief, see the map).
+ * The file's mechanism is kept: every token is declared in bare :root first,
+ * and the system block repeats the dark block verbatim (contrast.test asserts it).
+ * Values are solid, not the translucent washes of today: the board measured each
+ * surface against its ground.
+ */
+
+/* 1 . Light, the unstamped default */
+:root {
+  color-scheme: light;
+
+  --bg: #e9edf1;
+  --s1: #fcfdfe;
+  --s2: #e6ebf0;
+  --s3: #d4dce4;
+
+  --line: #c3ccd5;
+  --line2: #aeb9c4;
+  --edge: #7a8795;
+
+  --tx: #0c1117;
+  --tx2: #4e5863;
+  --tx3: #5c6570;
+
+  --accent: #0d7153;
+  --accent-2: #0a5a42;
+  --on-accent: #eef9f6;
+
+  --warn: #8a5300;
+  --warn-bg: #f7eedf;
+  --warn-line: #d9bf95;
+  --dang: #b0362b;
+  --dang-bg: #f9e9e6;
+  --dang-line: #dcb0aa;
+
+  --grid0: #dfe5eb;
+
+  --sh-1: 0 1px 2px rgb(12 17 23 / 0.1), 0 2px 8px rgb(12 17 23 / 0.06);
+  --sh-2: 0 -4px 16px rgb(12 17 23 / 0.1);
+  --sh-btn: 0 1px 2px rgb(12 17 23 / 0.18);
+
+  /* Type: the existing --fs-* scale holds; two sizes are NEW. Labels are sentence case, untracked. */
+  --fs-display-l: 3rem; /* NEW: Legs day, Progress at 840 px and up (the head band) */
+  --fs-name-l: 1.5rem; /* NEW: the Up first exercise name at 840 px and up */
+  --lh-display-l: 1.08;
+  --lh-name-l: 1.25;
+}
+
+:root[data-accent="mint"] {
+  --accent: #0d7153;
+  --accent-2: #0a5a42;
+  --on-accent: #eef9f6;
+}
+
+/* 2 . Dark by OS preference, for a page stamped System */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color-scheme: dark;
+
+    --bg: #080b0e;
+    --s1: #182029;
+    --s2: #222b35;
+    --s3: #2d3945;
+
+    --line: #36434e;
+    --line2: #465462;
+    --edge: #66788a;
+
+    --tx: #edf2f7;
+    --tx2: #a5b1be;
+    --tx3: #919dab;
+
+    --accent: #2bd9a4;
+    --accent-2: #7ff0c9;
+    --on-accent: #04231a;
+
+    --warn: #f0b457;
+    --warn-bg: #2a2214;
+    --warn-line: #5c4724;
+    --dang: #f2857a;
+    --dang-bg: #2b1917;
+    --dang-line: #6a3b36;
+
+    --grid0: #2a3541;
+
+    --sh-1: 0 1px 2px rgb(0 0 0 / 0.5), 0 2px 10px rgb(0 0 0 / 0.35);
+    --sh-2: 0 -4px 16px rgb(0 0 0 / 0.5);
+    --sh-btn: 0 1px 2px rgb(0 0 0 / 0.5);
+  }
+
+  :root[data-theme="system"][data-accent="mint"] {
+    --accent: #2bd9a4;
+    --accent-2: #7ff0c9;
+    --on-accent: #04231a;
+  }
+}
+
+/* 3 . Dark by explicit stamp, identical to block 2 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #080b0e;
+  --s1: #182029;
+  --s2: #222b35;
+  --s3: #2d3945;
+
+  --line: #36434e;
+  --line2: #465462;
+  --edge: #66788a;
+
+  --tx: #edf2f7;
+  --tx2: #a5b1be;
+  --tx3: #919dab;
+
+  --accent: #2bd9a4;
+  --accent-2: #7ff0c9;
+  --on-accent: #04231a;
+
+  --warn: #f0b457;
+  --warn-bg: #2a2214;
+  --warn-line: #5c4724;
+  --dang: #f2857a;
+  --dang-bg: #2b1917;
+  --dang-line: #6a3b36;
+
+  --grid0: #2a3541;
+
+  --sh-1: 0 1px 2px rgb(0 0 0 / 0.5), 0 2px 10px rgb(0 0 0 / 0.35);
+  --sh-2: 0 -4px 16px rgb(0 0 0 / 0.5);
+  --sh-btn: 0 1px 2px rgb(0 0 0 / 0.5);
+}
+
+:root[data-theme="dark"][data-accent="mint"] {
+  --accent: #2bd9a4;
+  --accent-2: #7ff0c9;
+  --on-accent: #04231a;
+}
+
+/* 4 . The @theme inline map: the existing entries stay; these are NEW or changed */
+@theme inline {
+  --color-edge: var(--edge); /* NEW: Easier, Harder, Log and field borders (3:1) */
+  --color-warn-line: var(--warn-line); /* NEW: the honest note's and the streak pill's edge */
+  --color-dang-line: var(--dang-line); /* NEW: the stop rule's and the error banner's edge */
+  --shadow-btn: var(--sh-btn); /* NEW: the solid Start button */
+  --text-display-l: var(--fs-display-l);
+  --text-display-l--line-height: var(--lh-display-l);
+  --text-name-l: var(--fs-name-l);
+  --text-name-l--line-height: var(--lh-name-l);
+}

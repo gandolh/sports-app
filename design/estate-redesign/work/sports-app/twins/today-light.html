@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sports app today, proposed (light twin)</title>
+<meta name="description" content="A plain-HTML twin of the board comp, for the local Floor checks.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&amp;display=swap">
+<style>
+/* Hallmark · shape: app screen · genre: fitness tracker · theme: brand · redesign: full
+   Inter is the app's own face (found in the project). Mint is the app's default accent. */
+/* Hallmark · waive 26b · no :disabled styling · the app has no disabled control: Start and Next set are always live, and a log is never required */
+/* Hallmark · waive 39b · button.btn 56px · Start workout and Next set are the page's one primary action and stay 56px for the thumb, as the app's own target rule sets */
+/* Hallmark · waive 72 · ol.cues text 2px from its box edge · the cue list sits in a closed details when measured and pads 12px 16px 16px 68px when open, nothing is clipped */
+[data-theme="light"]{color-scheme:light;--color-bg:#e9edf1;--color-s1:#fcfdfe;--color-s2:#e6ebf0;--color-s3:#d4dce4;--color-line:#c3ccd5;--color-line2:#aeb9c4;--color-edge:#7a8795;--color-tx:#0c1117;--color-tx2:#4e5863;--color-tx3:#5c6570;--color-accent:#0d7153;--color-accent-2:#0a5a42;--color-on-accent:#eef9f6;--color-warn:#8a5300;--color-warn-bg:#f7eedf;--color-warn-line:#d9bf95;--color-dang:#b0362b;--color-dang-bg:#f9e9e6;--color-dang-line:#dcb0aa;--color-grid0:#dfe5eb;--font-ui:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;--r-sm:8px;--r:12px;--r-lg:16px;--r-full:999px;--color-accent-ink:var(--color-on-accent);--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-8:32px;--sp-12:48px;--sh-1:0 1px 2px rgb(12 17 23 / .10),0 2px 8px rgb(12 17 23 / .06);--sh-2:0 -4px 16px rgb(12 17 23 / .10);--sh-btn:0 1px 2px rgb(12 17 23 / .18);--sh-3:0 2px 6px rgb(12 17 23 / .10),0 18px 40px -16px rgb(12 17 23 / .30);}
+[data-theme="dark"]{color-scheme:dark;--color-bg:#080b0e;--color-s1:#182029;--color-s2:#222b35;--color-s3:#2d3945;--color-line:#36434e;--color-line2:#465462;--color-edge:#66788a;--color-tx:#edf2f7;--color-tx2:#a5b1be;--color-tx3:#919dab;--color-accent:#2bd9a4;--color-accent-2:#7ff0c9;--color-on-accent:#04231a;--color-warn:#f0b457;--color-warn-bg:#2a2214;--color-warn-line:#5c4724;--color-dang:#f2857a;--color-dang-bg:#2b1917;--color-dang-line:#6a3b36;--color-grid0:#2a3541;--font-ui:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;--r-sm:8px;--r:12px;--r-lg:16px;--r-full:999px;--color-accent-ink:var(--color-on-accent);--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-8:32px;--sp-12:48px;--sh-1:0 1px 2px rgb(0 0 0 / .5),0 2px 10px rgb(0 0 0 / .35);--sh-2:0 -4px 16px rgb(0 0 0 / .5);--sh-btn:0 1px 2px rgb(0 0 0 / .5);--sh-3:0 2px 6px rgb(0 0 0 / .55),0 22px 44px -18px rgb(0 0 0 / .9);}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{overflow-x:clip}
+.sp{font:400 1.0625rem/1.5 var(--font-ui);background:var(--color-bg);color:var(--color-tx);min-height:100vh;-webkit-text-size-adjust:100%}
+.sp :where(h1,h2){text-wrap:balance}
+.sp{scrollbar-color:var(--color-edge) transparent;caret-color:var(--color-accent)}
+.sp ::selection{background:var(--color-accent);color:var(--color-on-accent)}
+.sp h1,.sp h2,.sp h3,.sp h4,.sp p,.sp ul,.sp ol,.sp dl,.sp dd{margin:0;padding:0}
+.sp ul,.sp ol{list-style:none}
+.sp a{color:inherit;text-decoration:none}
+:where(.sp) button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+.nw{white-space:nowrap}
+.tgt,.bigt,.big,.cmp dd,.tiles li,.stats li,.date,.gl,.gx span,.rn2,.key,.chead .meta,.step,.pill,.dots{font-variant-numeric:tabular-nums}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ic{flex:none}
+.topbar{display:none}
+.rail{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 16px 0;min-height:44px}
+.date{font-size:.9375rem;line-height:1.33;color:var(--color-tx2);font-weight:500}
+.pill{display:inline-flex;align-items:center;gap:4px;height:36px;padding:0 12px;border-radius:999px;background:var(--color-warn-bg);color:var(--color-warn);border:1px solid var(--color-warn-line)}
+.pill b{font-size:1rem;font-weight:800}
+.shell{padding:0 16px 24px}
+.card{color:var(--color-tx);background:var(--color-s1);border:1px solid var(--color-line);border-radius:16px;box-shadow:var(--sh-1);position:relative}
+.headband{padding:2px 0 8px}
+.headband h1{font-size:2.5rem;line-height:1.1;font-weight:800;letter-spacing:-.02em}
+.facts{display:flex;flex-wrap:wrap;gap:0 16px;margin-top:4px;font-size:.9375rem;line-height:1.4;color:var(--color-tx2)}
+.main{display:block}
+.left{display:grid;gap:12px}
+h2.sh{font-size:1.375rem;line-height:1.27;font-weight:700}
+.meta{font-size:.9375rem;line-height:1.33;color:var(--color-tx2)}
+.ov{font-size:.8125rem;line-height:1rem;font-weight:700;color:var(--color-accent);margin-bottom:4px}
+.upc{padding:16px}
+.upgrid{display:grid;grid-template-columns:96px minmax(0,1fr);gap:0 12px}
+.upwell{display:grid;place-items:center;height:100px;background:var(--color-s2);border-radius:12px;grid-row:1}
+.upwell .fig{width:auto;height:78px}
+.upbody{grid-column:2;grid-row:1;min-width:0}
+.upname{display:block}
+.upname h3{font-size:1.375rem;line-height:1.2;font-weight:700;letter-spacing:-.01em}
+.bigt{margin-top:2px}
+.bigt span[aria-hidden]{display:flex;align-items:baseline;gap:8px}
+.bigt b{font-size:1.75rem;line-height:1.15;font-weight:800;letter-spacing:-.01em;white-space:nowrap}
+.bigt i{font-style:normal;font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.ticks{grid-column:1/-1;display:flex;gap:4px;margin-top:12px;max-width:260px}
+.tk{display:block;flex:1;height:8px;border-radius:3px;background:var(--color-line2)}
+.tk.cur{background:var(--color-accent)}
+.cue{grid-column:1/-1;margin-top:12px;font-size:1.1875rem;line-height:1.47}
+.then{padding:16px 0 0;overflow:visible}
+.thead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:0 16px 8px}
+.hint{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.rows{display:block}
+.row{border-top:1px solid var(--color-line)}
+.dt>summary{list-style:none;cursor:pointer}
+.dt>summary::-webkit-details-marker{display:none}
+.rowtop{display:grid;grid-template-columns:40px minmax(0,1fr) auto 20px;gap:8px;align-items:center;padding:8px 12px;min-height:56px}
+.row:last-child .dt:not([open])>summary{border-radius:0 0 15px 15px}
+.well{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:var(--color-s2);color:var(--color-accent)}
+.well svg{width:30px;height:30px}
+.rname{display:block;min-width:0}
+.rn{display:block;font-size:1.0625rem;line-height:1.35;font-weight:600}
+.rm{display:block;font-size:.9375rem;line-height:1.33;color:var(--color-tx2)}
+.tgt{text-align:right;min-width:60px}
+.tgt b{display:block;font-size:1.25rem;line-height:1.25;font-weight:800;white-space:nowrap}
+.tgt i{display:block;font-style:normal;font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.how{display:flex;align-items:center;justify-content:flex-end;gap:8px;color:var(--color-accent);font-weight:600;font-size:.9375rem;min-height:44px}
+.hw{display:none}
+.how{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.cv{display:flex;color:var(--color-accent)}
+.how svg{display:none}
+.chev{transition:transform .15s}
+@media (prefers-reduced-motion:reduce){.chev{transition:none}}
+.dt[open] .chev{transform:rotate(180deg)}
+.dt[open]>summary{background:var(--color-s2)}
+.cues{counter-reset:c;display:grid;gap:12px;padding:12px 16px 16px 68px;background:var(--color-s2)}
+.cues li{counter-increment:c;position:relative;font-size:1.0625rem;line-height:1.55}
+.cues li::before{content:counter(c);position:absolute;left:-36px;top:2px;width:24px;height:24px;border-radius:50%;background:var(--color-s1);color:var(--color-tx2);font-size:.8125rem;font-weight:700;display:grid;place-items:center}
+.note{display:flex;gap:12px;margin:0;padding:12px 16px;border-radius:12px;background:var(--color-warn-bg);border:1px solid var(--color-warn-line);color:var(--color-tx);position:relative}
+.then .note{margin:0 12px 12px}
+.ni{color:var(--color-warn);flex:none;margin-top:1px;display:block}
+.note .nh{font-size:.8125rem;line-height:1rem;font-weight:700;color:var(--color-warn);margin-bottom:4px}
+.note p{font-size:1.0625rem;line-height:1.55}
+.helpline{font-size:.9375rem;line-height:1.4;color:var(--color-tx2);padding:0 4px}
+.side{margin-top:12px;display:grid;gap:12px}
+.startc{display:none}
+.help{font-size:.9375rem;line-height:1.4;color:var(--color-tx2)}
+.eh{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{white-space:nowrap;border-radius:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;width:100%}
+.sec{height:48px;background:var(--color-s1);color:var(--color-tx);border:1.5px solid var(--color-edge);font-weight:600;font-size:1rem}
+.sec:active{background:var(--color-s3)}
+.pri{height:56px;background:var(--color-accent);color:var(--color-on-accent);border:0;font-weight:700;font-size:1.1875rem;box-shadow:var(--sh-btn)}
+.week{padding:16px;box-shadow:none}
+.week h2{font-size:1.0625rem;line-height:1.3;font-weight:700;margin-bottom:12px}
+.ringrow{display:flex;gap:16px;align-items:center}
+.ringbox{position:relative;width:124px;height:124px;flex:none}
+.rn2{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.rn2 b{font-size:1.5rem;line-height:1.1;font-weight:800;letter-spacing:-.02em}
+.rn2 span{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.tiles{flex:1;display:grid;gap:8px;min-width:0}
+.tiles li{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--color-s2);border-radius:10px;padding:0 12px;height:32px}
+.tiles span{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.tiles b{font-size:1.125rem;line-height:1.1;font-weight:800}
+.gridwrap{margin-top:16px}
+.gx,.gr{display:grid;grid-template-columns:44px repeat(7,28px);gap:4px}
+.gx span{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2);text-align:center;padding-bottom:4px}
+.gl{font-size:.8125rem;line-height:16px;font-weight:500;color:var(--color-tx2);align-self:center}
+.c{display:block;height:14px;border-radius:4px;background:var(--color-grid0)}
+.c.on{background:var(--color-accent)}
+.c.fut{background:transparent;box-shadow:inset 0 0 0 1px var(--color-line)}
+.key{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.kk{display:flex;align-items:center;gap:8px}.kk .c{width:14px;height:14px}
+.foot{position:sticky;bottom:0;z-index:5}
+.footin{background:var(--color-s1);border-top:1px solid var(--color-line);box-shadow:var(--sh-2);padding:8px 16px}
+.footin .fh{display:none;font-size:.8125rem;line-height:1.3;padding-bottom:8px}
+.footin .eh{grid-template-columns:76px 76px minmax(0,1fr);align-items:center}
+@media (max-width:839px) and (min-height:900px){.footin .fh{display:block}.helpline{display:none}.fx .shell{padding-bottom:calc(var(--fh,172px) + 24px)}}
+.footin .sec{height:48px;padding:0}
+.tabbar{display:grid;grid-template-columns:repeat(4,1fr);background:var(--color-s1);border-top:1px solid var(--color-line2)}
+.tb{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:56px;color:var(--color-tx2);font-size:.8125rem;font-weight:600;line-height:1rem}
+.tb.on{color:var(--color-accent)}
+.tabonly .tabbar{box-shadow:var(--sh-2)}
+.fx .foot,.fs .foot{position:fixed;left:0;right:0;bottom:0}
+.fs .foot{position:absolute}
+.fx .shell{padding-bottom:calc(var(--fh,132px) + 24px)}
+/* player */
+.plbar{background:var(--color-s1);border-bottom:1px solid var(--color-line2)}
+.plin{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:16px;padding:0 16px;min-height:56px}
+.step{display:flex;gap:12px;font-size:.9375rem;font-weight:600;color:var(--color-tx2)}
+.step span:last-child{color:var(--color-tx)}
+.segs{display:flex;gap:4px;max-width:160px}
+.sg{display:block;flex:1;height:6px;border-radius:3px;background:var(--color-line2)}
+.sg.cur{background:var(--color-accent)}
+.quiet{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;background:transparent;border:0;border-radius:10px;color:var(--color-tx2);font-weight:600;font-size:.9375rem;cursor:pointer}
+.pl .shell{padding-top:12px}
+.figc{padding:12px;display:grid;grid-template-columns:116px minmax(0,1fr);gap:0 16px;align-items:center;order:1}
+.fhead h1{font-size:1.75rem;line-height:1.15;font-weight:800;letter-spacing:-.015em}
+.fhead .meta{display:flex;flex-wrap:wrap;gap:0 12px;margin-top:2px}
+.fhead .ticks{margin-top:8px;max-width:200px}
+.figwell{display:grid;place-items:center;grid-row:1;grid-column:1;height:116px;background:var(--color-s2);border-radius:12px}
+.fhead{grid-column:2;grid-row:1}
+.figwell .fig{height:96px;width:auto}
+.pl .main{display:flex;flex-direction:column;gap:12px}
+.pl .left,.pl .side{display:contents}
+.stoprule{order:3;display:flex;gap:12px;padding:12px 16px;border-radius:12px;background:var(--color-dang-bg);border:1px solid var(--color-dang-line);position:relative}
+.si{color:var(--color-dang);flex:none;margin-top:1px}
+.stoprule .nh{font-size:.8125rem;line-height:1rem;font-weight:700;color:var(--color-dang);margin-bottom:4px}
+.stoprule p{font-size:1.1875rem;line-height:1.45}
+.setc{padding:12px 16px;order:2}
+.sethead{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.sethead h2{font-size:1.0625rem;line-height:1.3;font-weight:700}
+.dots{display:flex;gap:8px}.dots i{display:block;width:28px;height:8px;border-radius:4px;background:var(--color-line2)}
+.numeral{display:grid;justify-items:center;margin:0 0 8px}
+.big{font-size:clamp(5.5rem,26vw,8.25rem);line-height:.92;font-weight:800;letter-spacing:-.03em;padding-top:8px}
+.nl{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2);margin-top:4px}
+.cmp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cmp div{background:var(--color-s2);border-radius:12px;padding:8px;text-align:center}
+.cmp dt{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.cmp dd{font-size:1.125rem;line-height:1.3;font-weight:800}
+.actions{padding:12px 16px;display:grid;gap:8px;order:4}
+.actions .help{text-align:center}
+.pl .actions{border-radius:0;border:0;border-top:1px solid var(--color-line);box-shadow:var(--sh-2);position:sticky;bottom:0;margin:0 -16px -24px;padding:8px 16px 16px;z-index:5}
+/* progress */
+.stats ul{display:grid;grid-template-columns:repeat(3,1fr)}
+.stats li{padding:16px 8px 12px;text-align:center;display:grid;gap:2px;justify-items:center;align-content:start}
+.stats li+li{border-left:1px solid var(--color-line)}
+.stats b{font-variant-numeric:tabular-nums;font-size:2rem;line-height:1.1;font-weight:800;letter-spacing:-.02em}
+.stats li span{font-variant-numeric:tabular-nums;font-size:.8125rem;line-height:1.15;font-weight:600;color:var(--color-tx2)}
+.chartc{padding:16px}
+.chead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px}
+.chead h2{font-size:1.375rem;line-height:1.27;font-weight:700}
+.chart{display:block;width:100%;height:auto;background:var(--color-s2);border-radius:12px}
+.cw{position:relative}
+.yl{position:absolute;left:10px;font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx3)}.yl.t{top:calc(8.3% + 2px)}.yl.b{bottom:calc(10% + 2px)}
+.cax{display:flex;justify-content:flex-start;align-items:center;margin-top:8px;font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.today{display:flex;align-items:center;gap:8px}.today i{display:block;width:10px;height:10px;border-radius:50%;background:var(--color-accent)}
+.miles{padding:16px}
+.miles li{margin-top:12px;background:var(--color-s2);border-radius:12px;padding:12px 16px}
+.ml{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.miles p{font-size:1.0625rem;line-height:1.45;margin-top:2px}
+.pg-p .side .note{margin:0}
+.co{display:none}
+@media (min-width:840px){
+ .foot{display:none}
+ .rail{display:none}
+ .topbar{display:flex;align-items:stretch;justify-content:space-between;height:64px;padding:0 max(24px,calc((100% - 1120px)/2));background:var(--color-s1);border-bottom:1px solid var(--color-line2);position:sticky;top:0;z-index:5}
+ .tl{display:flex;gap:4px;position:relative;margin-left:-16px}
+ .tn{display:flex;align-items:center;gap:8px;padding:0 16px;color:var(--color-tx2);font-weight:600;font-size:.9375rem;border-bottom:3px solid transparent;margin-bottom:-1px}
+ .tn.on{color:var(--color-accent);border-bottom-color:var(--color-accent)}
+ .tr{display:flex;align-items:center;gap:16px}
+ .shell{max-width:1168px;margin:0 auto;padding:16px 24px 40px}
+ .headband{color:var(--color-tx);background:var(--color-s1);border:1px solid var(--color-line);border-radius:16px;box-shadow:var(--sh-1);display:flex;justify-content:space-between;align-items:center;gap:8px 32px;flex-wrap:wrap;padding:16px 28px;margin-bottom:16px}
+ .headband h1{font-size:3rem;line-height:1.08}
+ .facts{margin:0;font-size:1.0625rem;line-height:1.41;gap:0}
+ .facts span+span{border-left:1px solid var(--color-line2);margin-left:16px;padding-left:16px}
+ .main{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:16px;align-items:start}
+ .left{gap:16px}
+ .side{margin-top:0;position:sticky;top:80px;gap:16px}
+ .startc{display:block;padding:20px 24px 24px}
+ .startc .eh{margin-top:12px}.startc .pri{margin-top:8px}
+ .helpline{display:none}
+ .upc{padding:20px 24px}
+ .upgrid{grid-template-columns:176px minmax(0,1fr);gap:0 20px}
+ .upwell{grid-row:1/span 3;height:auto;min-height:176px;align-self:stretch}
+ .upwell .fig{width:auto;height:160px}
+ .upbody{grid-column:2;grid-row:1}
+ .upbody .ov{font-size:1.0625rem;line-height:1.3;margin-bottom:4px}
+ .upname{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+ .upname h3{font-size:1.5rem}
+ .bigt{margin:0;text-align:right}
+ .bigt span[aria-hidden]{display:block}
+ .bigt b{display:block;font-size:1.75rem}
+ .bigt i{display:block;margin-top:2px}
+ .ticks{grid-column:2;grid-row:2;margin-top:8px}
+ .cue{grid-column:2;grid-row:3;margin-top:8px}
+ .then{padding:16px 0 0}
+ .thead{padding:0 24px 8px}
+ .rowtop{grid-template-columns:44px minmax(0,1fr) auto 150px;gap:16px;padding:8px 24px;min-height:60px}
+ .well{width:44px;height:44px}
+ .how{position:static;width:auto;height:auto;overflow:visible;clip:auto;display:flex;gap:8px}
+ .cv{display:none}
+ .hint{display:none}
+ .how svg{display:block}
+ .hw{display:inline}
+ .cues{padding:12px 24px 16px 84px}
+ .cues li::before{left:-36px}
+ .then .note{margin:0 16px 16px}
+ .week{padding:20px 24px}
+ .week h2{font-size:1.0625rem}
+ .co{display:grid;place-items:center;position:absolute;width:24px;height:24px;border-radius:50%;background:var(--color-tx);color:var(--color-bg);font-size:.8125rem;font-weight:800;line-height:1}
+ .co.l{left:-44px}.co.r{right:-44px}
+ .tl .co.l{left:-48px;top:20px!important}
+ /* player */
+ .plin{max-width:1120px;margin:0 auto;padding:0 24px 0 8px;min-height:64px}
+ .plbar{padding:0 max(0px,calc((100% - 1168px)/2))}
+ .step{font-size:1.0625rem}
+ .pl .shell{padding-top:16px}
+ .pl .main{display:grid}
+ .pl .left{display:grid;gap:16px}
+ .pl .side{display:grid;gap:16px;margin-top:0}
+ .figc{padding:24px;display:block}
+ .setc{padding:20px 24px 24px}
+ .fhead h1{font-size:2rem}
+ .fhead .meta{font-size:1.0625rem;gap:0 12px}
+ .figwell{height:532px;margin-top:16px}
+ .figwell .fig{height:400px}
+ .stoprule{padding:16px 20px}
+ .setc{padding:20px 24px 24px}
+ .sethead h2{font-size:1.375rem}
+ .big{font-size:8.25rem}
+ .cmp div{padding:8px 12px}
+ .pl .actions{position:relative;border:1px solid var(--color-line);border-radius:16px;box-shadow:var(--sh-1);margin:0;padding:20px 24px 24px;bottom:auto}
+ .pl .actions .pri{margin-top:4px}
+ /* progress */
+ .stats li{padding:20px 12px 20px}
+ .stats b{font-size:2.5rem;line-height:1.1}
+ .stats li span{font-size:.9375rem}
+ .chartc{padding:20px 24px 24px}
+ .miles{padding:20px 24px 24px}
+ .side>.note{padding:16px 20px}
+}
+@media (max-width:419px){
+ .upgrid{grid-template-columns:80px minmax(0,1fr)}
+ .upwell{height:84px}.upwell .fig{height:66px}
+ .upc{padding:12px 16px 16px}.ticks,.cue{margin-top:8px}
+ .then{padding-top:12px}.thead{padding-bottom:4px}
+ .rowtop{grid-template-columns:32px minmax(0,1fr) auto 20px;gap:8px;padding:4px 8px;min-height:52px}
+ .well{width:32px;height:32px}.well svg{width:24px;height:24px}
+ .left{gap:8px}
+}
+@media (max-width:389px){
+ .tgt{min-width:0}.tgt b{font-size:1.125rem}
+ .shell{padding-left:12px;padding-right:12px}
+ .rail{padding-left:12px;padding-right:12px}
+ .footin{padding-left:12px;padding-right:12px}
+ .big{font-size:4.5rem;padding-top:4px}
+ .pl .actions{margin:0 -12px -24px}.cmp div{padding:4px 8px}.setc{padding:8px 16px}.figc{padding:8px}.pl .main{gap:8px}
+}
+@media (max-width:370px){.footin .eh{grid-template-columns:68px 68px minmax(0,1fr)}.footin .pri{padding:0 8px;font-size:1.0625rem}.headband h1{font-size:2.25rem}}
+@media (max-width:1259px){.co{display:none!important}}
+body{margin:0;overflow-x:clip}
+</style>
+</head>
+<body>
+<div data-theme="light" class="sp">
+<div class="app"><header class="topbar"><nav class="tl" aria-label="Main"><span class="co l" style="top:10px" aria-hidden="true">1</span><a class="tn on" href="#" aria-current="page"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"></path><path d="M5 10v10h14V10"></path></svg><span>Today</span></a><a class="tn" href="#"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg><span>Plan</span></a><a class="tn" href="#"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"></path></svg><span>Progress</span></a><a class="tn" href="#"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg><span>You</span></a></nav><div class="tr"><span class="date">Thursday, 12 November</span><span class="pill" role="img" aria-label="1 day in a row."><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-4-1-6 1-10z"></path></svg><b>1</b></span></div></header><div class="rail"><span class="date">Thursday, 12 November</span><span class="pill" role="img" aria-label="1 day in a row."><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-4-1-6 1-10z"></path></svg><b>1</b></span></div>
+<main class="shell">
+<div class="headband"><h1>Legs day</h1><p class="facts"><span>Session 17</span><span>squat rung 2 of 9</span><span>hinge rung 2 of 8</span></p></div>
+<div class="main">
+<div class="left">
+<article class="card upc" aria-labelledby="hu"><span class="co l" style="top:20px" aria-hidden="true">2</span><div class="upgrid"><div class="upwell"><svg class="fig" width="133" height="150" viewBox="22 14 156 176" fill="none" stroke="var(--color-tx)" stroke-width="6" role="img" aria-label="Bodyweight squat, bottom position"><path d="M30 182H170" stroke="var(--color-edge)"></path><g stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M98 104L161.8 99.5" stroke="var(--color-tx2)"></path><path d="M75.7 139.6L114.6 143.1L97 178" stroke="var(--color-tx2)"></path><path d="M98 104L162 106"></path><path d="M75.7 139.6L98 104"></path><path d="M75.7 139.6L114.7 140.5L104 178"></path><path d="M98 104L105.5 91"></path><circle cx="111" cy="79" r="14"></circle></g><path d="M156 34V78M148 68l8 10 8-10" stroke="var(--color-accent)" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div class="upbody"><h2 class="ov" id="hu">Up first</h2><div class="upname"><div><h3>Bodyweight squat</h3><p class="meta">3 sets, rung 2 of 9</p></div><div class="bigt"><span aria-hidden="true"><b>3 × 8</b><i>reps</i></span><span class="vh">3 sets of 8 reps</span></div></div></div><div class="ticks" aria-hidden="true"><i class="tk"></i><i class="tk cur"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i></div><p class="cue">Sit down and back until the tops of your thighs are parallel with the floor, then stand all the way up and squeeze your glutes. Chest stays up, heels stay down.</p></div></article>
+<section class="card then" aria-labelledby="ht"><span class="co l" style="top:20px" aria-hidden="true">3</span><div class="thead"><h2 class="sh" id="ht">Then</h2><span class="hint">Tap a row for how to do it</span></div><ul class="rows">
+<li class="row"><details class="dt"><summary class="rowtop"><span class="well" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 172h160"></path><circle cx="30" cy="150" r="12"></circle><path d="M46 158L108 112L146 126L156 170M46 168H100"></path></svg></span><span class="rname"><b class="rn">Glute bridge, <span class="nw">2-second</span> hold at the top</b><span class="rm">3 sets, rung 2 of 8</span></span><div class="tgt"><span aria-hidden="true"><b>3 × 8</b><i>reps</i></span><span class="vh">3 sets of 8 reps</span></div><span class="how"><span class="hw">How to do it</span><svg class="ic chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span><span class="cv" aria-hidden="true"><svg class="ic chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></summary><ol class="cues"><li>Same setup as rung 1: on your back, heels a hand’s length from your backside, feet hip-width and flat.</li><li>Lift your hips to the straight knee-to-shoulder line, then hold still there for two seconds with your glutes squeezed hard and your ribs pulled down so your lower back stays flat. Then lower over about one second until your backside brushes the floor.</li><li>The hold is at the top of every rep, not the bottom: rung 1 passes straight through the top, this rung stops there and counts two. Do not trade it for a rest at the bottom ‒ the bottom is still just a brush.</li></ol></details></li>
+<li class="row"><details class="dt"><summary class="rowtop"><span class="well" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 176h160"></path><circle cx="34" cy="116" r="12"></circle><path d="M50 126L108 140L172 160M56 130V170H84"></path></svg></span><span class="rname"><b class="rn">Front plank</b><span class="rm">2 sets, rung 2 of 6</span></span><div class="tgt"><span aria-hidden="true"><b>2 × 36s</b><i>seconds</i></span><span class="vh">2 sets of 36 seconds</span></div><span class="how"><span class="hw">How to do it</span><svg class="ic chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span><span class="cv" aria-hidden="true"><svg class="ic chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></summary><ol class="cues"><li>Forearms on the floor with your elbows directly under your shoulders, feet hip-width, one straight line from heels to head, hips level with your shoulders.</li><li>Squeeze your glutes, tuck your ribs down toward your hips, and push the floor away with your forearms. Hold still and breathe normally for the whole time ‒ this is a hold, not a rest position.</li><li>Look at the floor just ahead of your hands so your neck stays in line with your spine.</li></ol></details></li>
+<li class="row"><details class="dt"><summary class="rowtop"><span class="well" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="36" cy="100" r="12"></circle><path d="M52 100H150L182 100M82 52V148"></path></svg></span><span class="rname"><b class="rn">Prone T raise</b><span class="rm">2 sets, rung 2 of 6</span></span><div class="tgt"><span aria-hidden="true"><b>2 × 18s</b><i>seconds</i></span><span class="vh">2 sets of 18 seconds</span></div><span class="how"><span class="hw">How to do it</span><svg class="ic chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span><span class="cv" aria-hidden="true"><svg class="ic chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></summary><ol class="cues"><li>Same face-down setup, forehead on the towel ‒ but your arms now go straight out to the sides at shoulder height, making a T. Thumbs up.</li><li>Squeeze your shoulder blades together and lift both arms a few inches, then hold still. The T angle puts the work lower between your shoulder blades than rung 1’s Y did.</li><li>Hold for the whole time on the clock, chest and forehead staying down and your lower back quiet.</li></ol></details><aside class="note"><span class="ni"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">What this slot does not train</p><p>Postural work, not pulling strength. With no bar or anchor, horizontal pulling cannot be trained at home ‒ this slot builds the upper back and shoulder-blade control that sitting takes away. The gap is real and this app does not pretend otherwise.</p></div></aside></li>
+</ul></section>
+<p class="helpline" id="hl">Easier and harder shift today’s numbers by two reps or five seconds. Neither changes what comes next.</p>
+</div>
+<div class="side">
+<section class="card startc" aria-label="Start"><span class="co r" style="top:20px" aria-hidden="true">4</span><p class="help">Easier and harder shift today’s numbers by two reps or five seconds. Neither changes what comes next.</p><div class="eh"><button class="btn sec" type="button" aria-label="Start today’s session, easier">Easier</button><button class="btn sec" type="button" aria-label="Start today’s session, harder">Harder</button></div><button class="btn pri" type="button">Start workout</button></section>
+<section class="card week" aria-labelledby="hw"><span class="co r" style="top:20px" aria-hidden="true">5</span><h2 id="hw">How it is going</h2><div class="ringrow"><div class="ringbox" role="img" aria-label="This week: 2 of 7 sessions."><svg width="124" height="124" viewBox="0 0 140 140" aria-hidden="true"><defs><linearGradient id="rg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="var(--color-accent)"></stop><stop offset="1" stop-color="var(--color-accent-2)"></stop></linearGradient></defs><circle cx="70" cy="70" r="58" fill="none" stroke="var(--color-grid0)" stroke-width="12"></circle><circle cx="70" cy="70" r="58" fill="none" stroke="url(#rg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="104.2 364.4" transform="rotate(-90 70 70)"></circle></svg><div class="rn2" aria-hidden="true"><b>29%</b><span>Weekly goal</span></div></div><ul class="tiles"><li><span>Sessions</span><b>16</b></li><li><span>Day streak</span><b>1</b></li><li><span>Reps ever</span><b>309</b></li></ul></div><div class="gridwrap"><div class="gx" aria-hidden="true"><span></span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div><div class="gr" role="img" aria-label="Trained on 16 of the last 42 days."><span class="gl" aria-hidden="true">5 Oct</span><i class="c"></i><i class="c"></i><i class="c on"></i><i class="c"></i><i class="c on"></i><i class="c"></i><i class="c"></i><span class="gl" aria-hidden="true">12 Oct</span><i class="c on"></i><i class="c"></i><i class="c on"></i><i class="c"></i><i class="c on"></i><i class="c"></i><i class="c"></i><span class="gl" aria-hidden="true">19 Oct</span><i class="c on"></i><i class="c"></i><i class="c on"></i><i class="c"></i><i class="c on"></i><i class="c"></i><i class="c"></i><span class="gl" aria-hidden="true">26 Oct</span><i class="c on"></i><i class="c"></i><i class="c on"></i><i class="c"></i><i class="c on"></i><i class="c"></i><i class="c"></i><span class="gl" aria-hidden="true">2 Nov</span><i class="c on"></i><i class="c"></i><i class="c on"></i><i class="c"></i><i class="c on"></i><i class="c"></i><i class="c"></i><span class="gl" aria-hidden="true">9 Nov</span><i class="c on"></i><i class="c"></i><i class="c on"></i><i class="c"></i><i class="c fut"></i><i class="c fut"></i><i class="c fut"></i></div><div class="key" aria-hidden="true"><span>Last 42 days</span><span class="kk">Less<i class="c"></i><i class="c on"></i>More</span></div></div></section>
+</div>
+</div>
+</main>
+<div class="foot"><div class="footin"><p class="help fh">Easier and harder shift today’s numbers by two reps or five seconds. Neither changes what comes next.</p><div class="eh"><button class="btn sec" type="button" aria-describedby="hl" aria-label="Start today’s session, easier">Easier</button><button class="btn sec" type="button" aria-describedby="hl" aria-label="Start today’s session, harder">Harder</button><button class="btn pri" type="button">Start workout</button></div></div><nav class="tabbar" aria-label="Main"><a class="tb on" href="#" aria-current="page"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"></path><path d="M5 10v10h14V10"></path></svg><span>Today</span></a><a class="tb" href="#"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg><span>Plan</span></a><a class="tb" href="#"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"></path></svg><span>Progress</span></a><a class="tb" href="#"><svg class="ic " width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg><span>You</span></a></nav></div>
+</div>
+</div>
+</body>
+</html>

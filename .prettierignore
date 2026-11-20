@@ -16,3 +16,6 @@ client/public/
 docs/.docusaurus/
 docs/docs/wiki/
 docs/static/
+
+# The estate redesign board's copy, kept as exported.
+design/

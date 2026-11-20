@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Sports app direction (twin)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&amp;display=swap">
+<style>
+/* Hallmark · shape: app screen · genre: fitness tracker · theme: brand · redesign: full
+   Inter is the app's own face (found in the project). Mint is the app's default accent. */
+/* Hallmark · waive 26b · no :disabled styling · the app has no disabled control: Start and Next set are always live, and a log is never required */
+/* Hallmark · waive 39b · button.btn 56px · Start workout and Next set are the page's one primary action and stay 56px for the thumb, as the app's own target rule sets */
+/* Hallmark · waive 72 · ol.cues text 2px from its box edge · the cue list sits in a closed details when measured and pads 12px 16px 16px 68px when open, nothing is clipped */
+.theme-light{color-scheme:light;--color-bg:#e9edf1;--color-s1:#fcfdfe;--color-s2:#e6ebf0;--color-s3:#d4dce4;--color-line:#c3ccd5;--color-line2:#aeb9c4;--color-edge:#7a8795;--color-tx:#0c1117;--color-tx2:#4e5863;--color-tx3:#5c6570;--color-accent:#0d7153;--color-accent-2:#0a5a42;--color-on-accent:#eef9f6;--color-warn:#8a5300;--color-warn-bg:#f7eedf;--color-warn-line:#d9bf95;--color-dang:#b0362b;--color-dang-bg:#f9e9e6;--color-dang-line:#dcb0aa;--color-grid0:#dfe5eb;--font-ui:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;--r-sm:8px;--r:12px;--r-lg:16px;--r-full:999px;--color-accent-ink:var(--color-on-accent);--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-8:32px;--sp-12:48px;--sh-1:0 1px 2px rgb(12 17 23 / .10),0 2px 8px rgb(12 17 23 / .06);--sh-2:0 -4px 16px rgb(12 17 23 / .10);--sh-btn:0 1px 2px rgb(12 17 23 / .18);--sh-3:0 2px 6px rgb(12 17 23 / .10),0 18px 40px -16px rgb(12 17 23 / .30);}
+.theme-dark{color-scheme:dark;--color-bg:#080b0e;--color-s1:#182029;--color-s2:#222b35;--color-s3:#2d3945;--color-line:#36434e;--color-line2:#465462;--color-edge:#66788a;--color-tx:#edf2f7;--color-tx2:#a5b1be;--color-tx3:#919dab;--color-accent:#2bd9a4;--color-accent-2:#7ff0c9;--color-on-accent:#04231a;--color-warn:#f0b457;--color-warn-bg:#2a2214;--color-warn-line:#5c4724;--color-dang:#f2857a;--color-dang-bg:#2b1917;--color-dang-line:#6a3b36;--color-grid0:#2a3541;--font-ui:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;--r-sm:8px;--r:12px;--r-lg:16px;--r-full:999px;--color-accent-ink:var(--color-on-accent);--sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-8:32px;--sp-12:48px;--sh-1:0 1px 2px rgb(0 0 0 / .5),0 2px 10px rgb(0 0 0 / .35);--sh-2:0 -4px 16px rgb(0 0 0 / .5);--sh-btn:0 1px 2px rgb(0 0 0 / .5);--sh-3:0 2px 6px rgb(0 0 0 / .55),0 22px 44px -18px rgb(0 0 0 / .9);}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{overflow-x:clip}
+.sp{font:400 1.0625rem/1.5 var(--font-ui);background:var(--color-bg);color:var(--color-tx);min-height:100vh;-webkit-text-size-adjust:100%}
+.sp :where(h1,h2){text-wrap:balance}
+.sp{scrollbar-color:var(--color-edge) transparent;caret-color:var(--color-accent)}
+.sp ::selection{background:var(--color-accent);color:var(--color-on-accent)}
+.sp h1,.sp h2,.sp h3,.sp h4,.sp p,.sp ul,.sp ol,.sp dl,.sp dd{margin:0;padding:0}
+.sp ul,.sp ol{list-style:none}
+.sp a{color:inherit;text-decoration:none}
+:where(.sp) button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+.nw{white-space:nowrap}
+.tgt,.bigt,.big,.cmp dd,.tiles li,.stats li,.date,.gl,.gx span,.rn2,.key,.chead .meta,.step,.pill,.dots{font-variant-numeric:tabular-nums}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ic{flex:none}
+.topbar{display:none}
+.rail{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 16px 0;min-height:44px}
+.date{font-size:.9375rem;line-height:1.33;color:var(--color-tx2);font-weight:500}
+.pill{display:inline-flex;align-items:center;gap:4px;height:36px;padding:0 12px;border-radius:999px;background:var(--color-warn-bg);color:var(--color-warn);border:1px solid var(--color-warn-line)}
+.pill b{font-size:1rem;font-weight:800}
+.shell{padding:0 16px 24px}
+.card{color:var(--color-tx);background:var(--color-s1);border:1px solid var(--color-line);border-radius:16px;box-shadow:var(--sh-1);position:relative}
+.headband{padding:2px 0 8px}
+.headband h1{font-size:2.5rem;line-height:1.1;font-weight:800;letter-spacing:-.02em}
+.facts{display:flex;flex-wrap:wrap;gap:0 16px;margin-top:4px;font-size:.9375rem;line-height:1.4;color:var(--color-tx2)}
+.main{display:block}
+.left{display:grid;gap:12px}
+h2.sh{font-size:1.375rem;line-height:1.27;font-weight:700}
+.meta{font-size:.9375rem;line-height:1.33;color:var(--color-tx2)}
+.ov{font-size:.8125rem;line-height:1rem;font-weight:700;color:var(--color-accent);margin-bottom:4px}
+.upc{padding:16px}
+.upgrid{display:grid;grid-template-columns:96px minmax(0,1fr);gap:0 12px}
+.upwell{display:grid;place-items:center;height:100px;background:var(--color-s2);border-radius:12px;grid-row:1}
+.upwell .fig{width:auto;height:78px}
+.upbody{grid-column:2;grid-row:1;min-width:0}
+.upname{display:block}
+.upname h3{font-size:1.375rem;line-height:1.2;font-weight:700;letter-spacing:-.01em}
+.bigt{margin-top:2px}
+.bigt span[aria-hidden]{display:flex;align-items:baseline;gap:8px}
+.bigt b{font-size:1.75rem;line-height:1.15;font-weight:800;letter-spacing:-.01em;white-space:nowrap}
+.bigt i{font-style:normal;font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.ticks{grid-column:1/-1;display:flex;gap:4px;margin-top:12px;max-width:260px}
+.tk{display:block;flex:1;height:8px;border-radius:3px;background:var(--color-line2)}
+.tk.cur{background:var(--color-accent)}
+.cue{grid-column:1/-1;margin-top:12px;font-size:1.1875rem;line-height:1.47}
+.then{padding:16px 0 0;overflow:visible}
+.thead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:0 16px 8px}
+.hint{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.rows{display:block}
+.row{border-top:1px solid var(--color-line)}
+.dt>summary{list-style:none;cursor:pointer}
+.dt>summary::-webkit-details-marker{display:none}
+.rowtop{display:grid;grid-template-columns:40px minmax(0,1fr) auto 20px;gap:8px;align-items:center;padding:8px 12px;min-height:56px}
+.row:last-child .dt:not([open])>summary{border-radius:0 0 15px 15px}
+.well{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;background:var(--color-s2);color:var(--color-accent)}
+.well svg{width:30px;height:30px}
+.rname{display:block;min-width:0}
+.rn{display:block;font-size:1.0625rem;line-height:1.35;font-weight:600}
+.rm{display:block;font-size:.9375rem;line-height:1.33;color:var(--color-tx2)}
+.tgt{text-align:right;min-width:60px}
+.tgt b{display:block;font-size:1.25rem;line-height:1.25;font-weight:800;white-space:nowrap}
+.tgt i{display:block;font-style:normal;font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.how{display:flex;align-items:center;justify-content:flex-end;gap:8px;color:var(--color-accent);font-weight:600;font-size:.9375rem;min-height:44px}
+.hw{display:none}
+.how{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.cv{display:flex;color:var(--color-accent)}
+.how svg{display:none}
+.chev{transition:transform .15s}
+@media (prefers-reduced-motion:reduce){.chev{transition:none}}
+.dt[open] .chev{transform:rotate(180deg)}
+.dt[open]>summary{background:var(--color-s2)}
+.cues{counter-reset:c;display:grid;gap:12px;padding:12px 16px 16px 68px;background:var(--color-s2)}
+.cues li{counter-increment:c;position:relative;font-size:1.0625rem;line-height:1.55}
+.cues li::before{content:counter(c);position:absolute;left:-36px;top:2px;width:24px;height:24px;border-radius:50%;background:var(--color-s1);color:var(--color-tx2);font-size:.8125rem;font-weight:700;display:grid;place-items:center}
+.note{display:flex;gap:12px;margin:0;padding:12px 16px;border-radius:12px;background:var(--color-warn-bg);border:1px solid var(--color-warn-line);color:var(--color-tx);position:relative}
+.then .note{margin:0 12px 12px}
+.ni{color:var(--color-warn);flex:none;margin-top:1px;display:block}
+.note .nh{font-size:.8125rem;line-height:1rem;font-weight:700;color:var(--color-warn);margin-bottom:4px}
+.note p{font-size:1.0625rem;line-height:1.55}
+.helpline{font-size:.9375rem;line-height:1.4;color:var(--color-tx2);padding:0 4px}
+.side{margin-top:12px;display:grid;gap:12px}
+.startc{display:none}
+.help{font-size:.9375rem;line-height:1.4;color:var(--color-tx2)}
+.eh{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{white-space:nowrap;border-radius:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;width:100%}
+.sec{height:48px;background:var(--color-s1);color:var(--color-tx);border:1.5px solid var(--color-edge);font-weight:600;font-size:1rem}
+.sec:active{background:var(--color-s3)}
+.pri{height:56px;background:var(--color-accent);color:var(--color-on-accent);border:0;font-weight:700;font-size:1.1875rem;box-shadow:var(--sh-btn)}
+.week{padding:16px;box-shadow:none}
+.week h2{font-size:1.0625rem;line-height:1.3;font-weight:700;margin-bottom:12px}
+.ringrow{display:flex;gap:16px;align-items:center}
+.ringbox{position:relative;width:124px;height:124px;flex:none}
+.rn2{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.rn2 b{font-size:1.5rem;line-height:1.1;font-weight:800;letter-spacing:-.02em}
+.rn2 span{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.tiles{flex:1;display:grid;gap:8px;min-width:0}
+.tiles li{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--color-s2);border-radius:10px;padding:0 12px;height:32px}
+.tiles span{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.tiles b{font-size:1.125rem;line-height:1.1;font-weight:800}
+.gridwrap{margin-top:16px}
+.gx,.gr{display:grid;grid-template-columns:44px repeat(7,28px);gap:4px}
+.gx span{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2);text-align:center;padding-bottom:4px}
+.gl{font-size:.8125rem;line-height:16px;font-weight:500;color:var(--color-tx2);align-self:center}
+.c{display:block;height:14px;border-radius:4px;background:var(--color-grid0)}
+.c.on{background:var(--color-accent)}
+.c.fut{background:transparent;box-shadow:inset 0 0 0 1px var(--color-line)}
+.key{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.kk{display:flex;align-items:center;gap:8px}.kk .c{width:14px;height:14px}
+.foot{position:sticky;bottom:0;z-index:5}
+.footin{background:var(--color-s1);border-top:1px solid var(--color-line);box-shadow:var(--sh-2);padding:8px 16px}
+.footin .fh{display:none;font-size:.8125rem;line-height:1.3;padding-bottom:8px}
+.footin .eh{grid-template-columns:76px 76px minmax(0,1fr);align-items:center}
+@media (max-width:839px) and (min-height:900px){.footin .fh{display:block}.helpline{display:none}.fx .shell{padding-bottom:calc(var(--fh,172px) + 24px)}}
+.footin .sec{height:48px;padding:0}
+.tabbar{display:grid;grid-template-columns:repeat(4,1fr);background:var(--color-s1);border-top:1px solid var(--color-line2)}
+.tb{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:56px;color:var(--color-tx2);font-size:.8125rem;font-weight:600;line-height:1rem}
+.tb.on{color:var(--color-accent)}
+.tabonly .tabbar{box-shadow:var(--sh-2)}
+.fx .foot,.fs .foot{position:fixed;left:0;right:0;bottom:0}
+.fs .foot{position:absolute}
+.fx .shell{padding-bottom:calc(var(--fh,132px) + 24px)}
+/* player */
+.plbar{background:var(--color-s1);border-bottom:1px solid var(--color-line2)}
+.plin{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:16px;padding:0 16px;min-height:56px}
+.step{display:flex;gap:12px;font-size:.9375rem;font-weight:600;color:var(--color-tx2)}
+.step span:last-child{color:var(--color-tx)}
+.segs{display:flex;gap:4px;max-width:160px}
+.sg{display:block;flex:1;height:6px;border-radius:3px;background:var(--color-line2)}
+.sg.cur{background:var(--color-accent)}
+.quiet{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;background:transparent;border:0;border-radius:10px;color:var(--color-tx2);font-weight:600;font-size:.9375rem;cursor:pointer}
+.pl .shell{padding-top:12px}
+.figc{padding:12px;display:grid;grid-template-columns:116px minmax(0,1fr);gap:0 16px;align-items:center;order:1}
+.fhead h1{font-size:1.75rem;line-height:1.15;font-weight:800;letter-spacing:-.015em}
+.fhead .meta{display:flex;flex-wrap:wrap;gap:0 12px;margin-top:2px}
+.fhead .ticks{margin-top:8px;max-width:200px}
+.figwell{display:grid;place-items:center;grid-row:1;grid-column:1;height:116px;background:var(--color-s2);border-radius:12px}
+.fhead{grid-column:2;grid-row:1}
+.figwell .fig{height:96px;width:auto}
+.pl .main{display:flex;flex-direction:column;gap:12px}
+.pl .left,.pl .side{display:contents}
+.stoprule{order:3;display:flex;gap:12px;padding:12px 16px;border-radius:12px;background:var(--color-dang-bg);border:1px solid var(--color-dang-line);position:relative}
+.si{color:var(--color-dang);flex:none;margin-top:1px}
+.stoprule .nh{font-size:.8125rem;line-height:1rem;font-weight:700;color:var(--color-dang);margin-bottom:4px}
+.stoprule p{font-size:1.1875rem;line-height:1.45}
+.setc{padding:12px 16px;order:2}
+.sethead{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.sethead h2{font-size:1.0625rem;line-height:1.3;font-weight:700}
+.dots{display:flex;gap:8px}.dots i{display:block;width:28px;height:8px;border-radius:4px;background:var(--color-line2)}
+.numeral{display:grid;justify-items:center;margin:0 0 8px}
+.big{font-size:clamp(5.5rem,26vw,8.25rem);line-height:.92;font-weight:800;letter-spacing:-.03em;padding-top:8px}
+.nl{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2);margin-top:4px}
+.cmp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cmp div{background:var(--color-s2);border-radius:12px;padding:8px;text-align:center}
+.cmp dt{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.cmp dd{font-size:1.125rem;line-height:1.3;font-weight:800}
+.actions{padding:12px 16px;display:grid;gap:8px;order:4}
+.actions .help{text-align:center}
+.pl .actions{border-radius:0;border:0;border-top:1px solid var(--color-line);box-shadow:var(--sh-2);position:sticky;bottom:0;margin:0 -16px -24px;padding:8px 16px 16px;z-index:5}
+/* progress */
+.stats ul{display:grid;grid-template-columns:repeat(3,1fr)}
+.stats li{padding:16px 8px 12px;text-align:center;display:grid;gap:2px;justify-items:center;align-content:start}
+.stats li+li{border-left:1px solid var(--color-line)}
+.stats b{font-variant-numeric:tabular-nums;font-size:2rem;line-height:1.1;font-weight:800;letter-spacing:-.02em}
+.stats li span{font-variant-numeric:tabular-nums;font-size:.8125rem;line-height:1.15;font-weight:600;color:var(--color-tx2)}
+.chartc{padding:16px}
+.chead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px}
+.chead h2{font-size:1.375rem;line-height:1.27;font-weight:700}
+.chart{display:block;width:100%;height:auto;background:var(--color-s2);border-radius:12px}
+.cw{position:relative}
+.yl{position:absolute;left:10px;font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx3)}.yl.t{top:calc(8.3% + 2px)}.yl.b{bottom:calc(10% + 2px)}
+.cax{display:flex;justify-content:flex-start;align-items:center;margin-top:8px;font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.today{display:flex;align-items:center;gap:8px}.today i{display:block;width:10px;height:10px;border-radius:50%;background:var(--color-accent)}
+.miles{padding:16px}
+.miles li{margin-top:12px;background:var(--color-s2);border-radius:12px;padding:12px 16px}
+.ml{font-size:.8125rem;line-height:1rem;font-weight:600;color:var(--color-tx2)}
+.miles p{font-size:1.0625rem;line-height:1.45;margin-top:2px}
+.pg-p .side .note{margin:0}
+.co{display:none}
+@media (min-width:840px){
+ .foot{display:none}
+ .rail{display:none}
+ .topbar{display:flex;align-items:stretch;justify-content:space-between;height:64px;padding:0 max(24px,calc((100% - 1120px)/2));background:var(--color-s1);border-bottom:1px solid var(--color-line2);position:sticky;top:0;z-index:5}
+ .tl{display:flex;gap:4px;position:relative;margin-left:-16px}
+ .tn{display:flex;align-items:center;gap:8px;padding:0 16px;color:var(--color-tx2);font-weight:600;font-size:.9375rem;border-bottom:3px solid transparent;margin-bottom:-1px}
+ .tn.on{color:var(--color-accent);border-bottom-color:var(--color-accent)}
+ .tr{display:flex;align-items:center;gap:16px}
+ .shell{max-width:1168px;margin:0 auto;padding:16px 24px 40px}
+ .headband{color:var(--color-tx);background:var(--color-s1);border:1px solid var(--color-line);border-radius:16px;box-shadow:var(--sh-1);display:flex;justify-content:space-between;align-items:center;gap:8px 32px;flex-wrap:wrap;padding:16px 28px;margin-bottom:16px}
+ .headband h1{font-size:3rem;line-height:1.08}
+ .facts{margin:0;font-size:1.0625rem;line-height:1.41;gap:0}
+ .facts span+span{border-left:1px solid var(--color-line2);margin-left:16px;padding-left:16px}
+ .main{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:16px;align-items:start}
+ .left{gap:16px}
+ .side{margin-top:0;position:sticky;top:80px;gap:16px}
+ .startc{display:block;padding:20px 24px 24px}
+ .startc .eh{margin-top:12px}.startc .pri{margin-top:8px}
+ .helpline{display:none}
+ .upc{padding:20px 24px}
+ .upgrid{grid-template-columns:176px minmax(0,1fr);gap:0 20px}
+ .upwell{grid-row:1/span 3;height:auto;min-height:176px;align-self:stretch}
+ .upwell .fig{width:auto;height:160px}
+ .upbody{grid-column:2;grid-row:1}
+ .upbody .ov{font-size:1.0625rem;line-height:1.3;margin-bottom:4px}
+ .upname{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+ .upname h3{font-size:1.5rem}
+ .bigt{margin:0;text-align:right}
+ .bigt span[aria-hidden]{display:block}
+ .bigt b{display:block;font-size:1.75rem}
+ .bigt i{display:block;margin-top:2px}
+ .ticks{grid-column:2;grid-row:2;margin-top:8px}
+ .cue{grid-column:2;grid-row:3;margin-top:8px}
+ .then{padding:16px 0 0}
+ .thead{padding:0 24px 8px}
+ .rowtop{grid-template-columns:44px minmax(0,1fr) auto 150px;gap:16px;padding:8px 24px;min-height:60px}
+ .well{width:44px;height:44px}
+ .how{position:static;width:auto;height:auto;overflow:visible;clip:auto;display:flex;gap:8px}
+ .cv{display:none}
+ .hint{display:none}
+ .how svg{display:block}
+ .hw{display:inline}
+ .cues{padding:12px 24px 16px 84px}
+ .cues li::before{left:-36px}
+ .then .note{margin:0 16px 16px}
+ .week{padding:20px 24px}
+ .week h2{font-size:1.0625rem}
+ .co{display:grid;place-items:center;position:absolute;width:24px;height:24px;border-radius:50%;background:var(--color-tx);color:var(--color-bg);font-size:.8125rem;font-weight:800;line-height:1}
+ .co.l{left:-44px}.co.r{right:-44px}
+ .tl .co.l{left:-48px;top:20px!important}
+ /* player */
+ .plin{max-width:1120px;margin:0 auto;padding:0 24px 0 8px;min-height:64px}
+ .plbar{padding:0 max(0px,calc((100% - 1168px)/2))}
+ .step{font-size:1.0625rem}
+ .pl .shell{padding-top:16px}
+ .pl .main{display:grid}
+ .pl .left{display:grid;gap:16px}
+ .pl .side{display:grid;gap:16px;margin-top:0}
+ .figc{padding:24px;display:block}
+ .setc{padding:20px 24px 24px}
+ .fhead h1{font-size:2rem}
+ .fhead .meta{font-size:1.0625rem;gap:0 12px}
+ .figwell{height:532px;margin-top:16px}
+ .figwell .fig{height:400px}
+ .stoprule{padding:16px 20px}
+ .setc{padding:20px 24px 24px}
+ .sethead h2{font-size:1.375rem}
+ .big{font-size:8.25rem}
+ .cmp div{padding:8px 12px}
+ .pl .actions{position:relative;border:1px solid var(--color-line);border-radius:16px;box-shadow:var(--sh-1);margin:0;padding:20px 24px 24px;bottom:auto}
+ .pl .actions .pri{margin-top:4px}
+ /* progress */
+ .stats li{padding:20px 12px 20px}
+ .stats b{font-size:2.5rem;line-height:1.1}
+ .stats li span{font-size:.9375rem}
+ .chartc{padding:20px 24px 24px}
+ .miles{padding:20px 24px 24px}
+ .side>.note{padding:16px 20px}
+}
+@media (max-width:419px){
+ .upgrid{grid-template-columns:80px minmax(0,1fr)}
+ .upwell{height:84px}.upwell .fig{height:66px}
+ .upc{padding:12px 16px 16px}.ticks,.cue{margin-top:8px}
+ .then{padding-top:12px}.thead{padding-bottom:4px}
+ .rowtop{grid-template-columns:32px minmax(0,1fr) auto 20px;gap:8px;padding:4px 8px;min-height:52px}
+ .well{width:32px;height:32px}.well svg{width:24px;height:24px}
+ .left{gap:8px}
+}
+@media (max-width:389px){
+ .tgt{min-width:0}.tgt b{font-size:1.125rem}
+ .shell{padding-left:12px;padding-right:12px}
+ .rail{padding-left:12px;padding-right:12px}
+ .footin{padding-left:12px;padding-right:12px}
+ .big{font-size:4.5rem;padding-top:4px}
+ .pl .actions{margin:0 -12px -24px}.cmp div{padding:4px 8px}.setc{padding:8px 16px}.figc{padding:8px}.pl .main{gap:8px}
+}
+@media (max-width:370px){.footin .eh{grid-template-columns:68px 68px minmax(0,1fr)}.footin .pri{padding:0 8px;font-size:1.0625rem}.headband h1{font-size:2.25rem}}
+@media (max-width:1259px){.co{display:none!important}}
+
+.dr .sp{min-height:0}
+.dr{width:1440px;padding:48px 56px 64px;display:flex;flex-direction:column;gap:40px;background:var(--color-bg);color:var(--color-tx)}
+.dr h1{font-size:3rem;line-height:1.08;font-weight:800;letter-spacing:-.02em}
+.dr h2.hd{font-size:1.5rem;line-height:1.25;font-weight:700;margin-bottom:6px}
+.dr .lead{font-size:1.1875rem;line-height:1.5;max-width:72ch;color:var(--color-tx)}
+.dr .cap{font-size:.8125rem;line-height:1.3;color:var(--color-tx2)}
+.dr .two{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.dr .three{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.dr .panel{background:var(--color-bg);color:var(--color-tx);border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:16px;border:1px solid var(--color-line)}
+.dr .pt{font-size:1.0625rem;line-height:1.3;font-weight:700}
+.dr .sws{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 12px}
+.dr .sw{display:flex;flex-direction:column;gap:4px;min-width:0}
+.dr .chip{height:40px;border-radius:10px;border:1px solid var(--color-line2)}
+.dr .sw b{font-size:.8125rem;line-height:1rem;font-weight:600;overflow-wrap:anywhere}
+.dr .sw span{font-size:.8125rem;line-height:1rem;color:var(--color-tx2)}
+.dr .sw .use{font-size:.75rem;line-height:1rem}
+.dr .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.dr .trow{display:grid;grid-template-columns:200px 1fr 320px;gap:8px 24px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--color-line)}
+.dr .trow code{font-size:.8125rem;color:var(--color-tx2);font-family:inherit}
+.dr .bar{display:block;height:16px;background:var(--color-accent);border-radius:4px}
+.dr .elev{height:84px;border-radius:16px;background:var(--color-s1);border:1px solid var(--color-line);display:flex;align-items:center;justify-content:center;font-size:.8125rem;color:var(--color-tx2);text-align:center;padding:0 8px}
+.dr table{border-collapse:collapse;width:100%;font-size:.8125rem;line-height:1.3}
+.dr th,.dr td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--color-line)}
+.dr td.n{text-align:right}
+.dr th{font-weight:600;color:var(--color-tx2)}
+.dr .btn{width:auto;padding:0 20px}
+.dr .btn.pri{height:56px}
+.dr .ring{outline:2px solid var(--color-accent);outline-offset:2px}
+.dr .banner{display:flex;gap:12px;padding:12px 14px;border-radius:12px;background:var(--color-dang-bg);border:1px solid var(--color-dang-line)}
+.dr .banner .si{color:var(--color-dang)}
+.dr .banner .nh{font-size:.8125rem;line-height:1rem;font-weight:700;color:var(--color-dang);margin-bottom:4px}
+.dr .banner p{font-size:1rem;line-height:1.45}
+.dr .fld{display:grid;gap:4px;font-size:.9375rem;color:var(--color-tx2)}
+.dr .fld input{height:48px;min-width:0;width:140px;border-radius:12px;border:1.5px solid var(--color-edge);background:var(--color-s2);color:var(--color-tx);padding:0 12px;font:inherit;font-size:1.0625rem}
+.dr .sec[aria-pressed="true"]{border-color:var(--color-accent);color:var(--color-accent)}
+.dr .card.mini{padding:16px;max-width:520px}
+.dr .st{display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:16px;background:var(--color-s1);border:1px solid var(--color-line);box-shadow:var(--sh-1)}
+.dr .st h3{font-size:.8125rem;line-height:1rem;font-weight:700;color:var(--color-tx2)}
+.dr .st h4.t{font-size:1.75rem;line-height:1.15;font-weight:800}
+.dr .st p{font-size:1rem;line-height:1.45}
+.dr .cd{position:relative;width:96px;height:96px}
+.dr .cd .rn2{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.dr .nav{display:flex;gap:4px}
+.dr .nav .tn{display:flex;align-items:center;gap:8px;padding:0 16px;height:48px;color:var(--color-tx2);font-weight:600;font-size:.9375rem;border-bottom:3px solid transparent}
+.dr .nav .tn.on{color:var(--color-accent);border-bottom-color:var(--color-accent)}
+.dr .footdemo{background:var(--color-s1);border:1px solid var(--color-line);box-shadow:var(--sh-2);border-radius:12px;padding:8px 16px;width:390px}
+.dr .footdemo .eh{grid-template-columns:76px 76px minmax(0,1fr);align-items:center}
+.dr .gridwrap{max-width:420px}
+.dr .tw{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+body{margin:0}
+</style>
+</head>
+<body>
+<div class="theme-light sp" style="width: 1440px">
+<div class="dr">
+<section><h1>Direction · Up first</h1><p class="lead">Today leads with the first exercise, drawn and explained, then the rest of the run order on the same screen; Start sits in the footer on a phone and in a card beside the plan on desktop.</p><p class="cap" style="margin-top:8px">Inter, the app's own face, and mint, its default accent (one of its eight). Figures are the app's own rigs (Squat drawn here); the glyph wells use simple line icons.</p></section>
+<section><h2 class="hd">Palette, by role</h2><p class="cap" style="margin-bottom:12px">Token names match the board's css; the code brief maps them to the app's names (see the tokens map).</p><div class="two"><div class="panel sp theme-light"><div class="pt">Light</div><div class="sws"><div class="sw"><span class="chip" style="background:#e9edf1"></span><b>--color-bg</b><span>#e9edf1</span><span class="use">the page behind the cards</span></div><div class="sw"><span class="chip" style="background:#fcfdfe"></span><b>--color-s1</b><span>#fcfdfe</span><span class="use">cards, the top bar, the footer</span></div><div class="sw"><span class="chip" style="background:#e6ebf0"></span><b>--color-s2</b><span>#e6ebf0</span><span class="use">wells under a figure, tiles, the log strip</span></div><div class="sw"><span class="chip" style="background:#d4dce4"></span><b>--color-s3</b><span>#d4dce4</span><span class="use">a control under the pointer or pressed</span></div><div class="sw"><span class="chip" style="background:#c3ccd5"></span><b>--color-line</b><span>#c3ccd5</span><span class="use">a card's edge, dividers inside a card</span></div><div class="sw"><span class="chip" style="background:#aeb9c4"></span><b>--color-line2</b><span>#aeb9c4</span><span class="use">the top bar's foot, the tab bar's head, inactive rung ticks</span></div><div class="sw"><span class="chip" style="background:#7a8795"></span><b>--color-edge</b><span>#7a8795</span><span class="use">edges that must be seen: Easier, Harder, Log, fields</span></div><div class="sw"><span class="chip" style="background:#0c1117"></span><b>--color-tx</b><span>#0c1117</span><span class="use">titles, names, targets, cues</span></div><div class="sw"><span class="chip" style="background:#4e5863"></span><b>--color-tx2</b><span>#4e5863</span><span class="use">meta, facts, units, helper text</span></div><div class="sw"><span class="chip" style="background:#5c6570"></span><b>--color-tx3</b><span>#5c6570</span><span class="use">placeholders, the chart's axis words</span></div><div class="sw"><span class="chip" style="background:#0d7153"></span><b>--color-accent</b><span>#0d7153</span><span class="use">Start, Next set, the current place, links, ring, focus</span></div><div class="sw"><span class="chip" style="background:#0a5a42"></span><b>--color-accent-2</b><span>#0a5a42</span><span class="use">the ring's far end</span></div><div class="sw"><span class="chip" style="background:#eef9f6"></span><b>--color-on-accent</b><span>#eef9f6</span><span class="use">text on the accent</span></div><div class="sw"><span class="chip" style="background:#8a5300"></span><b>--color-warn</b><span>#8a5300</span><span class="use">the honest note and the streak pill</span></div><div class="sw"><span class="chip" style="background:#f7eedf"></span><b>--color-warn-bg</b><span>#f7eedf</span><span class="use">ground of the note and the pill</span></div><div class="sw"><span class="chip" style="background:#d9bf95"></span><b>--color-warn-line</b><span>#d9bf95</span><span class="use">edge of the note and the pill</span></div><div class="sw"><span class="chip" style="background:#b0362b"></span><b>--color-dang</b><span>#b0362b</span><span class="use">the stop rule and the error banner, always with a label</span></div><div class="sw"><span class="chip" style="background:#f9e9e6"></span><b>--color-dang-bg</b><span>#f9e9e6</span><span class="use">ground of the stop rule and the error banner</span></div><div class="sw"><span class="chip" style="background:#dcb0aa"></span><b>--color-dang-line</b><span>#dcb0aa</span><span class="use">edge of the stop rule and the error banner</span></div><div class="sw"><span class="chip" style="background:#dfe5eb"></span><b>--color-grid0</b><span>#dfe5eb</span><span class="use">an untrained day, the ring's empty track</span></div></div></div><div class="panel sp theme-dark"><div class="pt">Dark</div><div class="sws"><div class="sw"><span class="chip" style="background:#080b0e"></span><b>--color-bg</b><span>#080b0e</span><span class="use">the page behind the cards</span></div><div class="sw"><span class="chip" style="background:#182029"></span><b>--color-s1</b><span>#182029</span><span class="use">cards, the top bar, the footer</span></div><div class="sw"><span class="chip" style="background:#222b35"></span><b>--color-s2</b><span>#222b35</span><span class="use">wells under a figure, tiles, the log strip</span></div><div class="sw"><span class="chip" style="background:#2d3945"></span><b>--color-s3</b><span>#2d3945</span><span class="use">a control under the pointer or pressed</span></div><div class="sw"><span class="chip" style="background:#36434e"></span><b>--color-line</b><span>#36434e</span><span class="use">a card's edge, dividers inside a card</span></div><div class="sw"><span class="chip" style="background:#465462"></span><b>--color-line2</b><span>#465462</span><span class="use">the top bar's foot, the tab bar's head, inactive rung ticks</span></div><div class="sw"><span class="chip" style="background:#66788a"></span><b>--color-edge</b><span>#66788a</span><span class="use">edges that must be seen: Easier, Harder, Log, fields</span></div><div class="sw"><span class="chip" style="background:#edf2f7"></span><b>--color-tx</b><span>#edf2f7</span><span class="use">titles, names, targets, cues</span></div><div class="sw"><span class="chip" style="background:#a5b1be"></span><b>--color-tx2</b><span>#a5b1be</span><span class="use">meta, facts, units, helper text</span></div><div class="sw"><span class="chip" style="background:#919dab"></span><b>--color-tx3</b><span>#919dab</span><span class="use">placeholders, the chart's axis words</span></div><div class="sw"><span class="chip" style="background:#2bd9a4"></span><b>--color-accent</b><span>#2bd9a4</span><span class="use">Start, Next set, the current place, links, ring, focus</span></div><div class="sw"><span class="chip" style="background:#7ff0c9"></span><b>--color-accent-2</b><span>#7ff0c9</span><span class="use">the ring's far end</span></div><div class="sw"><span class="chip" style="background:#04231a"></span><b>--color-on-accent</b><span>#04231a</span><span class="use">text on the accent</span></div><div class="sw"><span class="chip" style="background:#f0b457"></span><b>--color-warn</b><span>#f0b457</span><span class="use">the honest note and the streak pill</span></div><div class="sw"><span class="chip" style="background:#2a2214"></span><b>--color-warn-bg</b><span>#2a2214</span><span class="use">ground of the note and the pill</span></div><div class="sw"><span class="chip" style="background:#5c4724"></span><b>--color-warn-line</b><span>#5c4724</span><span class="use">edge of the note and the pill</span></div><div class="sw"><span class="chip" style="background:#f2857a"></span><b>--color-dang</b><span>#f2857a</span><span class="use">the stop rule and the error banner, always with a label</span></div><div class="sw"><span class="chip" style="background:#2b1917"></span><b>--color-dang-bg</b><span>#2b1917</span><span class="use">ground of the stop rule and the error banner</span></div><div class="sw"><span class="chip" style="background:#6a3b36"></span><b>--color-dang-line</b><span>#6a3b36</span><span class="use">edge of the stop rule and the error banner</span></div><div class="sw"><span class="chip" style="background:#2a3541"></span><b>--color-grid0</b><span>#2a3541</span><span class="use">an untrained day, the ring's empty track</span></div></div></div></div></section>
+<section><h2 class="hd">Type</h2><div class="panel sp theme-light" style="gap:0"><p class="cap" style="padding-bottom:8px">Inter, variable, weights 400 to 800, tabular figures on every number. Sentence case throughout: no tracked capitals.</p><div class="trow"><b>Title, 1280</b><div><span style="font-size:3rem;line-height:1.08;font-weight:800;letter-spacing:-.02em">Legs day</span></div><code>48/52 · 800 · −0.02em</code></div><div class="trow"><b>Title, phone</b><div><span style="font-size:2.5rem;line-height:1.1;font-weight:800;letter-spacing:-.02em">Legs day</span></div><code>40/44 · 800</code></div><div class="trow"><b>Player numeral</b><div><span style="font-size:6rem;line-height:.92;font-weight:800;letter-spacing:-.03em">8</span></div><code>132/121 · 800 · −0.03em (clamp 88 to 132)</code></div><div class="trow"><b>Up first target, tile</b><div><span style="font-size:1.75rem;line-height:1.15;font-weight:800">3 × 8</span> <span style="font-size:2.5rem;line-height:1.1;font-weight:800">16</span></div><code>28/32 · 800, tile 40 · 800</code></div><div class="trow"><b>Exercise name, Up first</b><div><span style="font-size:1.5rem;line-height:1.25;font-weight:700">Bodyweight squat</span></div><code>24/30 · 700</code></div><div class="trow"><b>Section head</b><div><span style="font-size:1.375rem;line-height:1.27;font-weight:700">How it is going</span></div><code>22/28 · 700</code></div><div class="trow"><b>Cue</b><div><span style="font-size:1.1875rem;line-height:1.47">Chest stays up, heels stay down.</span></div><code>19/28 · 400</code></div><div class="trow"><b>Row name, body</b><div><span style="font-size:1.0625rem;line-height:1.35;font-weight:600">Front plank</span></div><code>17/23 · 600, body 17/26 · 400</code></div><div class="trow"><b>Meta, facts</b><div><span style="font-size:.9375rem;line-height:1.33">3 sets, rung 2 of 6</span></div><code>15/20 · 400</code></div><div class="trow"><b>Label, unit (sentence case, untracked)</b><div><span style="font-size:.8125rem;line-height:1rem;font-weight:600">What this slot does not train</span></div><code>13/16 · 600</code></div></div></section>
+<section><h2 class="hd">Spacing, radii, elevation</h2><div class="three"><div class="panel sp theme-light"><div class="pt">Spacing</div><div class="row" style="gap:16px"><code class="cap" style="width:120px">--sp-1  4px</code><i class="bar" style="width:16px"></i></div><div class="row" style="gap:16px"><code class="cap" style="width:120px">--sp-2  8px</code><i class="bar" style="width:32px"></i></div><div class="row" style="gap:16px"><code class="cap" style="width:120px">--sp-3  12px</code><i class="bar" style="width:48px"></i></div><div class="row" style="gap:16px"><code class="cap" style="width:120px">--sp-4  16px</code><i class="bar" style="width:64px"></i></div><div class="row" style="gap:16px"><code class="cap" style="width:120px">--sp-5  20px</code><i class="bar" style="width:80px"></i></div><div class="row" style="gap:16px"><code class="cap" style="width:120px">--sp-6  24px</code><i class="bar" style="width:96px"></i></div><div class="row" style="gap:16px"><code class="cap" style="width:120px">--sp-8  32px</code><i class="bar" style="width:128px"></i></div><div class="row" style="gap:16px"><code class="cap" style="width:120px">--sp-12  48px</code><i class="bar" style="width:192px"></i></div></div><div class="panel sp theme-light"><div class="pt">Radii</div><div class="row"><span class="elev" style="width:96px;border-radius:8px">--r-sm 8</span><span class="elev" style="width:96px;border-radius:12px">--r 12</span><span class="elev" style="width:96px;border-radius:16px">--r-lg 16</span><span class="elev" style="width:96px;border-radius:999px">--r-full</span></div><p class="cap">8 for chips and wells, 12 for inner panels, 16 for cards, full for the streak pill. Buttons are 14.</p></div><div class="panel sp theme-light"><div class="pt">Elevation, light and dark</div><div class="row"><span class="elev" style="width:140px;box-shadow:var(--sh-1)">--sh-1 card</span><span class="elev" style="width:140px;box-shadow:var(--sh-2);border-radius:0">--sh-2 footer</span></div><div class="row theme-dark" style="background:var(--color-bg);padding:12px;border-radius:12px;gap:12px"><span class="elev" style="width:140px;box-shadow:var(--sh-1)">--sh-1 card</span><span class="elev" style="width:140px;box-shadow:var(--sh-2);border-radius:0">--sh-2 footer</span></div></div></div></section>
+<section><h2 class="hd">Components, both themes</h2><div class="two"><div class="panel sp theme-light">
+<div class="pt">Light</div>
+<div class="row"><button class="btn pri" type="button">Start workout</button><button class="btn pri ring" type="button">Start workout, focused</button><button class="btn pri" type="button" style="width:auto">Next set</button></div>
+<div class="row"><button class="btn sec" type="button">Easier</button><button class="btn sec" type="button">Harder</button><button class="btn sec" type="button" aria-pressed="false">Log 8</button><button class="btn sec" type="button" aria-pressed="true">Logged 8</button><button class="btn sec" type="button"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="m13 7 4 4"></path></svg><span>Log other</span></button><button class="quiet" type="button"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"></path></svg><span>Stop</span></button></div>
+<div class="row" style="align-items:flex-end"><label class="fld">Reps<input type="text" inputmode="numeric" value="9"></label><button class="btn sec" type="button">Save</button><span class="cap" style="max-width:300px">The app shows no error here: a number out of range is refused at the save, never mid-set.</span></div>
+<div class="nav"><a class="tn on" href="#"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"></path><path d="M5 10v10h14V10"></path></svg><span>Today</span></a><a class="tn" href="#"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg><span>Plan</span></a><a class="tn" href="#"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"></path></svg><span>Progress</span></a></div>
+<div class="card mini"><ul class="rows"><li class="row" style="border:0"><details class="dt" open=""><summary class="rowtop" style="padding:8px 0"><span class="well" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 176h160"></path><circle cx="34" cy="116" r="12"></circle><path d="M50 126L108 140L172 160M56 130V170H84"></path></svg></span><span class="rname"><b class="rn">Front plank</b><span class="rm">2 sets, rung 2 of 6</span></span><div class="tgt"><span><b>2 × 36s</b><i>seconds</i></span></div><span class="how"><span class="hw">How to do it</span><svg class="ic chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></summary><ol class="cues" style="padding-left:52px;margin:0 -16px;padding-right:16px"><li>Forearms on the floor with your elbows directly under your shoulders.</li></ol></details></li></ul></div>
+<div class="row" style="align-items:center;gap:24px"><div class="ringbox" style="width:96px;height:96px"><svg width="96" height="96" viewBox="0 0 140 140" aria-hidden="true"><defs><linearGradient id="rgtheme-light" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="var(--color-accent)"></stop><stop offset="1" stop-color="var(--color-accent-2)"></stop></linearGradient></defs><circle cx="70" cy="70" r="58" fill="none" stroke="var(--color-grid0)" stroke-width="12"></circle><circle cx="70" cy="70" r="58" fill="none" stroke="url(#rgtheme-light)" stroke-width="12" stroke-linecap="round" stroke-dasharray="104.2 364.4" transform="rotate(-90 70 70)"></circle></svg><div class="rn2"><b>29%</b></div></div><div class="ticks" aria-hidden="true"><i class="tk"></i><i class="tk cur"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i></div><span class="pill"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-4-1-6 1-10z"></path></svg><b>1</b></span></div>
+<div class="note"><span class="ni"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">What this slot does not train</p><p>Postural work, not pulling strength.</p></div></div>
+<div class="banner" role="alert"><span class="si"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">Read-only</p><p>The store could not write.</p></div></div>
+</div><div class="panel sp theme-dark">
+<div class="pt">Dark</div>
+<div class="row"><button class="btn pri" type="button">Start workout</button><button class="btn pri ring" type="button">Start workout, focused</button><button class="btn pri" type="button" style="width:auto">Next set</button></div>
+<div class="row"><button class="btn sec" type="button">Easier</button><button class="btn sec" type="button">Harder</button><button class="btn sec" type="button" aria-pressed="false">Log 8</button><button class="btn sec" type="button" aria-pressed="true">Logged 8</button><button class="btn sec" type="button"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="m13 7 4 4"></path></svg><span>Log other</span></button><button class="quiet" type="button"><svg class="ic " width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"></path></svg><span>Stop</span></button></div>
+<div class="row" style="align-items:flex-end"><label class="fld">Reps<input type="text" inputmode="numeric" value="9"></label><button class="btn sec" type="button">Save</button><span class="cap" style="max-width:300px">The app shows no error here: a number out of range is refused at the save, never mid-set.</span></div>
+<div class="nav"><a class="tn on" href="#"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8"></path><path d="M5 10v10h14V10"></path></svg><span>Today</span></a><a class="tn" href="#"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg><span>Plan</span></a><a class="tn" href="#"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"></path></svg><span>Progress</span></a></div>
+<div class="card mini"><ul class="rows"><li class="row" style="border:0"><details class="dt" open=""><summary class="rowtop" style="padding:8px 0"><span class="well" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 176h160"></path><circle cx="34" cy="116" r="12"></circle><path d="M50 126L108 140L172 160M56 130V170H84"></path></svg></span><span class="rname"><b class="rn">Front plank</b><span class="rm">2 sets, rung 2 of 6</span></span><div class="tgt"><span><b>2 × 36s</b><i>seconds</i></span></div><span class="how"><span class="hw">How to do it</span><svg class="ic chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></summary><ol class="cues" style="padding-left:52px;margin:0 -16px;padding-right:16px"><li>Forearms on the floor with your elbows directly under your shoulders.</li></ol></details></li></ul></div>
+<div class="row" style="align-items:center;gap:24px"><div class="ringbox" style="width:96px;height:96px"><svg width="96" height="96" viewBox="0 0 140 140" aria-hidden="true"><defs><linearGradient id="rgtheme-dark" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="var(--color-accent)"></stop><stop offset="1" stop-color="var(--color-accent-2)"></stop></linearGradient></defs><circle cx="70" cy="70" r="58" fill="none" stroke="var(--color-grid0)" stroke-width="12"></circle><circle cx="70" cy="70" r="58" fill="none" stroke="url(#rgtheme-dark)" stroke-width="12" stroke-linecap="round" stroke-dasharray="104.2 364.4" transform="rotate(-90 70 70)"></circle></svg><div class="rn2"><b>29%</b></div></div><div class="ticks" aria-hidden="true"><i class="tk"></i><i class="tk cur"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i><i class="tk"></i></div><span class="pill"><svg class="ic " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-4-1-6 1-10z"></path></svg><b>1</b></span></div>
+<div class="note"><span class="ni"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">What this slot does not train</p><p>Postural work, not pulling strength.</p></div></div>
+<div class="banner" role="alert"><span class="si"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">Read-only</p><p>The store could not write.</p></div></div>
+</div></div><div class="panel sp theme-light" style="margin-top:24px"><div class="pt">Phone footer, 390 wide: Easier and Harder 48 px, Start 56 px, above the 56 px tab bar</div><div class="footdemo"><div class="eh"><button class="btn sec" type="button">Easier</button><button class="btn sec" type="button">Harder</button><button class="btn pri" type="button">Start workout</button></div></div><p class="cap">The app has no menu and no toast: a menu or a toast is not drawn. Status changes are announced in place.</p></div></section>
+<section><h2 class="hd">States</h2><div class="two"><div class="panel sp theme-light"><div class="pt">Light</div>
+<div class="cap">Today</div>
+<div class="banner" role="alert"><span class="si"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">Read-only</p><p>The store could not write; training is blocked.</p></div></div>
+<div class="st"><h3>Unreadable history</h3><h4 class="t" style="font-size:1.5rem">The saved training history could not be read.</h4><div class="banner"><span class="si"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">Nothing was changed</p><p>The stored text is untouched and is usually repairable by hand.</p></div></div></div>
+<div class="st" style="align-items:center;text-align:center"><h4 class="t" style="font-size:2.5rem">Session complete.</h4><b style="font-size:4.5rem;line-height:1;font-weight:800">17</b><span class="cap">sessions completed</span></div>
+<div class="cap">Player</div>
+<div class="banner" role="alert"><span class="si"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">Not saved</p><p>The set could not be written.</p></div></div>
+<div class="row" style="gap:24px"><div class="cd"><svg width="96" height="96" viewBox="0 0 140 140" aria-hidden="true"><circle cx="70" cy="70" r="58" fill="none" stroke="var(--color-grid0)" stroke-width="12"></circle><circle cx="70" cy="70" r="58" fill="none" stroke="var(--color-accent)" stroke-width="12" stroke-linecap="round" stroke-dasharray="270 364.4" transform="rotate(-90 70 70)"></circle></svg><div class="rn2"><b>36</b><span>seconds</span></div></div><div style="display:grid;gap:8px"><button class="btn sec" type="button">Start 36s</button><button class="btn pri" type="button" style="height:56px">Finish</button></div></div>
+<div class="cap">Progress</div>
+<div class="banner" role="alert"><span class="si"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">Read-only</p><p>The document could not be read.</p></div></div>
+<p class="cap">Loading: none, the data is local and read synchronously. Empty: Today always has a prescribed day; Progress shows its zeros.</p></div><div class="panel sp theme-dark"><div class="pt">Dark</div>
+<div class="cap">Today</div>
+<div class="banner" role="alert"><span class="si"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">Read-only</p><p>The store could not write; training is blocked.</p></div></div>
+<div class="st"><h3>Unreadable history</h3><h4 class="t" style="font-size:1.5rem">The saved training history could not be read.</h4><div class="banner"><span class="si"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">Nothing was changed</p><p>The stored text is untouched and is usually repairable by hand.</p></div></div></div>
+<div class="st" style="align-items:center;text-align:center"><h4 class="t" style="font-size:2.5rem">Session complete.</h4><b style="font-size:4.5rem;line-height:1;font-weight:800">17</b><span class="cap">sessions completed</span></div>
+<div class="cap">Player</div>
+<div class="banner" role="alert"><span class="si"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">Not saved</p><p>The set could not be written.</p></div></div>
+<div class="row" style="gap:24px"><div class="cd"><svg width="96" height="96" viewBox="0 0 140 140" aria-hidden="true"><circle cx="70" cy="70" r="58" fill="none" stroke="var(--color-grid0)" stroke-width="12"></circle><circle cx="70" cy="70" r="58" fill="none" stroke="var(--color-accent)" stroke-width="12" stroke-linecap="round" stroke-dasharray="270 364.4" transform="rotate(-90 70 70)"></circle></svg><div class="rn2"><b>36</b><span>seconds</span></div></div><div style="display:grid;gap:8px"><button class="btn sec" type="button">Start 36s</button><button class="btn pri" type="button" style="height:56px">Finish</button></div></div>
+<div class="cap">Progress</div>
+<div class="banner" role="alert"><span class="si"><svg class="ic " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6M12 16.5v.5"></path></svg></span><div><p class="nh">Read-only</p><p>The document could not be read.</p></div></div>
+<p class="cap">Loading: none, the data is local and read synchronously. Empty: Today always has a prescribed day; Progress shows its zeros.</p></div></div></section>
+<section><h2 class="hd">Contrast, every pair</h2><div class="panel sp theme-light"><table><thead><tr><th>Pair</th><th>Light</th><th>Dark</th><th>Needs</th></tr></thead><tbody><tr><td>tx on bg</td><td class="n">16.11</td><td class="n">17.51</td><td class="n">4.5</td></tr><tr><td>tx on s1 (names, targets, cue)</td><td class="n">18.61</td><td class="n">14.60</td><td class="n">4.5</td></tr><tr><td>tx on s2 (figure, log strip)</td><td class="n">15.80</td><td class="n">12.73</td><td class="n">4.5</td></tr><tr><td>tx on warn-bg (note body)</td><td class="n">16.47</td><td class="n">13.94</td><td class="n">4.5</td></tr><tr><td>tx on dang-bg (stop rule body)</td><td class="n">16.09</td><td class="n">14.87</td><td class="n">4.5</td></tr><tr><td>tx2 on bg (date, facts)</td><td class="n">6.15</td><td class="n">9.05</td><td class="n">4.5</td></tr><tr><td>tx2 on s1 (meta, units, helper)</td><td class="n">7.11</td><td class="n">7.54</td><td class="n">4.5</td></tr><tr><td>tx2 on s2 (tile labels, ring caption)</td><td class="n">6.04</td><td class="n">6.58</td><td class="n">4.5</td></tr><tr><td>tx3 on s1 (chart axis words)</td><td class="n">5.81</td><td class="n">5.96</td><td class="n">4.5</td></tr><tr><td>tx3 on s2</td><td class="n">4.93</td><td class="n">5.20</td><td class="n">4.5</td></tr><tr><td>accent on s1 (How to do it, current place, links)</td><td class="n">5.88</td><td class="n">9.05</td><td class="n">4.5</td></tr><tr><td>accent on bg</td><td class="n">5.09</td><td class="n">10.86</td><td class="n">4.5</td></tr><tr><td>accent on s2 (figure glyphs)</td><td class="n">5.00</td><td class="n">7.89</td><td class="n">4.5</td></tr><tr><td>on-accent on accent (Start, Next set)</td><td class="n">5.57</td><td class="n">9.17</td><td class="n">4.5</td></tr><tr><td>warn on warn-bg (note label, streak count)</td><td class="n">5.50</td><td class="n">8.50</td><td class="n">4.5</td></tr><tr><td>dang on dang-bg (stop-rule label)</td><td class="n">5.23</td><td class="n">6.71</td><td class="n">4.5</td></tr><tr><td>dang on s1</td><td class="n">6.05</td><td class="n">6.58</td><td class="n">4.5</td></tr><tr><td>edge on s1 (Easier, Harder, Log border)</td><td class="n">3.60</td><td class="n">3.62</td><td class="n">3</td></tr><tr><td>edge on s2 (field edge, figure ground line)</td><td class="n">3.06</td><td class="n">3.15</td><td class="n">3</td></tr><tr><td>accent on s1 (ring, rung tick 2, trained day) as a UI part</td><td class="n">5.88</td><td class="n">9.05</td><td class="n">3</td></tr><tr><td>accent-2 on s1 (ring far end)</td><td class="n">8.07</td><td class="n">11.91</td><td class="n">3</td></tr><tr><td>line2 on s1 (inactive rung ticks)</td><td class="n">1.96</td><td class="n">2.12</td><td class="n">1.5</td></tr><tr><td>accent on bg (focus ring on the ground)</td><td class="n">5.09</td><td class="n">10.86</td><td class="n">3</td></tr><tr><td>accent on s1 (focus ring on a card)</td><td class="n">5.88</td><td class="n">9.05</td><td class="n">3</td></tr><tr><td>warn-line on warn-bg (note edge; needs 1.3)</td><td class="n">1.54</td><td class="n">1.78</td><td class="n">1.3</td></tr><tr><td>dang-line on dang-bg (banner edge; needs 1.3)</td><td class="n">1.65</td><td class="n">1.83</td><td class="n">1.3</td></tr><tr><td>SURFACE s1 on bg (card against the page; needs 1.09 or an edge)</td><td class="n">1.16</td><td class="n">1.20</td><td class="n">1.15</td></tr><tr><td>EDGE line on bg (the card's 1px edge; needs 1.3)</td><td class="n">1.38</td><td class="n">1.94</td><td class="n">1.3</td></tr><tr><td>EDGE line on s1 (row dividers, empty-cell edge)</td><td class="n">1.60</td><td class="n">1.62</td><td class="n">1.3</td></tr><tr><td>s2 on s1 (wells; needs 1.09)</td><td class="n">1.18</td><td class="n">1.15</td><td class="n">1.09</td></tr><tr><td>grid0 on s1 (untrained day; decorative, the label carries the count)</td><td class="n">1.25</td><td class="n">1.32</td><td class="n">1.09</td></tr><tr><td>line2 on bg (top bar foot)</td><td class="n">1.69</td><td class="n">2.54</td><td class="n">1.5</td></tr></tbody></table></div></section>
+</div>
+</div>
+</body>
+</html>
