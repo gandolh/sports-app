@@ -1561,3 +1561,9 @@ ward-auth 1.1.0 is vendored in both copies. Link Ward and Unlink Ward ask for th
 ## [2026-11-20] maintenance | The redesign's board page copied into the repo
 
 The estate redesign board is a private canvas, so `design/estate-redesign/` now holds a copy of this app's page on it and the build behind it: the directions, the judges' and the controller's rulings, the critique, the token hand-off, the board's notes, the owner's decisions, the proposed screens (as HTML with renders, or as the board's own artboard sources), and today's shots from before the redesign. It is the design record of brief 05, which built it; its README says what each file is. Prettier and the Docker build skip the folder.
+
+## [2026-11-24] todo | Brief 07 from the infra review of 2026-11-24
+
+Filed from the estate's infra review. The image's three `FROM` lines are pinned to `node:24.22.1-alpine`, the
+estate's one base, so a base bump no longer happens by accident and the box keeps one copy of the base. The build
+install is already scoped here. Ships with `node cli.ts sports-app server`.
