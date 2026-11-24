@@ -11,7 +11,11 @@
 # unprivileged account that owns the daemon — see the note in Ward's Dockerfile.
 # It has to, because /data is a bind mount of the host's state directory.
 
-FROM node:24-alpine AS proddeps
+# Every stage uses one exact base. A floating `node:24-alpine` follows the tag on
+# the day of the build, so the box ends up holding several bases and every cache
+# entry keyed on the old one goes dead; the estate moves to a new patch in one
+# sweep instead.
+FROM node:24.22.1-alpine AS proddeps
 WORKDIR /app
 # Manifests first for layer caching. All three workspace manifests are needed:
 # `npm ci` validates the lockfile against every workspace the root declares and
@@ -24,7 +28,7 @@ COPY server/package.json ./server/
 # was built on the deploy machine and shipped to Caddy as static files.
 RUN npm ci --omit=dev -w @sports-app/server --include-workspace-root
 
-FROM node:24-alpine AS build
+FROM node:24.22.1-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY shared/package.json ./shared/
@@ -37,7 +41,7 @@ COPY shared ./shared
 COPY server ./server
 RUN npm run build -w @sports-app/server
 
-FROM node:24-alpine AS prod
+FROM node:24.22.1-alpine AS prod
 LABEL org.opencontainers.image.title="sports-app state service"
 WORKDIR /app
 COPY --from=proddeps /app/node_modules ./node_modules
