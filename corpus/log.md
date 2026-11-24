@@ -1567,3 +1567,9 @@ The estate redesign board is a private canvas, so `design/estate-redesign/` now 
 Filed from the estate's infra review. The image's three `FROM` lines are pinned to `node:24.22.1-alpine`, the
 estate's one base, so a base bump no longer happens by accident and the box keeps one copy of the base. The build
 install is already scoped here. Ships with `node cli.ts sports-app server`.
+
+## [2026-11-24] brief | 07 The image's node base is pinned
+
+Built. The three `FROM` lines are `node:24.22.1-alpine`. The build stage needs no `--include-workspace-root`:
+the server declares its own `typescript`. The image (192 MB) turned healthy on scratch data. Ready for deploy:
+`node cli.ts sports-app server`. See [briefs/done/07-the-images-node-base-is-pinned.md](briefs/done/07-the-images-node-base-is-pinned.md).

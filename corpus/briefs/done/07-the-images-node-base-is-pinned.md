@@ -54,3 +54,16 @@ controller.
 ## Owner steps
 
 - `node cli.ts sports-app server` from vps-deploy. The image builds on the box.
+
+## Outcome
+
+Built 2026-11-24 by the controller (32fb73a). Ready for deploy: `node cli.ts sports-app server`.
+
+- **Step 1**: the three `FROM` lines are `node:24.22.1-alpine`, with a comment on why the base is pinned.
+- **Step 2**: the `build` stage's `npm ci -w @sports-app/server` compiles without `--include-workspace-root`
+  because `server/package.json` declares `typescript` 6.0.3 in its own `devDependencies`, and `npm ci`
+  installs a workspace's dev dependencies. The other repos' servers rely on the root's `typescript`, hence the flag.
+- **Step 3**: the image builds (191 MB before, 192 MB after: the pinned Node patch) and, on a scratch data folder
+  with `SPORTS_APP_PUBLIC_ORIGIN` set, turned healthy; `/api/health` answered `{"status":"ok"}`; Node is v24.22.1.
+  Test images and the container were removed.
+- `npm run check` exits 0; `bash corpus/lint.sh` passes.
